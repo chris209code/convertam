@@ -7,15 +7,14 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        desk: '#181d27',
-        'desk-2': '#1f2531',
-        paper: '#f7f4ec',
+        canvas: '#f3efe2',
+        paper: '#fffefb',
         ink: '#1c2333',
-        'ink-soft': '#4a5066',
-        'stamp-blue': '#5b8def',
-        'stamp-amber': '#f0a93b',
-        success: '#4fae74',
-        error: '#e2664f',
+        'ink-soft': '#5b6275',
+        'stamp-blue': '#3a63b8',
+        'stamp-amber': '#e2962c',
+        success: '#2f8f5b',
+        error: '#c84f3a',
       },
       fontFamily: {
         display: ['var(--font-display)'],

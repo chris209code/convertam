@@ -6,7 +6,7 @@ export default function Header() {
       <Link href="/" className="font-display font-bold text-xl">
         convertam<span className="text-stamp-amber">.</span>app
       </Link>
-      <span className="font-mono text-xs text-[#9aa3b8] tracking-wide">
+      <span className="font-mono text-xs text-ink-soft tracking-wide">
         FREE · NO SIGN-UP
       </span>
     </header>

@@ -12,7 +12,7 @@ export default function ToolPageClient({ tool }) {
         {tool.category.toUpperCase()}
       </p>
       <h1 className="font-display text-3xl md:text-4xl font-bold mb-3">{tool.title}</h1>
-      <p className="text-[#b9c0d4] mb-8 max-w-xl">{tool.description}</p>
+      <p className="text-ink-soft mb-8 max-w-xl">{tool.description}</p>
 
       {tool.mode === 'office' && (
         <OfficeConvertWorkspace accept={tool.accept} toFormat={tool.toFormat} toLabel={tool.toLabel} />

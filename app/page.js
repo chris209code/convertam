@@ -10,7 +10,7 @@ export default function HomePage() {
         <h1 className="font-display text-4xl md:text-6xl font-bold leading-tight mb-4">
           Upload. Convert am. <span className="text-stamp-amber">Download.</span>
         </h1>
-        <p className="text-[#b9c0d4] max-w-lg mx-auto text-lg">
+        <p className="text-ink-soft max-w-lg mx-auto text-lg">
           Free file conversion. No login. No watermark. No stress.
         </p>
       </section>
@@ -38,7 +38,7 @@ export default function HomePage() {
       })}
 
       <section className="max-w-4xl mx-auto px-5 md:px-10 py-10 text-center">
-        <p className="text-sm text-[#7b8398]">
+        <p className="text-sm text-ink-soft">
           Files you convert here are processed and then gone — we don&apos;t keep copies.
         </p>
       </section>

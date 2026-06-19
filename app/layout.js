@@ -32,7 +32,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
-      <body className="text-[#edeae0] font-body min-h-screen">
+      <body className="text-ink font-body min-h-screen">
         <Header />
         {children}
         <Footer />

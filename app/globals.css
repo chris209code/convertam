@@ -8,9 +8,9 @@
 
 body {
   background:
-    radial-gradient(1200px 600px at 15% -10%, rgba(91, 141, 239, 0.10), transparent 60%),
-    radial-gradient(900px 500px at 100% 0%, rgba(240, 169, 59, 0.08), transparent 55%),
-    #181d27;
+    radial-gradient(1200px 600px at 15% -10%, rgba(58, 99, 184, 0.07), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(226, 150, 44, 0.08), transparent 55%),
+    #f3efe2;
 }
 
 @layer components {
@@ -97,8 +97,8 @@ body {
 
   .tool-card {
     @apply flex items-center justify-between border rounded-xl px-4 py-3.5 text-sm font-medium transition-colors;
-    background: #1f2531;
-    border-color: #2c3344;
+    background: #fffefb;
+    border-color: var(--rule-light);
   }
   .tool-card:hover {
     @apply border-stamp-blue;

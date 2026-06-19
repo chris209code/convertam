@@ -1,0 +1,125 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --rule-light: #e2dcc9;
+}
+
+body {
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(91, 141, 239, 0.10), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(240, 169, 59, 0.08), transparent 55%),
+    #181d27;
+}
+
+@layer components {
+  .panel {
+    @apply bg-paper text-ink rounded-2xl p-6 md:p-10 shadow-2xl;
+  }
+
+  .dropzone {
+    @apply border-2 border-dashed rounded-xl p-9 text-center cursor-pointer transition-colors;
+    background: #fffdf8;
+    border-color: var(--rule-light);
+  }
+  .dropzone.drag,
+  .dropzone:hover {
+    @apply border-stamp-blue;
+    background: #f1f5ff;
+  }
+  .dz-icon {
+    @apply font-mono text-xs text-ink-soft tracking-wide;
+  }
+  .dz-main {
+    @apply font-semibold mt-1.5 mb-1;
+  }
+  .dz-sub {
+    @apply text-xs text-ink-soft;
+  }
+
+  .file-list {
+    @apply mt-4 flex flex-col gap-2;
+  }
+  .file-row {
+    @apply flex items-center gap-2.5 bg-white border rounded-lg px-3 py-2 text-sm;
+    border-color: var(--rule-light);
+  }
+  .badge {
+    @apply font-mono text-[10px] bg-ink text-paper px-1.5 py-0.5 rounded;
+  }
+  .file-row .name {
+    @apply flex-1 truncate;
+  }
+  .file-row .remove {
+    @apply text-error font-mono text-base leading-none bg-transparent border-none cursor-pointer;
+  }
+
+  .actions {
+    @apply mt-5 flex gap-3 items-center flex-wrap;
+  }
+  .btn {
+    @apply font-semibold text-sm rounded-lg px-5 py-3 cursor-pointer transition-shadow;
+  }
+  .btn-primary {
+    @apply bg-stamp-blue text-white;
+  }
+  .btn-primary:disabled {
+    @apply bg-[#c7cede] cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply bg-transparent border text-ink-soft;
+    border-color: var(--rule-light);
+  }
+  .btn-ghost-sm {
+    @apply text-xs border rounded-md px-3 py-1.5 bg-transparent cursor-pointer;
+    border-color: var(--rule-light);
+  }
+  .active-choice {
+    @apply border-stamp-blue text-stamp-blue;
+    background: #f1f5ff;
+  }
+
+  .status {
+    @apply font-mono text-xs mt-3.5;
+  }
+  .status.success {
+    @apply text-success;
+  }
+  .status.error {
+    @apply text-error;
+  }
+
+  .stamp-big {
+    @apply inline-block font-mono text-xs font-semibold tracking-widest text-stamp-amber border-2 border-stamp-amber rounded-md px-4 py-1.5;
+    transform: rotate(-3deg);
+  }
+
+  .tool-card {
+    @apply flex items-center justify-between border rounded-xl px-4 py-3.5 text-sm font-medium transition-colors;
+    background: #1f2531;
+    border-color: #2c3344;
+  }
+  .tool-card:hover {
+    @apply border-stamp-blue;
+  }
+  .tool-card-badge {
+    @apply font-mono text-[10px] px-1.5 py-0.5 rounded;
+  }
+  .tool-card-badge.live {
+    color: #4fae74;
+    background: rgba(79, 174, 116, 0.18);
+  }
+  .tool-card-badge.soon {
+    color: #f0a93b;
+    background: rgba(240, 169, 59, 0.18);
+  }
+
+  .range-input {
+    @apply border rounded-lg px-3 py-2 text-sm w-full max-w-xs;
+    border-color: var(--rule-light);
+  }
+  .privacy-note {
+    @apply text-xs text-ink-soft mt-4;
+  }
+}

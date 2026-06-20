@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import UploadBox from '@/components/UploadBox';
+import { runCloudConvertJob, downloadBlob } from '@/lib/cloudconvert-client';
 
 const PROFILES = [
   { id: 'web', label: 'Smaller file (web/sharing)' },
@@ -29,39 +30,20 @@ export default function CompressPdfWorkspace() {
     setBusy(true);
     setError('');
     setSavings(null);
-    setStatus('Compressing — this can take up to ~30 seconds…');
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('operation', 'optimize');
-      formData.append('profile', profile);
-
-      const res = await fetch('/api/convert', { method: 'POST', body: formData });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Compression failed.');
-      }
-
-      const blob = await res.blob();
-      const disposition = res.headers.get('Content-Disposition') || '';
-      const match = disposition.match(/filename="(.+)"/);
-      const filename = match ? match[1] : 'convertam-compressed.pdf';
+      const { blob, filename } = await runCloudConvertJob({
+        file,
+        operation: 'optimize',
+        profile,
+        onStatus: setStatus,
+      });
 
       if (file.size > 0) {
         const reduction = Math.round((1 - blob.size / file.size) * 100);
         setSavings(reduction);
       }
 
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
+      downloadBlob(blob, filename || 'convertam-compressed.pdf');
       setStatus('Done — your compressed file has downloaded.');
     } catch (err) {
       console.error(err);

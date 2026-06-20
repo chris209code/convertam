@@ -23,7 +23,7 @@ export default function HomePage() {
             <h2 className="font-mono text-xs tracking-widest text-stamp-blue mb-4">
               {cat.toUpperCase()}
             </h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {items.map((t) => (
                 <Link key={t.slug} href={`/${t.slug}`} className="tool-card">
                   <span>{t.title}</span>

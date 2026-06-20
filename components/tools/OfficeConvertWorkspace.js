@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import UploadBox from '@/components/UploadBox';
+import { runCloudConvertJob, downloadBlob } from '@/lib/cloudconvert-client';
 
 export default function OfficeConvertWorkspace({ accept, toFormat, toLabel }) {
   const [file, setFile] = useState(null);
@@ -19,33 +20,14 @@ export default function OfficeConvertWorkspace({ accept, toFormat, toLabel }) {
     if (!file) return;
     setBusy(true);
     setError('');
-    setStatus('Uploading and converting — this can take up to ~30 seconds…');
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('to', toFormat);
-
-      const res = await fetch('/api/convert', { method: 'POST', body: formData });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Conversion failed.');
-      }
-
-      const blob = await res.blob();
-      const disposition = res.headers.get('Content-Disposition') || '';
-      const match = disposition.match(/filename="(.+)"/);
-      const filename = match ? match[1] : `convertam-converted.${toFormat}`;
-
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
+      const { blob, filename } = await runCloudConvertJob({
+        file,
+        operation: 'convert',
+        to: toFormat,
+        onStatus: setStatus,
+      });
+      downloadBlob(blob, filename || `convertam-converted.${toFormat}`);
       setStatus('Done — your file has downloaded.');
     } catch (err) {
       console.error(err);

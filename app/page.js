@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { tools } from '@/lib/tools-config';
+import HeroIllustration from '@/components/HeroIllustration';
 
 const categories = ['Document Conversion', 'PDF Utilities', 'Image Tools', 'Smart Converter'];
 
@@ -13,6 +14,9 @@ export default function HomePage() {
         <p className="text-ink-soft max-w-lg mx-auto text-lg">
           Free file conversion. No login. No watermark. No stress.
         </p>
+        <div className="mt-10">
+          <HeroIllustration />
+        </div>
       </section>
 
       {categories.map((cat) => {

@@ -3,6 +3,7 @@
 import PdfLibWorkspace from '@/components/tools/PdfLibWorkspace';
 import OfficeConvertWorkspace from '@/components/tools/OfficeConvertWorkspace';
 import PdfToImageWorkspace from '@/components/tools/PdfToImageWorkspace';
+import SmartConverterWorkspace from '@/components/tools/SmartConverterWorkspace';
 import ComingSoon from '@/components/tools/ComingSoon';
 
 export default function ToolPageClient({ tool }) {
@@ -19,6 +20,7 @@ export default function ToolPageClient({ tool }) {
       )}
       {tool.mode === 'pdf-lib' && <PdfLibWorkspace mode={tool.pdfLibMode} accept={tool.accept} />}
       {tool.mode === 'pdf-to-image' && <PdfToImageWorkspace format={tool.imageFormat} />}
+      {tool.mode === 'smart' && <SmartConverterWorkspace />}
       {tool.mode === 'soon' && <ComingSoon title={tool.title} note={tool.note} />}
     </main>
   );

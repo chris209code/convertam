@@ -10,10 +10,21 @@ Merge PDF, Split PDF, Rotate PDF, Extract PDF Pages, JPG to PDF, PNG to PDF, PDF
 **Needs one free API key (steps below):**
 PDF to Word, Word to PDF, PDF to Excel, Excel to PDF, PDF to PowerPoint, PowerPoint to PDF
 
+**Needs a Gemini API key (steps below):**
+Smart AI Converter — photograph a document, get back Word or Excel
+
 **Not built yet (shows a "coming soon" page):**
-Compress PDF, Smart AI Converter
+Compress PDF
 
 ---
+
+## Step 0 — Get a free Gemini API key (for the Smart AI Converter)
+
+1. Go to https://aistudio.google.com/apikey
+2. Sign in with a Google account
+3. Click **Create API Key**
+4. Copy the key — you'll paste it into Vercel in Step 4, alongside the CloudConvert key
+5. Gemini's free tier has a daily request limit that's generous for testing and early traffic. If you hit it, Google will tell you when in the response — at that point you'd add billing to your Google AI Studio project to keep it running past free limits.
 
 ## Step 1 — Get a free CloudConvert API key
 
@@ -37,15 +48,17 @@ Compress PDF, Smart AI Converter
 3. Find your `convertam` repository in the list and click **Import**.
 4. Vercel will detect it's a Next.js project automatically. Don't change any build settings.
 
-## Step 4 — Add your CloudConvert key (without exposing it)
+## Step 4 — Add your API keys (without exposing them)
 
 1. Still on the Vercel import screen, expand **Environment Variables**.
-2. Add one:
-   - Name: `CLOUDCONVERT_API_KEY`
-   - Value: *(paste the key from Step 1)*
+2. Add two entries:
+   - Name: `CLOUDCONVERT_API_KEY` — Value: *(the key from Step 1)*
+   - Name: `GEMINI_API_KEY` — Value: *(the key from Step 0)*
 3. Click **Deploy**. Wait about a minute.
 
-Your site is now live at a `*.vercel.app` address. The Word/Excel/PowerPoint tools will work because the key lives only on Vercel's servers — it never reaches a visitor's browser.
+Your site is now live at a `*.vercel.app` address. The conversion tools work because both keys live only on Vercel's servers — they never reach a visitor's browser.
+
+If you're adding the Gemini key to an **already-deployed** site (not deploying fresh): go to your Vercel project → **Settings → Environment Variables** → **Add New** → enter `GEMINI_API_KEY` and its value → Save. Then go to the **Deployments** tab and **Redeploy** the latest one so the new variable takes effect.
 
 ## Step 5 — Connect convertam.app
 

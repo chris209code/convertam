@@ -12,7 +12,9 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "pdf-lib": "1.17.1",
-    "jszip": "3.10.1"
+    "jszip": "3.10.1",
+    "docx": "8.5.0",
+    "xlsx": "0.18.5"
   },
   "devDependencies": {
     "tailwindcss": "3.4.7",

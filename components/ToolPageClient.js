@@ -2,6 +2,7 @@
 
 import PdfLibWorkspace from '@/components/tools/PdfLibWorkspace';
 import OfficeConvertWorkspace from '@/components/tools/OfficeConvertWorkspace';
+import GoogleDriveConvertWorkspace from '@/components/tools/GoogleDriveConvertWorkspace';
 import PdfToImageWorkspace from '@/components/tools/PdfToImageWorkspace';
 import SmartConverterWorkspace from '@/components/tools/SmartConverterWorkspace';
 import CompressPdfWorkspace from '@/components/tools/CompressPdfWorkspace';
@@ -18,6 +19,16 @@ export default function ToolPageClient({ tool }) {
 
       {tool.mode === 'office' && (
         <OfficeConvertWorkspace accept={tool.accept} toFormat={tool.toFormat} toLabel={tool.toLabel} />
+      )}
+      {tool.mode === 'drive' && (
+        <GoogleDriveConvertWorkspace
+          accept={tool.accept}
+          sourceMimeType={tool.sourceMimeType}
+          googleNativeType={tool.googleNativeType}
+          exportMimeType={tool.exportMimeType}
+          downloadExt={tool.downloadExt}
+          toLabel={tool.toLabel}
+        />
       )}
       {tool.mode === 'pdf-lib' && <PdfLibWorkspace mode={tool.pdfLibMode} accept={tool.accept} />}
       {tool.mode === 'pdf-to-image' && <PdfToImageWorkspace format={tool.imageFormat} />}

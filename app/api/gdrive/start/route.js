@@ -5,9 +5,9 @@ export const runtime = 'nodejs';
 export async function POST(request) {
   try {
     const accessToken = await getDriveAccessToken();
-    const { filename, sourceMimeType, importMimeType } = await request.json();
+    const { filename, sourceMimeType, googleNativeType } = await request.json();
 
-    if (!filename || !sourceMimeType || !importMimeType) {
+    if (!filename || !sourceMimeType || !googleNativeType) {
       return Response.json({ error: 'Missing upload parameters.' }, { status: 400 });
     }
 
@@ -20,7 +20,7 @@ export async function POST(request) {
       },
       body: JSON.stringify({
         name: filename,
-        mimeType: importMimeType, // setting a Google-native mimeType here triggers conversion on upload
+        mimeType: googleNativeType, // setting a Google-native mimeType here triggers conversion on upload
       }),
     });
 

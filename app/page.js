@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { tools } from '@/lib/tools-config';
 
 const categories = ['Document Conversion', 'PDF Utilities', 'Image Tools', 'Smart Converter'];
@@ -15,13 +14,13 @@ export default function HomePage() {
           Free file conversion. No login. No watermark. No stress.
         </p>
         <div className="mt-10 max-w-2xl mx-auto">
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src="/hero.jpg"
             alt="File conversion illustration — documents flying out of a laptop"
-            width={1200}
-            height={800}
+            width="1200"
+            height="800"
             className="w-full h-auto rounded-2xl"
-            priority
           />
         </div>
       </section>

@@ -3,6 +3,10 @@
 import { useState } from 'react';
 import UploadBox from '@/components/UploadBox';
 
+// Must be a multiple of 256KB per Google's resumable upload protocol — 3.5MB keeps
+// each individual request comfortably under Vercel's server request-size limit.
+const CHUNK_SIZE = 3670016;
+
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -52,25 +56,43 @@ export default function GoogleDriveConvertWorkspace({
       const startData = await startRes.json();
       if (!startRes.ok) throw new Error(startData.error || 'Could not start the conversion.');
 
-      setStatus('Uploading…');
-      const uploadRes = await fetch(startData.uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': sourceMimeType },
-        body: file,
-      });
-      if (!uploadRes.ok) throw new Error('Upload failed. Please try again.');
-      const uploaded = await uploadRes.json();
+      const uploadUrl = startData.uploadUrl;
+      let fileId = null;
+      let offset = 0;
+
+      while (offset < file.size) {
+        const end = Math.min(offset + CHUNK_SIZE, file.size);
+        const chunk = file.slice(offset, end);
+        const pct = Math.round((offset / file.size) * 100);
+        setStatus(`Uploading… ${pct}%`);
+
+        const chunkForm = new FormData();
+        chunkForm.append('uploadUrl', uploadUrl);
+        chunkForm.append('chunk', chunk);
+        chunkForm.append('rangeStart', String(offset));
+        chunkForm.append('rangeEnd', String(end - 1));
+        chunkForm.append('totalSize', String(file.size));
+
+        const chunkRes = await fetch('/api/gdrive/upload-chunk', { method: 'POST', body: chunkForm });
+        const chunkData = await chunkRes.json();
+        if (!chunkRes.ok) throw new Error(chunkData.error || 'Upload failed partway through.');
+
+        if (chunkData.status === 'complete') {
+          fileId = chunkData.fileId;
+          break;
+        }
+        offset = end;
+      }
+
+      if (!fileId) throw new Error('Upload did not complete. Please try again.');
 
       setStatus('Converting…');
       const baseName = file.name.replace(/\.[^.]+$/, '');
+      const downloadName = `${baseName}.${downloadExt}`;
       const exportRes = await fetch('/api/gdrive/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileId: uploaded.id,
-          exportMimeType,
-          filename: `${baseName}.${downloadExt}`,
-        }),
+        body: JSON.stringify({ fileId, exportMimeType, filename: downloadName }),
       });
 
       if (!exportRes.ok) {
@@ -79,7 +101,7 @@ export default function GoogleDriveConvertWorkspace({
       }
 
       const blob = await exportRes.blob();
-      downloadBlob(blob, `${baseName}.${downloadExt}`);
+      downloadBlob(blob, downloadName);
       setStatus('Done — your file has downloaded.');
     } catch (err) {
       console.error(err);
@@ -92,13 +114,14 @@ export default function GoogleDriveConvertWorkspace({
 
   return (
     <div className="panel">
-      <UploadBox accept={accept} multiple={false} onFiles={handleFiles} />
+      <UploadBox accept={accept} multiple={false} onFiles={handleFiles} maxSizeLabel="Max 100MB for now." />
 
       {file && (
         <div className="file-list">
           <div className="file-row">
             <span className="badge">{(file.name.split('.').pop() || 'FILE').toUpperCase()}</span>
             <span className="name">{file.name}</span>
+            <span>{(file.size / (1024 * 1024)).toFixed(2)} MB</span>
             <button className="remove" onClick={() => setFile(null)} aria-label="Remove file">
               ×
             </button>
@@ -108,7 +131,7 @@ export default function GoogleDriveConvertWorkspace({
 
       <div className="actions">
         <button className="btn btn-primary" disabled={!file || busy} onClick={handleConvert}>
-          {busy ? 'Converting…' : `Convert to ${toLabel}`}
+          {busy ? 'Working…' : `Convert to ${toLabel}`}
         </button>
       </div>
 

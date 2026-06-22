@@ -20,14 +20,14 @@ export async function GET(request) {
   }
 
   try {
-    // List all files in the service account's Drive
-    const listRes = await fetch('https://www.googleapis.com/drive/v3/files?pageSize=1000&fields=files(id,name)', {
+    // List all files including trashed ones
+    const listRes = await fetch('https://www.googleapis.com/drive/v3/files?pageSize=1000&fields=files(id,name,trashed)&q=trashed%3Dfalse', {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     const listData = await listRes.json();
     const files = listData.files || [];
 
-    // Delete each one
+    // Delete each non-trashed file
     let deleted = 0;
     for (const file of files) {
       await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, {
@@ -36,6 +36,12 @@ export async function GET(request) {
       });
       deleted++;
     }
+
+    // Empty the trash completely — this is the key step that frees quota
+    await fetch('https://www.googleapis.com/drive/v3/files/trash', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
 
     return Response.json({ success: true, deleted, message: `Cleared ${deleted} files from the service account Drive.` });
   } catch (err) {

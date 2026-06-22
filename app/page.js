@@ -1,6 +1,6 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { tools } from '@/lib/tools-config';
-import HeroIllustration from '@/components/HeroIllustration';
 
 const categories = ['Document Conversion', 'PDF Utilities', 'Image Tools', 'Smart Converter'];
 
@@ -14,8 +14,15 @@ export default function HomePage() {
         <p className="text-ink-soft max-w-lg mx-auto text-lg">
           Free file conversion. No login. No watermark. No stress.
         </p>
-        <div className="mt-10">
-          <HeroIllustration />
+        <div className="mt-10 max-w-2xl mx-auto">
+          <Image
+            src="/hero.jpg"
+            alt="File conversion illustration — documents flying out of a laptop"
+            width={1200}
+            height={800}
+            className="w-full h-auto rounded-2xl"
+            priority
+          />
         </div>
       </section>
 

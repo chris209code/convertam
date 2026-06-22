@@ -6,6 +6,7 @@ import GoogleDriveConvertWorkspace from '@/components/tools/GoogleDriveConvertWo
 import PdfToImageWorkspace from '@/components/tools/PdfToImageWorkspace';
 import SmartConverterWorkspace from '@/components/tools/SmartConverterWorkspace';
 import CompressPdfWorkspace from '@/components/tools/CompressPdfWorkspace';
+import SignPdfWorkspace from '@/components/tools/SignPdfWorkspace';
 import ComingSoon from '@/components/tools/ComingSoon';
 
 export default function ToolPageClient({ tool }) {
@@ -34,6 +35,7 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'pdf-to-image' && <PdfToImageWorkspace format={tool.imageFormat} />}
       {tool.mode === 'smart' && <SmartConverterWorkspace />}
       {tool.mode === 'compress' && <CompressPdfWorkspace />}
+      {tool.mode === 'sign' && <SignPdfWorkspace />}
       {tool.mode === 'soon' && <ComingSoon title={tool.title} note={tool.note} />}
     </main>
   );

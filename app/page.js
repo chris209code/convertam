@@ -12,6 +12,7 @@ const categories = [
 const toolIcons = {
   'smart-converter': '🤖',
   'sign-pdf': '✍️',
+  'reorder-pdf': '🔀',
   'merge-pdf': '🔗',
   'split-pdf': '✂️',
   'compress-pdf': '🗜️',

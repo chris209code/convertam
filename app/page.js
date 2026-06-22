@@ -3,6 +3,7 @@ import { tools } from '@/lib/tools-config';
 
 const categories = [
   { key: 'Smart Converter', label: 'Smart Converter', icon: '✦' },
+  { key: 'PDF Editor', label: 'PDF Editor', icon: '✍️' },
   { key: 'PDF Utilities', label: 'PDF Utilities', icon: '📄' },
   { key: 'Image Tools', label: 'Image Tools', icon: '🖼️' },
   { key: 'Document Conversion', label: 'Document Conversion', icon: '🔄' },
@@ -10,6 +11,7 @@ const categories = [
 
 const toolIcons = {
   'smart-converter': '🤖',
+  'sign-pdf': '✍️',
   'merge-pdf': '🔗',
   'split-pdf': '✂️',
   'compress-pdf': '🗜️',

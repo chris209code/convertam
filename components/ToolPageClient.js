@@ -7,6 +7,7 @@ import PdfToImageWorkspace from '@/components/tools/PdfToImageWorkspace';
 import SmartConverterWorkspace from '@/components/tools/SmartConverterWorkspace';
 import CompressPdfWorkspace from '@/components/tools/CompressPdfWorkspace';
 import SignPdfWorkspace from '@/components/tools/SignPdfWorkspace';
+import ReorderPdfWorkspace from '@/components/tools/ReorderPdfWorkspace';
 import ComingSoon from '@/components/tools/ComingSoon';
 
 export default function ToolPageClient({ tool }) {
@@ -36,6 +37,7 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'smart' && <SmartConverterWorkspace />}
       {tool.mode === 'compress' && <CompressPdfWorkspace />}
       {tool.mode === 'sign' && <SignPdfWorkspace />}
+      {tool.mode === 'reorder' && <ReorderPdfWorkspace />}
       {tool.mode === 'soon' && <ComingSoon title={tool.title} note={tool.note} />}
     </main>
   );

@@ -41,25 +41,47 @@ function ToolBadge({ mode }) {
 export default function HomePage() {
   return (
     <main>
-      {/* Banner */}
-      <div className="w-full overflow-hidden" style={{ maxHeight: '220px' }}>
+      {/* Banner — slim */}
+      <div className="w-full overflow-hidden" style={{ maxHeight: '140px' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/banner.jpg"
           alt="File conversion banner"
           className="w-full object-cover"
-          style={{ objectPosition: 'center 30%', maxHeight: '220px' }}
+          style={{ objectPosition: 'center 30%', maxHeight: '140px' }}
         />
       </div>
 
       {/* Hero text */}
-      <section className="max-w-4xl mx-auto px-5 md:px-10 pt-8 pb-4 text-center">
+      <section className="max-w-4xl mx-auto px-5 md:px-10 pt-6 pb-2 text-center">
         <h1 className="font-display text-3xl md:text-5xl font-bold leading-tight mb-3">
           Upload. Convert am. <span className="text-stamp-amber">Download.</span>
         </h1>
         <p className="text-ink-soft text-base">
           Free file conversion. No login. No watermark. No stress.
         </p>
+      </section>
+
+      {/* How it works */}
+      <section className="max-w-4xl mx-auto px-5 md:px-10 py-6">
+        <div className="grid grid-cols-3 gap-4">
+          {[
+            { step: '01', icon: '📤', title: 'Upload', desc: 'Choose or drag your file. Up to 100MB supported.' },
+            { step: '02', icon: '⚙️', title: 'Convert', desc: 'Our engine processes your file instantly and securely.' },
+            { step: '03', icon: '📥', title: 'Download', desc: 'Your converted file downloads automatically. Done.' },
+          ].map(({ step, icon, title, desc }) => (
+            <div
+              key={step}
+              className="text-center rounded-xl p-4"
+              style={{ background: '#fffefb', border: '1px solid #e2dcc9' }}
+            >
+              <div className="text-2xl mb-2">{icon}</div>
+              <div className="font-mono text-xs text-stamp-amber mb-1">{step}</div>
+              <div className="font-semibold text-ink text-sm mb-1">{title}</div>
+              <div className="text-xs text-ink-soft leading-relaxed">{desc}</div>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* Tool sections */}

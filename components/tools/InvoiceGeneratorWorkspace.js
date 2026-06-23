@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { PDFDocument, rgb, degrees } from 'pdf-lib';
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -62,6 +62,11 @@ export default function InvoiceGeneratorWorkspace() {
     return invoice.currency + num.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  // pdfFmt uses same symbol as screen — Roboto font supports ₦ and other Unicode currencies
+  function pdfFmt(num) {
+    return fmt(num);
+  }
+
   async function handleGenerate() {
     if (!biz.name || !client.name || items.every(i => !i.description)) {
       setError('Please fill in your business name, client name, and at least one item.');
@@ -75,8 +80,14 @@ export default function InvoiceGeneratorWorkspace() {
       const page = doc.addPage([595, 842]); // A4
       const { width, height } = page.getSize();
 
-      const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
-      const fontReg = await doc.embedFont(StandardFonts.Helvetica);
+      // Fetch Roboto from Google Fonts — supports ₦ and full Unicode
+      const [fontRegBytes, fontBoldBytes] = await Promise.all([
+        fetch('https://fonts.gstatic.com/s/roboto/v32/KFOmCnqEu92Fr1Mu4mxK.woff2').then(r => r.arrayBuffer()),
+        fetch('https://fonts.gstatic.com/s/roboto/v32/KFOlCnqEu92Fr1MmWUlfBBc4.woff2').then(r => r.arrayBuffer()),
+      ]);
+
+      const fontReg = await doc.embedFont(fontRegBytes, { subset: false });
+      const fontBold = await doc.embedFont(fontBoldBytes, { subset: false });
 
       const amber = rgb(0.886, 0.588, 0.173);
       const dark = rgb(0.11, 0.137, 0.2);
@@ -155,8 +166,8 @@ export default function InvoiceGeneratorWorkspace() {
 
         page.drawText(item.description, { x: cols.desc + 8, y: rowY + 7, size: 9, font: fontReg, color: dark });
         page.drawText(String(qty), { x: cols.qty, y: rowY + 7, size: 9, font: fontReg, color: dark });
-        page.drawText(fmt(price), { x: cols.rate, y: rowY + 7, size: 9, font: fontReg, color: dark });
-        page.drawText(fmt(amount), { x: cols.amount, y: rowY + 7, size: 9, font: fontReg, color: dark });
+        page.drawText(pdfFmt(price), { x: cols.rate, y: rowY + 7, size: 9, font: fontReg, color: dark });
+        page.drawText(pdfFmt(amount), { x: cols.amount, y: rowY + 7, size: 9, font: fontReg, color: dark });
       });
 
       // Bottom line
@@ -170,19 +181,19 @@ export default function InvoiceGeneratorWorkspace() {
       const total = calcTotal();
 
       page.drawText('Subtotal', { x: cols.rate - 10, y: totY, size: 9, font: fontReg, color: gray });
-      page.drawText(fmt(subtotal), { x: cols.amount, y: totY, size: 9, font: fontReg, color: dark });
+      page.drawText(pdfFmt(subtotal), { x: cols.amount, y: totY, size: 9, font: fontReg, color: dark });
 
       if (taxAmt > 0) {
         totY -= 18;
         page.drawText(`Tax (${invoice.tax}%)`, { x: cols.rate - 10, y: totY, size: 9, font: fontReg, color: gray });
-        page.drawText(fmt(taxAmt), { x: cols.amount, y: totY, size: 9, font: fontReg, color: dark });
+        page.drawText(pdfFmt(taxAmt), { x: cols.amount, y: totY, size: 9, font: fontReg, color: dark });
       }
 
       // Total box
       totY -= 30;
       page.drawRectangle({ x: cols.rate - 20, y: totY - 4, width: width - cols.rate - 30, height: 28, color: amber });
       page.drawText('TOTAL DUE', { x: cols.rate - 10, y: totY + 8, size: 10, font: fontBold, color: white });
-      page.drawText(fmt(total), { x: cols.amount, y: totY + 8, size: 11, font: fontBold, color: white });
+      page.drawText(pdfFmt(total), { x: cols.amount, y: totY + 8, size: 11, font: fontBold, color: white });
 
       // Notes
       if (invoice.notes) {

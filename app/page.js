@@ -11,6 +11,7 @@ const categories = [
 
 const toolIcons = {
   'smart-converter': '🤖',
+  'receipt-scanner': '🧾',
   'sign-pdf': '✍️',
   'reorder-pdf': '🔀',
   'watermark-pdf': '🔏',
@@ -72,32 +73,35 @@ export default function HomePage() {
             </h2>
 
             {isSmart ? (
-              <Link
-                href="/smart-converter"
-                className="flex items-center justify-between border-2 rounded-xl px-5 py-4 transition-colors"
-                style={{ background: '#f0f5ff', borderColor: '#3a63b8' }}
-              >
-                <div className="flex items-center gap-4">
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
-                    style={{ background: '#3a63b8' }}
+              <div className="flex flex-col gap-2.5">
+                {items.map((t) => (
+                  <Link
+                    key={t.slug}
+                    href={`/${t.slug}`}
+                    className="flex items-center justify-between border-2 rounded-xl px-5 py-4 transition-colors"
+                    style={{ background: '#f0f5ff', borderColor: '#3a63b8' }}
                   >
-                    🤖
-                  </div>
-                  <div>
-                    <div className="font-semibold text-ink text-base">Smart AI Converter</div>
-                    <div className="text-xs text-ink-soft mt-0.5">
-                      Let AI read your document and extract text or tables
+                    <div className="flex items-center gap-4">
+                      <div
+                        className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                        style={{ background: '#3a63b8' }}
+                      >
+                        {toolIcons[t.slug] || '🤖'}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-ink text-base">{t.title}</div>
+                        <div className="text-xs text-ink-soft mt-0.5">{t.description}</div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-                <span
-                  className="text-xs font-bold px-3 py-1.5 rounded-full flex-shrink-0"
-                  style={{ background: '#3a63b8', color: 'white' }}
-                >
-                  ✦ AI · FREE
-                </span>
-              </Link>
+                    <span
+                      className="text-xs font-bold px-3 py-1.5 rounded-full flex-shrink-0 ml-3"
+                      style={{ background: '#3a63b8', color: 'white' }}
+                    >
+                      ✦ AI · FREE
+                    </span>
+                  </Link>
+                ))}
+              </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
                 {items.map((t) => (

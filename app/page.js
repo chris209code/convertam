@@ -33,7 +33,8 @@ const toolIcons = {
   'powerpoint-to-pdf': '📊',
 };
 
-const isFree = (mode) => ['pdf-lib', 'pdf-to-image', 'smart', 'compress'].includes(mode);
+const isFree = (mode) => ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice'].includes(mode);
+const isPaid = (mode) => ['office', 'compress'].includes(mode);
 
 export default function HomePage() {
   return (
@@ -121,10 +122,12 @@ export default function HomePage() {
                       style={
                         isFree(t.mode)
                           ? { background: 'rgba(47,143,91,0.15)', color: '#2f8f5b' }
+                          : isPaid(t.mode)
+                          ? { background: 'rgba(226,150,44,0.15)', color: '#e2962c' }
                           : { background: 'rgba(58,99,184,0.12)', color: '#3a63b8' }
                       }
                     >
-                      {isFree(t.mode) ? 'FREE' : 'LIVE'}
+                      {isFree(t.mode) ? 'FREE' : isPaid(t.mode) ? '₦500' : 'LIVE'}
                     </span>
                   </Link>
                 ))}

@@ -13,6 +13,7 @@ const toolIcons = {
   'smart-converter': '🤖',
   'sign-pdf': '✍️',
   'reorder-pdf': '🔀',
+  'watermark-pdf': '🔏',
   'merge-pdf': '🔗',
   'split-pdf': '✂️',
   'compress-pdf': '🗜️',

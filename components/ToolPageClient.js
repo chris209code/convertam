@@ -13,6 +13,8 @@ import WatermarkPdfWorkspace from '@/components/tools/WatermarkPdfWorkspace';
 import InvoiceGeneratorWorkspace from '@/components/tools/InvoiceGeneratorWorkspace';
 import ComingSoon from '@/components/tools/ComingSoon';
 
+import PaymentGate from '@/components/PaymentGate';
+
 export default function ToolPageClient({ tool }) {
   return (
     <main className="max-w-3xl mx-auto px-5 md:px-10 py-12">
@@ -23,7 +25,9 @@ export default function ToolPageClient({ tool }) {
       <p className="text-ink-soft mb-8 max-w-xl">{tool.description}</p>
 
       {tool.mode === 'office' && (
-        <OfficeConvertWorkspace accept={tool.accept} toFormat={tool.toFormat} toLabel={tool.toLabel} />
+        <PaymentGate toolName={tool.slug}>
+          <OfficeConvertWorkspace accept={tool.accept} toFormat={tool.toFormat} toLabel={tool.toLabel} />
+        </PaymentGate>
       )}
       {tool.mode === 'drive' && (
         <GoogleDriveConvertWorkspace
@@ -39,7 +43,11 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'pdf-to-image' && <PdfToImageWorkspace format={tool.imageFormat} />}
       {tool.mode === 'smart' && <SmartConverterWorkspace />}
       {tool.mode === 'receipt' && <ReceiptScanWorkspace />}
-      {tool.mode === 'compress' && <CompressPdfWorkspace />}
+      {tool.mode === 'compress' && (
+        <PaymentGate toolName={tool.slug}>
+          <CompressPdfWorkspace />
+        </PaymentGate>
+      )}
       {tool.mode === 'sign' && <SignPdfWorkspace />}
       {tool.mode === 'reorder' && <ReorderPdfWorkspace />}
       {tool.mode === 'watermark' && <WatermarkPdfWorkspace />}

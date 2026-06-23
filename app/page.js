@@ -57,28 +57,28 @@ export default function HomePage() {
         <h1 className="font-display text-3xl md:text-5xl font-bold leading-tight mb-3">
           Upload. Convert am. <span className="text-stamp-amber">Download.</span>
         </h1>
-        <p className="text-ink-soft text-base">
-          Free file conversion. No login. No watermark. No stress.
+        <p className="text-ink-soft text-base mb-4">
+          Convert any file. Instantly. No login.
         </p>
-      </section>
-
-      {/* How it works */}
-      <section className="max-w-4xl mx-auto px-5 md:px-10 py-6">
-        <div className="grid grid-cols-3 gap-4">
+        {/* Inline steps */}
+        <div className="flex items-center justify-center gap-2 flex-wrap">
           {[
-            { step: '01', icon: '📤', title: 'Upload', desc: 'Choose or drag your file. Up to 100MB supported.' },
-            { step: '02', icon: '⚙️', title: 'Convert', desc: 'Our engine processes your file instantly and securely.' },
-            { step: '03', icon: '📥', title: 'Download', desc: 'Your converted file downloads automatically. Done.' },
-          ].map(({ step, icon, title, desc }) => (
-            <div
-              key={step}
-              className="text-center rounded-xl p-4"
-              style={{ background: '#fffefb', border: '1px solid #e2dcc9' }}
-            >
-              <div className="text-2xl mb-2">{icon}</div>
-              <div className="font-mono text-xs text-stamp-amber mb-1">{step}</div>
-              <div className="font-semibold text-ink text-sm mb-1">{title}</div>
-              <div className="text-xs text-ink-soft leading-relaxed">{desc}</div>
+            { num: '01', icon: '📤', label: 'Upload' },
+            { num: '02', icon: '⚙️', label: 'Convert' },
+            { num: '03', icon: '📥', label: 'Download' },
+          ].map(({ num, icon, label }, i, arr) => (
+            <div key={num} className="flex items-center gap-2">
+              <div
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+                style={{ background: '#fffefb', border: '1px solid #e2dcc9' }}
+              >
+                <span className="font-mono text-[10px] text-stamp-amber">{num}</span>
+                <span>{icon}</span>
+                <span className="text-ink">{label}</span>
+              </div>
+              {i < arr.length - 1 && (
+                <span className="text-ink-soft text-xs">→</span>
+              )}
             </div>
           ))}
         </div>

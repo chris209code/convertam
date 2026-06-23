@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { tools } from '@/lib/tools-config';
+import { ToolIcon } from '@/components/ToolIcons';
 
 const categories = [
   { key: 'Smart Converter', label: 'Smart Converter', icon: '✦' },
@@ -9,32 +10,33 @@ const categories = [
   { key: 'Document Conversion', label: 'Document Conversion', icon: '🔄' },
 ];
 
-const toolIcons = {
-  'smart-converter': '🤖',
-  'receipt-scanner': '🧾',
-  'sign-pdf': '✍️',
-  'reorder-pdf': '🔀',
-  'watermark-pdf': '🔏',
-  'invoice-generator': '🧾',
-  'merge-pdf': '🔗',
-  'split-pdf': '✂️',
-  'compress-pdf': '🗜️',
-  'rotate-pdf': '🔃',
-  'extract-pdf-pages': '📑',
-  'jpg-to-pdf': '🖼️',
-  'png-to-pdf': '🖼️',
-  'pdf-to-jpg': '📷',
-  'pdf-to-png': '📷',
-  'pdf-to-word': '📝',
-  'word-to-pdf': '📄',
-  'pdf-to-excel': '📊',
-  'excel-to-pdf': '📊',
-  'pdf-to-powerpoint': '📊',
-  'powerpoint-to-pdf': '📊',
-};
-
-const isFree = (mode) => ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice'].includes(mode);
+const isFree = (mode) =>
+  ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice'].includes(mode);
 const isPaid = (mode) => ['office', 'compress'].includes(mode);
+
+function ToolBadge({ mode }) {
+  if (isFree(mode)) {
+    return (
+      <span
+        className="text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+        style={{ background: 'rgba(47,143,91,0.15)', color: '#2f8f5b' }}
+      >
+        FREE
+      </span>
+    );
+  }
+  if (isPaid(mode)) {
+    return (
+      <span
+        className="text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+        style={{ background: 'rgba(226,150,44,0.15)', color: '#e2962c' }}
+      >
+        PAID
+      </span>
+    );
+  }
+  return null;
+}
 
 export default function HomePage() {
   return (
@@ -85,10 +87,10 @@ export default function HomePage() {
                   >
                     <div className="flex items-center gap-4">
                       <div
-                        className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
-                        style={{ background: '#3a63b8' }}
+                        className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: '#f0f5ff' }}
                       >
-                        {toolIcons[t.slug] || '🤖'}
+                        <ToolIcon slug={t.slug} size={32} />
                       </div>
                       <div>
                         <div className="font-semibold text-ink text-base">{t.title}</div>
@@ -113,22 +115,11 @@ export default function HomePage() {
                     className="flex items-center gap-3 border rounded-xl px-3 py-3 transition-colors hover:border-stamp-blue"
                     style={{ background: '#fffefb', borderColor: '#e2dcc9' }}
                   >
-                    <span className="text-xl flex-shrink-0">{toolIcons[t.slug] || '📄'}</span>
+                    <ToolIcon slug={t.slug} size={22} />
                     <span className="text-sm font-medium text-ink flex-1 leading-tight">
                       {t.title}
                     </span>
-                    <span
-                      className="text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
-                      style={
-                        isFree(t.mode)
-                          ? { background: 'rgba(47,143,91,0.15)', color: '#2f8f5b' }
-                          : isPaid(t.mode)
-                          ? { background: 'rgba(226,150,44,0.15)', color: '#e2962c' }
-                          : { background: 'rgba(58,99,184,0.12)', color: '#3a63b8' }
-                      }
-                    >
-                      {isFree(t.mode) ? 'FREE' : isPaid(t.mode) ? '₦500' : 'LIVE'}
-                    </span>
+                    <ToolBadge mode={t.mode} />
                   </Link>
                 ))}
               </div>
@@ -165,9 +156,9 @@ export default function HomePage() {
 
           <div className="flex gap-6 md:ml-auto flex-wrap">
             {[
-              { icon: '🛡️', label: '100% Free', sub: 'Forever' },
-              { icon: '🔒', label: 'Secure', sub: '& Private' },
+              { icon: '🔒', label: 'Privacy First', sub: 'Files never stored' },
               { icon: '⚡', label: 'Fast', sub: '& Easy' },
+              { icon: '📱', label: 'Works on', sub: 'Mobile & Desktop' },
             ].map(({ icon, label, sub }) => (
               <div key={label} className="flex items-center gap-2">
                 <span className="text-xl">{icon}</span>

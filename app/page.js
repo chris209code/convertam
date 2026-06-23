@@ -15,6 +15,7 @@ const toolIcons = {
   'sign-pdf': '✍️',
   'reorder-pdf': '🔀',
   'watermark-pdf': '🔏',
+  'invoice-generator': '🧾',
   'merge-pdf': '🔗',
   'split-pdf': '✂️',
   'compress-pdf': '🗜️',

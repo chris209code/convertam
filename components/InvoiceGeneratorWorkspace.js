@@ -102,26 +102,32 @@ export default function InvoiceGeneratorWorkspace() {
       // Amber top bar
       page.drawRectangle({ x: 0, y: height - 10, width, height: 10, color: amber });
 
-      // Business name — large, bold, hero treatment
-      page.drawText(biz.name || 'Your Business', {
-        x: 50, y: height - 58, size: 26, font: fontBold, color: dark,
+      // Business name — top RIGHT, bold, like a letter header
+      const bizName = biz.name || 'Your Business';
+      const bizNameWidth = fontBold.widthOfTextAtSize(bizName, 18);
+      page.drawText(bizName, {
+        x: width - 50 - bizNameWidth,
+        y: height - 52,
+        size: 18,
+        font: fontBold,
+        color: dark,
       });
 
-      // Business details below name
-      let bizY = height - 78;
-      if (biz.address) { page.drawText(biz.address, { x: 50, y: bizY, size: 9, font: fontReg, color: gray }); bizY -= 13; }
-      if (biz.phone) { page.drawText(biz.phone, { x: 50, y: bizY, size: 9, font: fontReg, color: gray }); bizY -= 13; }
-      if (biz.email) { page.drawText(biz.email, { x: 50, y: bizY, size: 9, font: fontReg, color: gray }); }
+      // Business details — right aligned below name
+      let bizY = height - 68;
+      const bizDetails = [biz.address, biz.phone, biz.email].filter(Boolean);
+      for (const detail of bizDetails) {
+        const detailWidth = fontReg.widthOfTextAtSize(detail, 9);
+        page.drawText(detail, { x: width - 50 - detailWidth, y: bizY, size: 9, font: fontReg, color: gray });
+        bizY -= 13;
+      }
 
-      // Invoice meta — right side, clean and small
-      const metaX = width - 190;
-      page.drawText(`Invoice No:`, { x: metaX, y: height - 48, size: 8, font: fontBold, color: gray });
-      page.drawText(`#${invoice.number}`, { x: metaX + 65, y: height - 48, size: 8, font: fontReg, color: dark });
-      page.drawText(`Date:`, { x: metaX, y: height - 62, size: 8, font: fontBold, color: gray });
-      page.drawText(invoice.date, { x: metaX + 65, y: height - 62, size: 8, font: fontReg, color: dark });
+      // Invoice reference — small, top LEFT, understated
+      page.drawText(`Invoice`, { x: 50, y: height - 38, size: 9, font: fontBold, color: gray });
+      page.drawText(`#${invoice.number}`, { x: 50, y: height - 52, size: 9, font: fontReg, color: dark });
+      page.drawText(`Date: ${invoice.date}`, { x: 50, y: height - 65, size: 9, font: fontReg, color: gray });
       if (invoice.dueDate) {
-        page.drawText(`Due Date:`, { x: metaX, y: height - 76, size: 8, font: fontBold, color: gray });
-        page.drawText(invoice.dueDate, { x: metaX + 65, y: height - 76, size: 8, font: fontReg, color: dark });
+        page.drawText(`Due: ${invoice.dueDate}`, { x: 50, y: height - 78, size: 9, font: fontReg, color: gray });
       }
 
       // Amber divider

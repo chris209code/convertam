@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { PDFDocument, rgb, degrees } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -77,6 +78,7 @@ export default function InvoiceGeneratorWorkspace() {
 
     try {
       const doc = await PDFDocument.create();
+      doc.registerFontkit(fontkit);
       const page = doc.addPage([595, 842]); // A4
       const { width, height } = page.getSize();
 

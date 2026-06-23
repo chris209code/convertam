@@ -15,8 +15,7 @@
     "jszip": "3.10.1",
     "docx": "8.5.0",
     "xlsx": "0.18.5",
-    "google-auth-library": "9.14.1",
-    "@pdf-lib/fontkit": "1.1.1"
+    "google-auth-library": "9.14.1"
   },
   "devDependencies": {
     "tailwindcss": "3.4.7",

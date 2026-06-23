@@ -10,6 +10,7 @@ import CompressPdfWorkspace from '@/components/tools/CompressPdfWorkspace';
 import SignPdfWorkspace from '@/components/tools/SignPdfWorkspace';
 import ReorderPdfWorkspace from '@/components/tools/ReorderPdfWorkspace';
 import WatermarkPdfWorkspace from '@/components/tools/WatermarkPdfWorkspace';
+import InvoiceGeneratorWorkspace from '@/components/tools/InvoiceGeneratorWorkspace';
 import ComingSoon from '@/components/tools/ComingSoon';
 
 export default function ToolPageClient({ tool }) {
@@ -42,6 +43,7 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'sign' && <SignPdfWorkspace />}
       {tool.mode === 'reorder' && <ReorderPdfWorkspace />}
       {tool.mode === 'watermark' && <WatermarkPdfWorkspace />}
+      {tool.mode === 'invoice' && <InvoiceGeneratorWorkspace />}
       {tool.mode === 'soon' && <ComingSoon title={tool.title} note={tool.note} />}
     </main>
   );

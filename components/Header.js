@@ -1,11 +1,17 @@
 import Link from 'next/link';
-import Logo from '@/components/Logo';
 
 export default function Header() {
   return (
     <header className="flex items-center justify-between max-w-6xl mx-auto px-5 md:px-10 pt-6">
       <Link href="/" className="flex items-center gap-2">
-        <Logo size={28} />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/logo.png"
+          alt="Convertam logo"
+          width="28"
+          height="28"
+          style={{ borderRadius: '7px' }}
+        />
         <span className="font-display font-bold text-xl">
           convertam<span className="text-stamp-amber">.</span>app
         </span>

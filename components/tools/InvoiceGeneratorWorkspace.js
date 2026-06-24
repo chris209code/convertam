@@ -278,6 +278,8 @@ export default function InvoiceGeneratorWorkspace() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [generated, setGenerated] = useState(false);
+  const [lastBlob, setLastBlob] = useState(null);
+  const [lastFilename, setLastFilename] = useState('');
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -361,7 +363,10 @@ export default function InvoiceGeneratorWorkspace() {
 
       const pdfBytes = await pdfDoc.save();
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-      downloadBlob(blob, `Invoice-${invoice.number}-${client.name}.pdf`);
+      const fname = `Invoice-${invoice.number}-${client.name}.pdf`;
+      downloadBlob(blob, fname);
+      setLastBlob(blob);
+      setLastFilename(fname);
       setGenerated(true);
     } catch (err) {
       console.error(err);
@@ -371,9 +376,36 @@ export default function InvoiceGeneratorWorkspace() {
     }
   }
 
-  function shareWhatsApp() {
-    const msg = encodeURIComponent(`Hello ${client.name},\n\nPlease find attached your invoice #${invoice.number} from ${biz.name}.\n\nTotal Due: ${fmt(total, invoice.currency)}\n\nGenerated via convertam.app`);
-    window.open(`https://wa.me/?text=${msg}`, '_blank');
+  async function handleShare() {
+    if (!lastBlob || !lastFilename) return;
+
+    // Try native share (works on mobile — shows all apps including WhatsApp, Telegram, Gmail etc.)
+    if (navigator.share && navigator.canShare) {
+      try {
+        const file = new File([lastBlob], lastFilename, { type: 'application/pdf' });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            title: `Invoice #${invoice.number} from ${biz.name}`,
+            text: `Hello ${client.name},\n\nPlease find attached your invoice #${invoice.number} from ${biz.name}.\n\nTotal Due: ${fmt(total, invoice.currency)}\n\nGenerated via convertam.app`,
+            files: [file],
+          });
+          return;
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') console.error(err);
+        return;
+      }
+    }
+
+    // Fallback for desktop — copy message to clipboard
+    try {
+      await navigator.clipboard.writeText(
+        `Hello ${client.name},\n\nPlease find attached your invoice #${invoice.number} from ${biz.name}.\n\nTotal Due: ${fmt(total, invoice.currency)}\n\nGenerated via convertam.app`
+      );
+      alert('Message copied! Open WhatsApp or any app, find your contact, attach the downloaded PDF, and paste this message.');
+    } catch {
+      alert('To share: open WhatsApp or any app, find your contact, attach the downloaded PDF from your downloads folder.');
+    }
   }
 
   const s = sym(invoice.currency);
@@ -516,10 +548,16 @@ export default function InvoiceGeneratorWorkspace() {
             {busy ? '⏳ Generating…' : '📄 Generate Invoice PDF'}
           </button>
           {generated && (
-            <button className="btn flex items-center gap-2" onClick={shareWhatsApp}
-              style={{ background: '#25D366', color: 'white', border: 'none', borderRadius: '8px', padding: '10px 16px', fontWeight: 600 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.144.566 4.148 1.546 5.879L.057 23.405a.5.5 0 0 0 .612.612l5.526-1.489A11.945 11.945 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.907 0-3.686-.523-5.205-1.428l-.373-.221-3.878 1.046 1.046-3.878-.221-.373A9.956 9.956 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-              Share on WhatsApp
+            <button
+              className="btn flex items-center gap-2"
+              onClick={handleShare}
+              style={{ background: '#25D366', color: 'white', border: 'none', borderRadius: '8px', padding: '10px 16px', fontWeight: 600 }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+              </svg>
+              Share Invoice
             </button>
           )}
         </div>

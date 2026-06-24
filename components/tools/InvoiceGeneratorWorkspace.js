@@ -42,9 +42,12 @@ function InvoiceTemplate({ biz, client, invoice, items, logo, subtotal, discount
     ussd: { label: 'USSD', icon: '📱' },
   };
 
-  const activeMethods = Object.entries(invoice.paymentMethods)
-    .filter(([, v]) => v)
-    .map(([k]) => paymentLabels[k]);
+  const activeMethods = [
+    { label: 'Cash', icon: '💵' },
+    { label: 'Bank Transfer', icon: '🏦' },
+    { label: 'POS', icon: '💳' },
+    { label: 'USSD', icon: '📱' },
+  ];
 
   const hasBankDetails = invoice.bankName || invoice.bankAccount || invoice.bankAccountName;
 
@@ -267,7 +270,7 @@ export default function InvoiceGeneratorWorkspace() {
     tax: '',
     discount: '',
     notes: 'Thank you for your Patronage.',
-    paymentMethods: { cash: true, bankTransfer: true, pos: false, ussd: false },
+    paymentMethods: { cash: true, bankTransfer: true, pos: true, ussd: true },
     bankName: '', bankAccount: '', bankAccountName: '',
     status: 'Pending',
   });
@@ -285,7 +288,7 @@ export default function InvoiceGeneratorWorkspace() {
         setSavedBiz(p);
         if (p.biz) setBiz(p.biz);
         if (p.logo) setLogo(p.logo);
-        if (p.invoice) setInvoice(prev => ({ ...prev, ...p.invoice, number: prev.number, date: prev.date, dueDate: '', status: 'Pending', notes: prev.notes }));
+        if (p.invoice) setInvoice(prev => ({ ...prev, ...p.invoice, number: prev.number, date: prev.date, dueDate: '', status: 'Pending', notes: prev.notes, paymentMethods: p.invoice.paymentMethods || { cash: true, bankTransfer: true, pos: true, ussd: true } }));
       }
     } catch {}
   }, []);
@@ -492,15 +495,7 @@ export default function InvoiceGeneratorWorkspace() {
 
         {/* Payment methods */}
         <div className="mb-6">
-          <h3 className="font-semibold text-ink mb-3">💳 Payment Methods</h3>
-          <div className="flex gap-4 flex-wrap mb-4">
-            {[['cash','Cash'],['bankTransfer','Bank Transfer'],['pos','POS'],['ussd','USSD']].map(([key, label]) => (
-              <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="checkbox" checked={invoice.paymentMethods[key]} onChange={e => setInvoice({ ...invoice, paymentMethods: { ...invoice.paymentMethods, [key]: e.target.checked } })} />
-                {label}
-              </label>
-            ))}
-          </div>
+          <h3 className="font-semibold text-ink mb-3">💳 Bank Details <span className="text-xs font-normal text-ink-soft">(all payment methods shown on invoice)</span></h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div><label className={lb}>Bank Name</label><input className={ic()} style={is} placeholder="First Bank of Nigeria" value={invoice.bankName} onChange={e => setInvoice({ ...invoice, bankName: e.target.value })} /></div>
             <div><label className={lb}>Account Name</label><input className={ic()} style={is} placeholder="OBG Noble Laundry" value={invoice.bankAccountName} onChange={e => setInvoice({ ...invoice, bankAccountName: e.target.value })} /></div>

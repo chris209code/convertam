@@ -53,22 +53,29 @@ export default function FeedbackWidget() {
             position: 'fixed',
             right: 0,
             top: '50%',
-            transform: 'translateY(-50%) rotate(-90deg)',
-            transformOrigin: 'right center',
+            transform: 'translateY(-50%)',
             background: '#3a63b8',
             color: 'white',
             border: 'none',
-            borderRadius: '8px 8px 0 0',
-            padding: '8px 16px',
-            fontSize: '12px',
-            fontWeight: 600,
+            borderRadius: '8px 0 0 8px',
+            padding: '14px 10px',
+            fontSize: '11px',
+            fontWeight: 700,
             cursor: 'pointer',
             zIndex: 1000,
-            letterSpacing: '0.03em',
-            boxShadow: '-2px 0 8px rgba(0,0,0,0.15)',
+            letterSpacing: '0.05em',
+            boxShadow: '-3px 0 12px rgba(0,0,0,0.2)',
+            writingMode: 'vertical-rl',
+            textOrientation: 'mixed',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '6px',
+            lineHeight: 1,
           }}
         >
-          💬 Feedback
+          <span style={{ fontSize: 16 }}>💬</span>
+          <span>FEEDBACK</span>
         </button>
       )}
 

@@ -166,7 +166,19 @@ export function AIIcon({ size = 24 }) {
   );
 }
 
-// Map slug to icon component
+export function FillPdfIcon({ size = 24 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+      <rect width="32" height="32" rx="8" fill="#0277BD"/>
+      <rect x="7" y="6" width="14" height="19" rx="2" stroke="white" strokeWidth="1.5" fill="none"/>
+      <line x1="10" y1="12" x2="18" y2="12" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="10" y1="16" x2="18" y2="16" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="10" y1="20" x2="14" y2="20" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+      <circle cx="24" cy="24" r="6" fill="#e2962c"/>
+      <path d="M21.5 24l1.5 1.5 3-3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
 export function ToolIcon({ slug, size = 22 }) {
   const map = {
     'pdf-to-word': <><PdfIcon size={size}/></>,
@@ -184,6 +196,7 @@ export function ToolIcon({ slug, size = 22 }) {
     'compress-pdf': <><CompressIcon size={size}/></>,
     'rotate-pdf': <><RotateIcon size={size}/></>,
     'extract-pdf-pages': <><ExtractIcon size={size}/></>,
+    'fill-pdf': <><FillPdfIcon size={size}/></>,
     'sign-pdf': <><SignIcon size={size}/></>,
     'reorder-pdf': <><ReorderIcon size={size}/></>,
     'watermark-pdf': <><WatermarkIcon size={size}/></>,

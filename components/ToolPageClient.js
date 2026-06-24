@@ -8,6 +8,7 @@ import SmartConverterWorkspace from '@/components/tools/SmartConverterWorkspace'
 import ReceiptScanWorkspace from '@/components/tools/ReceiptScanWorkspace';
 import CompressPdfWorkspace from '@/components/tools/CompressPdfWorkspace';
 import SignPdfWorkspace from '@/components/tools/SignPdfWorkspace';
+import FillPdfWorkspace from '@/components/tools/FillPdfWorkspace';
 import ReorderPdfWorkspace from '@/components/tools/ReorderPdfWorkspace';
 import WatermarkPdfWorkspace from '@/components/tools/WatermarkPdfWorkspace';
 import InvoiceGeneratorWorkspace from '@/components/tools/InvoiceGeneratorWorkspace';
@@ -102,6 +103,7 @@ export default function ToolPageClient({ tool }) {
           <CompressPdfWorkspace />
         </PaymentGate>
       )}
+      {tool.mode === 'fill' && <FillPdfWorkspace />}
       {tool.mode === 'sign' && <SignPdfWorkspace />}
       {tool.mode === 'reorder' && <ReorderPdfWorkspace />}
       {tool.mode === 'watermark' && <WatermarkPdfWorkspace />}

@@ -1,41 +1,262 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
-
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
+import { PDFDocument } from 'pdf-lib';
 
 const CURRENCIES = ['NGN', 'USD', 'EUR', 'GBP', 'GHS', 'KES', 'ZAR'];
 const CURRENCY_SYMBOLS = { NGN: '₦', USD: '$', EUR: '€', GBP: '£', GHS: 'GH₵', KES: 'KSh', ZAR: 'R' };
-const STORAGE_KEY = 'convertam_biz_profile';
+const STORAGE_KEY = 'convertam_biz_profile_v2';
 
-function screenSym(c) { return CURRENCY_SYMBOLS[c] || c; }
-function pdfSym(c) { return c + ' '; }
+function sym(c) { return CURRENCY_SYMBOLS[c] || c; }
 const emptyItem = () => ({ description: '', quantity: '1', unitPrice: '' });
 function autoInvNum() {
   const d = new Date().toISOString().slice(0,10).replace(/-/g,'');
   return `INV-${d}-${Math.floor(1000 + Math.random() * 9000)}`;
 }
-
 function getInitials(name) {
-  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+  return name.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
+}
+function fmt(num, currency) {
+  return sym(currency) + num.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── INVOICE TEMPLATE (rendered in DOM, captured as image) ──
+function InvoiceTemplate({ biz, client, invoice, items, logo, subtotal, discountAmt, taxAmt, total }) {
+  const amber = '#E2962C';
+  const dark = '#161E38';
+  const gray = '#666';
+
+  const paymentLabels = {
+    cash: { label: 'Cash', icon: '💵' },
+    bankTransfer: { label: 'Bank Transfer', icon: '🏦' },
+    pos: { label: 'POS', icon: '💳' },
+    ussd: { label: 'USSD', icon: '📱' },
+  };
+
+  const activeMethods = Object.entries(invoice.paymentMethods)
+    .filter(([, v]) => v)
+    .map(([k]) => paymentLabels[k]);
+
+  const hasBankDetails = invoice.bankName || invoice.bankAccount || invoice.bankAccountName;
+
+  return (
+    <div id="invoice-template" style={{
+      width: 794, background: 'white', fontFamily: 'Arial, Helvetica, sans-serif',
+      color: dark, position: 'absolute', left: '-9999px', top: 0,
+    }}>
+      {/* Top amber bar */}
+      <div style={{ background: amber, height: 10, width: '100%' }} />
+
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '20px 40px 10px' }}>
+        {/* Left: Logo + Business */}
+        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+          {logo && <img src={logo} alt="logo" style={{ width: 70, height: 70, objectFit: 'contain', borderRadius: 8 }} />}
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: dark, letterSpacing: 1 }}>{biz.name.toUpperCase()}</div>
+            {biz.tagline && <div style={{ color: amber, fontSize: 11, fontWeight: 600, marginBottom: 4 }}>{biz.tagline}</div>}
+            {biz.address && <div style={{ fontSize: 10, color: gray, display: 'flex', alignItems: 'center', gap: 4 }}>📍 {biz.address}</div>}
+            {biz.phone && <div style={{ fontSize: 10, color: gray, display: 'flex', alignItems: 'center', gap: 4 }}>📞 {biz.phone}</div>}
+            {biz.email && <div style={{ fontSize: 10, color: gray, display: 'flex', alignItems: 'center', gap: 4 }}>✉️ {biz.email}</div>}
+          </div>
+        </div>
+
+        {/* Right: INVOICE label + meta */}
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 28, fontWeight: 900, color: amber, letterSpacing: 2 }}>INVOICE</div>
+          <table style={{ marginLeft: 'auto', fontSize: 10, borderCollapse: 'collapse' }}>
+            <tbody>
+              {[
+                ['Invoice No.', invoice.number],
+                ['Invoice Date', invoice.date],
+                ...(invoice.dueDate ? [['Due Date', invoice.dueDate]] : []),
+                ['Status', invoice.status],
+              ].map(([label, value]) => (
+                <tr key={label}>
+                  <td style={{ fontWeight: 700, color: gray, paddingRight: 8, paddingBottom: 3 }}>{label}</td>
+                  <td style={{ color: dark, paddingBottom: 3 }}>: {value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Amber divider */}
+      <div style={{ height: 2, background: amber, margin: '0 40px' }} />
+
+      {/* Bill To + Thank You */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 40px', alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <div style={{ width: 36, height: 36, borderRadius: '50%', border: `2px solid ${amber}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={amber} strokeWidth="2">
+              <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+            </svg>
+          </div>
+          <div>
+            <div style={{ color: amber, fontWeight: 700, fontSize: 11, letterSpacing: 1 }}>BILL TO</div>
+            <div style={{ fontWeight: 800, fontSize: 14, color: dark }}>{client.name}</div>
+            {client.address && <div style={{ fontSize: 10, color: gray }}>{client.address}</div>}
+            {client.email && <div style={{ fontSize: 10, color: gray }}>{client.email}</div>}
+          </div>
+        </div>
+
+        {/* Thank you box */}
+        <div style={{ border: `1.5px solid ${amber}`, borderRadius: 8, padding: '8px 14px', display: 'flex', gap: 10, alignItems: 'center', maxWidth: 220 }}>
+          <div style={{ width: 36, height: 36, border: `2px solid ${amber}`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={amber} strokeWidth="2">
+              <rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/>
+              <line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/>
+            </svg>
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 11, color: dark }}>Thank you for your business!</div>
+            <div style={{ fontSize: 10, color: gray }}>We appreciate your patronage.</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Items table */}
+      <div style={{ margin: '0 40px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+          <thead>
+            <tr style={{ background: dark, color: 'white' }}>
+              <th style={{ padding: '10px 12px', textAlign: 'left', width: 30 }}>#</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left' }}>DESCRIPTION</th>
+              <th style={{ padding: '10px 12px', textAlign: 'center', width: 60 }}>QTY</th>
+              <th style={{ padding: '10px 12px', textAlign: 'right', width: 120 }}>RATE</th>
+              <th style={{ padding: '10px 12px', textAlign: 'right', width: 120 }}>AMOUNT</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.filter(i => i.description).map((item, idx) => {
+              const qty = parseFloat(item.quantity) || 0;
+              const price = parseFloat(item.unitPrice) || 0;
+              return (
+                <tr key={idx} style={{ background: idx % 2 === 1 ? '#f7f7f7' : 'white' }}>
+                  <td style={{ padding: '10px 12px', borderBottom: '1px solid #eee' }}>{idx + 1}</td>
+                  <td style={{ padding: '10px 12px', borderBottom: '1px solid #eee' }}>{item.description}</td>
+                  <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #eee' }}>{qty}</td>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', borderBottom: '1px solid #eee' }}>{fmt(price, invoice.currency)}</td>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', borderBottom: '1px solid #eee' }}>{fmt(qty * price, invoice.currency)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Notes + Totals */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 40px', gap: 20 }}>
+        {/* Notes */}
+        <div style={{ flex: 1 }}>
+          {invoice.notes && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <div style={{ width: 28, height: 28, border: `2px solid ${amber}`, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={amber} strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                  </svg>
+                </div>
+                <span style={{ color: amber, fontWeight: 700, fontSize: 11, letterSpacing: 1 }}>NOTES</span>
+              </div>
+              <div style={{ fontSize: 10, color: gray, marginLeft: 34 }}>{invoice.notes}</div>
+            </>
+          )}
+        </div>
+
+        {/* Totals */}
+        <div style={{ minWidth: 260 }}>
+          {[
+            ['Subtotal', subtotal],
+            ...(discountAmt > 0 ? [[`Discount (${invoice.discount}%)`, -discountAmt]] : []),
+            [`Tax (${invoice.tax || 0}%)`, taxAmt],
+          ].map(([label, value]) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, paddingBottom: 6, borderBottom: '1px dashed #eee', marginBottom: 6 }}>
+              <span style={{ color: gray }}>{label}</span>
+              <span style={{ color: dark }}>{fmt(Math.abs(value), invoice.currency)}</span>
+            </div>
+          ))}
+          <div style={{ background: amber, borderRadius: 6, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+            <span style={{ color: 'white', fontWeight: 700, fontSize: 12 }}>TOTAL DUE</span>
+            <span style={{ color: 'white', fontWeight: 900, fontSize: 15 }}>{fmt(total, invoice.currency)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Payment Methods + Bank Details */}
+      {(activeMethods.length > 0 || hasBankDetails) && (
+        <div style={{ display: 'flex', gap: 12, margin: '0 40px 16px', }}>
+          {activeMethods.length > 0 && (
+            <div style={{ flex: 1, border: `1px solid #eee`, borderRadius: 8, padding: '10px 14px', background: '#fafafa' }}>
+              <div style={{ color: amber, fontWeight: 700, fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>PAYMENT METHODS</div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                {activeMethods.map(({ label, icon }) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: dark }}>
+                    <span style={{ fontSize: 16 }}>{icon}</span> {label}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {hasBankDetails && (
+            <div style={{ flex: 1, border: `1px solid #eee`, borderRadius: 8, padding: '10px 14px', background: '#fafafa' }}>
+              <div style={{ color: amber, fontWeight: 700, fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>BANK DETAILS</div>
+              {invoice.bankName && <div style={{ fontSize: 10, color: dark, marginBottom: 3 }}>Bank Name &nbsp;&nbsp;&nbsp;: {invoice.bankName}</div>}
+              {invoice.bankAccountName && <div style={{ fontSize: 10, color: dark, marginBottom: 3 }}>Account Name : {invoice.bankAccountName}</div>}
+              {invoice.bankAccount && <div style={{ fontSize: 10, color: dark }}>Account No. &nbsp;: {invoice.bankAccount}</div>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Footer */}
+      <div style={{ background: dark, padding: '16px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <div style={{ width: 32, height: 32, border: `2px solid ${amber}`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={amber} strokeWidth="2.5">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ color: amber, fontWeight: 900, fontSize: 16, fontStyle: 'italic' }}>Thank You!</div>
+              <div style={{ color: '#aaa', fontSize: 9 }}>We look forward to serving you again.</div>
+            </div>
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          {biz.phone && <div style={{ color: '#ccc', fontSize: 10, marginBottom: 3 }}>📞 {biz.phone}</div>}
+          {biz.email && <div style={{ color: '#ccc', fontSize: 10, marginBottom: 3 }}>✉️ {biz.email}</div>}
+          {biz.address && <div style={{ color: '#ccc', fontSize: 10 }}>📍 {biz.address}</div>}
+        </div>
+      </div>
+
+      {/* Bottom tag */}
+      <div style={{ textAlign: 'center', padding: '6px', fontSize: 8, color: '#aaa' }}>
+        Generated by convertam.app
+      </div>
+    </div>
+  );
+}
+
+// ── MAIN COMPONENT ──
 export default function InvoiceGeneratorWorkspace() {
-  const [savedBiz, setSavedBiz] = useState(null); // loaded from localStorage
-  const [editingBiz, setEditingBiz] = useState(false); // show edit form
+  const [savedBiz, setSavedBiz] = useState(null);
+  const [editingBiz, setEditingBiz] = useState(false);
   const [logo, setLogo] = useState(null);
-  const [logoBytes, setLogoBytes] = useState(null);
-  const [logoType, setLogoType] = useState('image/png');
   const [biz, setBiz] = useState({ name: '', tagline: '', address: '', phone: '', email: '' });
   const [client, setClient] = useState({ name: '', address: '', email: '' });
   const [invoice, setInvoice] = useState({
@@ -53,46 +274,25 @@ export default function InvoiceGeneratorWorkspace() {
   const [items, setItems] = useState([emptyItem()]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [downloadedBlob, setDownloadedBlob] = useState(null);
-  const [downloadedName, setDownloadedName] = useState('');
+  const [generated, setGenerated] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Load saved business profile on mount
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        const parsed = JSON.parse(saved);
-        setSavedBiz(parsed);
-        setBiz(parsed.biz || biz);
-        if (parsed.logo) setLogo(parsed.logo);
-        if (parsed.invoice) {
-          setInvoice(prev => ({
-            ...prev,
-            currency: parsed.invoice.currency || 'NGN',
-            paymentMethods: parsed.invoice.paymentMethods || prev.paymentMethods,
-            bankName: parsed.invoice.bankName || '',
-            bankAccount: parsed.invoice.bankAccount || '',
-            bankAccountName: parsed.invoice.bankAccountName || '',
-          }));
-        }
+        const p = JSON.parse(saved);
+        setSavedBiz(p);
+        if (p.biz) setBiz(p.biz);
+        if (p.logo) setLogo(p.logo);
+        if (p.invoice) setInvoice(prev => ({ ...prev, ...p.invoice, number: prev.number, date: prev.date, dueDate: '', status: 'Pending', notes: prev.notes }));
       }
     } catch {}
   }, []);
 
   function saveProfile() {
-    if (!biz.name) { setError('Please enter your business name before saving.'); return; }
-    const profile = {
-      biz,
-      logo: logo || null,
-      invoice: {
-        currency: invoice.currency,
-        paymentMethods: invoice.paymentMethods,
-        bankName: invoice.bankName,
-        bankAccount: invoice.bankAccount,
-        bankAccountName: invoice.bankAccountName,
-      },
-    };
+    if (!biz.name) { setError('Please enter your business name first.'); return; }
+    const profile = { biz, logo, invoice: { currency: invoice.currency, paymentMethods: invoice.paymentMethods, bankName: invoice.bankName, bankAccount: invoice.bankAccount, bankAccountName: invoice.bankAccountName } };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
     setSavedBiz(profile);
     setEditingBiz(false);
@@ -104,7 +304,14 @@ export default function InvoiceGeneratorWorkspace() {
     setSavedBiz(null);
     setBiz({ name: '', tagline: '', address: '', phone: '', email: '' });
     setLogo(null);
-    setLogoBytes(null);
+  }
+
+  function handleLogo(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => setLogo(ev.target.result);
+    reader.readAsDataURL(file);
   }
 
   function updateItem(i, field, value) {
@@ -112,36 +319,11 @@ export default function InvoiceGeneratorWorkspace() {
     updated[i][field] = value;
     setItems(updated);
   }
-  function addItem() { setItems([...items, emptyItem()]); }
-  function removeItem(i) { if (items.length > 1) setItems(items.filter((_, idx) => idx !== i)); }
 
-  function calcSubtotal() {
-    return items.reduce((sum, item) => {
-      return sum + (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0);
-    }, 0);
-  }
-  function calcDiscount() { return calcSubtotal() * ((parseFloat(invoice.discount) || 0) / 100); }
-  function calcTax() { return (calcSubtotal() - calcDiscount()) * ((parseFloat(invoice.tax) || 0) / 100); }
-  function calcTotal() { return calcSubtotal() - calcDiscount() + calcTax(); }
-
-  function fmtS(num) { return screenSym(invoice.currency) + num.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-  function fmtP(num) { return pdfSym(invoice.currency) + num.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-
-  function handleLogo(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    setLogoType(file.type || 'image/png');
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setLogo(ev.target.result);
-      const b64 = ev.target.result.split(',')[1];
-      const binary = atob(b64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      setLogoBytes(bytes.buffer);
-    };
-    reader.readAsDataURL(file);
-  }
+  const subtotal = items.reduce((s, i) => s + (parseFloat(i.quantity)||0) * (parseFloat(i.unitPrice)||0), 0);
+  const discountAmt = subtotal * ((parseFloat(invoice.discount)||0) / 100);
+  const taxAmt = (subtotal - discountAmt) * ((parseFloat(invoice.tax)||0) / 100);
+  const total = subtotal - discountAmt + taxAmt;
 
   async function handleGenerate() {
     if (!biz.name || !client.name || items.every(i => !i.description)) {
@@ -150,402 +332,204 @@ export default function InvoiceGeneratorWorkspace() {
     }
     setBusy(true);
     setError('');
-
     try {
-      const doc = await PDFDocument.create();
-      const page = doc.addPage([595, 842]);
-      const { width, height } = page.getSize();
+      // Wait for template to render
+      await new Promise(r => setTimeout(r, 300));
 
-      const fB = await doc.embedFont(StandardFonts.HelveticaBold);
-      const fR = await doc.embedFont(StandardFonts.Helvetica);
+      const el = document.getElementById('invoice-template');
+      if (!el) throw new Error('Template not found');
 
-      const amber = rgb(0.886, 0.588, 0.173);
-      const dark = rgb(0.086, 0.118, 0.22);
-      const gray = rgb(0.45, 0.45, 0.45);
-      const lgray = rgb(0.88, 0.88, 0.88);
-      const white = rgb(1, 1, 1);
-      const offWhite = rgb(0.98, 0.96, 0.92);
-
-      // ── TOP AMBER BAR ──
-      page.drawRectangle({ x: 0, y: height - 8, width, height: 8, color: amber });
-
-      // ── HEADER ──
-      let headerY = height - 30;
-
-      // Logo (optional)
-      let logoEndX = 50;
-      if (logoBytes) {
-        try {
-          const img = logoType === 'image/jpeg'
-            ? await doc.embedJpg(logoBytes)
-            : await doc.embedPng(logoBytes);
-          const dims = img.scale(0.18);
-          page.drawImage(img, { x: 50, y: headerY - dims.height + 10, width: dims.width, height: dims.height });
-          logoEndX = 50 + dims.width + 10;
-        } catch {}
-      }
-
-      // Business name
-      page.drawText(biz.name.toUpperCase(), {
-        x: logoEndX, y: headerY, size: 16, font: fB, color: dark,
-      });
-      let byY = headerY - 16;
-      if (biz.tagline) {
-        page.drawText(biz.tagline, { x: logoEndX, y: byY, size: 9, font: fR, color: amber });
-        byY -= 14;
-      }
-      if (biz.address) { page.drawText('  ' + biz.address, { x: logoEndX, y: byY, size: 8, font: fR, color: gray }); byY -= 12; }
-      if (biz.phone) { page.drawText('  ' + biz.phone, { x: logoEndX, y: byY, size: 8, font: fR, color: gray }); byY -= 12; }
-      if (biz.email) { page.drawText('  ' + biz.email, { x: logoEndX, y: byY, size: 8, font: fR, color: gray }); }
-
-      // INVOICE label + details (right side)
-      page.drawText('INVOICE', { x: width - 160, y: headerY, size: 22, font: fB, color: amber });
-
-      const metaY = headerY - 24;
-      const metaRows = [
-        ['Invoice No.', ': ' + invoice.number],
-        ['Invoice Date', ': ' + invoice.date],
-        ...(invoice.dueDate ? [['Due Date', ': ' + invoice.dueDate]] : []),
-        ['Status', ': ' + invoice.status],
-      ];
-      metaRows.forEach(([label, value], i) => {
-        page.drawText(label, { x: width - 160, y: metaY - i * 14, size: 8, font: fB, color: gray });
-        page.drawText(value, { x: width - 95, y: metaY - i * 14, size: 8, font: fR, color: dark });
+      // Dynamically import html2canvas
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        width: 794,
       });
 
-      // Divider
-      const divY = height - 145;
-      page.drawRectangle({ x: 50, y: divY, width: width - 100, height: 1.5, color: amber });
+      const imgData = canvas.toDataURL('image/png');
 
-      // ── BILL TO + THANK YOU ──
-      const billY = divY - 20;
-      page.drawText('BILL TO', { x: 50, y: billY, size: 8, font: fB, color: amber });
-      page.drawText(client.name, { x: 50, y: billY - 14, size: 12, font: fB, color: dark });
-      let cY = billY - 28;
-      if (client.address) { page.drawText(client.address, { x: 50, y: cY, size: 9, font: fR, color: gray }); cY -= 12; }
-      if (client.email) { page.drawText(client.email, { x: 50, y: cY, size: 9, font: fR, color: gray }); }
+      // Wrap in PDF
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([canvas.width / 2, canvas.height / 2]);
+      const img = await pdfDoc.embedPng(imgData);
+      page.drawImage(img, { x: 0, y: 0, width: canvas.width / 2, height: canvas.height / 2 });
 
-      // Thank you box (right side)
-      page.drawRectangle({ x: width - 210, y: billY - 55, width: 160, height: 55, color: offWhite });
-      page.drawRectangle({ x: width - 210, y: billY - 55, width: 160, height: 55, color: amber, opacity: 0.15 });
-      page.drawText('Thank you for your business!', { x: width - 202, y: billY - 25, size: 8, font: fB, color: dark });
-      page.drawText('We appreciate your patronage.', { x: width - 202, y: billY - 39, size: 8, font: fR, color: gray });
-
-      // ── ITEMS TABLE ──
-      const tableTop = divY - 80;
-      const rowH = 24;
-      const cols = { num: 52, desc: 80, qty: 330, rate: 400, amount: 480 };
-
-      // Table header
-      page.drawRectangle({ x: 50, y: tableTop, width: width - 100, height: 26, color: dark });
-      page.drawText('#', { x: cols.num, y: tableTop + 9, size: 9, font: fB, color: white });
-      page.drawText('DESCRIPTION', { x: cols.desc, y: tableTop + 9, size: 9, font: fB, color: white });
-      page.drawText('QTY', { x: cols.qty, y: tableTop + 9, size: 9, font: fB, color: white });
-      page.drawText('RATE', { x: cols.rate, y: tableTop + 9, size: 9, font: fB, color: white });
-      page.drawText('AMOUNT', { x: cols.amount, y: tableTop + 9, size: 9, font: fB, color: white });
-
-      let rowY = tableTop - 2;
-      let itemNum = 0;
-      items.forEach((item, i) => {
-        if (!item.description) return;
-        itemNum++;
-        rowY -= rowH;
-        if (i % 2 === 1) {
-          page.drawRectangle({ x: 50, y: rowY, width: width - 100, height: rowH, color: rgb(0.96, 0.96, 0.96) });
-        }
-        const qty = parseFloat(item.quantity) || 0;
-        const price = parseFloat(item.unitPrice) || 0;
-        const amount = qty * price;
-        const desc = item.description.length > 32 ? item.description.slice(0, 29) + '...' : item.description;
-
-        page.drawText(String(itemNum), { x: cols.num, y: rowY + 8, size: 10, font: fR, color: dark });
-        page.drawText(desc, { x: cols.desc, y: rowY + 8, size: 10, font: fR, color: dark });
-        page.drawText(String(qty), { x: cols.qty, y: rowY + 8, size: 10, font: fR, color: dark });
-        page.drawText(fmtP(price), { x: cols.rate, y: rowY + 8, size: 10, font: fR, color: dark });
-        page.drawText(fmtP(amount), { x: cols.amount, y: rowY + 8, size: 10, font: fR, color: dark });
-      });
-
-      // Divider after items
-      rowY -= 10;
-      page.drawRectangle({ x: 50, y: rowY, width: width - 100, height: 1, color: lgray });
-
-      // ── NOTES (left) + TOTALS (right) ──
-      const bottomY = rowY - 20;
-      if (invoice.notes) {
-        page.drawText('NOTES', { x: 50, y: bottomY, size: 9, font: fB, color: amber });
-        page.drawText(invoice.notes, { x: 50, y: bottomY - 14, size: 9, font: fR, color: gray });
-      }
-
-      // Totals
-      const subtotal = calcSubtotal();
-      const discountAmt = calcDiscount();
-      const taxAmt = calcTax();
-      const total = calcTotal();
-      let totY = bottomY;
-
-      const totRows = [
-        ['Subtotal', fmtP(subtotal)],
-        ...(discountAmt > 0 ? [`Discount (${invoice.discount}%)`, fmtP(discountAmt)] : []),
-        [`Tax (${invoice.tax || 0}%)`, fmtP(taxAmt)],
-      ];
-
-      totRows.forEach(([label, value]) => {
-        if (Array.isArray(label)) { label = label; value = value; }
-        page.drawText(label, { x: cols.rate - 20, y: totY, size: 9, font: fR, color: gray });
-        const vW = fR.widthOfTextAtSize(value, 9);
-        page.drawText(value, { x: width - 50 - vW, y: totY, size: 9, font: fR, color: dark });
-        totY -= 16;
-      });
-
-      // Total box
-      totY -= 10;
-      page.drawRectangle({ x: cols.rate - 30, y: totY - 6, width: width - cols.rate - 18, height: 30, color: amber });
-      page.drawText('TOTAL DUE', { x: cols.rate - 18, y: totY + 7, size: 10, font: fB, color: white });
-      const totalStr = fmtP(total);
-      const tW = fB.widthOfTextAtSize(totalStr, 12);
-      page.drawText(totalStr, { x: width - 52 - tW, y: totY + 6, size: 12, font: fB, color: white });
-
-      // ── PAYMENT METHODS ──
-      const pmY = totY - 45;
-      const hasBankDetails = invoice.bankName || invoice.bankAccount || invoice.bankAccountName;
-      const pmMethods = Object.entries(invoice.paymentMethods)
-        .filter(([, v]) => v)
-        .map(([k]) => ({ cash: 'Cash', bankTransfer: 'Bank Transfer', pos: 'POS', ussd: 'USSD' }[k]));
-
-      if (pmMethods.length > 0) {
-        page.drawRectangle({ x: 50, y: pmY - 40, width: hasBankDetails ? 220 : width - 100, height: 55, color: offWhite });
-        page.drawText('PAYMENT METHODS', { x: 60, y: pmY + 5, size: 8, font: fB, color: amber });
-        page.drawText(pmMethods.join('   '), { x: 60, y: pmY - 10, size: 8, font: fR, color: dark });
-      }
-
-      if (hasBankDetails) {
-        page.drawRectangle({ x: width - 270, y: pmY - 40, width: 220, height: 55, color: offWhite });
-        page.drawText('BANK DETAILS', { x: width - 260, y: pmY + 5, size: 8, font: fB, color: amber });
-        if (invoice.bankName) { page.drawText('Bank Name    : ' + invoice.bankName, { x: width - 260, y: pmY - 9, size: 8, font: fR, color: dark }); }
-        if (invoice.bankAccountName) { page.drawText('Account Name : ' + invoice.bankAccountName, { x: width - 260, y: pmY - 21, size: 8, font: fR, color: dark }); }
-        if (invoice.bankAccount) { page.drawText('Account No.  : ' + invoice.bankAccount, { x: width - 260, y: pmY - 33, size: 8, font: fR, color: dark }); }
-      }
-
-      // ── FOOTER ──
-      const footH = 70;
-      page.drawRectangle({ x: 0, y: 0, width, height: footH, color: dark });
-      page.drawText('Thank You!', { x: 70, y: footH - 28, size: 16, font: fB, color: amber });
-      page.drawText('We look forward to serving you again.', { x: 70, y: footH - 44, size: 8, font: fR, color: lgray });
-
-      // Footer contact
-      const footDetails = [biz.phone, biz.email, biz.address].filter(Boolean);
-      footDetails.forEach((d, i) => {
-        page.drawText(d, { x: width - 250, y: footH - 20 - i * 14, size: 8, font: fR, color: lgray });
-      });
-
-      // Footer bottom line
-      page.drawText('Generated by convertam.app', { x: width / 2 - 60, y: 8, size: 7, font: fR, color: gray });
-
-      const bytes = await doc.save();
-      const blob = new Blob([bytes], { type: 'application/pdf' });
-      const fname = `Invoice-${invoice.number}-${client.name}.pdf`;
-      downloadBlob(blob, fname);
-      setDownloadedBlob(blob);
-      setDownloadedName(fname);
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      downloadBlob(blob, `Invoice-${invoice.number}-${client.name}.pdf`);
+      setGenerated(true);
     } catch (err) {
       console.error(err);
-      setError('Could not generate the invoice. Please try again.');
+      setError('Could not generate invoice. Please try again.');
     } finally {
       setBusy(false);
     }
   }
 
   function shareWhatsApp() {
-    const msg = encodeURIComponent(
-      `Hello ${client.name || ''},\n\nPlease find attached your invoice #${invoice.number} from ${biz.name}.\n\nTotal Due: ${fmtS(calcTotal())}\n\nGenerated via convertam.app`
-    );
+    const msg = encodeURIComponent(`Hello ${client.name},\n\nPlease find attached your invoice #${invoice.number} from ${biz.name}.\n\nTotal Due: ${fmt(total, invoice.currency)}\n\nGenerated via convertam.app`);
     window.open(`https://wa.me/?text=${msg}`, '_blank');
   }
 
-  const sym = screenSym(invoice.currency);
-  const inputCls = 'w-full border rounded-lg px-3 py-2 text-sm';
-  const inputSty = { borderColor: '#e2dcc9', background: '#fffefb' };
-  const lbl = 'text-xs font-medium text-ink-soft block mb-1';
+  const s = sym(invoice.currency);
+  const ic = inputCls => 'w-full border rounded-lg px-3 py-2 text-sm';
+  const is = { borderColor: '#e2dcc9', background: '#fffefb' };
+  const lb = 'text-xs font-medium text-ink-soft block mb-1';
 
   return (
-    <div className="panel">
+    <>
+      {/* Hidden invoice template rendered in DOM */}
+      <InvoiceTemplate
+        biz={biz} client={client} invoice={invoice}
+        items={items} logo={logo}
+        subtotal={subtotal} discountAmt={discountAmt}
+        taxAmt={taxAmt} total={total}
+      />
 
-      {/* ── BUSINESS PROFILE SECTION ── */}
-      {savedBiz && !editingBiz ? (
-        // Saved profile card
-        <div
-          className="rounded-xl p-4 mb-6 flex items-center justify-between gap-4"
-          style={{ background: '#f0f5ff', border: '1.5px solid #3a63b8' }}
-        >
-          <div className="flex items-center gap-3">
-            {logo ? (
-              <img src={logo} alt="logo" className="rounded-lg object-contain flex-shrink-0" style={{ width: 44, height: 44, border: '1px solid #e2dcc9' }} />
-            ) : (
-              <div
-                className="rounded-lg flex items-center justify-center font-bold text-white flex-shrink-0"
-                style={{ width: 44, height: 44, background: '#3a63b8', fontSize: 14 }}
-              >
-                {getInitials(biz.name)}
+      <div className="panel">
+        {/* Business profile */}
+        {savedBiz && !editingBiz ? (
+          <div className="rounded-xl p-4 mb-6 flex items-center justify-between gap-4" style={{ background: '#f0f5ff', border: '1.5px solid #3a63b8' }}>
+            <div className="flex items-center gap-3">
+              {logo
+                ? <img src={logo} alt="logo" className="rounded-lg object-contain flex-shrink-0" style={{ width: 44, height: 44 }} />
+                : <div className="rounded-lg flex items-center justify-center font-bold text-white flex-shrink-0" style={{ width: 44, height: 44, background: '#3a63b8', fontSize: 14 }}>{getInitials(biz.name)}</div>
+              }
+              <div>
+                <div className="font-bold text-ink">{biz.name}</div>
+                {biz.tagline && <div className="text-xs" style={{ color: '#e2962c' }}>{biz.tagline}</div>}
+                <div className="text-xs text-ink-soft">{[biz.phone, biz.address].filter(Boolean).join(' · ')}</div>
               </div>
-            )}
-            <div>
-              <div className="font-bold text-ink">{biz.name}</div>
-              {biz.tagline && <div className="text-xs" style={{ color: '#e2962c' }}>{biz.tagline}</div>}
-              <div className="text-xs text-ink-soft">{[biz.phone, biz.address].filter(Boolean).join(' · ')}</div>
+            </div>
+            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+              <span className="text-xs font-medium" style={{ color: '#2f8f5b' }}>✅ Saved on this device</span>
+              <button className="text-xs underline text-stamp-blue" onClick={() => setEditingBiz(true)}>✏️ Edit</button>
+              <button className="text-xs underline" style={{ color: '#cc4444' }} onClick={clearProfile}>🗑️ Clear</button>
             </div>
           </div>
-          <div className="flex flex-col items-end gap-1 flex-shrink-0">
-            <span className="text-xs font-medium" style={{ color: '#2f8f5b' }}>✅ Saved on this device</span>
-            <button className="text-xs underline text-stamp-blue" onClick={() => setEditingBiz(true)}>✏️ Edit</button>
-            <button className="text-xs underline" style={{ color: '#cc4444' }} onClick={clearProfile}>🗑️ Clear</button>
-          </div>
-        </div>
-      ) : (
-        // Business form
-        <div className="mb-6">
-          <h3 className="font-semibold text-ink mb-1 flex items-center gap-2">
-            🏢 Your Business
-            <span className="text-xs font-normal text-ink-soft">(saved to this device)</span>
-          </h3>
-          <p className="text-xs text-ink-soft mb-3">Fill in once — your details will be remembered on this device for future invoices.</p>
-
-          {/* Logo upload */}
-          <div className="flex items-center gap-4 mb-4">
-            {logo && <img src={logo} alt="Logo" className="rounded-lg object-contain" style={{ width: 56, height: 56, border: '1px solid #e2dcc9' }} />}
-            <div>
-              <button className="btn-ghost-sm" onClick={() => fileInputRef.current?.click()}>
-                {logo ? '🔄 Change logo' : '📁 Upload logo (optional)'}
-              </button>
-              {logo && <button className="btn-ghost-sm ml-2" onClick={() => { setLogo(null); setLogoBytes(null); }}>✕ Remove</button>}
-              <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleLogo} />
-              <p className="text-xs text-ink-soft mt-1">Optional — JPG or PNG</p>
+        ) : (
+          <div className="mb-6">
+            <h3 className="font-semibold text-ink mb-1 flex items-center gap-2">🏢 Your Business <span className="text-xs font-normal text-ink-soft">(saved to this device)</span></h3>
+            <p className="text-xs text-ink-soft mb-3">Fill in once — remembered for future invoices on this device.</p>
+            <div className="flex items-center gap-4 mb-4">
+              {logo && <img src={logo} alt="Logo" className="rounded-lg object-contain" style={{ width: 56, height: 56, border: '1px solid #e2dcc9' }} />}
+              <div>
+                <button className="btn-ghost-sm" onClick={() => fileInputRef.current?.click()}>{logo ? '🔄 Change logo' : '📁 Upload logo (optional)'}</button>
+                {logo && <button className="btn-ghost-sm ml-2" onClick={() => setLogo(null)}>✕ Remove</button>}
+                <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleLogo} />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+              <div><label className={lb}>Business Name *</label><input className={ic()} style={is} placeholder="OBG Noble Laundry" value={biz.name} onChange={e => setBiz({ ...biz, name: e.target.value })} /></div>
+              <div><label className={lb}>Tagline</label><input className={ic()} style={is} placeholder="Clean Clothes, Happy You." value={biz.tagline} onChange={e => setBiz({ ...biz, tagline: e.target.value })} /></div>
+              <div><label className={lb}>Address</label><input className={ic()} style={is} placeholder="Kajola, Sagamu" value={biz.address} onChange={e => setBiz({ ...biz, address: e.target.value })} /></div>
+              <div><label className={lb}>Phone</label><input className={ic()} style={is} placeholder="+234 800 000 0000" value={biz.phone} onChange={e => setBiz({ ...biz, phone: e.target.value })} /></div>
+              <div className="md:col-span-2"><label className={lb}>Email</label><input className={ic()} style={is} placeholder="you@example.com" value={biz.email} onChange={e => setBiz({ ...biz, email: e.target.value })} /></div>
+            </div>
+            <div className="flex gap-2">
+              <button className="btn btn-primary text-sm py-2 px-4" onClick={saveProfile}>💾 Save my business details</button>
+              {savedBiz && <button className="btn-ghost-sm" onClick={() => setEditingBiz(false)}>Cancel</button>}
             </div>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-            <div><label className={lbl}>Business Name *</label><input className={inputCls} style={inputSty} placeholder="OBG Noble Laundry" value={biz.name} onChange={e => setBiz({ ...biz, name: e.target.value })} /></div>
-            <div><label className={lbl}>Tagline</label><input className={inputCls} style={inputSty} placeholder="Clean Clothes, Happy You." value={biz.tagline} onChange={e => setBiz({ ...biz, tagline: e.target.value })} /></div>
-            <div><label className={lbl}>Address</label><input className={inputCls} style={inputSty} placeholder="Kajola, Sagamu" value={biz.address} onChange={e => setBiz({ ...biz, address: e.target.value })} /></div>
-            <div><label className={lbl}>Phone</label><input className={inputCls} style={inputSty} placeholder="+234 800 000 0000" value={biz.phone} onChange={e => setBiz({ ...biz, phone: e.target.value })} /></div>
-            <div className="md:col-span-2"><label className={lbl}>Email</label><input className={inputCls} style={inputSty} placeholder="you@example.com" value={biz.email} onChange={e => setBiz({ ...biz, email: e.target.value })} /></div>
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              className="btn btn-primary text-sm py-2 px-4"
-              onClick={saveProfile}
-            >
-              💾 Save my business details
-            </button>
-            {savedBiz && (
-              <button className="btn-ghost-sm" onClick={() => setEditingBiz(false)}>Cancel</button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── CLIENT DETAILS ── */}
-      <div className="mb-6">
-        <h3 className="font-semibold text-ink mb-3">👤 Client Details</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div><label className={lbl}>Client Name *</label><input className={inputCls} style={inputSty} placeholder="Mr Jacob" value={client.name} onChange={e => setClient({ ...client, name: e.target.value })} /></div>
-          <div><label className={lbl}>Address</label><input className={inputCls} style={inputSty} placeholder="Sagamu" value={client.address} onChange={e => setClient({ ...client, address: e.target.value })} /></div>
-          <div><label className={lbl}>Email</label><input className={inputCls} style={inputSty} placeholder="client@example.com" value={client.email} onChange={e => setClient({ ...client, email: e.target.value })} /></div>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <div><label className={lbl}>Invoice #</label><input className={inputCls} style={inputSty} value={invoice.number} onChange={e => setInvoice({ ...invoice, number: e.target.value })} /></div>
-        <div><label className={lbl}>Date</label><input type="date" className={inputCls} style={inputSty} value={invoice.date} onChange={e => setInvoice({ ...invoice, date: e.target.value })} /></div>
-        <div><label className={lbl}>Due Date</label><input type="date" className={inputCls} style={inputSty} value={invoice.dueDate} onChange={e => setInvoice({ ...invoice, dueDate: e.target.value })} /></div>
-        <div>
-          <label className={lbl}>Currency</label>
-          <select className={inputCls} style={inputSty} value={invoice.currency} onChange={e => setInvoice({ ...invoice, currency: e.target.value })}>
-            {CURRENCIES.map(c => <option key={c} value={c}>{CURRENCY_SYMBOLS[c]} {c}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className={lbl}>Status</label>
-          <select className={inputCls} style={inputSty} value={invoice.status} onChange={e => setInvoice({ ...invoice, status: e.target.value })}>
-            {['Pending', 'Paid', 'Overdue', 'Draft'].map(s => <option key={s}>{s}</option>)}
-          </select>
-        </div>
-      </div>
-
-      {/* Items */}
-      <div className="mb-6">
-        <h3 className="font-semibold text-ink mb-3">📋 Items</h3>
-        <div className="flex flex-col gap-2">
-          {items.map((item, i) => (
-            <div key={i} className="grid gap-2" style={{ gridTemplateColumns: '3fr 1fr 1.5fr auto' }}>
-              <input className={inputCls} style={inputSty} placeholder="Description" value={item.description} onChange={e => updateItem(i, 'description', e.target.value)} />
-              <input className={inputCls} style={inputSty} placeholder="Qty" type="number" min="1" value={item.quantity} onChange={e => updateItem(i, 'quantity', e.target.value)} />
-              <input className={inputCls} style={inputSty} placeholder={`Unit price (${sym})`} type="number" min="0" value={item.unitPrice} onChange={e => updateItem(i, 'unitPrice', e.target.value)} />
-              <button onClick={() => removeItem(i)} className="text-red-400 font-mono text-lg px-2" disabled={items.length === 1}>×</button>
-            </div>
-          ))}
-        </div>
-        <button onClick={addItem} className="btn-ghost-sm mt-2">+ Add item</button>
-      </div>
-
-      {/* Totals preview */}
-      <div className="rounded-xl p-4 mb-6" style={{ background: '#fffefb', border: '1px solid #e2dcc9' }}>
-        <div className="flex justify-between text-sm mb-1"><span className="text-ink-soft">Subtotal</span><span>{sym}{calcSubtotal().toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span></div>
-        <div className="flex gap-4 mb-2">
-          <div className="flex items-center gap-2"><span className="text-sm text-ink-soft">Discount (%)</span><input type="number" min="0" max="100" className="border rounded px-2 py-1 text-sm w-20" style={{ borderColor: '#e2dcc9' }} placeholder="0" value={invoice.discount} onChange={e => setInvoice({ ...invoice, discount: e.target.value })} /></div>
-          <div className="flex items-center gap-2"><span className="text-sm text-ink-soft">Tax (%)</span><input type="number" min="0" max="100" className="border rounded px-2 py-1 text-sm w-20" style={{ borderColor: '#e2dcc9' }} placeholder="0" value={invoice.tax} onChange={e => setInvoice({ ...invoice, tax: e.target.value })} /></div>
-        </div>
-        <div className="flex justify-between font-bold text-base pt-2" style={{ borderTop: '2px solid #e2962c', color: '#e2962c' }}>
-          <span>TOTAL DUE</span><span>{sym}{calcTotal().toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
-        </div>
-      </div>
-
-      {/* Payment methods */}
-      <div className="mb-6">
-        <h3 className="font-semibold text-ink mb-3">💳 Payment Methods</h3>
-        <div className="flex gap-4 flex-wrap mb-4">
-          {[['cash', 'Cash'], ['bankTransfer', 'Bank Transfer'], ['pos', 'POS'], ['ussd', 'USSD']].map(([key, label]) => (
-            <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="checkbox" checked={invoice.paymentMethods[key]} onChange={e => setInvoice({ ...invoice, paymentMethods: { ...invoice.paymentMethods, [key]: e.target.checked } })} />
-              {label}
-            </label>
-          ))}
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div><label className={lbl}>Bank Name</label><input className={inputCls} style={inputSty} placeholder="First Bank of Nigeria" value={invoice.bankName} onChange={e => setInvoice({ ...invoice, bankName: e.target.value })} /></div>
-          <div><label className={lbl}>Account Name</label><input className={inputCls} style={inputSty} placeholder="OBG Noble Laundry" value={invoice.bankAccountName} onChange={e => setInvoice({ ...invoice, bankAccountName: e.target.value })} /></div>
-          <div><label className={lbl}>Account Number</label><input className={inputCls} style={inputSty} placeholder="2034025678" value={invoice.bankAccount} onChange={e => setInvoice({ ...invoice, bankAccount: e.target.value })} /></div>
-        </div>
-      </div>
-
-      {/* Notes */}
-      <div className="mb-6">
-        <label className={lbl}>Notes</label>
-        <textarea className={inputCls} style={{ ...inputSty, minHeight: '60px', resize: 'vertical' }} value={invoice.notes} onChange={e => setInvoice({ ...invoice, notes: e.target.value })} />
-      </div>
-
-      <p className="text-xs text-ink-soft mb-4">
-        💡 Currency shows as <strong>{invoice.currency}</strong> in the PDF for maximum compatibility on all devices and PDF viewers.
-      </p>
-
-      {error && <div className="status error mb-3">{error}</div>}
-
-      <div className="actions flex-wrap gap-3">
-        <button className="btn btn-primary" disabled={busy} onClick={handleGenerate}>
-          {busy ? 'Generating…' : 'Generate Invoice PDF'}
-        </button>
-        {downloadedBlob && (
-          <button
-            className="btn btn-ghost flex items-center gap-2"
-            onClick={shareWhatsApp}
-            style={{ background: '#25D366', color: 'white', border: 'none' }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.144.566 4.148 1.546 5.879L.057 23.405a.5.5 0 0 0 .612.612l5.526-1.489A11.945 11.945 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.907 0-3.686-.523-5.205-1.428l-.373-.221-3.878 1.046 1.046-3.878-.221-.373A9.956 9.956 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-            Share on WhatsApp
-          </button>
         )}
-      </div>
 
-      <p className="privacy-note mt-4">Generated entirely in your browser — nothing is uploaded or stored.</p>
-    </div>
+        {/* Client */}
+        <div className="mb-6">
+          <h3 className="font-semibold text-ink mb-3">👤 Client Details</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div><label className={lb}>Client Name *</label><input className={ic()} style={is} placeholder="Mr Jacob" value={client.name} onChange={e => setClient({ ...client, name: e.target.value })} /></div>
+            <div><label className={lb}>Address</label><input className={ic()} style={is} placeholder="Sagamu" value={client.address} onChange={e => setClient({ ...client, address: e.target.value })} /></div>
+            <div><label className={lb}>Email</label><input className={ic()} style={is} placeholder="client@example.com" value={client.email} onChange={e => setClient({ ...client, email: e.target.value })} /></div>
+          </div>
+        </div>
+
+        {/* Invoice details */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <div><label className={lb}>Invoice #</label><input className={ic()} style={is} value={invoice.number} onChange={e => setInvoice({ ...invoice, number: e.target.value })} /></div>
+          <div><label className={lb}>Date</label><input type="date" className={ic()} style={is} value={invoice.date} onChange={e => setInvoice({ ...invoice, date: e.target.value })} /></div>
+          <div><label className={lb}>Due Date</label><input type="date" className={ic()} style={is} value={invoice.dueDate} onChange={e => setInvoice({ ...invoice, dueDate: e.target.value })} /></div>
+          <div><label className={lb}>Currency</label>
+            <select className={ic()} style={is} value={invoice.currency} onChange={e => setInvoice({ ...invoice, currency: e.target.value })}>
+              {CURRENCIES.map(c => <option key={c} value={c}>{CURRENCY_SYMBOLS[c]} {c}</option>)}
+            </select>
+          </div>
+          <div><label className={lb}>Status</label>
+            <select className={ic()} style={is} value={invoice.status} onChange={e => setInvoice({ ...invoice, status: e.target.value })}>
+              {['Pending','Paid','Overdue','Draft'].map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Items */}
+        <div className="mb-6">
+          <h3 className="font-semibold text-ink mb-3">📋 Items</h3>
+          <div className="flex flex-col gap-2">
+            {items.map((item, i) => (
+              <div key={i} className="grid gap-2" style={{ gridTemplateColumns: '3fr 1fr 1.5fr auto' }}>
+                <input className={ic()} style={is} placeholder="Description" value={item.description} onChange={e => updateItem(i, 'description', e.target.value)} />
+                <input className={ic()} style={is} placeholder="Qty" type="number" min="1" value={item.quantity} onChange={e => updateItem(i, 'quantity', e.target.value)} />
+                <input className={ic()} style={is} placeholder={`Unit price (${s})`} type="number" min="0" value={item.unitPrice} onChange={e => updateItem(i, 'unitPrice', e.target.value)} />
+                <button onClick={() => items.length > 1 && setItems(items.filter((_,idx) => idx !== i))} className="text-red-400 font-mono text-lg px-2" disabled={items.length === 1}>×</button>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => setItems([...items, emptyItem()])} className="btn-ghost-sm mt-2">+ Add item</button>
+        </div>
+
+        {/* Totals preview */}
+        <div className="rounded-xl p-4 mb-6" style={{ background: '#fffefb', border: '1px solid #e2dcc9' }}>
+          <div className="flex justify-between text-sm mb-2"><span className="text-ink-soft">Subtotal</span><span>{s}{subtotal.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span></div>
+          <div className="flex gap-4 mb-2 flex-wrap">
+            <div className="flex items-center gap-2"><span className="text-sm text-ink-soft">Discount (%)</span><input type="number" min="0" max="100" className="border rounded px-2 py-1 text-sm w-20" style={{ borderColor: '#e2dcc9' }} placeholder="0" value={invoice.discount} onChange={e => setInvoice({ ...invoice, discount: e.target.value })} /></div>
+            <div className="flex items-center gap-2"><span className="text-sm text-ink-soft">Tax (%)</span><input type="number" min="0" max="100" className="border rounded px-2 py-1 text-sm w-20" style={{ borderColor: '#e2dcc9' }} placeholder="0" value={invoice.tax} onChange={e => setInvoice({ ...invoice, tax: e.target.value })} /></div>
+          </div>
+          <div className="flex justify-between font-bold text-base pt-2" style={{ borderTop: '2px solid #e2962c', color: '#e2962c' }}>
+            <span>TOTAL DUE</span><span>{s}{total.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
+          </div>
+        </div>
+
+        {/* Payment methods */}
+        <div className="mb-6">
+          <h3 className="font-semibold text-ink mb-3">💳 Payment Methods</h3>
+          <div className="flex gap-4 flex-wrap mb-4">
+            {[['cash','Cash'],['bankTransfer','Bank Transfer'],['pos','POS'],['ussd','USSD']].map(([key, label]) => (
+              <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" checked={invoice.paymentMethods[key]} onChange={e => setInvoice({ ...invoice, paymentMethods: { ...invoice.paymentMethods, [key]: e.target.checked } })} />
+                {label}
+              </label>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div><label className={lb}>Bank Name</label><input className={ic()} style={is} placeholder="First Bank of Nigeria" value={invoice.bankName} onChange={e => setInvoice({ ...invoice, bankName: e.target.value })} /></div>
+            <div><label className={lb}>Account Name</label><input className={ic()} style={is} placeholder="OBG Noble Laundry" value={invoice.bankAccountName} onChange={e => setInvoice({ ...invoice, bankAccountName: e.target.value })} /></div>
+            <div><label className={lb}>Account Number</label><input className={ic()} style={is} placeholder="2034025678" value={invoice.bankAccount} onChange={e => setInvoice({ ...invoice, bankAccount: e.target.value })} /></div>
+          </div>
+        </div>
+
+        {/* Notes */}
+        <div className="mb-6">
+          <label className={lb}>Notes</label>
+          <textarea className={ic()} style={{ ...is, minHeight: '60px', resize: 'vertical' }} value={invoice.notes} onChange={e => setInvoice({ ...invoice, notes: e.target.value })} />
+        </div>
+
+        {error && <div className="status error mb-3">{error}</div>}
+
+        <div className="actions flex-wrap gap-3">
+          <button className="btn btn-primary" disabled={busy} onClick={handleGenerate}>
+            {busy ? '⏳ Generating…' : '📄 Generate Invoice PDF'}
+          </button>
+          {generated && (
+            <button className="btn flex items-center gap-2" onClick={shareWhatsApp}
+              style={{ background: '#25D366', color: 'white', border: 'none', borderRadius: '8px', padding: '10px 16px', fontWeight: 600 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.144.566 4.148 1.546 5.879L.057 23.405a.5.5 0 0 0 .612.612l5.526-1.489A11.945 11.945 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.907 0-3.686-.523-5.205-1.428l-.373-.221-3.878 1.046 1.046-3.878-.221-.373A9.956 9.956 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+              Share on WhatsApp
+            </button>
+          )}
+        </div>
+        <p className="privacy-note mt-4">Generated entirely in your browser — nothing is uploaded or stored.</p>
+      </div>
+    </>
   );
 }

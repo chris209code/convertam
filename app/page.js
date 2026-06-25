@@ -10,10 +10,6 @@ const categories = [
   { key: 'Document Conversion', label: 'Document Conversion', icon: '🔄' },
 ];
 
-const popularTools = [
-  'pdf-to-word', 'word-to-pdf', 'merge-pdf', 'compress-pdf', 'jpg-to-pdf', 'invoice-generator'
-];
-
 const isFree = (mode) =>
   ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice'].includes(mode);
 const isPaid = (mode) => ['office', 'compress'].includes(mode);
@@ -79,28 +75,6 @@ export default function HomePage() {
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* Popular Tools */}
-      <section className="max-w-4xl mx-auto px-5 md:px-10 py-2">
-        <h2 className="font-mono text-xs tracking-widest text-stamp-amber mb-3 flex items-center gap-2">
-          <span>🔥</span> POPULAR TOOLS
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
-          {popularTools.map(slug => {
-            const t = tools.find(t => t.slug === slug);
-            if (!t) return null;
-            return (
-              <Link key={slug} href={`/${slug}`}
-                className="flex items-center gap-3 border rounded-xl px-3 py-3 transition-colors hover:border-stamp-blue"
-                style={{ background: '#fffefb', borderColor: '#e2dcc9' }}>
-                <ToolIcon slug={slug} size={22} />
-                <span className="text-sm font-medium text-ink flex-1 leading-tight">{t.title}</span>
-                <ToolBadge mode={t.mode} />
-              </Link>
-            );
-          })}
         </div>
       </section>
 

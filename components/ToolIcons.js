@@ -196,7 +196,18 @@ export function ToolIcon({ slug, size = 22 }) {
     'compress-pdf': <><CompressIcon size={size}/></>,
     'rotate-pdf': <><RotateIcon size={size}/></>,
     'extract-pdf-pages': <><ExtractIcon size={size}/></>,
-    'fill-pdf': <><FillPdfIcon size={size}/></>,
+    'summarize-pdf': (
+      <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+        <rect width="32" height="32" rx="8" fill="#7B1FA2"/>
+        <rect x="7" y="6" width="14" height="19" rx="2" stroke="white" strokeWidth="1.5" fill="none"/>
+        <line x1="10" y1="11" x2="18" y2="11" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+        <line x1="10" y1="15" x2="18" y2="15" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+        <line x1="10" y1="19" x2="14" y2="19" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+        <circle cx="23" cy="23" r="6" fill="#e2962c"/>
+        <text x="23" y="27" textAnchor="middle" fill="white" fontSize="8" fontWeight="800">AI</text>
+      </svg>
+    ),
+    'fill-pdf': <FillPdfIcon size={size}/>,
     'sign-pdf': <><SignIcon size={size}/></>,
     'reorder-pdf': <><ReorderIcon size={size}/></>,
     'watermark-pdf': <><WatermarkIcon size={size}/></>,

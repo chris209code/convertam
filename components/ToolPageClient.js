@@ -26,7 +26,7 @@ import { toolMeta } from '@/lib/tool-meta';
 
 const isFree = (mode) =>
   ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice',
-   'remove-pages', 'add-page-numbers', 'protect-pdf', 'html-to-pdf', 'ocr-pdf'].includes(mode);
+   'remove-pages', 'add-page-numbers', 'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize', 'fill'].includes(mode);
 
 export default function ToolPageClient({ tool }) {
   const meta = toolMeta[tool.slug] || {};
@@ -51,7 +51,7 @@ export default function ToolPageClient({ tool }) {
       {/* Trust badges */}
       <div className="flex flex-wrap gap-2 mb-6">
         {[
-          { icon: '⭐', label: isFree(tool.mode) ? 'Free' : tool.mode === 'office' ? 'Free & Premium' : '₦500' },
+          { icon: '⭐', label: isFree(tool.mode) ? 'Free' : '₦500' },
           { icon: '⚡', label: 'Fast' },
           { icon: '🔒', label: 'Secure' },
           { icon: '🚫', label: 'No Login Required' },
@@ -87,7 +87,9 @@ export default function ToolPageClient({ tool }) {
 
       {/* Workspace */}
       {tool.mode === 'office' && (
-        <OfficeConvertWorkspace accept={tool.accept} toFormat={tool.toFormat} toLabel={tool.toLabel} />
+        <PaymentGate toolName={tool.slug}>
+          <OfficeConvertWorkspace accept={tool.accept} toFormat={tool.toFormat} toLabel={tool.toLabel} />
+        </PaymentGate>
       )}
       {tool.mode === 'drive' && (
         <GoogleDriveConvertWorkspace

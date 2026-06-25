@@ -13,6 +13,11 @@ import FillPdfWorkspace from '@/components/tools/FillPdfWorkspace';
 import ReorderPdfWorkspace from '@/components/tools/ReorderPdfWorkspace';
 import WatermarkPdfWorkspace from '@/components/tools/WatermarkPdfWorkspace';
 import InvoiceGeneratorWorkspace from '@/components/tools/InvoiceGeneratorWorkspace';
+import RemovePagesWorkspace from '@/components/tools/RemovePagesWorkspace';
+import AddPageNumbersWorkspace from '@/components/tools/AddPageNumbersWorkspace';
+import ProtectPdfWorkspace from '@/components/tools/ProtectPdfWorkspace';
+import HtmlToPdfWorkspace from '@/components/tools/HtmlToPdfWorkspace';
+import OcrPdfWorkspace from '@/components/tools/OcrPdfWorkspace';
 import PaymentGate from '@/components/PaymentGate';
 import ComingSoon from '@/components/tools/ComingSoon';
 import Link from 'next/link';
@@ -20,7 +25,8 @@ import { tools, getTool } from '@/lib/tools-config';
 import { toolMeta } from '@/lib/tool-meta';
 
 const isFree = (mode) =>
-  ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice'].includes(mode);
+  ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice',
+   'remove-pages', 'add-page-numbers', 'protect-pdf', 'html-to-pdf', 'ocr-pdf'].includes(mode);
 
 export default function ToolPageClient({ tool }) {
   const meta = toolMeta[tool.slug] || {};
@@ -45,7 +51,7 @@ export default function ToolPageClient({ tool }) {
       {/* Trust badges */}
       <div className="flex flex-wrap gap-2 mb-6">
         {[
-          { icon: '⭐', label: isFree(tool.mode) ? 'Free' : '₦500' },
+          { icon: '⭐', label: isFree(tool.mode) ? 'Free' : tool.mode === 'office' ? 'Free & Premium' : '₦500' },
           { icon: '⚡', label: 'Fast' },
           { icon: '🔒', label: 'Secure' },
           { icon: '🚫', label: 'No Login Required' },
@@ -81,9 +87,7 @@ export default function ToolPageClient({ tool }) {
 
       {/* Workspace */}
       {tool.mode === 'office' && (
-        <PaymentGate toolName={tool.slug}>
-          <OfficeConvertWorkspace accept={tool.accept} toFormat={tool.toFormat} toLabel={tool.toLabel} />
-        </PaymentGate>
+        <OfficeConvertWorkspace accept={tool.accept} toFormat={tool.toFormat} toLabel={tool.toLabel} />
       )}
       {tool.mode === 'drive' && (
         <GoogleDriveConvertWorkspace
@@ -110,6 +114,11 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'reorder' && <ReorderPdfWorkspace />}
       {tool.mode === 'watermark' && <WatermarkPdfWorkspace />}
       {tool.mode === 'invoice' && <InvoiceGeneratorWorkspace />}
+      {tool.mode === 'remove-pages' && <RemovePagesWorkspace />}
+      {tool.mode === 'add-page-numbers' && <AddPageNumbersWorkspace />}
+      {tool.mode === 'protect-pdf' && <ProtectPdfWorkspace />}
+      {tool.mode === 'html-to-pdf' && <HtmlToPdfWorkspace />}
+      {tool.mode === 'ocr-pdf' && <OcrPdfWorkspace />}
       {tool.mode === 'soon' && <ComingSoon title={tool.title} note={tool.note} />}
 
       {/* Privacy line */}

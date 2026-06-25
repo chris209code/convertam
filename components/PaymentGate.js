@@ -5,7 +5,6 @@ import Script from 'next/script';
 
 const PAYSTACK_PUBLIC_KEY = 'pk_test_d0ce0abc4daa9a22429362cdc4457fff2b5dbffd';
 
-// Detect currency from browser timezone/language
 function detectCurrency() {
   try {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -18,11 +17,11 @@ function detectCurrency() {
 }
 
 function formatPrice(currency) {
-  return currency === 'NGN' ? '₦500' : '$0.99';
+  return currency === 'NGN' ? '₦500' : '$1.00';
 }
 
 function getAmount(currency) {
-  return currency === 'NGN' ? 50000 : 99; // kobo / cents
+  return currency === 'NGN' ? 50000 : 100; // kobo / cents
 }
 
 export default function PaymentGate({ children, toolName }) {
@@ -34,8 +33,6 @@ export default function PaymentGate({ children, toolName }) {
 
   useEffect(() => {
     setCurrency(detectCurrency());
-
-    // Check if user already paid in this session for this tool
     const sessionKey = `convertam_paid_${toolName}`;
     if (sessionStorage.getItem(sessionKey) === 'true') {
       setPaid(true);
@@ -49,7 +46,7 @@ export default function PaymentGate({ children, toolName }) {
     }
     setError('');
 
-    const email = `user_${Date.now()}@convertam.app`; // anonymous email for Paystack
+    const email = `user_${Date.now()}@convertam.app`;
 
     const handler = window.PaystackPop.setup({
       key: PAYSTACK_PUBLIC_KEY,
@@ -68,7 +65,6 @@ export default function PaymentGate({ children, toolName }) {
           const data = await res.json();
 
           if (data.verified) {
-            // Store in session so they don't pay again if they refresh
             sessionStorage.setItem(`convertam_paid_${toolName}`, 'true');
             setPaid(true);
           } else {

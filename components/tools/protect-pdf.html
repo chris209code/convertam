@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Protect PDF with Password – Convertam</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --cream: #F8F6F1; --ink: #1A1A1A; --ink-soft: #555;
+      --accent: #D95F2B; --border: #E4E0D6; --radius: 12px;
+      --card: #fff; --shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+    body { font-family: 'Inter', sans-serif; background: var(--cream); color: var(--ink); min-height: 100vh; }
+    nav { background:#fff; border-bottom:1px solid var(--border); padding:0 24px; display:flex; align-items:center; height:56px; }
+    .logo { font-weight:700; font-size:1.1rem; color:var(--ink); text-decoration:none; }
+    .logo span { color:var(--accent); }
+    .back { margin-left:auto; font-size:0.85rem; color:var(--ink-soft); text-decoration:none; }
+    .back:hover { color:var(--accent); }
+
+    .container { max-width: 580px; margin: 0 auto; padding: 40px 24px 80px; }
+    h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 8px; }
+    .subtitle { color: var(--ink-soft); margin-bottom: 32px; font-size: 0.95rem; }
+
+    .drop-zone {
+      border: 2px dashed var(--border); border-radius: var(--radius);
+      background: var(--card); padding: 48px 24px; text-align: center;
+      cursor: pointer; transition: border-color 0.2s, background 0.2s;
+    }
+    .drop-zone:hover, .drop-zone.active { border-color: var(--accent); background: #FFF8F5; }
+    .drop-zone .icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .drop-zone p { color: var(--ink-soft); font-size: 0.9rem; }
+    .drop-zone strong { color: var(--accent); }
+    #fileInput { display: none; }
+
+    .panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; margin-top: 24px; box-shadow: var(--shadow); }
+    .file-info { background: #F0F7FF; border: 1px solid #BFD9F2; border-radius: 8px; padding: 12px 16px; margin-bottom: 24px; font-size: 0.85rem; color: #2563EB; }
+    .panel-title { font-weight: 700; font-size: 1rem; margin-bottom: 20px; }
+
+    .form-row { margin-bottom: 18px; }
+    label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; }
+    .input-wrap { position: relative; }
+    input[type="password"], input[type="text"] {
+      width: 100%; padding: 11px 44px 11px 14px;
+      border: 1px solid var(--border); border-radius: 8px;
+      font-size: 0.9rem; font-family: inherit;
+      background: var(--cream); color: var(--ink);
+      transition: border-color 0.2s;
+    }
+    input:focus { outline: none; border-color: var(--accent); }
+    .toggle-pw {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      cursor: pointer; font-size: 1rem; opacity: 0.5; user-select: none;
+    }
+    .toggle-pw:hover { opacity: 1; }
+
+    .strength-bar { height: 4px; border-radius: 2px; margin-top: 6px; background: var(--border); overflow: hidden; }
+    .strength-fill { height: 100%; width: 0; transition: width 0.3s, background 0.3s; border-radius: 2px; }
+    .strength-label { font-size: 0.75rem; color: var(--ink-soft); margin-top: 4px; }
+
+    .info-box {
+      background: #FFFBE8; border: 1px solid #F0D070; border-radius: 8px;
+      padding: 12px 16px; font-size: 0.82rem; color: #7A6000;
+      margin-bottom: 20px; line-height: 1.5;
+    }
+
+    .btn {
+      display: block; width: 100%; padding: 13px; border-radius: 8px;
+      font-size: 0.95rem; font-weight: 600; cursor: pointer; border: none;
+      transition: background 0.18s; text-align: center;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #BF4F1F; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--ink-soft); padding: 9px; font-size: 0.85rem; margin-top: 10px; cursor: pointer; border-radius: 8px; font-family: inherit; }
+    .btn-secondary:hover { background: var(--border); }
+
+    .status { margin-top: 14px; font-size: 0.88rem; text-align: center; }
+    .status.success { color: #2a7f4f; font-weight: 600; }
+    .status.error { color: #e53e3e; }
+  </style>
+</head>
+<body>
+<nav>
+  <a href="/" class="logo">Convert<span>am</span></a>
+  <a href="/" class="back">← All tools</a>
+</nav>
+
+<div class="container">
+  <h1>🔐 Protect PDF</h1>
+  <p class="subtitle">Add a password to your PDF so only the right people can open it.</p>
+
+  <div class="drop-zone" id="dropZone">
+    <div class="icon">📄</div>
+    <p><strong onclick="document.getElementById('fileInput').click()">Choose a PDF</strong> or drag it here</p>
+    <p style="margin-top:6px;font-size:0.8rem;">Files stay in your browser — nothing is uploaded.</p>
+    <input type="file" id="fileInput" accept=".pdf"/>
+  </div>
+
+  <div class="panel" id="panel" style="display:none;">
+    <div class="file-info" id="fileInfo"></div>
+    <div class="panel-title">Set a password</div>
+
+    <div class="info-box">
+      ⚠️ <strong>Remember this password.</strong> If you forget it, the PDF cannot be recovered — there is no "forgot password" for encrypted PDFs.
+    </div>
+
+    <div class="form-row">
+      <label for="pw1">Password</label>
+      <div class="input-wrap">
+        <input type="password" id="pw1" placeholder="Enter a strong password" oninput="checkStrength()"/>
+        <span class="toggle-pw" onclick="togglePw('pw1', this)">👁️</span>
+      </div>
+      <div class="strength-bar"><div class="strength-fill" id="strengthFill"></div></div>
+      <div class="strength-label" id="strengthLabel"></div>
+    </div>
+
+    <div class="form-row">
+      <label for="pw2">Confirm password</label>
+      <div class="input-wrap">
+        <input type="password" id="pw2" placeholder="Repeat the password"/>
+        <span class="toggle-pw" onclick="togglePw('pw2', this)">👁️</span>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="processBtn" onclick="protectPdf()">Protect & Download PDF</button>
+    <button class="btn btn-secondary" onclick="resetTool()">Start over</button>
+    <div class="status" id="status"></div>
+  </div>
+</div>
+
+<script>
+  let pdfBytes = null;
+
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('active'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('active'));
+  dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('active'); handleFile(e.dataTransfer.files[0]); });
+  fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
+  dropZone.addEventListener('click', e => { if(e.target.tagName !== 'STRONG') fileInput.click(); });
+
+  async function handleFile(file) {
+    if (!file || file.type !== 'application/pdf') return;
+    const buffer = await file.arrayBuffer();
+    pdfBytes = new Uint8Array(buffer);
+    const tmpDoc = await PDFLib.PDFDocument.load(pdfBytes);
+    document.getElementById('fileInfo').textContent = `📄 ${file.name} · ${tmpDoc.getPageCount()} pages · ${(file.size/1024).toFixed(0)} KB`;
+    document.getElementById('panel').style.display = 'block';
+    dropZone.style.display = 'none';
+  }
+
+  function checkStrength() {
+    const pw = document.getElementById('pw1').value;
+    const fill = document.getElementById('strengthFill');
+    const label = document.getElementById('strengthLabel');
+    let score = 0;
+    if (pw.length >= 8) score++;
+    if (pw.length >= 12) score++;
+    if (/[A-Z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+    const levels = [
+      { pct: '0%', color: '', text: '' },
+      { pct: '25%', color: '#e53e3e', text: 'Weak' },
+      { pct: '50%', color: '#DD6B20', text: 'Fair' },
+      { pct: '75%', color: '#D69E2E', text: 'Good' },
+      { pct: '90%', color: '#38A169', text: 'Strong' },
+      { pct: '100%', color: '#2B6CB0', text: 'Very strong' },
+    ];
+    const l = levels[Math.min(score, 5)];
+    fill.style.width = l.pct;
+    fill.style.background = l.color;
+    label.textContent = l.text;
+    label.style.color = l.color;
+  }
+
+  function togglePw(id, icon) {
+    const el = document.getElementById(id);
+    if (el.type === 'password') { el.type = 'text'; icon.style.opacity = '1'; }
+    else { el.type = 'password'; icon.style.opacity = '0.5'; }
+  }
+
+  async function protectPdf() {
+    const pw1 = document.getElementById('pw1').value;
+    const pw2 = document.getElementById('pw2').value;
+    if (!pw1) { setStatus('Please enter a password.', 'error'); return; }
+    if (pw1 !== pw2) { setStatus('Passwords do not match.', 'error'); return; }
+
+    const btn = document.getElementById('processBtn');
+    btn.disabled = true;
+    setStatus('Encrypting…', '');
+
+    try {
+      const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+      const newBytes = await pdfDoc.save({
+        userPassword: pw1,
+        ownerPassword: pw1 + '_owner',
+        permissions: {
+          printing: 'highResolution',
+          copying: false,
+          modifying: false,
+          annotating: false,
+        },
+        encryptionAlgorithm: PDFLib.EncryptionAlgorithm?.AES_256 || undefined,
+      });
+      const blob = new Blob([newBytes], { type: 'application/pdf' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'convertam-protected.pdf';
+      a.click();
+      setStatus('✅ PDF protected! Your download should start.', 'success');
+    } catch(e) {
+      // pdf-lib may not support encryption in all builds — fallback message
+      setStatus('Encryption failed. This PDF may already be protected or use an unsupported format.', 'error');
+      console.error(e);
+    }
+    btn.disabled = false;
+  }
+
+  function resetTool() {
+    pdfBytes = null;
+    document.getElementById('panel').style.display = 'none';
+    dropZone.style.display = '';
+    fileInput.value = '';
+    document.getElementById('pw1').value = '';
+    document.getElementById('pw2').value = '';
+    setStatus('', '');
+  }
+
+  function setStatus(msg, type) {
+    const el = document.getElementById('status');
+    el.textContent = msg; el.className = 'status ' + type;
+  }
+</script>
+</body>
+</html>

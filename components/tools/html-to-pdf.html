@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>HTML to PDF – Convertam</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --cream: #F8F6F1; --ink: #1A1A1A; --ink-soft: #555;
+      --accent: #D95F2B; --border: #E4E0D6; --radius: 12px;
+      --card: #fff; --shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+    body { font-family: 'Inter', sans-serif; background: var(--cream); color: var(--ink); min-height: 100vh; }
+    nav { background:#fff; border-bottom:1px solid var(--border); padding:0 24px; display:flex; align-items:center; height:56px; }
+    .logo { font-weight:700; font-size:1.1rem; color:var(--ink); text-decoration:none; }
+    .logo span { color:var(--accent); }
+    .back { margin-left:auto; font-size:0.85rem; color:var(--ink-soft); text-decoration:none; }
+    .back:hover { color:var(--accent); }
+
+    .container { max-width: 760px; margin: 0 auto; padding: 40px 24px 80px; }
+    h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 8px; }
+    .subtitle { color: var(--ink-soft); margin-bottom: 32px; font-size: 0.95rem; }
+
+    .tabs { display: flex; gap: 4px; background: var(--cream-dark, #EFECe4); border-radius: 10px; padding: 4px; margin-bottom: 24px; border: 1px solid var(--border); }
+    .tab {
+      flex: 1; padding: 9px; text-align: center; border-radius: 7px;
+      font-size: 0.88rem; font-weight: 600; cursor: pointer;
+      border: none; background: transparent; color: var(--ink-soft);
+      transition: all 0.15s; font-family: inherit;
+    }
+    .tab.active { background: #fff; color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+
+    .panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; box-shadow: var(--shadow); }
+    label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; }
+
+    textarea {
+      width: 100%; min-height: 260px; padding: 14px;
+      border: 1px solid var(--border); border-radius: 8px;
+      font-size: 0.88rem; font-family: 'Courier New', monospace;
+      background: var(--cream); color: var(--ink); resize: vertical;
+      transition: border-color 0.2s;
+    }
+    textarea:focus { outline: none; border-color: var(--accent); }
+
+    input[type="text"] {
+      width: 100%; padding: 11px 14px;
+      border: 1px solid var(--border); border-radius: 8px;
+      font-size: 0.9rem; font-family: inherit;
+      background: var(--cream); color: var(--ink);
+    }
+    input[type="text"]:focus { outline: none; border-color: var(--accent); }
+
+    .info-box {
+      background: #FFFBE8; border: 1px solid #F0D070; border-radius: 8px;
+      padding: 12px 16px; font-size: 0.82rem; color: #7A6000;
+      margin-bottom: 20px; line-height: 1.5;
+    }
+
+    .options-row { display: flex; gap: 16px; margin-top: 18px; flex-wrap: wrap; }
+    .option-group { flex: 1; min-width: 140px; }
+    .option-group label { margin-bottom: 6px; }
+    select {
+      width: 100%; padding: 9px 12px;
+      border: 1px solid var(--border); border-radius: 8px;
+      font-family: inherit; font-size: 0.88rem;
+      background: var(--cream); color: var(--ink);
+    }
+
+    .btn {
+      display: block; width: 100%; padding: 13px; border-radius: 8px;
+      font-size: 0.95rem; font-weight: 600; cursor: pointer; border: none;
+      transition: background 0.18s; text-align: center; margin-top: 20px;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #BF4F1F; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .status { margin-top: 14px; font-size: 0.88rem; text-align: center; }
+    .status.success { color: #2a7f4f; font-weight: 600; }
+    .status.error { color: #e53e3e; }
+
+    /* hidden render area */
+    #renderArea {
+      position: fixed; left: -9999px; top: 0;
+      background: white; padding: 40px;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
+</head>
+<body>
+<nav>
+  <a href="/" class="logo">Convert<span>am</span></a>
+  <a href="/" class="back">← All tools</a>
+</nav>
+
+<div class="container">
+  <h1>🌐 HTML to PDF</h1>
+  <p class="subtitle">Paste HTML code and convert it to a downloadable PDF. Runs entirely in your browser.</p>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('code')">📝 Paste HTML</button>
+    <button class="tab" onclick="switchTab('url')">🔗 From URL</button>
+  </div>
+
+  <div class="panel">
+    <div class="tab-content active" id="tab-code">
+      <label for="htmlInput">HTML code</label>
+      <textarea id="htmlInput" placeholder="<!DOCTYPE html>
+<html>
+<body>
+  <h1>Hello, Convertam!</h1>
+  <p>This will become a PDF.</p>
+</body>
+</html>"></textarea>
+    </div>
+
+    <div class="tab-content" id="tab-url">
+      <div class="info-box">
+        ⚠️ Due to browser security restrictions (CORS), not all websites can be fetched directly. This works best with URLs that allow cross-origin access, or paste the page's HTML source instead.
+      </div>
+      <label for="urlInput">Website URL</label>
+      <input type="text" id="urlInput" placeholder="https://example.com"/>
+      <button class="btn btn-primary" style="margin-top:14px;width:auto;padding:10px 22px;display:inline-block;" onclick="fetchUrl()">Fetch HTML</button>
+      <div class="status" id="fetchStatus"></div>
+    </div>
+
+    <div class="options-row">
+      <div class="option-group">
+        <label>Page size</label>
+        <select id="pageSize">
+          <option value="a4">A4</option>
+          <option value="letter">US Letter</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <label>Orientation</label>
+        <select id="orientation">
+          <option value="portrait">Portrait</option>
+          <option value="landscape">Landscape</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <label>Scale</label>
+        <select id="scale">
+          <option value="1">100%</option>
+          <option value="0.8" selected>80% (recommended)</option>
+          <option value="0.6">60%</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="convertBtn" onclick="convertToPdf()">Convert to PDF & Download</button>
+    <div class="status" id="status"></div>
+  </div>
+</div>
+
+<!-- Off-screen render area -->
+<div id="renderArea"></div>
+
+<script>
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='code')||(i===1&&tab==='url')));
+    document.getElementById('tab-code').classList.toggle('active', tab === 'code');
+    document.getElementById('tab-url').classList.toggle('active', tab === 'url');
+  }
+
+  async function fetchUrl() {
+    const url = document.getElementById('urlInput').value.trim();
+    if (!url) return;
+    document.getElementById('fetchStatus').textContent = 'Fetching…';
+    document.getElementById('fetchStatus').className = 'status';
+    try {
+      const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+      const data = await res.json();
+      document.getElementById('htmlInput').value = data.contents;
+      switchTab('code');
+      document.getElementById('fetchStatus').textContent = '';
+    } catch(e) {
+      document.getElementById('fetchStatus').textContent = 'Could not fetch this URL. Try pasting the HTML source instead.';
+      document.getElementById('fetchStatus').className = 'status error';
+    }
+  }
+
+  async function convertToPdf() {
+    const html = document.getElementById('htmlInput').value.trim();
+    if (!html) { setStatus('Please paste some HTML first.', 'error'); return; }
+
+    const btn = document.getElementById('convertBtn');
+    btn.disabled = true;
+    setStatus('Rendering HTML…', '');
+
+    const renderArea = document.getElementById('renderArea');
+    const pageSize = document.getElementById('pageSize').value;
+    const orientation = document.getElementById('orientation').value;
+    const scale = parseFloat(document.getElementById('scale').value);
+
+    // Width in px for A4 at 96dpi = ~794px, letter = ~816px
+    const w = pageSize === 'a4' ? 794 : 816;
+    renderArea.style.width = w + 'px';
+    renderArea.innerHTML = html;
+
+    // Wait for images/fonts to load
+    await new Promise(r => setTimeout(r, 600));
+
+    try {
+      const canvas = await html2canvas(renderArea, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        width: w,
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.9);
+      const { jsPDF } = window.jspdf;
+
+      const pdfW = pageSize === 'a4'
+        ? (orientation === 'portrait' ? 210 : 297)
+        : (orientation === 'portrait' ? 215.9 : 279.4);
+      const pdfH = pageSize === 'a4'
+        ? (orientation === 'portrait' ? 297 : 210)
+        : (orientation === 'portrait' ? 279.4 : 215.9);
+
+      const pdf = new jsPDF({ orientation, unit: 'mm', format: pageSize });
+
+      const imgW = pdfW;
+      const imgH = (canvas.height * imgW) / canvas.width;
+
+      let yOffset = 0;
+      let remaining = imgH;
+
+      while (remaining > 0) {
+        if (yOffset > 0) pdf.addPage();
+        const srcY = (yOffset / imgH) * canvas.height;
+        const sliceH = Math.min(pdfH, remaining);
+        const slicePx = (sliceH / imgH) * canvas.height;
+
+        // Crop canvas slice
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = slicePx;
+        sliceCanvas.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, slicePx, 0, 0, canvas.width, slicePx);
+        const sliceData = sliceCanvas.toDataURL('image/jpeg', 0.9);
+        pdf.addImage(sliceData, 'JPEG', 0, 0, imgW, sliceH);
+        remaining -= sliceH;
+        yOffset += sliceH;
+      }
+
+      pdf.save('convertam-html.pdf');
+      setStatus('✅ Done! Your PDF download should start.', 'success');
+    } catch(e) {
+      setStatus('Conversion failed. Complex CSS or external fonts may cause issues.', 'error');
+      console.error(e);
+    }
+
+    renderArea.innerHTML = '';
+    btn.disabled = false;
+  }
+
+  function setStatus(msg, type) {
+    const el = document.getElementById('status');
+    el.textContent = msg; el.className = 'status ' + type;
+  }
+</script>
+</body>
+</html>

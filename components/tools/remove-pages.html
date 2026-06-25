@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Remove Pages from PDF – Convertam</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --cream: #F8F6F1; --ink: #1A1A1A; --ink-soft: #555;
+      --accent: #D95F2B; --border: #E4E0D6; --radius: 12px;
+      --card: #fff; --shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+    body { font-family: 'Inter', sans-serif; background: var(--cream); color: var(--ink); min-height: 100vh; }
+    nav { background:#fff; border-bottom:1px solid var(--border); padding:0 24px; display:flex; align-items:center; height:56px; }
+    .logo { font-weight:700; font-size:1.1rem; color:var(--ink); text-decoration:none; }
+    .logo span { color:var(--accent); }
+    .back { margin-left:auto; font-size:0.85rem; color:var(--ink-soft); text-decoration:none; }
+    .back:hover { color:var(--accent); }
+
+    .container { max-width: 820px; margin: 0 auto; padding: 40px 24px 80px; }
+    h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 8px; }
+    .subtitle { color: var(--ink-soft); margin-bottom: 32px; font-size: 0.95rem; }
+
+    .drop-zone {
+      border: 2px dashed var(--border); border-radius: var(--radius);
+      background: var(--card); padding: 48px 24px; text-align: center;
+      cursor: pointer; transition: border-color 0.2s, background 0.2s;
+    }
+    .drop-zone:hover, .drop-zone.active { border-color: var(--accent); background: #FFF8F5; }
+    .drop-zone .icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .drop-zone p { color: var(--ink-soft); font-size: 0.9rem; }
+    .drop-zone strong { color: var(--accent); cursor: pointer; }
+    #fileInput { display: none; }
+
+    .panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-top: 24px; box-shadow: var(--shadow); }
+    .panel-title { font-weight: 600; font-size: 1rem; margin-bottom: 16px; }
+
+    .pages-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+    .page-thumb {
+      position: relative; width: 100px; cursor: pointer;
+      border: 2px solid var(--border); border-radius: 8px; overflow: hidden;
+      transition: border-color 0.15s;
+      user-select: none;
+    }
+    .page-thumb canvas { width: 100%; display: block; }
+    .page-thumb .page-label {
+      text-align: center; font-size: 0.72rem; color: var(--ink-soft);
+      padding: 4px 0; background: var(--cream);
+    }
+    .page-thumb.marked-delete { border-color: #e53e3e; }
+    .page-thumb.marked-delete::after {
+      content: '✕';
+      position: absolute; top: 4px; right: 6px;
+      color: #fff; background: #e53e3e;
+      border-radius: 50%; width: 20px; height: 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 700;
+      line-height: 20px; text-align: center;
+    }
+    .page-thumb.marked-delete .page-label { color: #e53e3e; font-weight: 600; }
+
+    .hint { font-size: 0.82rem; color: var(--ink-soft); margin-bottom: 16px; }
+    .delete-count { font-size: 0.88rem; font-weight: 600; color: #e53e3e; margin-bottom: 16px; }
+
+    .btn {
+      display: inline-block; padding: 12px 28px; border-radius: 8px;
+      font-size: 0.9rem; font-weight: 600; cursor: pointer; border: none;
+      transition: background 0.18s, transform 0.1s;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #BF4F1F; transform: translateY(-1px); }
+    .btn-secondary { background: var(--cream); color: var(--ink); border: 1px solid var(--border); margin-left: 10px; }
+    .btn-secondary:hover { background: var(--border); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .status { margin-top: 16px; font-size: 0.88rem; color: var(--ink-soft); }
+    .status.success { color: #2a7f4f; font-weight: 600; }
+    .status.error { color: #e53e3e; }
+  </style>
+</head>
+<body>
+<nav>
+  <a href="/" class="logo">Convert<span>am</span></a>
+  <a href="/" class="back">← All tools</a>
+</nav>
+<div class="container">
+  <h1>🗑️ Remove Pages</h1>
+  <p class="subtitle">Click pages to mark them for deletion, then download the cleaned PDF.</p>
+
+  <div class="drop-zone" id="dropZone">
+    <div class="icon">📄</div>
+    <p><strong onclick="document.getElementById('fileInput').click()">Choose a PDF</strong> or drag it here</p>
+    <p style="margin-top:6px;font-size:0.8rem;">Files stay in your browser — nothing is uploaded.</p>
+    <input type="file" id="fileInput" accept=".pdf"/>
+  </div>
+
+  <div class="panel" id="panel" style="display:none;">
+    <div class="panel-title">Select pages to remove</div>
+    <p class="hint">Click a page thumbnail to mark it for removal. Click again to unmark.</p>
+    <div class="delete-count" id="deleteCount"></div>
+    <div class="pages-grid" id="pagesGrid"></div>
+    <div style="margin-top:24px;">
+      <button class="btn btn-primary" id="downloadBtn" onclick="removeAndDownload()">Remove & Download PDF</button>
+      <button class="btn btn-secondary" onclick="resetTool()">Start over</button>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+</div>
+
+<script>
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  let pdfBytes = null;
+  let totalPages = 0;
+  let markedForDelete = new Set();
+
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('active'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('active'));
+  dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('active'); handleFile(e.dataTransfer.files[0]); });
+  fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
+  dropZone.addEventListener('click', e => { if(e.target.tagName !== 'STRONG') fileInput.click(); });
+
+  async function handleFile(file) {
+    if (!file || file.type !== 'application/pdf') return;
+    const buffer = await file.arrayBuffer();
+    pdfBytes = new Uint8Array(buffer);
+    await renderThumbnails(buffer);
+    document.getElementById('panel').style.display = 'block';
+    dropZone.style.display = 'none';
+  }
+
+  async function renderThumbnails(buffer) {
+    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+    totalPages = pdf.numPages;
+    const grid = document.getElementById('pagesGrid');
+    grid.innerHTML = '';
+    markedForDelete.clear();
+    updateDeleteCount();
+
+    for (let i = 1; i <= totalPages; i++) {
+      const page = await pdf.getPage(i);
+      const vp = page.getViewport({ scale: 0.3 });
+      const canvas = document.createElement('canvas');
+      canvas.width = vp.width; canvas.height = vp.height;
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+
+      const thumb = document.createElement('div');
+      thumb.className = 'page-thumb';
+      thumb.dataset.page = i;
+      const label = document.createElement('div');
+      label.className = 'page-label';
+      label.textContent = `Page ${i}`;
+      thumb.appendChild(canvas);
+      thumb.appendChild(label);
+      thumb.addEventListener('click', () => togglePage(i, thumb));
+      grid.appendChild(thumb);
+    }
+  }
+
+  function togglePage(pageNum, el) {
+    if (markedForDelete.has(pageNum)) {
+      markedForDelete.delete(pageNum);
+      el.classList.remove('marked-delete');
+    } else {
+      markedForDelete.add(pageNum);
+      el.classList.add('marked-delete');
+    }
+    updateDeleteCount();
+  }
+
+  function updateDeleteCount() {
+    const el = document.getElementById('deleteCount');
+    if (markedForDelete.size === 0) el.textContent = '';
+    else if (markedForDelete.size === totalPages) el.textContent = '⚠️ You\'ve selected all pages — at least one must remain.';
+    else el.textContent = `${markedForDelete.size} page${markedForDelete.size > 1 ? 's' : ''} marked for removal`;
+  }
+
+  async function removeAndDownload() {
+    if (markedForDelete.size === 0) { setStatus('No pages selected for removal.', 'error'); return; }
+    if (markedForDelete.size === totalPages) { setStatus('You must keep at least one page.', 'error'); return; }
+
+    setStatus('Processing…', '');
+    const btn = document.getElementById('downloadBtn');
+    btn.disabled = true;
+
+    try {
+      const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+      const indicesToRemove = [...markedForDelete].map(n => n - 1).sort((a, b) => b - a);
+      for (const idx of indicesToRemove) pdfDoc.removePage(idx);
+      const newBytes = await pdfDoc.save();
+      const blob = new Blob([newBytes], { type: 'application/pdf' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'convertam-removed-pages.pdf';
+      a.click();
+      setStatus(`✅ Done! Removed ${markedForDelete.size} page(s). Your download should start.`, 'success');
+    } catch(e) {
+      setStatus('Something went wrong. Please try another PDF.', 'error');
+    }
+    btn.disabled = false;
+  }
+
+  function resetTool() {
+    pdfBytes = null; totalPages = 0; markedForDelete.clear();
+    document.getElementById('panel').style.display = 'none';
+    document.getElementById('pagesGrid').innerHTML = '';
+    dropZone.style.display = '';
+    fileInput.value = '';
+    setStatus('', '');
+  }
+
+  function setStatus(msg, type) {
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = 'status ' + type;
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Add Page Numbers to PDF – Convertam</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --cream: #F8F6F1; --ink: #1A1A1A; --ink-soft: #555;
+      --accent: #D95F2B; --border: #E4E0D6; --radius: 12px;
+      --card: #fff; --shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+    body { font-family: 'Inter', sans-serif; background: var(--cream); color: var(--ink); min-height: 100vh; }
+    nav { background:#fff; border-bottom:1px solid var(--border); padding:0 24px; display:flex; align-items:center; height:56px; }
+    .logo { font-weight:700; font-size:1.1rem; color:var(--ink); text-decoration:none; }
+    .logo span { color:var(--accent); }
+    .back { margin-left:auto; font-size:0.85rem; color:var(--ink-soft); text-decoration:none; }
+    .back:hover { color:var(--accent); }
+
+    .container { max-width: 680px; margin: 0 auto; padding: 40px 24px 80px; }
+    h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 8px; }
+    .subtitle { color: var(--ink-soft); margin-bottom: 32px; font-size: 0.95rem; }
+
+    .drop-zone {
+      border: 2px dashed var(--border); border-radius: var(--radius);
+      background: var(--card); padding: 48px 24px; text-align: center;
+      cursor: pointer; transition: border-color 0.2s, background 0.2s;
+    }
+    .drop-zone:hover, .drop-zone.active { border-color: var(--accent); background: #FFF8F5; }
+    .drop-zone .icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .drop-zone p { color: var(--ink-soft); font-size: 0.9rem; }
+    .drop-zone strong { color: var(--accent); }
+    #fileInput { display: none; }
+
+    .panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; margin-top: 24px; box-shadow: var(--shadow); }
+    .panel-title { font-weight: 600; font-size: 1rem; margin-bottom: 20px; color: var(--ink); }
+
+    .form-row { margin-bottom: 18px; }
+    label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: var(--ink); }
+    select, input[type="number"], input[type="text"] {
+      width: 100%; padding: 10px 14px; border: 1px solid var(--border);
+      border-radius: 8px; font-size: 0.9rem; font-family: inherit;
+      background: var(--cream); color: var(--ink);
+      transition: border-color 0.2s;
+    }
+    select:focus, input:focus { outline: none; border-color: var(--accent); }
+
+    .position-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .pos-btn {
+      padding: 10px; border: 1px solid var(--border); border-radius: 8px;
+      background: var(--cream); cursor: pointer; font-size: 0.8rem;
+      text-align: center; transition: all 0.15s; font-family: inherit; color: var(--ink);
+    }
+    .pos-btn.selected { border-color: var(--accent); background: #FFF0E8; color: var(--accent); font-weight: 600; }
+    .pos-btn:hover { border-color: var(--accent); }
+
+    .file-info { background: #F0F7FF; border: 1px solid #BFD9F2; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 0.85rem; color: #2563EB; }
+
+    .btn {
+      display: inline-block; padding: 13px 32px; border-radius: 8px;
+      font-size: 0.9rem; font-weight: 600; cursor: pointer; border: none;
+      transition: background 0.18s, transform 0.1s;
+    }
+    .btn-primary { background: var(--accent); color: #fff; width: 100%; text-align: center; }
+    .btn-primary:hover { background: #BF4F1F; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary { background: transparent; color: var(--ink-soft); border: 1px solid var(--border); padding: 8px 16px; font-size: 0.82rem; margin-top: 10px; }
+    .btn-secondary:hover { background: var(--border); }
+
+    .status { margin-top: 14px; font-size: 0.88rem; text-align: center; }
+    .status.success { color: #2a7f4f; font-weight: 600; }
+    .status.error { color: #e53e3e; }
+  </style>
+</head>
+<body>
+<nav>
+  <a href="/" class="logo">Convert<span>am</span></a>
+  <a href="/" class="back">← All tools</a>
+</nav>
+
+<div class="container">
+  <h1>🔢 Add Page Numbers</h1>
+  <p class="subtitle">Stamp page numbers onto every page of your PDF — choose position, size, and starting number.</p>
+
+  <div class="drop-zone" id="dropZone">
+    <div class="icon">📄</div>
+    <p><strong onclick="document.getElementById('fileInput').click()">Choose a PDF</strong> or drag it here</p>
+    <p style="margin-top:6px;font-size:0.8rem;">Files stay in your browser — nothing is uploaded.</p>
+    <input type="file" id="fileInput" accept=".pdf"/>
+  </div>
+
+  <div class="panel" id="panel" style="display:none;">
+    <div class="file-info" id="fileInfo"></div>
+    <div class="panel-title">Page number settings</div>
+
+    <div class="form-row">
+      <label>Position</label>
+      <div class="position-grid" id="posGrid">
+        <button class="pos-btn" data-pos="top-left">↖ Top Left</button>
+        <button class="pos-btn" data-pos="top-center">↑ Top Center</button>
+        <button class="pos-btn" data-pos="top-right">↗ Top Right</button>
+        <button class="pos-btn" data-pos="bottom-left">↙ Bottom Left</button>
+        <button class="pos-btn selected" data-pos="bottom-center">↓ Bottom Center</button>
+        <button class="pos-btn" data-pos="bottom-right">↘ Bottom Right</button>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label for="startNum">Start numbering from</label>
+      <input type="number" id="startNum" value="1" min="1" max="9999" style="width:120px;"/>
+    </div>
+
+    <div class="form-row">
+      <label for="fontSize">Font size (pt)</label>
+      <input type="number" id="fontSize" value="12" min="8" max="36" style="width:120px;"/>
+    </div>
+
+    <div class="form-row">
+      <label for="format">Number format</label>
+      <select id="format">
+        <option value="plain">1, 2, 3 …</option>
+        <option value="page-of">Page 1 of N, Page 2 of N …</option>
+        <option value="dash">— 1 —, — 2 — …</option>
+      </select>
+    </div>
+
+    <button class="btn btn-primary" id="processBtn" onclick="addNumbers()">Add Numbers & Download</button>
+    <br>
+    <button class="btn btn-secondary" onclick="resetTool()">Start over</button>
+    <div class="status" id="status"></div>
+  </div>
+</div>
+
+<script>
+  let pdfBytes = null;
+  let totalPages = 0;
+  let selectedPos = 'bottom-center';
+
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+
+  document.querySelectorAll('.pos-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedPos = btn.dataset.pos;
+    });
+  });
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('active'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('active'));
+  dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('active'); handleFile(e.dataTransfer.files[0]); });
+  fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
+  dropZone.addEventListener('click', e => { if(e.target.tagName !== 'STRONG') fileInput.click(); });
+
+  async function handleFile(file) {
+    if (!file || file.type !== 'application/pdf') return;
+    const buffer = await file.arrayBuffer();
+    pdfBytes = new Uint8Array(buffer);
+    const tmpDoc = await PDFLib.PDFDocument.load(pdfBytes);
+    totalPages = tmpDoc.getPageCount();
+    document.getElementById('fileInfo').textContent = `📄 ${file.name} · ${totalPages} pages · ${(file.size/1024).toFixed(0)} KB`;
+    document.getElementById('panel').style.display = 'block';
+    dropZone.style.display = 'none';
+  }
+
+  async function addNumbers() {
+    const btn = document.getElementById('processBtn');
+    btn.disabled = true;
+    setStatus('Adding page numbers…', '');
+
+    try {
+      const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+      const pages = pdfDoc.getPages();
+      const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+      const startNum = parseInt(document.getElementById('startNum').value) || 1;
+      const fontSize = parseInt(document.getElementById('fontSize').value) || 12;
+      const format = document.getElementById('format').value;
+      const margin = 28;
+
+      pages.forEach((page, idx) => {
+        const { width, height } = page.getSize();
+        const pageNum = startNum + idx;
+        let text = '';
+        if (format === 'plain') text = `${pageNum}`;
+        else if (format === 'page-of') text = `Page ${pageNum} of ${totalPages + startNum - 1}`;
+        else text = `— ${pageNum} —`;
+
+        const textWidth = font.widthOfTextAtSize(text, fontSize);
+        let x, y;
+
+        if (selectedPos.includes('left')) x = margin;
+        else if (selectedPos.includes('right')) x = width - textWidth - margin;
+        else x = (width - textWidth) / 2;
+
+        if (selectedPos.includes('top')) y = height - margin - fontSize;
+        else y = margin;
+
+        page.drawText(text, { x, y, size: fontSize, font, color: PDFLib.rgb(0.3, 0.3, 0.3) });
+      });
+
+      const newBytes = await pdfDoc.save();
+      const blob = new Blob([newBytes], { type: 'application/pdf' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'convertam-numbered.pdf';
+      a.click();
+      setStatus('✅ Done! Your download should start.', 'success');
+    } catch(e) {
+      setStatus('Something went wrong. Please try another PDF.', 'error');
+    }
+    btn.disabled = false;
+  }
+
+  function resetTool() {
+    pdfBytes = null;
+    document.getElementById('panel').style.display = 'none';
+    dropZone.style.display = '';
+    fileInput.value = '';
+    setStatus('', '');
+  }
+
+  function setStatus(msg, type) {
+    const el = document.getElementById('status');
+    el.textContent = msg; el.className = 'status ' + type;
+  }
+</script>
+</body>
+</html>

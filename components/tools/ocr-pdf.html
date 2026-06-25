@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>OCR PDF – Extract Text from Scanned PDFs – Convertam</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --cream: #F8F6F1; --ink: #1A1A1A; --ink-soft: #555;
+      --accent: #D95F2B; --border: #E4E0D6; --radius: 12px;
+      --card: #fff; --shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+    body { font-family: 'Inter', sans-serif; background: var(--cream); color: var(--ink); min-height: 100vh; }
+    nav { background:#fff; border-bottom:1px solid var(--border); padding:0 24px; display:flex; align-items:center; height:56px; }
+    .logo { font-weight:700; font-size:1.1rem; color:var(--ink); text-decoration:none; }
+    .logo span { color:var(--accent); }
+    .back { margin-left:auto; font-size:0.85rem; color:var(--ink-soft); text-decoration:none; }
+    .back:hover { color:var(--accent); }
+
+    .container { max-width: 720px; margin: 0 auto; padding: 40px 24px 80px; }
+    h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 8px; }
+    .subtitle { color: var(--ink-soft); margin-bottom: 32px; font-size: 0.95rem; }
+
+    .ai-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #EDE9FF; color: #5B21B6; padding: 5px 12px;
+      border-radius: 20px; font-size: 0.8rem; font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .drop-zone {
+      border: 2px dashed var(--border); border-radius: var(--radius);
+      background: var(--card); padding: 48px 24px; text-align: center;
+      cursor: pointer; transition: border-color 0.2s, background 0.2s;
+    }
+    .drop-zone:hover, .drop-zone.active { border-color: var(--accent); background: #FFF8F5; }
+    .drop-zone .icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .drop-zone p { color: var(--ink-soft); font-size: 0.9rem; }
+    .drop-zone strong { color: var(--accent); }
+    #fileInput { display: none; }
+
+    .panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; margin-top: 24px; box-shadow: var(--shadow); }
+    .file-info { background: #F0F7FF; border: 1px solid #BFD9F2; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 0.85rem; color: #2563EB; }
+
+    .api-row { margin-bottom: 20px; }
+    label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; }
+    .api-hint { font-size: 0.78rem; color: var(--ink-soft); margin-top: 4px; }
+    .api-hint a { color: var(--accent); }
+    .input-wrap { position: relative; }
+    input[type="password"], input[type="text"] {
+      width: 100%; padding: 11px 44px 11px 14px;
+      border: 1px solid var(--border); border-radius: 8px;
+      font-size: 0.9rem; font-family: inherit;
+      background: var(--cream); color: var(--ink);
+    }
+    input:focus { outline: none; border-color: var(--accent); }
+    .toggle-pw {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      cursor: pointer; font-size: 1rem; opacity: 0.5;
+    }
+    .toggle-pw:hover { opacity: 1; }
+
+    .btn {
+      display: block; width: 100%; padding: 13px; border-radius: 8px;
+      font-size: 0.95rem; font-weight: 600; cursor: pointer; border: none;
+      transition: background 0.18s; text-align: center;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #BF4F1F; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .result-box {
+      margin-top: 24px; display: none;
+    }
+    .result-box .result-title {
+      font-weight: 600; margin-bottom: 10px; font-size: 0.95rem;
+    }
+    .result-text {
+      background: var(--cream); border: 1px solid var(--border);
+      border-radius: 8px; padding: 16px; font-size: 0.88rem;
+      line-height: 1.7; white-space: pre-wrap; max-height: 400px;
+      overflow-y: auto; color: var(--ink);
+      font-family: 'Courier New', monospace;
+    }
+    .copy-btn {
+      margin-top: 10px; padding: 9px 20px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--cream);
+      font-family: inherit; font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; color: var(--ink);
+    }
+    .copy-btn:hover { background: var(--border); }
+    .download-btn {
+      margin-top: 10px; margin-left: 8px; padding: 9px 20px; border-radius: 8px;
+      border: none; background: var(--accent); color: #fff;
+      font-family: inherit; font-size: 0.85rem; font-weight: 600;
+      cursor: pointer;
+    }
+    .download-btn:hover { background: #BF4F1F; }
+
+    .status { margin-top: 14px; font-size: 0.88rem; text-align: center; }
+    .status.success { color: #2a7f4f; font-weight: 600; }
+    .status.error { color: #e53e3e; }
+
+    .spinner {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+      vertical-align: middle; margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .page-limit-note { font-size: 0.8rem; color: var(--ink-soft); margin-top: 6px; }
+  </style>
+</head>
+<body>
+<nav>
+  <a href="/" class="logo">Convert<span>am</span></a>
+  <a href="/" class="back">← All tools</a>
+</nav>
+
+<div class="container">
+  <h1>🔍 OCR PDF</h1>
+  <div class="ai-badge">✨ Powered by Google Gemini</div>
+  <p class="subtitle">Extract text from scanned PDFs and images. Works even on handwritten documents.</p>
+
+  <div class="drop-zone" id="dropZone">
+    <div class="icon">📄</div>
+    <p><strong onclick="document.getElementById('fileInput').click()">Choose a PDF</strong> or drag it here</p>
+    <p style="margin-top:6px;font-size:0.8rem;">Works on scanned documents, photos of text, and handwriting.</p>
+    <input type="file" id="fileInput" accept=".pdf,image/*"/>
+  </div>
+
+  <div class="panel" id="panel" style="display:none;">
+    <div class="file-info" id="fileInfo"></div>
+
+    <div class="api-row">
+      <label for="apiKey">Google Gemini API Key</label>
+      <div class="input-wrap">
+        <input type="password" id="apiKey" placeholder="Paste your Gemini API key here"/>
+        <span class="toggle-pw" onclick="togglePw()">👁️</span>
+      </div>
+      <div class="api-hint">
+        Free tier available. Get your key at <a href="https://aistudio.google.com/app/apikey" target="_blank">aistudio.google.com</a>.
+        Your key stays in your browser only.
+      </div>
+    </div>
+
+    <div class="page-limit-note">📝 For multi-page PDFs, the first 5 pages will be processed (free tier limit).</div>
+
+    <button class="btn btn-primary" id="processBtn" style="margin-top:16px;" onclick="runOCR()">
+      Extract Text
+    </button>
+    <div class="status" id="status"></div>
+
+    <div class="result-box" id="resultBox">
+      <div class="result-title">Extracted text</div>
+      <div class="result-text" id="resultText"></div>
+      <button class="copy-btn" onclick="copyText()">📋 Copy text</button>
+      <button class="download-btn" onclick="downloadText()">⬇️ Download .txt</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let fileData = null;
+  let fileName = '';
+
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('active'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('active'));
+  dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('active'); handleFile(e.dataTransfer.files[0]); });
+  fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
+  dropZone.addEventListener('click', e => { if(e.target.tagName !== 'STRONG') fileInput.click(); });
+
+  async function handleFile(file) {
+    if (!file) return;
+    fileName = file.name;
+    const reader = new FileReader();
+    reader.onload = e => {
+      fileData = e.target.result; // base64 data URL
+      const type = file.type || 'application/pdf';
+      const sizeKB = (file.size / 1024).toFixed(0);
+      document.getElementById('fileInfo').textContent = `📄 ${file.name} · ${sizeKB} KB`;
+      document.getElementById('panel').style.display = 'block';
+      dropZone.style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function togglePw() {
+    const el = document.getElementById('apiKey');
+    el.type = el.type === 'password' ? 'text' : 'password';
+  }
+
+  async function runOCR() {
+    const apiKey = document.getElementById('apiKey').value.trim();
+    if (!apiKey) { setStatus('Please enter your Gemini API key.', 'error'); return; }
+    if (!fileData) { setStatus('Please select a file first.', 'error'); return; }
+
+    const btn = document.getElementById('processBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Extracting text with AI…';
+    setStatus('', '');
+    document.getElementById('resultBox').style.display = 'none';
+
+    try {
+      // Extract base64 and mime type from data URL
+      const [meta, base64] = fileData.split(',');
+      const mimeType = meta.match(/:(.*?);/)[1];
+
+      const payload = {
+        contents: [{
+          parts: [
+            {
+              inline_data: {
+                mime_type: mimeType,
+                data: base64
+              }
+            },
+            {
+              text: `Please extract ALL text from this document exactly as it appears. 
+Preserve the original structure, paragraphs, and line breaks as much as possible.
+If the document is in another language, extract the text as-is without translating.
+Return only the extracted text with no additional commentary.`
+            }
+          ]
+        }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 8192
+        }
+      };
+
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }
+      );
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || `API error ${res.status}`);
+      }
+
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      if (!text) throw new Error('No text returned from API.');
+
+      document.getElementById('resultText').textContent = text;
+      document.getElementById('resultBox').style.display = 'block';
+      setStatus('✅ Text extracted successfully!', 'success');
+    } catch(e) {
+      setStatus(`Error: ${e.message}`, 'error');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = 'Extract Text';
+  }
+
+  function copyText() {
+    const text = document.getElementById('resultText').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = event.target;
+      btn.textContent = '✅ Copied!';
+      setTimeout(() => btn.textContent = '📋 Copy text', 2000);
+    });
+  }
+
+  function downloadText() {
+    const text = document.getElementById('resultText').textContent;
+    const blob = new Blob([text], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName.replace(/\.pdf$/i, '') + '-ocr.txt';
+    a.click();
+  }
+
+  function setStatus(msg, type) {
+    const el = document.getElementById('status');
+    el.textContent = msg; el.className = 'status ' + type;
+  }
+</script>
+</body>
+</html>

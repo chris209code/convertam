@@ -5,6 +5,7 @@ import OfficeConvertWorkspace from '@/components/tools/OfficeConvertWorkspace';
 import GoogleDriveConvertWorkspace from '@/components/tools/GoogleDriveConvertWorkspace';
 import PdfToImageWorkspace from '@/components/tools/PdfToImageWorkspace';
 import SmartConverterWorkspace from '@/components/tools/SmartConverterWorkspace';
+import SummarizePdfWorkspace from '@/components/tools/SummarizePdfWorkspace';
 import ReceiptScanWorkspace from '@/components/tools/ReceiptScanWorkspace';
 import CompressPdfWorkspace from '@/components/tools/CompressPdfWorkspace';
 import SignPdfWorkspace from '@/components/tools/SignPdfWorkspace';
@@ -97,6 +98,7 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'pdf-lib' && <PdfLibWorkspace mode={tool.pdfLibMode} accept={tool.accept} />}
       {tool.mode === 'pdf-to-image' && <PdfToImageWorkspace format={tool.imageFormat} />}
       {tool.mode === 'smart' && <SmartConverterWorkspace />}
+      {tool.mode === 'summarize' && <SummarizePdfWorkspace />}
       {tool.mode === 'receipt' && <ReceiptScanWorkspace />}
       {tool.mode === 'compress' && (
         <PaymentGate toolName={tool.slug}>

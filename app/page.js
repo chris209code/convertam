@@ -11,15 +11,12 @@ const categories = [
 ];
 
 const isFree = (mode) =>
-  ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice'].includes(mode);
-const isPaid = (mode) => ['office', 'compress'].includes(mode);
+  ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice',
+   'remove-pages', 'add-page-numbers', 'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize', 'fill'].includes(mode);
 
 function ToolBadge({ mode }) {
   if (isFree(mode)) return (
     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(47,143,91,0.15)', color: '#2f8f5b' }}>FREE</span>
-  );
-  if (isPaid(mode)) return (
-    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(226,150,44,0.15)', color: '#e2962c' }}>PAID</span>
   );
   return null;
 }

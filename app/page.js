@@ -24,7 +24,6 @@ function ToolBadge({ mode }) {
   return null;
 }
 
-// ─── Ad Placeholder ───────────────────────────────────────────────────────────
 function AdPlaceholder({ id }) {
   return (
     <div id={id} className="w-full my-8 flex items-center justify-center rounded-2xl text-xs text-gray-400 font-medium"
@@ -34,7 +33,6 @@ function AdPlaceholder({ id }) {
   );
 }
 
-// ─── Stats ────────────────────────────────────────────────────────────────────
 const stats = [
   { value: '25+', label: 'Tools Available' },
   { value: '100%', label: 'Free Core Tools' },
@@ -72,14 +70,11 @@ export default function HomePage() {
       {/* ── HERO ── */}
       <section className="max-w-6xl mx-auto px-5 md:px-10 pt-16 pb-12 md:pt-20 md:pb-16">
         <div className="grid md:grid-cols-2 gap-12 items-center">
-
-          {/* Left */}
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-6"
               style={{ background: 'rgba(14,165,233,0.08)', color: '#0ea5e9', border: '1px solid rgba(14,165,233,0.2)' }}>
               🔒 100% Free · No Sign-up Required
             </div>
-
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight mb-4"
               style={{ letterSpacing: '-0.02em' }}>
               Convert any file.<br />
@@ -87,11 +82,9 @@ export default function HomePage() {
                 Instantly.
               </span>
             </h1>
-
             <p className="text-lg text-gray-500 mb-8 leading-relaxed max-w-md">
               Fast, secure PDF and document conversion. No login, no watermarks, no stress. Your files stay private.
             </p>
-
             <div className="flex flex-wrap gap-3 mb-8">
               <Link href="#tools"
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 hover:-translate-y-0.5"
@@ -103,8 +96,6 @@ export default function HomePage() {
                 ✦ Try AI Tools
               </Link>
             </div>
-
-            {/* Trust indicators */}
             <div className="flex flex-wrap gap-4">
               {[
                 { icon: '⚡', text: 'Instant conversion' },
@@ -117,8 +108,6 @@ export default function HomePage() {
               ))}
             </div>
           </div>
-
-          {/* Right — Hero illustration */}
           <div className="flex items-center justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -137,8 +126,7 @@ export default function HomePage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {stats.map(({ value, label }) => (
               <div key={label} className="text-center">
-                <div className="text-2xl md:text-3xl font-bold text-gray-900 mb-1"
-                  style={{ fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+                <div className="text-2xl md:text-3xl font-bold text-gray-900 mb-1">{value}</div>
                 <div className="text-xs text-gray-500 font-medium">{label}</div>
               </div>
             ))}
@@ -148,16 +136,12 @@ export default function HomePage() {
 
       {/* ── TOOLS ── */}
       <div id="tools" className="max-w-6xl mx-auto px-5 md:px-10 py-12">
-
         {categories.map(({ key, label, icon, highlight }, catIdx) => {
           const items = allTools.filter(t => t.category === key);
           if (items.length === 0) return null;
           const isAI = highlight;
-
           return (
             <section key={key} id={isAI ? 'ai-tools' : undefined} className="mb-12">
-
-              {/* Category header */}
               <div className="flex items-center gap-3 mb-5">
                 <span className="text-lg">{icon}</span>
                 <h2 className="text-base font-bold text-gray-900 tracking-tight">{label}</h2>
@@ -167,8 +151,6 @@ export default function HomePage() {
                 )}
                 <div className="flex-1 h-px" style={{ background: '#f1f5f9' }} />
               </div>
-
-              {/* AI tools — full width cards */}
               {isAI ? (
                 <div className="grid md:grid-cols-2 gap-3">
                   {items.map(t => (
@@ -191,7 +173,6 @@ export default function HomePage() {
                   ))}
                 </div>
               ) : (
-                /* Regular tool grid */
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {items.map(t => (
                     <Link key={t.slug} href={`/${t.slug}`}
@@ -206,8 +187,6 @@ export default function HomePage() {
                   ))}
                 </div>
               )}
-
-              {/* Ad after Popular Tools and after AI Tools */}
               {(catIdx === 0 || catIdx === 1) && <AdPlaceholder id={`ad-slot-${catIdx + 1}`} />}
             </section>
           );
@@ -237,7 +216,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── AD SLOT 3 — above footer ── */}
+      {/* ── AD SLOT 3 ── */}
       <div className="max-w-6xl mx-auto px-5 md:px-10">
         <AdPlaceholder id="ad-slot-3" />
       </div>
@@ -249,9 +228,7 @@ export default function HomePage() {
           <div className="flex items-center gap-4 flex-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/founder.jpg" alt="Christopher Okeke"
-              className="w-14 h-14 rounded-full object-cover flex-shrink-0"
-              onError={e => { e.target.style.display = 'none'; }}
-            />
+              className="w-14 h-14 rounded-full object-cover flex-shrink-0" />
             <div>
               <div className="text-[10px] font-bold text-blue-500 tracking-widest mb-0.5">FOUNDER</div>
               <div className="font-bold text-gray-900">Christopher Okeke</div>
@@ -278,8 +255,6 @@ export default function HomePage() {
       <footer className="border-t border-gray-100" style={{ background: '#f8fafc' }}>
         <div className="max-w-6xl mx-auto px-5 md:px-10 py-10">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-
-            {/* Brand */}
             <div className="md:col-span-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/logo.png" alt="Convertam" className="h-7 w-auto mb-3" />
@@ -287,8 +262,6 @@ export default function HomePage() {
                 Fast, secure file conversion for everyone. No sign-up, no limits, no stress.
               </p>
             </div>
-
-            {/* Tools */}
             <div>
               <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-3">Tools</h3>
               <ul className="space-y-2">
@@ -304,8 +277,6 @@ export default function HomePage() {
                 })}
               </ul>
             </div>
-
-            {/* AI Tools */}
             <div>
               <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-3">AI Tools</h3>
               <ul className="space-y-2">
@@ -318,8 +289,6 @@ export default function HomePage() {
                 ))}
               </ul>
             </div>
-
-            {/* Company */}
             <div>
               <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-3">Company</h3>
               <ul className="space-y-2">
@@ -337,7 +306,6 @@ export default function HomePage() {
               </ul>
             </div>
           </div>
-
           <div className="pt-6 border-t border-gray-200 flex flex-col md:flex-row items-center justify-between gap-3">
             <p className="text-xs text-gray-400">
               © {new Date().getFullYear()} Convertam · Files processed and deleted — we don&apos;t keep copies.

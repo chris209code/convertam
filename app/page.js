@@ -2,8 +2,9 @@ import Link from 'next/link';
 import { tools } from '@/lib/tools-config';
 import { ToolIcon } from '@/components/ToolIcons';
 
+// ─── Categories ──────────────────────────────────────────────────────────────
 const categories = [
-  { key: 'Smart Converter', label: 'Smart Converter', icon: '✦' },
+  { key: 'Smart Converter', label: 'Smart AI Tools', icon: '✦', highlight: true },
   { key: 'PDF Editor', label: 'PDF Editor', icon: '✍️' },
   { key: 'PDF Utilities', label: 'PDF Utilities', icon: '📄' },
   { key: 'Image Tools', label: 'Image Tools', icon: '🖼️' },
@@ -11,121 +12,344 @@ const categories = [
 ];
 
 const isFree = (mode) =>
-  ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice',
-   'remove-pages', 'add-page-numbers', 'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize', 'fill'].includes(mode);
+  ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder',
+   'watermark', 'invoice', 'remove-pages', 'add-page-numbers',
+   'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize', 'fill'].includes(mode);
 
 function ToolBadge({ mode }) {
   if (isFree(mode)) return (
-    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0" style={{ background: 'rgba(47,143,91,0.15)', color: '#2f8f5b' }}>FREE</span>
+    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+      style={{ background: 'rgba(16,185,129,0.12)', color: '#059669' }}>FREE</span>
   );
   return null;
 }
 
-export default function HomePage() {
+// ─── Ad Placeholder ───────────────────────────────────────────────────────────
+function AdPlaceholder({ id }) {
   return (
-    <main>
-      {/* Banner */}
-      <div className="w-full overflow-hidden" style={{ maxHeight: '140px' }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/banner.jpg" alt="Convertam — free document toolkit" className="w-full object-cover" style={{ objectPosition: 'center 30%', maxHeight: '140px' }} />
-      </div>
+    <div id={id} className="w-full my-8 flex items-center justify-center rounded-2xl text-xs text-gray-400 font-medium"
+      style={{ minHeight: 90, background: '#f8fafc', border: '1px dashed #e2e8f0' }}>
+      Advertisement
+    </div>
+  );
+}
 
-      {/* Hero */}
-      <section className="max-w-4xl mx-auto px-5 md:px-10 pt-6 pb-2 text-center">
-        <h1 className="font-display text-3xl md:text-5xl font-bold leading-tight mb-3">
-          Upload. Convert am. <span className="text-stamp-amber">Download.</span>
-        </h1>
-        <p className="text-ink-soft text-base mb-4">Convert any file. Instantly. No login.</p>
-        <div className="flex items-center justify-center gap-2 flex-wrap">
-          {[
-            { num: '01', icon: '📤', label: 'Upload' },
-            { num: '02', icon: '⚙️', label: 'Convert' },
-            { num: '03', icon: '📥', label: 'Download' },
-          ].map(({ num, icon, label }, i, arr) => (
-            <div key={num} className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium" style={{ background: '#fffefb', border: '1px solid #e2dcc9' }}>
-                <span className="font-mono text-[10px] text-stamp-amber">{num}</span>
-                <span>{icon}</span>
-                <span className="text-ink">{label}</span>
-              </div>
-              {i < arr.length - 1 && <span className="text-ink-soft text-xs">→</span>}
+// ─── Stats ────────────────────────────────────────────────────────────────────
+const stats = [
+  { value: '25+', label: 'Tools Available' },
+  { value: '100%', label: 'Free Core Tools' },
+  { value: '0', label: 'Login Required' },
+  { value: '∞', label: 'Files Deleted After Use' },
+];
+
+export default function HomePage() {
+  const allTools = tools;
+
+  return (
+    <main className="bg-white min-h-screen">
+
+      {/* ── NAV ── */}
+      <nav className="sticky top-0 z-50 bg-white border-b border-gray-100"
+        style={{ backdropFilter: 'blur(8px)' }}>
+        <div className="max-w-6xl mx-auto px-5 md:px-10 h-16 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="Convertam" className="h-8 w-auto" />
+          </Link>
+          <div className="flex items-center gap-6">
+            <Link href="#tools" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors hidden md:block">Tools</Link>
+            <Link href="#ai-tools" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors hidden md:block">AI Tools</Link>
+            <Link href="/about" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors hidden md:block">About</Link>
+            <Link href="#tools"
+              className="text-sm font-semibold px-4 py-2 rounded-xl text-white transition-all hover:opacity-90"
+              style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
+              Get Started
+            </Link>
+          </div>
+        </div>
+      </nav>
+
+      {/* ── HERO ── */}
+      <section className="max-w-6xl mx-auto px-5 md:px-10 pt-16 pb-12 md:pt-20 md:pb-16">
+        <div className="grid md:grid-cols-2 gap-12 items-center">
+
+          {/* Left */}
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-6"
+              style={{ background: 'rgba(14,165,233,0.08)', color: '#0ea5e9', border: '1px solid rgba(14,165,233,0.2)' }}>
+              🔒 100% Free · No Sign-up Required
             </div>
-          ))}
+
+            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight mb-4"
+              style={{ letterSpacing: '-0.02em' }}>
+              Convert any file.<br />
+              <span style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                Instantly.
+              </span>
+            </h1>
+
+            <p className="text-lg text-gray-500 mb-8 leading-relaxed max-w-md">
+              Fast, secure PDF and document conversion. No login, no watermarks, no stress. Your files stay private.
+            </p>
+
+            <div className="flex flex-wrap gap-3 mb-8">
+              <Link href="#tools"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 hover:-translate-y-0.5"
+                style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)', boxShadow: '0 4px 14px rgba(14,165,233,0.35)' }}>
+                🚀 Explore All Tools
+              </Link>
+              <Link href="#ai-tools"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-gray-700 transition-all hover:bg-gray-100 border border-gray-200">
+                ✦ Try AI Tools
+              </Link>
+            </div>
+
+            {/* Trust indicators */}
+            <div className="flex flex-wrap gap-4">
+              {[
+                { icon: '⚡', text: 'Instant conversion' },
+                { icon: '🔒', text: 'Files never stored' },
+                { icon: '💳', text: 'No account needed' },
+              ].map(({ icon, text }) => (
+                <div key={text} className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+                  <span>{icon}</span><span>{text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right — Hero illustration */}
+          <div className="flex items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/hero.png"
+              alt="Convertam — convert any file format"
+              className="w-full max-w-lg"
+              style={{ filter: 'drop-shadow(0 20px 40px rgba(14,165,233,0.15))' }}
+            />
+          </div>
         </div>
       </section>
 
-      {/* Why Convertam */}
-      <section className="max-w-4xl mx-auto px-5 md:px-10 py-6">
-        <div className="rounded-2xl p-6" style={{ background: '#fffefb', border: '1px solid #e2dcc9' }}>
-          <h2 className="font-display text-lg font-bold text-ink mb-4">Why Choose Convertam?</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { icon: '⚡', title: 'Fast', desc: 'Conversions in seconds' },
-              { icon: '🔒', title: 'Privacy First', desc: 'Files never stored' },
-              { icon: '🚫', title: 'No Registration', desc: 'Just upload and go' },
-              { icon: '💯', title: 'Mostly Free', desc: 'Most tools cost nothing' },
-            ].map(({ icon, title, desc }) => (
-              <div key={title} className="text-center">
-                <div className="text-2xl mb-1">{icon}</div>
-                <div className="font-semibold text-ink text-sm">{title}</div>
-                <div className="text-xs text-ink-soft">{desc}</div>
+      {/* ── STATS ── */}
+      <section className="border-y border-gray-100" style={{ background: '#f8fafc' }}>
+        <div className="max-w-6xl mx-auto px-5 md:px-10 py-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {stats.map(({ value, label }) => (
+              <div key={label} className="text-center">
+                <div className="text-2xl md:text-3xl font-bold text-gray-900 mb-1"
+                  style={{ fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+                <div className="text-xs text-gray-500 font-medium">{label}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* All tool sections */}
-      {categories.map(({ key, label, icon }) => {
-        const items = tools.filter((t) => t.category === key);
-        if (items.length === 0) return null;
-        const isSmart = key === 'Smart Converter';
-        return (
-          <section key={key} className="max-w-4xl mx-auto px-5 md:px-10 py-4">
-            <h2 className="font-mono text-xs tracking-widest text-stamp-blue mb-3 flex items-center gap-2">
-              <span>{icon}</span><span>{label.toUpperCase()}</span>
-            </h2>
-            {isSmart ? (
-              <div className="flex flex-col gap-2.5">
-                {items.map((t) => (
-                  <Link key={t.slug} href={`/${t.slug}`}
-                    className="flex items-center justify-between border-2 rounded-xl px-5 py-4 transition-colors"
-                    style={{ background: '#f0f5ff', borderColor: '#3a63b8' }}>
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#f0f5ff' }}>
-                        <ToolIcon slug={t.slug} size={32} />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-ink text-base">{t.title}</div>
-                        <div className="text-xs text-ink-soft mt-0.5">{t.description}</div>
-                      </div>
-                    </div>
-                    <span className="text-xs font-bold px-3 py-1.5 rounded-full flex-shrink-0 ml-3" style={{ background: '#3a63b8', color: 'white' }}>✦ AI · FREE</span>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
-                {items.map((t) => (
-                  <Link key={t.slug} href={`/${t.slug}`}
-                    className="flex items-center gap-3 border rounded-xl px-3 py-3 transition-colors hover:border-stamp-blue"
-                    style={{ background: '#fffefb', borderColor: '#e2dcc9' }}>
-                    <ToolIcon slug={t.slug} size={22} />
-                    <span className="text-sm font-medium text-ink flex-1 leading-tight">{t.title}</span>
-                    <ToolBadge mode={t.mode} />
-                  </Link>
-                ))}
-              </div>
-            )}
-          </section>
-        );
-      })}
+      {/* ── TOOLS ── */}
+      <div id="tools" className="max-w-6xl mx-auto px-5 md:px-10 py-12">
 
-      <section className="max-w-4xl mx-auto px-5 md:px-10 pb-8 text-center">
-        <p className="text-xs text-ink-soft">
-          Files you convert here are processed and then gone — we don&apos;t keep copies.
-        </p>
+        {categories.map(({ key, label, icon, highlight }, catIdx) => {
+          const items = allTools.filter(t => t.category === key);
+          if (items.length === 0) return null;
+          const isAI = highlight;
+
+          return (
+            <section key={key} id={isAI ? 'ai-tools' : undefined} className="mb-12">
+
+              {/* Category header */}
+              <div className="flex items-center gap-3 mb-5">
+                <span className="text-lg">{icon}</span>
+                <h2 className="text-base font-bold text-gray-900 tracking-tight">{label}</h2>
+                {isAI && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    style={{ background: 'rgba(14,165,233,0.1)', color: '#0ea5e9' }}>NEW</span>
+                )}
+                <div className="flex-1 h-px" style={{ background: '#f1f5f9' }} />
+              </div>
+
+              {/* AI tools — full width cards */}
+              {isAI ? (
+                <div className="grid md:grid-cols-2 gap-3">
+                  {items.map(t => (
+                    <Link key={t.slug} href={`/${t.slug}`}
+                      className="flex items-center gap-4 p-4 rounded-2xl border transition-all hover:-translate-y-0.5 group"
+                      style={{ background: 'linear-gradient(135deg, #f0f9ff, #e0f2fe)', borderColor: '#bae6fd' }}>
+                      <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: 'white', boxShadow: '0 2px 8px rgba(14,165,233,0.15)' }}>
+                        <ToolIcon slug={t.slug} size={24} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-gray-900 text-sm">{t.title}</div>
+                        <div className="text-xs text-gray-500 mt-0.5 truncate">{t.description}</div>
+                      </div>
+                      <span className="text-[9px] font-bold px-2 py-1 rounded-full flex-shrink-0"
+                        style={{ background: 'rgba(14,165,233,0.15)', color: '#0ea5e9' }}>
+                        ✦ AI · FREE
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                /* Regular tool grid */
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {items.map(t => (
+                    <Link key={t.slug} href={`/${t.slug}`}
+                      className="flex items-center gap-3 p-3.5 rounded-xl border border-gray-100 bg-white transition-all hover:border-blue-200 hover:shadow-sm hover:-translate-y-0.5 group"
+                      style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                      <div className="flex-shrink-0">
+                        <ToolIcon slug={t.slug} size={20} />
+                      </div>
+                      <span className="text-sm font-medium text-gray-800 flex-1 leading-tight">{t.title}</span>
+                      <ToolBadge mode={t.mode} />
+                    </Link>
+                  ))}
+                </div>
+              )}
+
+              {/* Ad after Popular Tools and after AI Tools */}
+              {(catIdx === 0 || catIdx === 1) && <AdPlaceholder id={`ad-slot-${catIdx + 1}`} />}
+            </section>
+          );
+        })}
+      </div>
+
+      {/* ── WHY CONVERTAM ── */}
+      <section style={{ background: '#f8fafc' }} className="border-t border-gray-100">
+        <div className="max-w-6xl mx-auto px-5 md:px-10 py-14">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2 text-center">Why Choose Convertam?</h2>
+          <p className="text-gray-500 text-sm text-center mb-10">Built for people who just need it done. Fast.</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {[
+              { icon: '⚡', title: 'Lightning Fast', desc: 'Conversions in seconds, not minutes.' },
+              { icon: '🔒', title: 'Privacy First', desc: 'Files deleted immediately after conversion.' },
+              { icon: '🚫', title: 'No Registration', desc: 'Just upload and go. No account needed.' },
+              { icon: '📱', title: 'Works Everywhere', desc: 'Any device. Any browser. Any time.' },
+            ].map(({ icon, title, desc }) => (
+              <div key={title} className="text-center p-5 rounded-2xl bg-white border border-gray-100"
+                style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                <div className="text-3xl mb-3">{icon}</div>
+                <div className="font-semibold text-gray-900 text-sm mb-1">{title}</div>
+                <div className="text-xs text-gray-500 leading-relaxed">{desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
+
+      {/* ── AD SLOT 3 — above footer ── */}
+      <div className="max-w-6xl mx-auto px-5 md:px-10">
+        <AdPlaceholder id="ad-slot-3" />
+      </div>
+
+      {/* ── FOUNDER CARD ── */}
+      <section className="max-w-6xl mx-auto px-5 md:px-10 pb-12">
+        <div className="rounded-2xl p-6 flex flex-col md:flex-row items-center gap-6"
+          style={{ background: 'linear-gradient(135deg, #f0f9ff, #e0f2fe)', border: '1px solid #bae6fd' }}>
+          <div className="flex items-center gap-4 flex-1">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/founder.jpg" alt="Christopher Okeke"
+              className="w-14 h-14 rounded-full object-cover flex-shrink-0"
+              onError={e => { e.target.style.display = 'none'; }}
+            />
+            <div>
+              <div className="text-[10px] font-bold text-blue-500 tracking-widest mb-0.5">FOUNDER</div>
+              <div className="font-bold text-gray-900">Christopher Okeke</div>
+              <div className="text-xs text-gray-500">Building simple tools for a simpler you.</div>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-6 text-center">
+            {[
+              { icon: '✅', title: '100% Free', sub: 'Core tools forever' },
+              { icon: '🔒', title: 'Secure', sub: 'Files never stored' },
+              { icon: '⚡', title: 'Fast', sub: 'Results in seconds' },
+            ].map(({ icon, title, sub }) => (
+              <div key={title}>
+                <div className="text-lg mb-0.5">{icon}</div>
+                <div className="text-xs font-semibold text-gray-900">{title}</div>
+                <div className="text-[10px] text-gray-500">{sub}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FOOTER ── */}
+      <footer className="border-t border-gray-100" style={{ background: '#f8fafc' }}>
+        <div className="max-w-6xl mx-auto px-5 md:px-10 py-10">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+
+            {/* Brand */}
+            <div className="md:col-span-1">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" alt="Convertam" className="h-7 w-auto mb-3" />
+              <p className="text-xs text-gray-500 leading-relaxed max-w-xs">
+                Fast, secure file conversion for everyone. No sign-up, no limits, no stress.
+              </p>
+            </div>
+
+            {/* Tools */}
+            <div>
+              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-3">Tools</h3>
+              <ul className="space-y-2">
+                {['PDF to Word', 'Merge PDF', 'Compress PDF', 'JPG to PDF', 'Sign PDF'].map(name => {
+                  const tool = tools.find(t => t.title === name);
+                  return tool ? (
+                    <li key={name}>
+                      <Link href={`/${tool.slug}`} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
+                        {name}
+                      </Link>
+                    </li>
+                  ) : null;
+                })}
+              </ul>
+            </div>
+
+            {/* AI Tools */}
+            <div>
+              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-3">AI Tools</h3>
+              <ul className="space-y-2">
+                {tools.filter(t => t.category === 'Smart Converter').map(t => (
+                  <li key={t.slug}>
+                    <Link href={`/${t.slug}`} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
+                      {t.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Company */}
+            <div>
+              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-3">Company</h3>
+              <ul className="space-y-2">
+                {[
+                  { label: 'About', href: '/about' },
+                  { label: 'Privacy Policy', href: '/privacy-policy' },
+                  { label: 'Contact', href: '/contact' },
+                ].map(({ label, href }) => (
+                  <li key={label}>
+                    <Link href={href} className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
+                      {label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <div className="pt-6 border-t border-gray-200 flex flex-col md:flex-row items-center justify-between gap-3">
+            <p className="text-xs text-gray-400">
+              © {new Date().getFullYear()} Convertam · Files processed and deleted — we don&apos;t keep copies.
+            </p>
+            <p className="text-xs text-gray-400">
+              convertam.app is free to use. If it&apos;s useful to you,{' '}
+              <a href="/support" className="underline hover:text-gray-600">support it here</a>.
+            </p>
+          </div>
+        </div>
+      </footer>
+
     </main>
   );
 }

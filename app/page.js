@@ -35,10 +35,31 @@ export default function HomePage() {
     <main style={{ background: 'linear-gradient(180deg, #F8FBFF 0%, #FFFFFF 40%, #F8FAFC 100%)' }}>
 
       {/* ── HERO ── */}
-      <section style={{ background: '#F8FBFF', borderBottom: '1px solid #E6EDF5', padding: '90px 0' }}>
-        <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '0 40px' }}>
+      <section style={{
+        position: 'relative', overflow: 'hidden',
+        background: 'white',
+        borderBottom: '1px solid #E6EDF5',
+        padding: '90px 0',
+      }}>
+        {/* Blue wave shapes — top right */}
+        <div style={{
+          position: 'absolute', top: '-80px', right: '-80px',
+          width: '500px', height: '500px', borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(37,99,235,0.07) 0%, transparent 65%)',
+          pointerEvents: 'none',
+        }} />
+        {/* Blue wave shapes — bottom left */}
+        <div style={{
+          position: 'absolute', bottom: '-60px', left: '-60px',
+          width: '400px', height: '400px', borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(99,102,241,0.06) 0%, transparent 65%)',
+          pointerEvents: 'none',
+        }} />
+
+        <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '0 40px', position: 'relative', zIndex: 1 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', alignItems: 'center' }}>
 
+            {/* Left */}
             <div>
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: '8px',
@@ -86,10 +107,11 @@ export default function HomePage() {
               </div>
             </div>
 
+            {/* Right — illustration fills the full column */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/hero.png" alt="Convertam file conversion"
-                style={{ width: '100%', maxWidth: '560px', height: 'auto', objectFit: 'contain', display: 'block' }} />
+                style={{ width: '100%', maxWidth: '640px', height: 'auto', objectFit: 'contain', display: 'block' }} />
             </div>
           </div>
         </div>
@@ -152,7 +174,6 @@ export default function HomePage() {
               {/* Card container */}
               <div style={{ background: sectionBg, borderRadius: '16px', padding: '16px', border: '1px solid #E5E7EB' }}>
                 {isAI ? (
-                  /* AI tools — 2 column cards with description */
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     {items.map(t => (
                       <Link key={t.slug} href={`/${t.slug}`}
@@ -176,8 +197,8 @@ export default function HomePage() {
                     ))}
                   </div>
                 ) : (
-                  /* Regular tools — 2 column full-width rows matching target design */
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  /* 4-column full-width rows matching target */
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
                     {items.map(t => (
                       <ToolCard key={t.slug} slug={t.slug} title={t.title} mode={t.mode} bg={bg} isFree={isFreeMode(t.mode)} />
                     ))}
@@ -217,7 +238,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* AD SLOT 2 */}
       <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '0 40px' }}>
         <AdSlot id="ad-slot-2" />
       </div>

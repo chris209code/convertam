@@ -7,15 +7,28 @@
 }
 
 body {
-  background: linear-gradient(180deg, #F8FBFF 0%, #FFFFFF 35%, #F8FAFC 100%);
-  min-height: 100vh;
+  background:
+    radial-gradient(circle at top right,
+      rgba(37,99,235,.06) 0%,
+      rgba(37,99,235,0) 35%),
+    radial-gradient(circle at bottom left,
+      rgba(16,185,129,.05) 0%,
+      rgba(16,185,129,0) 40%),
+    linear-gradient(
+      180deg,
+      #F6FAFF 0%,
+      #FFFFFF 22%,
+      #FBFCFE 55%,
+      #F8FAFC 100%
+    );
+  color: #0F172A;
 }
 
 @layer components {
   .panel {
     @apply bg-white text-ink rounded-2xl p-6 md:p-10;
-    border: 1px solid #E2E8F0;
-    box-shadow: 0 8px 30px rgba(2,6,23,0.05);
+    border: 1px solid #E4EBF4;
+    box-shadow: 0 2px 8px rgba(15,23,42,0.04);
   }
   .dropzone {
     @apply border-2 border-dashed rounded-xl p-9 text-center cursor-pointer transition-colors;
@@ -33,7 +46,7 @@ body {
   .file-list { @apply mt-4 flex flex-col gap-2; }
   .file-row {
     @apply flex items-center gap-2.5 bg-white border rounded-lg px-3 py-2 text-sm;
-    border-color: #E2E8F0;
+    border-color: #E4EBF4;
   }
   .badge { @apply font-mono text-[10px] bg-ink text-white px-1.5 py-0.5 rounded; }
   .file-row .name { @apply flex-1 truncate; }
@@ -47,8 +60,8 @@ body {
   }
   .btn-primary:hover { box-shadow: 0 14px 28px rgba(37,99,235,0.35); }
   .btn-primary:disabled { @apply bg-[#c7cede] cursor-not-allowed; box-shadow: none; }
-  .btn-ghost { @apply bg-transparent border text-ink-soft; border-color: #E2E8F0; }
-  .btn-ghost-sm { @apply text-xs border rounded-md px-3 py-1.5 bg-transparent cursor-pointer; border-color: #E2E8F0; }
+  .btn-ghost { @apply bg-transparent border text-ink-soft; border-color: #E4EBF4; }
+  .btn-ghost-sm { @apply text-xs border rounded-md px-3 py-1.5 bg-transparent cursor-pointer; border-color: #E4EBF4; }
   .active-choice { border-color: #2563EB; color: #2563EB; background: #EFF6FF; }
   .status { @apply font-mono text-xs mt-3.5; }
   .status.success { @apply text-success; }
@@ -59,18 +72,18 @@ body {
   }
   .tool-card {
     @apply flex items-center justify-between border rounded-xl px-4 py-3.5 text-sm font-medium transition-all;
-    background: white;
-    border-color: #E2E8F0;
-    box-shadow: 0 2px 8px rgba(2,6,23,0.04);
+    background: #FFFFFF;
+    border-color: #E4EBF4;
+    box-shadow: 0 2px 8px rgba(15,23,42,0.04);
   }
   .tool-card:hover {
     transform: translateY(-3px);
-    box-shadow: 0 12px 24px rgba(2,6,23,0.08);
-    border-color: #CBD5E1;
+    border-color: #C7D8F7;
+    box-shadow: 0 14px 28px rgba(37,99,235,0.10);
   }
   .tool-card-badge { @apply font-mono text-[10px] px-1.5 py-0.5 rounded; }
   .tool-card-badge.live { color: #10B981; background: rgba(16,185,129,0.15); }
   .tool-card-badge.soon { color: #F59E0B; background: rgba(245,158,11,0.15); }
-  .range-input { @apply border rounded-lg px-3 py-2 text-sm w-full max-w-xs; border-color: #E2E8F0; }
+  .range-input { @apply border rounded-lg px-3 py-2 text-sm w-full max-w-xs; border-color: #E4EBF4; }
   .privacy-note { @apply text-xs text-ink-soft mt-4; }
 }

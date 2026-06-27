@@ -34,14 +34,14 @@ export default function HomePage() {
   return (
     <main>
 
-      {/* ── HERO — full-width image as background, text overlaid left ── */}
+      {/* ── HERO ── */}
       <section style={{
         position: 'relative',
         backgroundImage: 'url(/hero.png)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center top',
+        backgroundSize: '100% auto',
+        backgroundPosition: 'top center',
         backgroundRepeat: 'no-repeat',
-        minHeight: '560px',
+        minHeight: '620px',
         display: 'flex',
         alignItems: 'center',
       }}>
@@ -121,15 +121,10 @@ export default function HomePage() {
       {/* ── STATS ── */}
       <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '0 40px' }}>
         <div style={{
-          background: '#FFFFFF',
-          border: '1px solid #E7EDF5',
-          borderRadius: '22px',
-          boxShadow: '0 15px 40px rgba(15,23,42,0.06)',
-          marginTop: '-30px',
-          position: 'relative',
-          zIndex: 5,
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
+          background: '#FFFFFF', border: '1px solid #E7EDF5',
+          borderRadius: '22px', boxShadow: '0 15px 40px rgba(15,23,42,0.06)',
+          marginTop: '-30px', position: 'relative', zIndex: 5,
+          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
         }}>
           {[
             { value: '25+', label: 'Free Tools Available', icon: '🛠️', bg: '#EFF6FF' },
@@ -159,11 +154,9 @@ export default function HomePage() {
           const items = tools.filter(t => t.category === key);
           if (!items.length) return null;
           const isAI = highlight;
-
           return (
             <section key={key} id={isAI ? 'ai-tools' : undefined}
               style={{ paddingTop: catIdx === 0 ? 0 : '56px' }}>
-
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '14px', marginBottom: '20px', borderBottom: '1px solid #E7EDF5' }}>
                 <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
                   <span style={{ color: accent }}>{icon}</span>
@@ -176,7 +169,6 @@ export default function HomePage() {
                   <p style={{ fontSize: '0.75rem', color: '#64748B', margin: 0 }}>{desc}</p>
                 </div>
               </div>
-
               <div style={{ background: sectionBg, borderRadius: '16px', padding: '16px', border: '1px solid #E7EDF5' }}>
                 {isAI ? (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -209,7 +201,6 @@ export default function HomePage() {
                   </div>
                 )}
               </div>
-
               {catIdx === 0 && <AdSlot id="ad-slot-1" />}
             </section>
           );

@@ -17,19 +17,28 @@ const isFreeMode = (mode) =>
    'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize', 'fill'].includes(mode);
 
 function AdSlot({ id }) {
-  return <div id={id} style={{ minHeight: 0, overflow: 'hidden' }} />;
+  return (
+    <div id={id} style={{
+      width: '100%', height: '120px', margin: '32px 0',
+      background: '#F8FAFC', border: '1px dashed #CBD5E1',
+      borderRadius: '16px', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', fontSize: '0.75rem', color: '#94A3B8',
+      fontWeight: 500, letterSpacing: '0.05em',
+    }}>
+      Advertisement
+    </div>
+  );
 }
 
 export default function HomePage() {
   return (
-    <main style={{ background: 'linear-gradient(180deg, #F8FBFF 0%, #FFFFFF 35%, #F8FAFC 100%)' }}>
+    <main style={{ background: 'linear-gradient(180deg, #F8FBFF 0%, #FFFFFF 40%, #F8FAFC 100%)' }}>
 
       {/* ── HERO ── */}
-      <section style={{ background: '#F8FBFF', borderBottom: '1px solid #E6EDF5', padding: '72px 0 80px' }}>
+      <section style={{ background: '#F8FBFF', borderBottom: '1px solid #E6EDF5', padding: '90px 0' }}>
         <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '0 40px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', alignItems: 'center' }}>
 
-            {/* Left */}
             <div>
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: '8px',
@@ -77,7 +86,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Right — illustration, no border no box */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/hero.png" alt="Convertam file conversion"
@@ -88,7 +96,7 @@ export default function HomePage() {
       </section>
 
       {/* ── STATS ── */}
-      <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '40px 40px 0' }}>
+      <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '48px 40px 0' }}>
         <div style={{
           background: 'white', border: '1px solid #E5E7EB',
           borderRadius: '18px', boxShadow: '0 8px 30px rgba(2,6,23,0.05)',
@@ -101,8 +109,7 @@ export default function HomePage() {
             { value: 'Auto', label: 'Files Deleted After Use', icon: '🗑️', bg: '#FFFBEB' },
           ].map(({ value, label, icon, bg }, i) => (
             <div key={label} style={{
-              display: 'flex', alignItems: 'center', gap: '16px',
-              padding: '24px 28px',
+              display: 'flex', alignItems: 'center', gap: '16px', padding: '24px 28px',
               borderLeft: i > 0 ? '1px solid #E5E7EB' : 'none',
             }}>
               <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
@@ -118,17 +125,18 @@ export default function HomePage() {
       </div>
 
       {/* ── TOOLS ── */}
-      <div id="tools" style={{ maxWidth: '1152px', margin: '0 auto', padding: '48px 40px 64px' }}>
+      <div id="tools" style={{ maxWidth: '1152px', margin: '0 auto', padding: '48px 40px 72px' }}>
         {categories.map(({ key, label, desc, icon, accent, bg, sectionBg, highlight }, catIdx) => {
           const items = tools.filter(t => t.category === key);
           if (!items.length) return null;
           const isAI = highlight;
 
           return (
-            <section key={key} id={isAI ? 'ai-tools' : undefined} style={{ marginBottom: '40px' }}>
+            <section key={key} id={isAI ? 'ai-tools' : undefined}
+              style={{ paddingTop: catIdx === 0 ? 0 : '56px', paddingBottom: '8px' }}>
 
               {/* Section header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '12px', marginBottom: '20px', borderBottom: '1px solid #E5E7EB' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '12px', marginBottom: '16px', borderBottom: '1px solid #E5E7EB' }}>
                 <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
                   <span style={{ color: accent }}>{icon}</span>
                 </div>
@@ -141,9 +149,10 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Cards — alternating section background */}
+              {/* Card container */}
               <div style={{ background: sectionBg, borderRadius: '16px', padding: '16px', border: '1px solid #E5E7EB' }}>
                 {isAI ? (
+                  /* AI tools — 2 column cards with description */
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     {items.map(t => (
                       <Link key={t.slug} href={`/${t.slug}`}
@@ -152,7 +161,6 @@ export default function HomePage() {
                           borderRadius: '12px', border: '1px solid #A7F3D0',
                           background: 'white', textDecoration: 'none',
                           boxShadow: '0 1px 4px rgba(16,185,129,0.08)',
-                          transition: 'all 0.2s',
                         }}>
                         <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           <ToolIcon slug={t.slug} size={22} />
@@ -168,7 +176,8 @@ export default function HomePage() {
                     ))}
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+                  /* Regular tools — 2 column full-width rows matching target design */
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     {items.map(t => (
                       <ToolCard key={t.slug} slug={t.slug} title={t.title} mode={t.mode} bg={bg} isFree={isFreeMode(t.mode)} />
                     ))}
@@ -183,7 +192,7 @@ export default function HomePage() {
       </div>
 
       {/* ── WHY CONVERTAM ── */}
-      <section style={{ background: 'white', borderTop: '1px solid #E2E8F0', padding: '64px 0' }}>
+      <section style={{ background: 'white', borderTop: '1px solid #E2E8F0', padding: '72px 0' }}>
         <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '0 40px' }}>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 800, textAlign: 'center', color: '#0F172A', marginBottom: '8px', letterSpacing: '-0.01em' }}>
             Why Choose Convertam?
@@ -208,6 +217,7 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* AD SLOT 2 */}
       <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '0 40px' }}>
         <AdSlot id="ad-slot-2" />
       </div>

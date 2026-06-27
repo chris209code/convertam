@@ -34,78 +34,86 @@ export default function HomePage() {
   return (
     <main>
 
-      {/* ── HERO ── */}
+      {/* ── HERO — full-width image as background, text overlaid left ── */}
       <section style={{
-        background: 'linear-gradient(180deg, #FAFCFF 0%, #F8FBFF 100%)',
-        padding: '90px 0',
-        borderBottom: '1px solid #E8EEF6',
         position: 'relative',
-        overflow: 'hidden',
+        backgroundImage: 'url(/hero.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center top',
+        backgroundRepeat: 'no-repeat',
+        minHeight: '560px',
+        display: 'flex',
+        alignItems: 'center',
       }}>
-        {/* Glow behind illustration */}
-        <div style={{
-          position: 'absolute', right: '5%', top: '40px',
-          width: '520px', height: '520px',
-          background: 'radial-gradient(circle, rgba(37,99,235,.10), transparent 70%)',
-          filter: 'blur(40px)', zIndex: 0, pointerEvents: 'none',
-        }} />
+        <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '80px 40px', width: '100%' }}>
+          <div style={{ maxWidth: '520px' }}>
 
-        <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '0 40px', position: 'relative', zIndex: 1 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', alignItems: 'center' }}>
+            {/* Trust badge */}
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              padding: '7px 16px', borderRadius: '99px', fontSize: '0.8rem', fontWeight: 600,
+              background: 'rgba(255,255,255,0.25)', color: '#1e3a6e',
+              border: '1px solid rgba(255,255,255,0.4)', marginBottom: '28px',
+              backdropFilter: 'blur(8px)',
+            }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', display: 'inline-block' }} />
+              100% Free Forever
+            </div>
 
-            <div>
-              <div style={{
+            {/* Headline */}
+            <h1 style={{ fontSize: 'clamp(2.4rem, 4vw, 3.4rem)', fontWeight: 900, lineHeight: 1.1, letterSpacing: '-0.02em', color: '#0A1628', marginBottom: '20px' }}>
+              Convert{' '}
+              <span style={{ color: '#2563EB' }}>any file.</span>
+              <br />Instantly. Securely.
+            </h1>
+
+            {/* Description */}
+            <p style={{ fontSize: '1.05rem', color: '#1e3a6e', lineHeight: 1.7, marginBottom: '32px', maxWidth: '420px' }}>
+              Convert PDFs, images, documents, and more in seconds. 100% free, private, and secure.
+            </p>
+
+            {/* Feature badges */}
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '36px' }}>
+              {[
+                { icon: '⚡', title: 'Instant', sub: 'Conversion' },
+                { icon: '🔒', title: 'Private', sub: '& Secure' },
+                { icon: '🛡️', title: 'No Sign-up', sub: 'Required' },
+                { icon: '✦', title: '25+ Tools', sub: 'Free to Use' },
+              ].map(({ icon, title, sub }) => (
+                <div key={title} style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '10px 14px', borderRadius: '12px',
+                  background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255,255,255,0.7)',
+                }}>
+                  <span style={{ fontSize: '1rem' }}>{icon}</span>
+                  <div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0A1628', lineHeight: 1.1 }}>{title}</div>
+                    <div style={{ fontSize: '0.68rem', color: '#3B5280', lineHeight: 1.1 }}>{sub}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* CTAs */}
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px' }}>
+              <Link href="#tools" style={{
                 display: 'inline-flex', alignItems: 'center', gap: '8px',
-                padding: '8px 16px', borderRadius: '99px', fontSize: '0.75rem', fontWeight: 600,
-                background: 'rgba(37,99,235,0.08)', color: '#2563EB',
-                border: '1px solid rgba(37,99,235,0.2)', marginBottom: '28px',
-              }}>
-                🛡️ 100% Free • No Sign-up Required
-              </div>
-
-              <h1 style={{ fontSize: 'clamp(2.5rem, 4vw, 3.5rem)', fontWeight: 800, lineHeight: 1.15, letterSpacing: '-0.02em', color: '#0F172A', marginBottom: '20px' }}>
-                Convert any file.<br />
-                <span style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-                  Instantly.
-                </span>
-              </h1>
-
-              <p style={{ fontSize: '1.1rem', color: '#64748B', lineHeight: 1.7, maxWidth: '440px', marginBottom: '36px' }}>
-                Fast, secure PDF and document conversion. No login, no watermarks, no stress. Your files stay private.
-              </p>
-
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '32px' }}>
-                <Link href="#tools" style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '8px',
-                  padding: '14px 28px', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 700,
-                  color: 'white', textDecoration: 'none',
-                  background: 'linear-gradient(135deg, #2563EB, #1D4ED8)',
-                  boxShadow: '0 10px 24px rgba(37,99,235,0.25)',
-                }}>🚀 Start Converting</Link>
-                <Link href="#ai-tools" style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '8px',
-                  padding: '14px 28px', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 600,
-                  color: '#2563EB', textDecoration: 'none',
-                  background: 'white', border: '1.5px solid #2563EB',
-                  boxShadow: '0 2px 8px rgba(37,99,235,0.1)',
-                }}>✦ Try AI Tools</Link>
-              </div>
-
-              <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
-                {[{ icon: '⚡', text: 'Instant conversion' }, { icon: '🔒', text: 'Files never stored' }, { icon: '👤', text: 'No account needed' }].map(({ icon, text }) => (
-                  <span key={text} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 500, color: '#64748B' }}>
-                    {icon} {text}
-                  </span>
-                ))}
-              </div>
+                padding: '14px 28px', borderRadius: '12px', fontSize: '0.95rem', fontWeight: 700,
+                color: 'white', textDecoration: 'none',
+                background: '#2563EB',
+                boxShadow: '0 8px 24px rgba(37,99,235,0.35)',
+              }}>⬆️ Choose a file</Link>
+              <Link href="#tools" style={{
+                display: 'inline-flex', alignItems: 'center', gap: '8px',
+                padding: '14px 28px', borderRadius: '12px', fontSize: '0.95rem', fontWeight: 600,
+                color: '#2563EB', textDecoration: 'none',
+                background: 'rgba(255,255,255,0.7)', border: '1.5px solid rgba(37,99,235,0.3)',
+                backdropFilter: 'blur(8px)',
+              }}>🔍 Search for a tool</Link>
             </div>
 
-            {/* Hero illustration — no border, no card, no shadow */}
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'transparent', padding: '20px' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/hero.png" alt="Convertam file conversion"
-                style={{ width: '100%', maxWidth: '640px', height: 'auto', objectFit: 'contain', display: 'block' }} />
-            </div>
+            <p style={{ fontSize: '0.8rem', color: '#3B5280' }}>or drag and drop your file here</p>
           </div>
         </div>
       </section>
@@ -116,7 +124,7 @@ export default function HomePage() {
           background: '#FFFFFF',
           border: '1px solid #E7EDF5',
           borderRadius: '22px',
-          boxShadow: '0 15px 40px rgba(15,23,42,0.05)',
+          boxShadow: '0 15px 40px rgba(15,23,42,0.06)',
           marginTop: '-30px',
           position: 'relative',
           zIndex: 5,
@@ -156,12 +164,7 @@ export default function HomePage() {
             <section key={key} id={isAI ? 'ai-tools' : undefined}
               style={{ paddingTop: catIdx === 0 ? 0 : '56px' }}>
 
-              {/* Section header */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '12px',
-                paddingBottom: '14px', marginBottom: '20px',
-                borderBottom: '1px solid #E7EDF5',
-              }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '14px', marginBottom: '20px', borderBottom: '1px solid #E7EDF5' }}>
                 <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
                   <span style={{ color: accent }}>{icon}</span>
                 </div>
@@ -174,7 +177,6 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Cards container with alternating background */}
               <div style={{ background: sectionBg, borderRadius: '16px', padding: '16px', border: '1px solid #E7EDF5' }}>
                 {isAI ? (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>

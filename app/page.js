@@ -21,7 +21,7 @@ function AdSlot({ id }) {
     <div id={id} style={{
       width: '100%', height: '120px', margin: '32px 0',
       background: '#F8FAFC', border: '1px dashed #CBD5E1',
-      borderRadius: '16px', display: 'flex', alignItems: 'center',
+      borderRadius: '18px', display: 'flex', alignItems: 'center',
       justifyContent: 'center', fontSize: '0.75rem', color: '#94A3B8',
       fontWeight: 500, letterSpacing: '0.05em',
     }}>
@@ -32,34 +32,27 @@ function AdSlot({ id }) {
 
 export default function HomePage() {
   return (
-    <main style={{ background: 'linear-gradient(180deg, #F8FBFF 0%, #FFFFFF 40%, #F8FAFC 100%)' }}>
+    <main>
 
       {/* ── HERO ── */}
       <section style={{
-        position: 'relative', overflow: 'hidden',
-        background: 'white',
-        borderBottom: '1px solid #E6EDF5',
+        background: 'linear-gradient(180deg, #FAFCFF 0%, #F8FBFF 100%)',
         padding: '90px 0',
+        borderBottom: '1px solid #E8EEF6',
+        position: 'relative',
+        overflow: 'hidden',
       }}>
-        {/* Blue wave shapes — top right */}
+        {/* Glow behind illustration */}
         <div style={{
-          position: 'absolute', top: '-80px', right: '-80px',
-          width: '500px', height: '500px', borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(37,99,235,0.07) 0%, transparent 65%)',
-          pointerEvents: 'none',
-        }} />
-        {/* Blue wave shapes — bottom left */}
-        <div style={{
-          position: 'absolute', bottom: '-60px', left: '-60px',
-          width: '400px', height: '400px', borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(99,102,241,0.06) 0%, transparent 65%)',
-          pointerEvents: 'none',
+          position: 'absolute', right: '5%', top: '40px',
+          width: '520px', height: '520px',
+          background: 'radial-gradient(circle, rgba(37,99,235,.10), transparent 70%)',
+          filter: 'blur(40px)', zIndex: 0, pointerEvents: 'none',
         }} />
 
         <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '0 40px', position: 'relative', zIndex: 1 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', alignItems: 'center' }}>
 
-            {/* Left */}
             <div>
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: '8px',
@@ -107,8 +100,8 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Right — illustration fills the full column */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {/* Hero illustration — no border, no card, no shadow */}
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'transparent', padding: '20px' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/hero.png" alt="Convertam file conversion"
                 style={{ width: '100%', maxWidth: '640px', height: 'auto', objectFit: 'contain', display: 'block' }} />
@@ -118,11 +111,17 @@ export default function HomePage() {
       </section>
 
       {/* ── STATS ── */}
-      <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '48px 40px 0' }}>
+      <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '0 40px' }}>
         <div style={{
-          background: 'white', border: '1px solid #E5E7EB',
-          borderRadius: '18px', boxShadow: '0 8px 30px rgba(2,6,23,0.05)',
-          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
+          background: '#FFFFFF',
+          border: '1px solid #E7EDF5',
+          borderRadius: '22px',
+          boxShadow: '0 15px 40px rgba(15,23,42,0.05)',
+          marginTop: '-30px',
+          position: 'relative',
+          zIndex: 5,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
         }}>
           {[
             { value: '25+', label: 'Free Tools Available', icon: '🛠️', bg: '#EFF6FF' },
@@ -131,8 +130,8 @@ export default function HomePage() {
             { value: 'Auto', label: 'Files Deleted After Use', icon: '🗑️', bg: '#FFFBEB' },
           ].map(({ value, label, icon, bg }, i) => (
             <div key={label} style={{
-              display: 'flex', alignItems: 'center', gap: '16px', padding: '24px 28px',
-              borderLeft: i > 0 ? '1px solid #E5E7EB' : 'none',
+              display: 'flex', alignItems: 'center', gap: '16px', padding: '28px',
+              borderLeft: i > 0 ? '1px solid #E7EDF5' : 'none',
             }}>
               <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
                 {icon}
@@ -147,7 +146,7 @@ export default function HomePage() {
       </div>
 
       {/* ── TOOLS ── */}
-      <div id="tools" style={{ maxWidth: '1152px', margin: '0 auto', padding: '48px 40px 72px' }}>
+      <div id="tools" style={{ maxWidth: '1152px', margin: '0 auto', padding: '56px 40px 72px' }}>
         {categories.map(({ key, label, desc, icon, accent, bg, sectionBg, highlight }, catIdx) => {
           const items = tools.filter(t => t.category === key);
           if (!items.length) return null;
@@ -155,10 +154,14 @@ export default function HomePage() {
 
           return (
             <section key={key} id={isAI ? 'ai-tools' : undefined}
-              style={{ paddingTop: catIdx === 0 ? 0 : '56px', paddingBottom: '8px' }}>
+              style={{ paddingTop: catIdx === 0 ? 0 : '56px' }}>
 
               {/* Section header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '12px', marginBottom: '16px', borderBottom: '1px solid #E5E7EB' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '12px',
+                paddingBottom: '14px', marginBottom: '20px',
+                borderBottom: '1px solid #E7EDF5',
+              }}>
                 <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
                   <span style={{ color: accent }}>{icon}</span>
                 </div>
@@ -171,8 +174,8 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Card container */}
-              <div style={{ background: sectionBg, borderRadius: '16px', padding: '16px', border: '1px solid #E5E7EB' }}>
+              {/* Cards container with alternating background */}
+              <div style={{ background: sectionBg, borderRadius: '16px', padding: '16px', border: '1px solid #E7EDF5' }}>
                 {isAI ? (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     {items.map(t => (
@@ -197,7 +200,6 @@ export default function HomePage() {
                     ))}
                   </div>
                 ) : (
-                  /* 4-column full-width rows matching target */
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
                     {items.map(t => (
                       <ToolCard key={t.slug} slug={t.slug} title={t.title} mode={t.mode} bg={bg} isFree={isFreeMode(t.mode)} />
@@ -213,7 +215,7 @@ export default function HomePage() {
       </div>
 
       {/* ── WHY CONVERTAM ── */}
-      <section style={{ background: 'white', borderTop: '1px solid #E2E8F0', padding: '72px 0' }}>
+      <section style={{ background: '#FFFFFF', borderTop: '1px solid #E7EDF5', padding: '72px 0' }}>
         <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '0 40px' }}>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 800, textAlign: 'center', color: '#0F172A', marginBottom: '8px', letterSpacing: '-0.01em' }}>
             Why Choose Convertam?
@@ -228,7 +230,7 @@ export default function HomePage() {
               { icon: '🚫', title: 'No Registration', desc: 'Just upload and go. No account needed.', bg: '#F5F3FF' },
               { icon: '📱', title: 'Works Everywhere', desc: 'Any device. Any browser. Any time.', bg: '#EFF6FF' },
             ].map(({ icon, title, desc, bg }) => (
-              <div key={title} style={{ textAlign: 'center', padding: '28px 20px', borderRadius: '16px', background: bg, border: '1px solid #E2E8F0' }}>
+              <div key={title} style={{ textAlign: 'center', padding: '28px 20px', borderRadius: '16px', background: bg, border: '1px solid #E7EDF5' }}>
                 <div style={{ fontSize: '2rem', marginBottom: '12px' }}>{icon}</div>
                 <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0F172A', marginBottom: '6px' }}>{title}</div>
                 <div style={{ fontSize: '0.8rem', color: '#64748B', lineHeight: 1.6 }}>{desc}</div>

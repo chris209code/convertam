@@ -7,45 +7,29 @@ export default function ToolCard({ slug, title, isFree, bg }) {
     <Link href={`/${slug}`}
       style={{
         display: 'flex', alignItems: 'center', gap: '12px',
-        padding: '12px 16px', borderRadius: '12px',
-        border: '1px solid #E2E8F0', background: 'white',
-        textDecoration: 'none',
-        boxShadow: '0 2px 8px rgba(2,6,23,0.04)',
-        transition: 'all 0.18s ease',
+        padding: '16px', borderRadius: '18px',
+        border: '1px solid #DCE7F5', background: '#FAFCFF',
+        textDecoration: 'none', cursor: 'pointer',
+        boxShadow: '0 8px 24px rgba(37,99,235,0.06)',
+        transition: 'all 0.25s ease',
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = '0 12px 24px rgba(2,6,23,0.08)';
-        e.currentTarget.style.borderColor = '#CBD5E1';
+        e.currentTarget.style.transform = 'translateY(-4px)';
+        e.currentTarget.style.borderColor = '#2563EB';
+        e.currentTarget.style.boxShadow = '0 18px 40px rgba(37,99,235,0.14)';
       }}
       onMouseLeave={e => {
         e.currentTarget.style.transform = '';
-        e.currentTarget.style.boxShadow = '0 2px 8px rgba(2,6,23,0.04)';
-        e.currentTarget.style.borderColor = '#E2E8F0';
+        e.currentTarget.style.borderColor = '#DCE7F5';
+        e.currentTarget.style.boxShadow = '0 8px 24px rgba(37,99,235,0.06)';
       }}>
-      {/* Icon tile */}
-      <div style={{
-        width: '36px', height: '36px', borderRadius: '8px',
-        background: bg || '#EFF6FF',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-      }}>
-        <ToolIcon slug={slug} size={20} />
+      <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: bg || '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <ToolIcon slug={slug} size={23} />
       </div>
-
-      {/* Title */}
-      <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#0F172A', flex: 1 }}>{title}</span>
-
-      {/* FREE badge */}
+      <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#152238', flex: 1, lineHeight: 1.3 }}>{title}</span>
       {isFree && (
-        <span style={{
-          fontSize: '0.65rem', fontWeight: 700, padding: '3px 8px',
-          borderRadius: '99px', background: '#ECFDF5', color: '#10B981',
-          border: '1px solid #A7F3D0', flexShrink: 0,
-        }}>FREE</span>
+        <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '4px 10px', borderRadius: '99px', background: '#EAF2FF', color: '#2563EB', flexShrink: 0 }}>FREE</span>
       )}
-
-      {/* Arrow */}
-      <span style={{ color: '#CBD5E1', fontSize: '0.9rem', flexShrink: 0 }}>›</span>
     </Link>
   );
 }

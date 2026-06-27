@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { tools } from '@/lib/tools-config';
-import { ToolIcon } from '@/components/ToolIcons';
 import ToolCard from '@/components/tools/ToolCard';
+import AIToolCard from '@/components/tools/AIToolCard';
 
 const categories = [
   { key: 'Smart Converter', label: 'Smart AI Tools', desc: 'AI-powered tools for smart document processing', icon: '🤖', accent: '#10B981', bg: '#ECFDF5', highlight: true },
@@ -106,14 +106,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════
-          EVERYTHING BELOW THIS LINE IS REDESIGNED
-      ══════════════════════════════════════════ */}
-
-      {/* Page background wrapper */}
+      {/* ── BELOW HERO ── */}
       <div style={{ background: 'linear-gradient(180deg, #F8FBFF 0%, #F3F8FF 50%, #EEF5FF 100%)', paddingBottom: '80px' }}>
 
-        {/* ── STATS ── */}
+        {/* STATS */}
         <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 32px' }}>
           <div style={{
             background: '#FFFFFF', border: '1px solid #E5EDF8',
@@ -143,7 +139,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* ── TOOLS ── */}
+        {/* TOOLS */}
         <div id="tools" style={{ maxWidth: '1400px', margin: '0 auto', padding: '72px 32px 0' }}>
           {categories.map(({ key, label, desc, icon, accent, bg, highlight }, catIdx) => {
             const items = tools.filter(t => t.category === key);
@@ -152,14 +148,10 @@ export default function HomePage() {
 
             return (
               <div key={key} id={isAI ? 'ai-tools' : undefined} style={{
-                background: '#FFFFFF',
-                border: '1px solid #E5EDF8',
-                borderRadius: '28px',
-                padding: '36px',
-                marginBottom: '48px',
+                background: '#FFFFFF', border: '1px solid #E5EDF8',
+                borderRadius: '28px', padding: '36px', marginBottom: '48px',
                 boxShadow: '0 15px 45px rgba(30,64,175,0.06)',
               }}>
-
                 {/* Category heading */}
                 <div style={{ borderBottom: '1px solid #E6EEF9', paddingBottom: '16px', marginBottom: '28px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -180,35 +172,7 @@ export default function HomePage() {
                 {isAI ? (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     {items.map(t => (
-                      <Link key={t.slug} href={`/${t.slug}`}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: '16px', padding: '20px',
-                          borderRadius: '18px', border: '1px solid #DCE7F5',
-                          background: '#FAFCFF', textDecoration: 'none',
-                          boxShadow: '0 8px 24px rgba(37,99,235,0.06)',
-                          transition: 'all 0.25s ease', cursor: 'pointer',
-                        }}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.transform = 'translateY(-4px)';
-                          e.currentTarget.style.borderColor = '#2563EB';
-                          e.currentTarget.style.boxShadow = '0 18px 40px rgba(37,99,235,0.14)';
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.transform = '';
-                          e.currentTarget.style.borderColor = '#DCE7F5';
-                          e.currentTarget.style.boxShadow = '0 8px 24px rgba(37,99,235,0.06)';
-                        }}>
-                        <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <ToolIcon slug={t.slug} size={26} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#0F172A' }}>{t.title}</div>
-                          <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description}</div>
-                        </div>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '4px 10px', borderRadius: '99px', background: '#EAF2FF', color: '#2563EB', flexShrink: 0 }}>
-                          ✦ AI · FREE
-                        </span>
-                      </Link>
+                      <AIToolCard key={t.slug} slug={t.slug} title={t.title} description={t.description} />
                     ))}
                   </div>
                 ) : (
@@ -225,13 +189,12 @@ export default function HomePage() {
           })}
         </div>
 
-        {/* ── WHY CONVERTAM ── */}
+        {/* WHY CONVERTAM */}
         <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 32px' }}>
           <div style={{
             background: '#FFFFFF', border: '1px solid #E5EDF8',
             borderRadius: '28px', padding: '56px 40px',
-            boxShadow: '0 15px 45px rgba(30,64,175,0.06)',
-            marginBottom: '48px',
+            boxShadow: '0 15px 45px rgba(30,64,175,0.06)', marginBottom: '48px',
           }}>
             <h2 style={{ fontSize: '1.75rem', fontWeight: 800, textAlign: 'center', color: '#152238', marginBottom: '8px', letterSpacing: '-0.01em' }}>
               Why Choose Convertam?
@@ -254,12 +217,10 @@ export default function HomePage() {
               ))}
             </div>
           </div>
-
           <AdSlot id="ad-slot-2" />
         </div>
 
       </div>
-
     </main>
   );
 }

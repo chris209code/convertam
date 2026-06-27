@@ -24,13 +24,12 @@ function ToolBadge({ mode }) {
   return null;
 }
 
-// Production-ready ad slot — collapses when no ad is served
-// Replace the comment block with your AdSense <ins> tag when ready
+// Production-ready ad slot — collapses automatically when no ad is served
 function AdSlot({ id }) {
   return (
     <div id={id} className="w-full overflow-hidden" style={{ minHeight: 0 }}>
       {/*
-        ADSENSE SLOT — uncomment and replace with your publisher details when ready:
+        ADSENSE SLOT — replace this comment with your AdSense tag when ready:
 
         <ins className="adsbygoogle"
           style={{ display: 'block' }}
@@ -39,8 +38,8 @@ function AdSlot({ id }) {
           data-ad-format="auto"
           data-full-width-responsive="true" />
 
-        When AdSense has no ad to serve, this container collapses to zero height automatically.
-        No empty space will be shown to users.
+        AdSense collapses this container to zero height automatically
+        when no ad is available. Users never see empty space.
       */}
     </div>
   );
@@ -56,7 +55,7 @@ export default function HomePage() {
       <nav className="sticky top-0 z-50 bg-white border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-5 md:px-10 h-16 flex items-center justify-between">
 
-          {/* Logo only — no text next to it */}
+          {/* Logo only — no text */}
           <Link href="/">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo.png" alt="Convertam" className="h-11 w-auto" />
@@ -140,7 +139,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Right — transparent PNG renders cleanly on white background */}
+          {/* Right — hero.png is now white-background, no checkerboard */}
           <div className="flex items-center justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -232,7 +231,7 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* Ad slot after Smart AI Tools only — collapses when no ad served */}
+              {/* Ad slot after Smart AI Tools only */}
               {catIdx === 0 && <AdSlot id="ad-slot-1" />}
             </section>
           );
@@ -268,7 +267,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── AD SLOT 2 — above footer, collapses when empty ── */}
+      {/* ── AD SLOT 2 — above footer ── */}
       <div className="max-w-6xl mx-auto px-5 md:px-10">
         <AdSlot id="ad-slot-2" />
       </div>

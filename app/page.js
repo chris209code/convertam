@@ -4,31 +4,11 @@ import { ToolIcon } from '@/components/ToolIcons';
 import ToolCard from '@/components/tools/ToolCard';
 
 const categories = [
-  {
-    key: 'Smart Converter', label: 'Smart AI Tools',
-    desc: 'AI-powered tools for smart document processing',
-    icon: '✦', accent: '#10B981', bg: '#ECFDF5', highlight: true,
-  },
-  {
-    key: 'PDF Editor', label: 'PDF Editor',
-    desc: 'Edit, sign, annotate and manage your PDFs',
-    icon: '✍️', accent: '#2563EB', bg: '#EFF6FF',
-  },
-  {
-    key: 'PDF Utilities', label: 'PDF Utilities',
-    desc: 'Organize, edit and optimize your PDF documents',
-    icon: '📄', accent: '#8B5CF6', bg: '#F5F3FF',
-  },
-  {
-    key: 'Image Tools', label: 'Image Tools',
-    desc: 'Convert and optimize image files',
-    icon: '🖼️', accent: '#F59E0B', bg: '#FFFBEB',
-  },
-  {
-    key: 'Document Conversion', label: 'Document Conversion',
-    desc: 'Convert between documents and formats',
-    icon: '🔄', accent: '#2563EB', bg: '#EFF6FF',
-  },
+  { key: 'Smart Converter', label: 'Smart AI Tools', desc: 'AI-powered tools for smart document processing', icon: '✦', accent: '#10B981', bg: '#ECFDF5', sectionBg: '#F8FBFF', highlight: true },
+  { key: 'PDF Editor', label: 'PDF Editor', desc: 'Edit, sign, annotate and manage your PDFs', icon: '✍️', accent: '#2563EB', bg: '#EFF6FF', sectionBg: '#FFFFFF' },
+  { key: 'PDF Utilities', label: 'PDF Utilities', desc: 'Organize, edit and optimize your PDF documents', icon: '📄', accent: '#8B5CF6', bg: '#F5F3FF', sectionBg: '#FBFCFE' },
+  { key: 'Image Tools', label: 'Image Tools', desc: 'Convert and optimize image files', icon: '🖼️', accent: '#F59E0B', bg: '#FFFBEB', sectionBg: '#FFFFFF' },
+  { key: 'Document Conversion', label: 'Document Conversion', desc: 'Convert between documents and formats', icon: '🔄', accent: '#2563EB', bg: '#EFF6FF', sectionBg: '#F8FBFF' },
 ];
 
 const isFreeMode = (mode) =>
@@ -37,82 +17,68 @@ const isFreeMode = (mode) =>
    'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize', 'fill'].includes(mode);
 
 function AdSlot({ id }) {
-  return (
-    <div id={id} style={{ minHeight: 0, overflow: 'hidden' }}>
-      {/* AdSense — collapses when empty */}
-    </div>
-  );
+  return <div id={id} style={{ minHeight: 0, overflow: 'hidden' }} />;
 }
 
 export default function HomePage() {
   return (
-    <main style={{ background: 'linear-gradient(160deg, #EFF6FF 0%, #F8FAFF 40%, #ffffff 100%)' }}>
+    <main style={{ background: 'linear-gradient(180deg, #F8FBFF 0%, #FFFFFF 35%, #F8FAFC 100%)' }}>
 
       {/* ── HERO ── */}
-      <section style={{ position: 'relative', overflow: 'hidden', paddingBottom: '60px' }}>
-        {/* Soft wave blobs */}
-        <div style={{
-          position: 'absolute', bottom: '-40px', left: '-80px', width: '420px', height: '420px',
-          borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.07) 0%, transparent 70%)',
-          pointerEvents: 'none',
-        }} />
-        <div style={{
-          position: 'absolute', top: '-60px', right: '-60px', width: '500px', height: '500px',
-          borderRadius: '50%', background: 'radial-gradient(circle, rgba(37,99,235,0.07) 0%, transparent 70%)',
-          pointerEvents: 'none',
-        }} />
-
-        <div className="max-w-6xl mx-auto px-5 md:px-10 pt-14 md:pt-20" style={{ position: 'relative', zIndex: 1 }}>
-          <div className="grid md:grid-cols-2 gap-10 items-center">
+      <section style={{ background: '#F8FBFF', borderBottom: '1px solid #E6EDF5', padding: '72px 0 80px' }}>
+        <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '0 40px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', alignItems: 'center' }}>
 
             {/* Left */}
             <div>
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold mb-7"
-                style={{ background: 'rgba(37,99,235,0.08)', color: '#2563EB', border: '1px solid rgba(37,99,235,0.2)' }}>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: '8px',
+                padding: '8px 16px', borderRadius: '99px', fontSize: '0.75rem', fontWeight: 600,
+                background: 'rgba(37,99,235,0.08)', color: '#2563EB',
+                border: '1px solid rgba(37,99,235,0.2)', marginBottom: '28px',
+              }}>
                 🛡️ 100% Free • No Sign-up Required
               </div>
 
-              <h1 className="font-bold leading-tight mb-4"
-                style={{ fontSize: 'clamp(2.4rem, 4.5vw, 3.5rem)', letterSpacing: '-0.02em', color: '#0F172A' }}>
+              <h1 style={{ fontSize: 'clamp(2.5rem, 4vw, 3.5rem)', fontWeight: 800, lineHeight: 1.15, letterSpacing: '-0.02em', color: '#0F172A', marginBottom: '20px' }}>
                 Convert any file.<br />
-                <span style={{
-                  background: 'linear-gradient(135deg, #2563EB, #1D4ED8)',
-                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-                }}>Instantly.</span>
+                <span style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                  Instantly.
+                </span>
               </h1>
 
-              <p className="mb-9 leading-relaxed max-w-md" style={{ fontSize: '1.05rem', color: '#64748B' }}>
+              <p style={{ fontSize: '1.1rem', color: '#64748B', lineHeight: 1.7, maxWidth: '440px', marginBottom: '36px' }}>
                 Fast, secure PDF and document conversion. No login, no watermarks, no stress. Your files stay private.
               </p>
 
-              <div className="flex flex-wrap gap-3 mb-9">
-                <Link href="#tools"
-                  className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl text-sm font-semibold text-white"
-                  style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)', boxShadow: '0 4px 14px rgba(37,99,235,0.4)' }}>
-                  🚀 Start Converting
-                </Link>
-                <Link href="#ai-tools"
-                  className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl text-sm font-semibold"
-                  style={{ background: 'white', color: '#2563EB', border: '1.5px solid #2563EB', boxShadow: '0 2px 8px rgba(37,99,235,0.12)' }}>
-                  ✦ Try AI Tools
-                </Link>
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '32px' }}>
+                <Link href="#tools" style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '8px',
+                  padding: '14px 28px', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 700,
+                  color: 'white', textDecoration: 'none',
+                  background: 'linear-gradient(135deg, #2563EB, #1D4ED8)',
+                  boxShadow: '0 10px 24px rgba(37,99,235,0.25)',
+                }}>🚀 Start Converting</Link>
+                <Link href="#ai-tools" style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '8px',
+                  padding: '14px 28px', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 600,
+                  color: '#2563EB', textDecoration: 'none',
+                  background: 'white', border: '1.5px solid #2563EB',
+                  boxShadow: '0 2px 8px rgba(37,99,235,0.1)',
+                }}>✦ Try AI Tools</Link>
               </div>
 
-              <div className="flex flex-wrap gap-6">
-                {[
-                  { icon: '⚡', text: 'Instant conversion' },
-                  { icon: '🔒', text: 'Files never stored' },
-                  { icon: '👤', text: 'No account needed' },
-                ].map(({ icon, text }) => (
-                  <span key={text} className="flex items-center gap-1.5 text-xs font-medium" style={{ color: '#64748B' }}>
+              <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                {[{ icon: '⚡', text: 'Instant conversion' }, { icon: '🔒', text: 'Files never stored' }, { icon: '👤', text: 'No account needed' }].map(({ icon, text }) => (
+                  <span key={text} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 500, color: '#64748B' }}>
                     {icon} {text}
                   </span>
                 ))}
               </div>
             </div>
 
-            {/* Right — illustration, no box */}
-            <div className="flex items-center justify-center">
+            {/* Right — illustration, no border no box */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/hero.png" alt="Convertam file conversion"
                 style={{ width: '100%', maxWidth: '560px', height: 'auto', objectFit: 'contain', display: 'block' }} />
@@ -122,97 +88,89 @@ export default function HomePage() {
       </section>
 
       {/* ── STATS ── */}
-      <div className="max-w-6xl mx-auto px-5 md:px-10 py-10">
-        <div className="rounded-2xl overflow-hidden"
-          style={{ background: 'white', border: '1px solid #E2E8F0', boxShadow: '0 8px 30px rgba(2,6,23,0.06)' }}>
-          <div className="grid grid-cols-2 md:grid-cols-4">
-            {[
-              { value: '25+', label: 'Free Tools Available', icon: '🛠️', bg: '#EFF6FF' },
-              { value: '100%', label: 'Free Core Features', icon: '✅', bg: '#ECFDF5' },
-              { value: 'No Login', label: 'Ever Required', icon: '👤', bg: '#F5F3FF' },
-              { value: 'Auto', label: 'Files Deleted After Use', icon: '🗑️', bg: '#FFFBEB' },
-            ].map(({ value, label, icon, bg }, i) => (
-              <div key={label} className="flex items-center gap-4 px-6 py-5"
-                style={{ borderLeft: i > 0 ? '1px solid #E2E8F0' : 'none' }}>
-                <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 text-xl"
-                  style={{ background: bg }}>
-                  {icon}
-                </div>
-                <div>
-                  <div className="text-xl font-bold" style={{ color: '#0F172A' }}>{value}</div>
-                  <div className="text-xs mt-0.5" style={{ color: '#64748B' }}>{label}</div>
-                </div>
+      <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '40px 40px 0' }}>
+        <div style={{
+          background: 'white', border: '1px solid #E5E7EB',
+          borderRadius: '18px', boxShadow: '0 8px 30px rgba(2,6,23,0.05)',
+          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
+        }}>
+          {[
+            { value: '25+', label: 'Free Tools Available', icon: '🛠️', bg: '#EFF6FF' },
+            { value: '100%', label: 'Free Core Features', icon: '✅', bg: '#ECFDF5' },
+            { value: 'No Login', label: 'Ever Required', icon: '👤', bg: '#F5F3FF' },
+            { value: 'Auto', label: 'Files Deleted After Use', icon: '🗑️', bg: '#FFFBEB' },
+          ].map(({ value, label, icon, bg }, i) => (
+            <div key={label} style={{
+              display: 'flex', alignItems: 'center', gap: '16px',
+              padding: '24px 28px',
+              borderLeft: i > 0 ? '1px solid #E5E7EB' : 'none',
+            }}>
+              <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
+                {icon}
               </div>
-            ))}
-          </div>
+              <div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.1 }}>{value}</div>
+                <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>{label}</div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* ── TOOLS ── */}
-      <div id="tools" className="max-w-6xl mx-auto px-5 md:px-10 pb-16">
-        {categories.map(({ key, label, desc, icon, accent, bg, highlight }, catIdx) => {
+      <div id="tools" style={{ maxWidth: '1152px', margin: '0 auto', padding: '48px 40px 64px' }}>
+        {categories.map(({ key, label, desc, icon, accent, bg, sectionBg, highlight }, catIdx) => {
           const items = tools.filter(t => t.category === key);
           if (!items.length) return null;
           const isAI = highlight;
 
           return (
-            <section key={key} id={isAI ? 'ai-tools' : undefined} className="mb-10">
+            <section key={key} id={isAI ? 'ai-tools' : undefined} style={{ marginBottom: '40px' }}>
 
-              {/* Category header */}
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0"
-                  style={{ background: bg }}>
+              {/* Section header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '12px', marginBottom: '20px', borderBottom: '1px solid #E5E7EB' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0 }}>
                   <span style={{ color: accent }}>{icon}</span>
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-base font-bold" style={{ color: '#0F172A' }}>{label}</h2>
-                    {isAI && (
-                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full"
-                        style={{ background: '#ECFDF5', color: '#10B981' }}>NEW</span>
-                    )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>{label}</h2>
+                    {isAI && <span style={{ fontSize: '0.6rem', fontWeight: 700, padding: '2px 8px', borderRadius: '99px', background: '#ECFDF5', color: '#10B981' }}>NEW</span>}
                   </div>
-                  <p className="text-xs" style={{ color: '#64748B' }}>{desc}</p>
+                  <p style={{ fontSize: '0.75rem', color: '#64748B', margin: 0 }}>{desc}</p>
                 </div>
               </div>
 
-              {/* Cards container */}
-              <div className="rounded-2xl overflow-hidden"
-                style={{ background: '#F8FAFF', border: '1px solid #E2E8F0', padding: '16px' }}>
-
+              {/* Cards — alternating section background */}
+              <div style={{ background: sectionBg, borderRadius: '16px', padding: '16px', border: '1px solid #E5E7EB' }}>
                 {isAI ? (
-                  <div className="grid md:grid-cols-2 gap-3">
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     {items.map(t => (
                       <Link key={t.slug} href={`/${t.slug}`}
-                        className="flex items-center gap-4 p-4 rounded-xl border transition-all hover:-translate-y-0.5 hover:shadow-md"
-                        style={{ background: 'white', borderColor: '#A7F3D0', boxShadow: '0 1px 4px rgba(16,185,129,0.08)' }}>
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                          style={{ background: '#ECFDF5' }}>
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '16px', padding: '16px',
+                          borderRadius: '12px', border: '1px solid #A7F3D0',
+                          background: 'white', textDecoration: 'none',
+                          boxShadow: '0 1px 4px rgba(16,185,129,0.08)',
+                          transition: 'all 0.2s',
+                        }}>
+                        <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           <ToolIcon slug={t.slug} size={22} />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-sm" style={{ color: '#0F172A' }}>{t.title}</div>
-                          <div className="text-xs mt-0.5 truncate" style={{ color: '#64748B' }}>{t.description}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#0F172A' }}>{t.title}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description}</div>
                         </div>
-                        <span className="text-[9px] font-bold px-2.5 py-1 rounded-full flex-shrink-0"
-                          style={{ background: '#ECFDF5', color: '#10B981', border: '1px solid #A7F3D0' }}>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '4px 10px', borderRadius: '99px', background: '#ECFDF5', color: '#10B981', border: '1px solid #A7F3D0', flexShrink: 0 }}>
                           ✦ AI · FREE
                         </span>
                       </Link>
                     ))}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
                     {items.map(t => (
-                      <ToolCard
-                        key={t.slug}
-                        slug={t.slug}
-                        title={t.title}
-                        mode={t.mode}
-                        bg={bg}
-                        accent={accent}
-                        isFree={isFreeMode(t.mode)}
-                      />
+                      <ToolCard key={t.slug} slug={t.slug} title={t.title} mode={t.mode} bg={bg} isFree={isFreeMode(t.mode)} />
                     ))}
                   </div>
                 )}
@@ -225,33 +183,32 @@ export default function HomePage() {
       </div>
 
       {/* ── WHY CONVERTAM ── */}
-      <section style={{ background: 'white', borderTop: '1px solid #E2E8F0' }}>
-        <div className="max-w-6xl mx-auto px-5 md:px-10 py-16">
-          <h2 className="text-2xl md:text-3xl font-bold text-center mb-3" style={{ color: '#0F172A', letterSpacing: '-0.01em' }}>
+      <section style={{ background: 'white', borderTop: '1px solid #E2E8F0', padding: '64px 0' }}>
+        <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '0 40px' }}>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, textAlign: 'center', color: '#0F172A', marginBottom: '8px', letterSpacing: '-0.01em' }}>
             Why Choose Convertam?
           </h2>
-          <p className="text-sm text-center mb-12" style={{ color: '#64748B' }}>
+          <p style={{ textAlign: 'center', color: '#64748B', fontSize: '0.9rem', marginBottom: '48px' }}>
             Built for people who just need it done. Fast.
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
             {[
               { icon: '⚡', title: 'Lightning Fast', desc: 'Conversions in seconds, not minutes.', bg: '#FFFBEB' },
               { icon: '🔒', title: 'Privacy First', desc: 'Files deleted immediately after conversion.', bg: '#ECFDF5' },
               { icon: '🚫', title: 'No Registration', desc: 'Just upload and go. No account needed.', bg: '#F5F3FF' },
               { icon: '📱', title: 'Works Everywhere', desc: 'Any device. Any browser. Any time.', bg: '#EFF6FF' },
             ].map(({ icon, title, desc, bg }) => (
-              <div key={title} className="text-center p-6 rounded-2xl border"
-                style={{ background: bg, borderColor: '#E2E8F0' }}>
-                <div className="text-3xl mb-3">{icon}</div>
-                <div className="font-semibold text-sm mb-1.5" style={{ color: '#0F172A' }}>{title}</div>
-                <div className="text-xs leading-relaxed" style={{ color: '#64748B' }}>{desc}</div>
+              <div key={title} style={{ textAlign: 'center', padding: '28px 20px', borderRadius: '16px', background: bg, border: '1px solid #E2E8F0' }}>
+                <div style={{ fontSize: '2rem', marginBottom: '12px' }}>{icon}</div>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0F172A', marginBottom: '6px' }}>{title}</div>
+                <div style={{ fontSize: '0.8rem', color: '#64748B', lineHeight: 1.6 }}>{desc}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <div className="max-w-6xl mx-auto px-5 md:px-10">
+      <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '0 40px' }}>
         <AdSlot id="ad-slot-2" />
       </div>
 

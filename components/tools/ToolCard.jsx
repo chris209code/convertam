@@ -5,15 +5,16 @@ import { ToolIcon } from '@/components/ToolIcons';
 export default function ToolCard({ slug, title, isFree, bg }) {
   return (
     <Link href={`/${slug}`}
-      className="flex items-center gap-3 px-4 py-3 rounded-xl border transition-all"
       style={{
-        background: 'white',
-        borderColor: '#E2E8F0',
-        boxShadow: '0 2px 8px rgba(2,6,23,0.04)',
+        display: 'flex', alignItems: 'center', gap: '12px',
+        padding: '12px 16px', borderRadius: '12px',
+        border: '1px solid #E2E8F0', background: 'white',
         textDecoration: 'none',
+        boxShadow: '0 2px 8px rgba(2,6,23,0.04)',
+        transition: 'all 0.18s ease',
       }}
       onMouseEnter={e => {
-        e.currentTarget.style.transform = 'translateY(-3px)';
+        e.currentTarget.style.transform = 'translateY(-2px)';
         e.currentTarget.style.boxShadow = '0 12px 24px rgba(2,6,23,0.08)';
         e.currentTarget.style.borderColor = '#CBD5E1';
       }}
@@ -22,16 +23,29 @@ export default function ToolCard({ slug, title, isFree, bg }) {
         e.currentTarget.style.boxShadow = '0 2px 8px rgba(2,6,23,0.04)';
         e.currentTarget.style.borderColor = '#E2E8F0';
       }}>
-      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-        style={{ background: bg || '#EFF6FF' }}>
-        <ToolIcon slug={slug} size={18} />
+      {/* Icon tile */}
+      <div style={{
+        width: '36px', height: '36px', borderRadius: '8px',
+        background: bg || '#EFF6FF',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      }}>
+        <ToolIcon slug={slug} size={20} />
       </div>
-      <span className="text-sm font-medium flex-1 leading-tight" style={{ color: '#0F172A' }}>{title}</span>
+
+      {/* Title */}
+      <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#0F172A', flex: 1 }}>{title}</span>
+
+      {/* FREE badge */}
       {isFree && (
-        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
-          style={{ background: '#ECFDF5', color: '#10B981', border: '1px solid #A7F3D0' }}>FREE</span>
+        <span style={{
+          fontSize: '0.65rem', fontWeight: 700, padding: '3px 8px',
+          borderRadius: '99px', background: '#ECFDF5', color: '#10B981',
+          border: '1px solid #A7F3D0', flexShrink: 0,
+        }}>FREE</span>
       )}
-      <span style={{ color: '#CBD5E1', fontSize: '0.85rem', marginLeft: '2px' }}>›</span>
+
+      {/* Arrow */}
+      <span style={{ color: '#CBD5E1', fontSize: '0.9rem', flexShrink: 0 }}>›</span>
     </Link>
   );
 }

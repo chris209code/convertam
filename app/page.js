@@ -51,40 +51,8 @@ export default function HomePage() {
   return (
     <main className="bg-white min-h-screen">
 
-      {/* ── NAV ── */}
-      <nav className="sticky top-0 z-50 bg-white border-b border-gray-100">
-        <div className="max-w-6xl mx-auto px-5 md:px-10 h-16 flex items-center justify-between">
-
-          {/* Logo only — no text */}
-          <Link href="/">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Convertam" className="h-11 w-auto" />
-          </Link>
-
-          <div className="flex items-center gap-8">
-            <Link href="#tools"
-              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors hidden md:block">
-              Tools
-            </Link>
-            <Link href="#ai-tools"
-              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors hidden md:block">
-              AI Tools
-            </Link>
-            <Link href="/about"
-              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors hidden md:block">
-              About
-            </Link>
-            <Link href="#tools"
-              className="text-sm font-semibold px-5 py-2.5 rounded-xl text-white transition-all hover:opacity-90 hover:shadow-md"
-              style={{ background: 'linear-gradient(135deg, #0ea5e9, #0284c7)' }}>
-              Start Converting
-            </Link>
-          </div>
-        </div>
-      </nav>
-
       {/* ── HERO ── */}
-      <section className="max-w-6xl mx-auto px-5 md:px-10 pt-20 pb-16 md:pt-28 md:pb-20">
+      <section className="max-w-6xl mx-auto px-5 md:px-10 pt-16 pb-12 md:pt-20 md:pb-16">
         <div className="grid md:grid-cols-2 gap-12 items-center">
 
           {/* Left */}
@@ -139,17 +107,14 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Right — hero.png is now white-background, no checkerboard */}
+          {/* Right — hero.png has white background, no checkerboard */}
           <div className="flex items-center justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/hero.png"
               alt="Convertam — convert any file format"
               className="w-full"
-              style={{
-                maxWidth: '540px',
-                filter: 'drop-shadow(0 24px 48px rgba(14,165,233,0.12))',
-              }}
+              style={{ maxWidth: '540px' }}
             />
           </div>
         </div>
@@ -216,11 +181,16 @@ export default function HomePage() {
                   ))}
                 </div>
               ) : (
+                /* Tool cards with light gray background to stand out from white page */
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {items.map(t => (
                     <Link key={t.slug} href={`/${t.slug}`}
-                      className="flex items-center gap-3 p-3.5 rounded-xl border border-gray-100 bg-white transition-all hover:border-blue-200 hover:shadow-sm hover:-translate-y-0.5"
-                      style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                      className="flex items-center gap-3 p-3.5 rounded-xl border transition-all hover:border-blue-300 hover:shadow-md hover:-translate-y-0.5"
+                      style={{
+                        background: '#f8fafc',
+                        borderColor: '#e2e8f0',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                      }}>
                       <div className="flex-shrink-0">
                         <ToolIcon slug={t.slug} size={20} />
                       </div>
@@ -256,8 +226,8 @@ export default function HomePage() {
               { icon: '📱', title: 'Works Everywhere', desc: 'Any device. Any browser. Any time.' },
             ].map(({ icon, title, desc }) => (
               <div key={title}
-                className="text-center p-6 rounded-2xl bg-white border border-gray-100 hover:border-blue-100 hover:shadow-sm transition-all"
-                style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                className="text-center p-6 rounded-2xl border transition-all hover:border-blue-100 hover:shadow-sm"
+                style={{ background: '#f8fafc', borderColor: '#e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                 <div className="text-3xl mb-3">{icon}</div>
                 <div className="font-semibold text-gray-900 text-sm mb-2">{title}</div>
                 <div className="text-xs text-gray-500 leading-relaxed">{desc}</div>
@@ -271,81 +241,6 @@ export default function HomePage() {
       <div className="max-w-6xl mx-auto px-5 md:px-10">
         <AdSlot id="ad-slot-2" />
       </div>
-
-      {/* ── FOOTER ── */}
-      <footer className="bg-white border-t border-gray-100">
-        <div className="max-w-6xl mx-auto px-5 md:px-10 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-10">
-
-            <div className="md:col-span-1">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" alt="Convertam" className="h-9 w-auto mb-4" />
-              <p className="text-xs text-gray-500 leading-relaxed max-w-xs">
-                Fast, secure file conversion for everyone. No sign-up, no limits, no stress.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-4">Tools</h3>
-              <ul className="space-y-2.5">
-                {['PDF to Word', 'Merge PDF', 'Compress PDF', 'JPG to PDF', 'Sign PDF'].map(name => {
-                  const tool = tools.find(t => t.title === name);
-                  return tool ? (
-                    <li key={name}>
-                      <Link href={`/${tool.slug}`}
-                        className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
-                        {name}
-                      </Link>
-                    </li>
-                  ) : null;
-                })}
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-4">AI Tools</h3>
-              <ul className="space-y-2.5">
-                {tools.filter(t => t.category === 'Smart Converter').map(t => (
-                  <li key={t.slug}>
-                    <Link href={`/${t.slug}`}
-                      className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
-                      {t.title}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="text-xs font-bold text-gray-900 uppercase tracking-widest mb-4">Company</h3>
-              <ul className="space-y-2.5">
-                {[
-                  { label: 'About', href: '/about' },
-                  { label: 'Privacy Policy', href: '/privacy-policy' },
-                  { label: 'Contact', href: '/contact' },
-                ].map(({ label, href }) => (
-                  <li key={label}>
-                    <Link href={href}
-                      className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
-                      {label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          <div className="pt-8 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-3">
-            <p className="text-xs text-gray-400">
-              © {new Date().getFullYear()} Convertam · Files processed and deleted — we don&apos;t keep copies.
-            </p>
-            <p className="text-xs text-gray-400">
-              Free to use. If it&apos;s useful,{' '}
-              <a href="/support" className="underline hover:text-gray-600">support it here</a>.
-            </p>
-          </div>
-        </div>
-      </footer>
 
     </main>
   );

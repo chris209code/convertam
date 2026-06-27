@@ -5,14 +5,17 @@ export default function Header() {
     <header style={{ background: 'white', borderBottom: '1px solid #E2E8F0', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}
       className="sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-5 md:px-10 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Convertam" style={{ height: '44px', width: 'auto' }} />
+          <img src="/logo.png" alt="Convertam" style={{ height: '36px', width: 'auto' }} />
+          <span style={{ fontWeight: 700, fontSize: '1.2rem', color: '#1e293b', letterSpacing: '-0.01em' }}>
+            Convertam
+          </span>
         </Link>
         <div className="flex items-center gap-8">
-          <Link href="/#tools" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors hidden md:block">Tools</Link>
-          <Link href="/#ai-tools" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors hidden md:block">AI Tools</Link>
-          <Link href="/about" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors hidden md:block">About</Link>
+          <Link href="/#tools" className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors hidden md:block">Tools</Link>
+          <Link href="/#ai-tools" className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors hidden md:block">AI Tools</Link>
+          <Link href="/about" className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors hidden md:block">About</Link>
           <Link href="/#tools"
             className="inline-flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-xl text-white transition-all hover:opacity-90"
             style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)', boxShadow: '0 2px 8px rgba(37,99,235,0.35)' }}>

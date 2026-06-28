@@ -34,18 +34,63 @@ export default function HomePage() {
   return (
     <main style={{ width: '100%', minHeight: '100vh', overflowX: 'hidden' }}>
 
+      <style>{`
+        .hero-section {
+          width: 100%;
+          background-image: url(/hero.png);
+          background-size: 100% auto;
+          background-position: top center;
+          background-repeat: no-repeat;
+          min-height: 620px;
+          display: flex;
+          align-items: center;
+        }
+        .inner { max-width: 1600px; margin: 0 auto; padding: 80px 64px; width: 100%; }
+        .stats-inner { max-width: 1600px; margin: 0 auto; padding: 0 64px; }
+        .tools-inner { max-width: 1600px; margin: 0 auto; padding: 0 64px; }
+        .why-inner { max-width: 1600px; margin: 0 auto; padding: 0 64px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); }
+        .tools-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+        .ai-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 16px; }
+        .why-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+        .feature-badges { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 36px; }
+        .cta-buttons { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+
+        @media (max-width: 768px) {
+          .hero-section {
+            min-height: 420px;
+            background-size: cover;
+            background-position: center top;
+            align-items: flex-start;
+          }
+          .inner { padding: 40px 20px; }
+          .stats-inner { padding: 0 16px; }
+          .tools-inner { padding: 0 16px; }
+          .why-inner { padding: 0 16px; }
+          .stats-grid { grid-template-columns: repeat(2, 1fr); }
+          .stats-grid > div { border-left: none !important; border-top: 1px solid #E5EDF8; padding: 20px 16px; }
+          .stats-grid > div:nth-child(2) { border-left: 1px solid #E5EDF8 !important; }
+          .stats-grid > div:nth-child(3) { border-top: 1px solid #E5EDF8; }
+          .tools-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+          .ai-grid { grid-template-columns: minmax(0, 1fr); }
+          .why-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+          .category-container { padding: 20px !important; border-radius: 16px !important; }
+          .feature-badges { gap: 8px; }
+          .cta-buttons { flex-direction: column; }
+          .cta-buttons a { text-align: center; justify-content: center; }
+        }
+
+        @media (max-width: 480px) {
+          .tools-grid { grid-template-columns: minmax(0, 1fr); }
+          .why-grid { grid-template-columns: 1fr; }
+          .stats-grid { grid-template-columns: 1fr; }
+          .stats-grid > div { border-left: none !important; border-top: 1px solid #E5EDF8; }
+        }
+      `}</style>
+
       {/* ── HERO ── */}
-      <section style={{
-        width: '100%',
-        backgroundImage: 'url(/hero.png)',
-        backgroundSize: '100% auto',
-        backgroundPosition: 'top center',
-        backgroundRepeat: 'no-repeat',
-        minHeight: '620px',
-        display: 'flex',
-        alignItems: 'center',
-      }}>
-        <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '80px 64px', width: '100%' }}>
+      <section className="hero-section">
+        <div className="inner">
           <div style={{ maxWidth: '520px' }}>
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: '8px',
@@ -57,15 +102,15 @@ export default function HomePage() {
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', display: 'inline-block' }} />
               100% Free Forever
             </div>
-            <h1 style={{ fontSize: 'clamp(2.4rem, 4vw, 3.4rem)', fontWeight: 900, lineHeight: 1.1, letterSpacing: '-0.02em', color: '#0A1628', marginBottom: '20px' }}>
+            <h1 style={{ fontSize: 'clamp(1.8rem, 5vw, 3.4rem)', fontWeight: 900, lineHeight: 1.1, letterSpacing: '-0.02em', color: '#0A1628', marginBottom: '20px' }}>
               Convert{' '}
               <span style={{ color: '#2563EB' }}>any file.</span>
               <br />Instantly. Securely.
             </h1>
-            <p style={{ fontSize: '1.05rem', color: '#1e3a6e', lineHeight: 1.7, marginBottom: '32px', maxWidth: '420px' }}>
+            <p style={{ fontSize: 'clamp(0.9rem, 2vw, 1.05rem)', color: '#1e3a6e', lineHeight: 1.7, marginBottom: '32px', maxWidth: '420px' }}>
               Convert PDFs, images, documents, and more in seconds. 100% free, private, and secure.
             </p>
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '36px' }}>
+            <div className="feature-badges">
               {[
                 { icon: '⚡', title: 'Instant', sub: 'Conversion' },
                 { icon: '🔒', title: 'Private', sub: '& Secure' },
@@ -86,7 +131,7 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px' }}>
+            <div className="cta-buttons">
               <Link href="#tools" style={{
                 display: 'inline-flex', alignItems: 'center', gap: '8px',
                 padding: '14px 28px', borderRadius: '12px', fontSize: '0.95rem', fontWeight: 700,
@@ -108,12 +153,11 @@ export default function HomePage() {
 
       {/* ── STATS ── */}
       <section style={{ width: '100%', background: 'linear-gradient(180deg, #F8FBFF 0%, #F3F8FF 100%)', padding: '0 0 48px' }}>
-        <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '0 64px' }}>
-          <div style={{
+        <div className="stats-inner">
+          <div className="stats-grid" style={{
             background: '#FFFFFF', border: '1px solid #E5EDF8',
             borderRadius: '28px', boxShadow: '0 15px 45px rgba(30,64,175,0.06)',
             marginTop: '-30px', position: 'relative', zIndex: 5,
-            display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
           }}>
             {[
               { value: '25+', label: 'Free Tools Available', icon: '🛠️', bg: '#EFF6FF' },
@@ -140,18 +184,20 @@ export default function HomePage() {
 
       {/* ── TOOLS ── */}
       <section id="tools" style={{ width: '100%', background: 'linear-gradient(180deg, #F3F8FF 0%, #EEF5FF 100%)', padding: '48px 0 80px' }}>
-        <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '0 64px' }}>
+        <div className="tools-inner">
           {categories.map(({ key, label, desc, icon, accent, bg, highlight }, catIdx) => {
             const items = tools.filter(t => t.category === key);
             if (!items.length) return null;
             const isAI = highlight;
 
             return (
-              <div key={key} id={isAI ? 'ai-tools' : undefined} style={{
-                background: '#FFFFFF', border: '1px solid #E5EDF8',
-                borderRadius: '28px', padding: '36px', marginBottom: '32px',
-                boxShadow: '0 15px 45px rgba(30,64,175,0.06)',
-              }}>
+              <div key={key} id={isAI ? 'ai-tools' : undefined}
+                className="category-container"
+                style={{
+                  background: '#FFFFFF', border: '1px solid #E5EDF8',
+                  borderRadius: '28px', padding: '36px', marginBottom: '32px',
+                  boxShadow: '0 15px 45px rgba(30,64,175,0.06)',
+                }}>
                 <div style={{ borderBottom: '1px solid #E6EEF9', paddingBottom: '16px', marginBottom: '28px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
@@ -168,13 +214,13 @@ export default function HomePage() {
                 </div>
 
                 {isAI ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '16px' }}>
+                  <div className="ai-grid">
                     {items.map(t => (
                       <AIToolCard key={t.slug} slug={t.slug} title={t.title} description={t.description} />
                     ))}
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: '12px' }}>
+                  <div className="tools-grid">
                     {items.map(t => (
                       <ToolCard key={t.slug} slug={t.slug} title={t.title} mode={t.mode} bg={bg} isFree={isFreeMode(t.mode)} />
                     ))}
@@ -190,14 +236,14 @@ export default function HomePage() {
 
       {/* ── WHY CONVERTAM ── */}
       <section style={{ width: '100%', background: '#FFFFFF', borderTop: '1px solid #E5EDF8', padding: '72px 0' }}>
-        <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '0 64px' }}>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, textAlign: 'center', color: '#152238', marginBottom: '8px', letterSpacing: '-0.01em' }}>
+        <div className="why-inner">
+          <h2 style={{ fontSize: 'clamp(1.4rem, 3vw, 1.75rem)', fontWeight: 800, textAlign: 'center', color: '#152238', marginBottom: '8px', letterSpacing: '-0.01em' }}>
             Why Choose Convertam?
           </h2>
           <p style={{ textAlign: 'center', color: '#64748B', fontSize: '0.95rem', marginBottom: '48px' }}>
             Built for people who just need it done. Fast.
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
+          <div className="why-grid">
             {[
               { icon: '⚡', title: 'Lightning Fast', desc: 'Conversions in seconds, not minutes.', bg: '#FFFBEB' },
               { icon: '🔒', title: 'Privacy First', desc: 'Files deleted immediately after conversion.', bg: '#ECFDF5' },

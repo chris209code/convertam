@@ -42,12 +42,21 @@ export const metadata = {
     url: 'https://www.convertam.app',
     siteName: 'Convertam',
     type: 'website',
+    images: [
+      {
+        url: 'https://www.convertam.app/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Convertam — Free File Conversion',
+      },
+    ],
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: 'Convertam — Free File Conversion',
     description: 'Free online file conversion. No login, no watermark, no stress.',
     creator: '@chrisndz',
+    images: ['https://www.convertam.app/og-image.png'],
   },
 };
 

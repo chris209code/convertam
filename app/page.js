@@ -34,7 +34,7 @@ export default function HomePage() {
   return (
     <main style={{ width: '100%', minHeight: '100vh', overflowX: 'hidden' }}>
 
-      {/* ── HERO — full browser width ── */}
+      {/* ── HERO ── */}
       <section style={{
         width: '100%',
         backgroundImage: 'url(/hero.png)',
@@ -45,8 +45,7 @@ export default function HomePage() {
         display: 'flex',
         alignItems: 'center',
       }}>
-        {/* Inner content max-width */}
-        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '80px 48px', width: '100%' }}>
+        <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '80px 64px', width: '100%' }}>
           <div style={{ maxWidth: '520px' }}>
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: '8px',
@@ -107,9 +106,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── STATS — full browser width background ── */}
+      {/* ── STATS ── */}
       <section style={{ width: '100%', background: 'linear-gradient(180deg, #F8FBFF 0%, #F3F8FF 100%)', padding: '0 0 48px' }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 48px' }}>
+        <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '0 64px' }}>
           <div style={{
             background: '#FFFFFF', border: '1px solid #E5EDF8',
             borderRadius: '28px', boxShadow: '0 15px 45px rgba(30,64,175,0.06)',
@@ -139,9 +138,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── TOOLS — full browser width background ── */}
+      {/* ── TOOLS ── */}
       <section id="tools" style={{ width: '100%', background: 'linear-gradient(180deg, #F3F8FF 0%, #EEF5FF 100%)', padding: '48px 0 80px' }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 48px' }}>
+        <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '0 64px' }}>
           {categories.map(({ key, label, desc, icon, accent, bg, highlight }, catIdx) => {
             const items = tools.filter(t => t.category === key);
             if (!items.length) return null;
@@ -189,9 +188,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── WHY CONVERTAM — full browser width ── */}
+      {/* ── WHY CONVERTAM ── */}
       <section style={{ width: '100%', background: '#FFFFFF', borderTop: '1px solid #E5EDF8', padding: '72px 0' }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 48px' }}>
+        <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '0 64px' }}>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 800, textAlign: 'center', color: '#152238', marginBottom: '8px', letterSpacing: '-0.01em' }}>
             Why Choose Convertam?
           </h2>
@@ -215,9 +214,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* AD SLOT */}
+      {/* ── AD SLOT ── */}
       <section style={{ width: '100%', background: '#EEF5FF', padding: '32px 0' }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 48px' }}>
+        <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '0 64px' }}>
           <AdSlot id="ad-slot-2" />
         </div>
       </section>

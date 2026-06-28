@@ -17,15 +17,12 @@ const isFreeMode = (mode) =>
    'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize', 'fill'].includes(mode);
 
 function AdSlot({ id }) {
+  // Set to true and add your AdSense tag below when ready
+  const hasAd = false;
+  if (!hasAd) return null;
   return (
-    <div id={id} style={{
-      width: '100%', height: '120px', margin: '32px 0',
-      background: '#F8FAFC', border: '1px dashed #CBD5E1',
-      borderRadius: '18px', display: 'flex', alignItems: 'center',
-      justifyContent: 'center', fontSize: '0.75rem', color: '#94A3B8',
-      fontWeight: 500, letterSpacing: '0.05em',
-    }}>
-      Advertisement
+    <div id={id} style={{ width: '100%', margin: '32px 0' }}>
+      {/* Paste your AdSense tag here when ready */}
     </div>
   );
 }
@@ -46,12 +43,8 @@ export default function HomePage() {
           background-position: top center;
           background-repeat: no-repeat;
         }
-        .hero-mobile-bg {
-          display: none;
-        }
-        .hero-overlay {
-          display: none;
-        }
+        .hero-mobile-bg { display: none; }
+        .hero-overlay { display: none; }
         .inner { max-width: 1600px; margin: 0 auto; padding: 80px 64px; width: 100%; position: relative; z-index: 2; }
         .stats-inner { max-width: 1600px; margin: 0 auto; padding: 0 64px; }
         .tools-inner { max-width: 1600px; margin: 0 auto; padding: 0 64px; }
@@ -116,12 +109,9 @@ export default function HomePage() {
 
       {/* ── HERO ── */}
       <section className="hero-section">
-        {/* Mobile background image */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/hero-mobile.png" alt="" className="hero-mobile-bg" aria-hidden="true" />
-        {/* Mobile gradient overlay — keeps left side readable */}
         <div className="hero-overlay" />
-
         <div className="inner">
           <div style={{ maxWidth: '520px' }}>
             <div style={{
@@ -259,7 +249,7 @@ export default function HomePage() {
                   </div>
                 )}
 
-                {catIdx === 0 && <AdSlot id="ad-slot-1" />}
+                <AdSlot id={`ad-slot-${catIdx}`} />
               </div>
             );
           })}
@@ -289,13 +279,6 @@ export default function HomePage() {
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* ── AD SLOT ── */}
-      <section style={{ width: '100%', background: '#EEF5FF', padding: '32px 0' }}>
-        <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '0 64px' }}>
-          <AdSlot id="ad-slot-2" />
         </div>
       </section>
 

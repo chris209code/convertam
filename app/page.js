@@ -32,11 +32,11 @@ function AdSlot({ id }) {
 
 export default function HomePage() {
   return (
-    <main>
+    <main style={{ width: '100%', minHeight: '100vh', overflowX: 'hidden' }}>
 
-      {/* ── HERO — DO NOT MODIFY ── */}
+      {/* ── HERO — full browser width ── */}
       <section style={{
-        position: 'relative',
+        width: '100%',
         backgroundImage: 'url(/hero.png)',
         backgroundSize: '100% auto',
         backgroundPosition: 'top center',
@@ -45,7 +45,8 @@ export default function HomePage() {
         display: 'flex',
         alignItems: 'center',
       }}>
-        <div style={{ maxWidth: '1152px', margin: '0 auto', padding: '80px 40px', width: '100%' }}>
+        {/* Inner content max-width */}
+        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '80px 48px', width: '100%' }}>
           <div style={{ maxWidth: '520px' }}>
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: '8px',
@@ -106,11 +107,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── BELOW HERO ── */}
-      <div style={{ background: 'linear-gradient(180deg, #F8FBFF 0%, #F3F8FF 50%, #EEF5FF 100%)', paddingBottom: '80px' }}>
-
-        {/* STATS */}
-        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 32px' }}>
+      {/* ── STATS — full browser width background ── */}
+      <section style={{ width: '100%', background: 'linear-gradient(180deg, #F8FBFF 0%, #F3F8FF 100%)', padding: '0 0 48px' }}>
+        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 48px' }}>
           <div style={{
             background: '#FFFFFF', border: '1px solid #E5EDF8',
             borderRadius: '28px', boxShadow: '0 15px 45px rgba(30,64,175,0.06)',
@@ -138,9 +137,11 @@ export default function HomePage() {
             ))}
           </div>
         </div>
+      </section>
 
-        {/* TOOLS */}
-        <div id="tools" style={{ maxWidth: '1400px', margin: '0 auto', padding: '72px 32px 0' }}>
+      {/* ── TOOLS — full browser width background ── */}
+      <section id="tools" style={{ width: '100%', background: 'linear-gradient(180deg, #F3F8FF 0%, #EEF5FF 100%)', padding: '48px 0 80px' }}>
+        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 48px' }}>
           {categories.map(({ key, label, desc, icon, accent, bg, highlight }, catIdx) => {
             const items = tools.filter(t => t.category === key);
             if (!items.length) return null;
@@ -149,10 +150,9 @@ export default function HomePage() {
             return (
               <div key={key} id={isAI ? 'ai-tools' : undefined} style={{
                 background: '#FFFFFF', border: '1px solid #E5EDF8',
-                borderRadius: '28px', padding: '36px', marginBottom: '48px',
+                borderRadius: '28px', padding: '36px', marginBottom: '32px',
                 boxShadow: '0 15px 45px rgba(30,64,175,0.06)',
               }}>
-                {/* Category heading */}
                 <div style={{ borderBottom: '1px solid #E6EEF9', paddingBottom: '16px', marginBottom: '28px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
@@ -168,15 +168,14 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* Cards */}
                 {isAI ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '16px' }}>
                     {items.map(t => (
                       <AIToolCard key={t.slug} slug={t.slug} title={t.title} description={t.description} />
                     ))}
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: '12px' }}>
                     {items.map(t => (
                       <ToolCard key={t.slug} slug={t.slug} title={t.title} mode={t.mode} bg={bg} isFree={isFreeMode(t.mode)} />
                     ))}
@@ -188,39 +187,41 @@ export default function HomePage() {
             );
           })}
         </div>
+      </section>
 
-        {/* WHY CONVERTAM */}
-        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 32px' }}>
-          <div style={{
-            background: '#FFFFFF', border: '1px solid #E5EDF8',
-            borderRadius: '28px', padding: '56px 40px',
-            boxShadow: '0 15px 45px rgba(30,64,175,0.06)', marginBottom: '48px',
-          }}>
-            <h2 style={{ fontSize: '1.75rem', fontWeight: 800, textAlign: 'center', color: '#152238', marginBottom: '8px', letterSpacing: '-0.01em' }}>
-              Why Choose Convertam?
-            </h2>
-            <p style={{ textAlign: 'center', color: '#64748B', fontSize: '0.95rem', marginBottom: '48px' }}>
-              Built for people who just need it done. Fast.
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
-              {[
-                { icon: '⚡', title: 'Lightning Fast', desc: 'Conversions in seconds, not minutes.', bg: '#FFFBEB' },
-                { icon: '🔒', title: 'Privacy First', desc: 'Files deleted immediately after conversion.', bg: '#ECFDF5' },
-                { icon: '🚫', title: 'No Registration', desc: 'Just upload and go. No account needed.', bg: '#F5F3FF' },
-                { icon: '📱', title: 'Works Everywhere', desc: 'Any device. Any browser. Any time.', bg: '#EFF6FF' },
-              ].map(({ icon, title, desc, bg }) => (
-                <div key={title} style={{ textAlign: 'center', padding: '32px 20px', borderRadius: '20px', background: bg, border: '1px solid #E5EDF8' }}>
-                  <div style={{ fontSize: '2.2rem', marginBottom: '14px' }}>{icon}</div>
-                  <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#152238', marginBottom: '8px' }}>{title}</div>
-                  <div style={{ fontSize: '0.82rem', color: '#64748B', lineHeight: 1.6 }}>{desc}</div>
-                </div>
-              ))}
-            </div>
+      {/* ── WHY CONVERTAM — full browser width ── */}
+      <section style={{ width: '100%', background: '#FFFFFF', borderTop: '1px solid #E5EDF8', padding: '72px 0' }}>
+        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 48px' }}>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, textAlign: 'center', color: '#152238', marginBottom: '8px', letterSpacing: '-0.01em' }}>
+            Why Choose Convertam?
+          </h2>
+          <p style={{ textAlign: 'center', color: '#64748B', fontSize: '0.95rem', marginBottom: '48px' }}>
+            Built for people who just need it done. Fast.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
+            {[
+              { icon: '⚡', title: 'Lightning Fast', desc: 'Conversions in seconds, not minutes.', bg: '#FFFBEB' },
+              { icon: '🔒', title: 'Privacy First', desc: 'Files deleted immediately after conversion.', bg: '#ECFDF5' },
+              { icon: '🚫', title: 'No Registration', desc: 'Just upload and go. No account needed.', bg: '#F5F3FF' },
+              { icon: '📱', title: 'Works Everywhere', desc: 'Any device. Any browser. Any time.', bg: '#EFF6FF' },
+            ].map(({ icon, title, desc, bg }) => (
+              <div key={title} style={{ textAlign: 'center', padding: '32px 20px', borderRadius: '20px', background: bg, border: '1px solid #E5EDF8' }}>
+                <div style={{ fontSize: '2.2rem', marginBottom: '14px' }}>{icon}</div>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#152238', marginBottom: '8px' }}>{title}</div>
+                <div style={{ fontSize: '0.82rem', color: '#64748B', lineHeight: 1.6 }}>{desc}</div>
+              </div>
+            ))}
           </div>
+        </div>
+      </section>
+
+      {/* AD SLOT */}
+      <section style={{ width: '100%', background: '#EEF5FF', padding: '32px 0' }}>
+        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 48px' }}>
           <AdSlot id="ad-slot-2" />
         </div>
+      </section>
 
-      </div>
     </main>
   );
 }

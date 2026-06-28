@@ -42,7 +42,7 @@ export default function ToolPageClient({ tool }) {
     .filter(Boolean);
 
   return (
-    <main className="max-w-3xl mx-auto px-5 md:px-10 py-10">
+    <main className="max-w-5xl mx-auto px-5 md:px-10 py-10">
 
       {/* Category */}
       <p className="font-mono text-xs text-stamp-amber tracking-wide mb-2">

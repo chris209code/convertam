@@ -17,14 +17,9 @@ const isFreeMode = (mode) =>
    'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize', 'fill'].includes(mode);
 
 function AdSlot({ id }) {
-  // Set to true and add your AdSense tag below when ready
   const hasAd = false;
   if (!hasAd) return null;
-  return (
-    <div id={id} style={{ width: '100%', margin: '32px 0' }}>
-      {/* Paste your AdSense tag here when ready */}
-    </div>
-  );
+  return <div id={id} style={{ width: '100%', margin: '32px 0' }} />;
 }
 
 export default function HomePage() {
@@ -53,36 +48,23 @@ export default function HomePage() {
         .tools-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
         .ai-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 16px; }
         .why-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+        .why-card { text-align: center; padding: 32px 20px; border-radius: 20px; border: 1px solid #E5EDF8; }
+        .why-icon { font-size: 2.2rem; margin-bottom: 14px; }
+        .why-title { font-weight: 700; font-size: 0.95rem; color: #152238; margin-bottom: 8px; }
+        .why-desc { font-size: 0.82rem; color: #64748B; line-height: 1.6; }
         .feature-badges { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 36px; }
         .cta-buttons { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 
         @media (max-width: 768px) {
-          .hero-section {
-            min-height: 520px;
-            background-image: none !important;
-          }
+          .hero-section { min-height: 520px; background-image: none !important; }
           .hero-mobile-bg {
-            display: block;
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            object-position: right center;
-            z-index: 0;
+            display: block; position: absolute; inset: 0;
+            width: 100%; height: 100%; object-fit: cover;
+            object-position: right center; z-index: 0;
           }
           .hero-overlay {
-            display: block;
-            position: absolute;
-            inset: 0;
-            z-index: 1;
-            background: linear-gradient(
-              90deg,
-              rgba(243,247,255,0.92) 0%,
-              rgba(243,247,255,0.72) 34%,
-              rgba(243,247,255,0.28) 58%,
-              rgba(243,247,255,0.08) 100%
-            );
+            display: block; position: absolute; inset: 0; z-index: 1;
+            background: linear-gradient(90deg, rgba(243,247,255,0.92) 0%, rgba(243,247,255,0.72) 34%, rgba(243,247,255,0.28) 58%, rgba(243,247,255,0.08) 100%);
           }
           .inner { padding: 40px 20px; }
           .stats-inner { padding: 0 16px; }
@@ -93,7 +75,11 @@ export default function HomePage() {
           .stats-grid > div:nth-child(2) { border-left: 1px solid #E5EDF8 !important; }
           .tools-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
           .ai-grid { grid-template-columns: minmax(0, 1fr); }
-          .why-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+          .why-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+          .why-card { padding: 16px 12px; border-radius: 14px; }
+          .why-icon { font-size: 1.5rem; margin-bottom: 8px; }
+          .why-title { font-size: 0.82rem; margin-bottom: 4px; }
+          .why-desc { font-size: 0.72rem; }
           .category-container { padding: 20px !important; border-radius: 16px !important; }
           .cta-buttons { flex-direction: column; }
           .cta-buttons a { text-align: center; justify-content: center; }
@@ -101,7 +87,7 @@ export default function HomePage() {
 
         @media (max-width: 480px) {
           .tools-grid { grid-template-columns: minmax(0, 1fr); }
-          .why-grid { grid-template-columns: 1fr; }
+          .why-grid { grid-template-columns: repeat(2, 1fr); }
           .stats-grid { grid-template-columns: 1fr; }
           .stats-grid > div { border-left: none !important; border-top: 1px solid #E5EDF8; }
         }
@@ -211,7 +197,6 @@ export default function HomePage() {
             const items = tools.filter(t => t.category === key);
             if (!items.length) return null;
             const isAI = highlight;
-
             return (
               <div key={key} id={isAI ? 'ai-tools' : undefined}
                 className="category-container"
@@ -234,7 +219,6 @@ export default function HomePage() {
                     </div>
                   </div>
                 </div>
-
                 {isAI ? (
                   <div className="ai-grid">
                     {items.map(t => (
@@ -248,7 +232,6 @@ export default function HomePage() {
                     ))}
                   </div>
                 )}
-
                 <AdSlot id={`ad-slot-${catIdx}`} />
               </div>
             );
@@ -272,10 +255,10 @@ export default function HomePage() {
               { icon: '🚫', title: 'No Registration', desc: 'Just upload and go. No account needed.', bg: '#F5F3FF' },
               { icon: '📱', title: 'Works Everywhere', desc: 'Any device. Any browser. Any time.', bg: '#EFF6FF' },
             ].map(({ icon, title, desc, bg }) => (
-              <div key={title} style={{ textAlign: 'center', padding: '32px 20px', borderRadius: '20px', background: bg, border: '1px solid #E5EDF8' }}>
-                <div style={{ fontSize: '2.2rem', marginBottom: '14px' }}>{icon}</div>
-                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#152238', marginBottom: '8px' }}>{title}</div>
-                <div style={{ fontSize: '0.82rem', color: '#64748B', lineHeight: 1.6 }}>{desc}</div>
+              <div key={title} className="why-card" style={{ background: bg }}>
+                <div className="why-icon">{icon}</div>
+                <div className="why-title">{title}</div>
+                <div className="why-desc">{desc}</div>
               </div>
             ))}
           </div>

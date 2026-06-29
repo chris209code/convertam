@@ -47,11 +47,11 @@ export default function HomePage() {
         .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); }
         .tools-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
         .ai-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 16px; }
-        .why-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
-        .why-card { text-align: center; padding: 32px 20px; border-radius: 20px; border: 1px solid #E5EDF8; }
-        .why-icon { font-size: 2.2rem; margin-bottom: 14px; }
-        .why-title { font-weight: 700; font-size: 0.95rem; color: #152238; margin-bottom: 8px; }
-        .why-desc { font-size: 0.82rem; color: #64748B; line-height: 1.6; }
+        .why-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        .why-card { display: flex; align-items: center; gap: 14px; padding: 18px 20px; border-radius: 16px; border: 1px solid #E5EDF8; }
+        .why-icon { font-size: 1.6rem; flex-shrink: 0; }
+        .why-title { font-weight: 700; font-size: 0.88rem; color: #152238; margin-bottom: 2px; }
+        .why-desc { font-size: 0.75rem; color: #64748B; line-height: 1.4; }
         .feature-badges { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 36px; }
         .cta-buttons { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 
@@ -75,10 +75,10 @@ export default function HomePage() {
           .stats-grid > div:nth-child(2) { border-left: 1px solid #E5EDF8 !important; }
           .tools-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
           .ai-grid { grid-template-columns: minmax(0, 1fr); }
-          .why-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-          .why-card { padding: 16px 12px; border-radius: 14px; }
-          .why-icon { font-size: 1.5rem; margin-bottom: 8px; }
-          .why-title { font-size: 0.82rem; margin-bottom: 4px; }
+          .why-grid { grid-template-columns: 1fr; gap: 10px; }
+          .why-card { padding: 12px 14px; border-radius: 12px; }
+          .why-icon { font-size: 1.3rem; }
+          .why-title { font-size: 0.82rem; }
           .why-desc { font-size: 0.72rem; }
           .category-container { padding: 20px !important; border-radius: 16px !important; }
           .cta-buttons { flex-direction: column; }
@@ -87,7 +87,6 @@ export default function HomePage() {
 
         @media (max-width: 480px) {
           .tools-grid { grid-template-columns: minmax(0, 1fr); }
-          .why-grid { grid-template-columns: repeat(2, 1fr); }
           .stats-grid { grid-template-columns: 1fr; }
           .stats-grid > div { border-left: none !important; border-top: 1px solid #E5EDF8; }
         }
@@ -160,7 +159,7 @@ export default function HomePage() {
       </section>
 
       {/* ── STATS ── */}
-      <section style={{ width: '100%', background: 'linear-gradient(180deg, #F8FBFF 0%, #F3F8FF 100%)', padding: '0 0 48px' }}>
+      <section style={{ width: '100%', background: 'linear-gradient(180deg, #F8FBFF 0%, #F3F8FF 100%)', padding: '0 0 40px' }}>
         <div className="stats-inner">
           <div className="stats-grid" style={{
             background: '#FFFFFF', border: '1px solid #E5EDF8',
@@ -174,15 +173,15 @@ export default function HomePage() {
               { value: 'Auto', label: 'Files Deleted After Use', icon: '🗑️', bg: '#FFFBEB' },
             ].map(({ value, label, icon, bg }, i) => (
               <div key={label} style={{
-                display: 'flex', alignItems: 'center', gap: '16px', padding: '32px',
+                display: 'flex', alignItems: 'center', gap: '16px', padding: '24px',
                 borderLeft: i > 0 ? '1px solid #E5EDF8' : 'none',
               }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.3rem', flexShrink: 0 }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
                   {icon}
                 </div>
                 <div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.1 }}>{value}</div>
-                  <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: '3px' }}>{label}</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.1 }}>{value}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>{label}</div>
                 </div>
               </div>
             ))}
@@ -191,7 +190,7 @@ export default function HomePage() {
       </section>
 
       {/* ── TOOLS ── */}
-      <section id="tools" style={{ width: '100%', background: 'linear-gradient(180deg, #F3F8FF 0%, #EEF5FF 100%)', padding: '48px 0 80px' }}>
+      <section id="tools" style={{ width: '100%', background: 'linear-gradient(180deg, #F3F8FF 0%, #EEF5FF 100%)', padding: '40px 0 60px' }}>
         <div className="tools-inner">
           {categories.map(({ key, label, desc, icon, accent, bg, highlight }, catIdx) => {
             const items = tools.filter(t => t.category === key);
@@ -202,20 +201,20 @@ export default function HomePage() {
                 className="category-container"
                 style={{
                   background: '#FFFFFF', border: '1px solid #E5EDF8',
-                  borderRadius: '28px', padding: '36px', marginBottom: '32px',
+                  borderRadius: '28px', padding: '36px', marginBottom: '24px',
                   boxShadow: '0 15px 45px rgba(30,64,175,0.06)',
                 }}>
-                <div style={{ borderBottom: '1px solid #E6EEF9', paddingBottom: '16px', marginBottom: '28px' }}>
+                <div style={{ borderBottom: '1px solid #E6EEF9', paddingBottom: '16px', marginBottom: '24px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
                       <span style={{ color: accent }}>{icon}</span>
                     </div>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#152238', margin: 0 }}>{label}</h2>
+                        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#152238', margin: 0 }}>{label}</h2>
                         {isAI && <span style={{ fontSize: '0.6rem', fontWeight: 700, padding: '3px 10px', borderRadius: '99px', background: '#ECFDF5', color: '#10B981', border: '1px solid #A7F3D0' }}>NEW</span>}
                       </div>
-                      <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '2px 0 0' }}>{desc}</p>
+                      <p style={{ fontSize: '0.78rem', color: '#64748B', margin: '2px 0 0' }}>{desc}</p>
                     </div>
                   </div>
                 </div>
@@ -240,12 +239,12 @@ export default function HomePage() {
       </section>
 
       {/* ── WHY CONVERTAM ── */}
-      <section style={{ width: '100%', background: '#FFFFFF', borderTop: '1px solid #E5EDF8', padding: '72px 0' }}>
+      <section style={{ width: '100%', background: '#FFFFFF', borderTop: '1px solid #E5EDF8', padding: '32px 0' }}>
         <div className="why-inner">
-          <h2 style={{ fontSize: 'clamp(1.4rem, 3vw, 1.75rem)', fontWeight: 800, textAlign: 'center', color: '#152238', marginBottom: '8px', letterSpacing: '-0.01em' }}>
+          <h2 style={{ fontSize: '1.1rem', fontWeight: 800, textAlign: 'center', color: '#152238', marginBottom: '4px' }}>
             Why Choose Convertam?
           </h2>
-          <p style={{ textAlign: 'center', color: '#64748B', fontSize: '0.95rem', marginBottom: '48px' }}>
+          <p style={{ textAlign: 'center', color: '#64748B', fontSize: '0.82rem', marginBottom: '20px' }}>
             Built for people who just need it done. Fast.
           </p>
           <div className="why-grid">
@@ -257,8 +256,10 @@ export default function HomePage() {
             ].map(({ icon, title, desc, bg }) => (
               <div key={title} className="why-card" style={{ background: bg }}>
                 <div className="why-icon">{icon}</div>
-                <div className="why-title">{title}</div>
-                <div className="why-desc">{desc}</div>
+                <div>
+                  <div className="why-title">{title}</div>
+                  <div className="why-desc">{desc}</div>
+                </div>
               </div>
             ))}
           </div>

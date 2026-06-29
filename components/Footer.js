@@ -18,7 +18,6 @@ export default function Footer() {
 
       <div className="footer-inner">
 
-        {/* Logo + tagline */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="Convertam" style={{ height: '40px', width: 'auto', marginBottom: '12px' }} />
@@ -27,7 +26,6 @@ export default function Footer() {
           </p>
         </div>
 
-        {/* Action buttons */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '28px' }}>
           <a href="https://paystack.com/pay/convertam-donate"
             target="_blank" rel="noopener noreferrer"
@@ -56,7 +54,6 @@ export default function Footer() {
           </button>
         </div>
 
-        {/* Nav links */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '28px' }}>
           {[
             { label: 'About', href: '/about', internal: true },
@@ -76,7 +73,6 @@ export default function Footer() {
           ))}
         </div>
 
-        {/* Divider */}
         <div style={{ borderTop: '1px solid #E5EDF8', paddingTop: '24px', textAlign: 'center' }}>
           <p style={{ fontSize: '0.8rem', color: '#94A3B8', margin: 0 }}>
             convertam.app is free to use. If it&apos;s useful to you, support it by tolerating the ads, or{' '}

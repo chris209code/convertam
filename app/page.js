@@ -40,10 +40,10 @@ export default function HomePage() {
         }
         .hero-mobile-bg { display: none; }
         .hero-overlay { display: none; }
-        .inner { max-width: 1600px; margin: 0 auto; padding: 80px 64px; width: 100%; position: relative; z-index: 2; }
-        .stats-inner { max-width: 1600px; margin: 0 auto; padding: 0 64px; }
-        .tools-inner { max-width: 1600px; margin: 0 auto; padding: 0 64px; }
-        .why-inner { max-width: 1600px; margin: 0 auto; padding: 0 64px; }
+        .inner { width: 100%; padding: 80px 4%; }
+        .stats-inner { width: 100%; padding: 0 4%; }
+        .tools-inner { width: 100%; padding: 0 4%; }
+        .why-inner { width: 100%; padding: 0 4%; }
         .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); }
         .tools-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
         .ai-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 16px; }
@@ -70,10 +70,10 @@ export default function HomePage() {
             display: block; position: absolute; inset: 0; z-index: 1;
             background: linear-gradient(90deg, rgba(243,247,255,0.92) 0%, rgba(243,247,255,0.72) 34%, rgba(243,247,255,0.28) 58%, rgba(243,247,255,0.08) 100%);
           }
-          .inner { padding: 40px 20px; }
-          .stats-inner { padding: 0 16px; }
-          .tools-inner { padding: 0 16px; }
-          .why-inner { padding: 0 16px; }
+          .inner { padding: 40px 5%; }
+          .stats-inner { padding: 0 5%; }
+          .tools-inner { padding: 0 5%; }
+          .why-inner { padding: 0 5%; }
           .stats-grid { grid-template-columns: repeat(2, 1fr); }
           .stats-grid > div { border-left: none !important; border-top: 1px solid #E5EDF8; padding: 20px 16px; }
           .stats-grid > div:nth-child(2) { border-left: 1px solid #E5EDF8 !important; }
@@ -101,7 +101,7 @@ export default function HomePage() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/hero-mobile.png" alt="" className="hero-mobile-bg" aria-hidden="true" />
         <div className="hero-overlay" />
-        <div className="inner">
+        <div className="inner" style={{ position: 'relative', zIndex: 2 }}>
           <div style={{ maxWidth: '520px' }}>
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: '8px',

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 function downloadBlob(blob, filename) {
@@ -16,7 +16,7 @@ function downloadBlob(blob, filename) {
 
 export default function OverlayTextWorkspace() {
   const [file, setFile] = useState(null);
-  const [pages, setPages] = useState([]);
+  const [pdfPages, setPdfPages] = useState([]); // rendered page canvases
   const [currentPage, setCurrentPage] = useState(0);
   const [textItems, setTextItems] = useState([]);
   const [activeItem, setActiveItem] = useState(null);
@@ -28,7 +28,8 @@ export default function OverlayTextWorkspace() {
   const [fontSize, setFontSize] = useState(11);
   const [fontColor, setFontColor] = useState('#000000');
   const [addMode, setAddMode] = useState(false);
-  const imgRef = useRef();
+  const canvasRef = useRef();
+  const containerRef = useRef();
 
   useEffect(() => {
     if (window.pdfjsLib) { setPdfjsReady(true); return; }
@@ -41,6 +42,42 @@ export default function OverlayTextWorkspace() {
     };
     document.body.appendChild(script);
   }, []);
+
+  // Redraw canvas whenever items change
+  const redrawCanvas = useCallback(() => {
+    if (!canvasRef.current || !pdfPages[currentPage]) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const pageCanvas = pdfPages[currentPage].canvas;
+
+    canvas.width = pageCanvas.width;
+    canvas.height = pageCanvas.height;
+
+    // Draw PDF page
+    ctx.drawImage(pageCanvas, 0, 0);
+
+    // Draw all text items for this page
+    const items = textItems.filter(i => i.page === currentPage);
+    items.forEach(item => {
+      ctx.font = `${item.fontSize}px Helvetica, Arial, sans-serif`;
+      ctx.fillStyle = item.color;
+      ctx.fillText(item.text || '', item.x, item.y);
+
+      // Draw selection indicator
+      if (item.id === activeItem) {
+        const metrics = ctx.measureText(item.text || '');
+        ctx.strokeStyle = '#2563EB';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 2]);
+        ctx.strokeRect(item.x - 2, item.y - item.fontSize - 2, Math.max(metrics.width + 8, 80), item.fontSize + 8);
+        ctx.setLineDash([]);
+      }
+    });
+  }, [pdfPages, currentPage, textItems, activeItem]);
+
+  useEffect(() => {
+    redrawCanvas();
+  }, [redrawCanvas]);
 
   async function handleFile(f) {
     if (!f) return;
@@ -55,18 +92,14 @@ export default function OverlayTextWorkspace() {
       const rendered = [];
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 1.5 });
+        const viewport = page.getViewport({ scale: 2 });
         const canvas = document.createElement('canvas');
         canvas.width = viewport.width;
         canvas.height = viewport.height;
         await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-        rendered.push({
-          dataUrl: canvas.toDataURL(),
-          canvasWidth: viewport.width,
-          canvasHeight: viewport.height,
-        });
+        rendered.push({ canvas, viewport, scale: 2 });
       }
-      setPages(rendered);
+      setPdfPages(rendered);
       setTextItems([]);
       setCurrentPage(0);
       setStep(2);
@@ -80,36 +113,35 @@ export default function OverlayTextWorkspace() {
 
   function handleCanvasClick(e) {
     if (!addMode) return;
-
-    const img = imgRef.current;
-    if (!img) return;
-
-    const rect = img.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    // Scale click coords to canvas coords
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
 
     const id = Date.now();
-    setTextItems(prev => [...prev, {
-      id,
-      page: currentPage,
-      x, y,
-      displayWidth: rect.width,
-      displayHeight: rect.height,
-      text: '',
-      fontSize,
-      color: fontColor,
-    }]);
+    setTextItems(prev => [...prev, { id, page: currentPage, x, y, text: '', fontSize: fontSize * 2, color: fontColor }]);
     setActiveItem(id);
     setAddMode(false);
   }
 
-  function updateText(id, text) {
-    setTextItems(prev => prev.map(item => item.id === id ? { ...item, text } : item));
-  }
+  function handleCanvasKeyInput(e) {
+    if (!activeItem) return;
+    const item = textItems.find(i => i.id === activeItem);
+    if (!item) return;
 
-  function removeItem(id) {
-    setTextItems(prev => prev.filter(item => item.id !== id));
-    if (activeItem === id) setActiveItem(null);
+    if (e.key === 'Backspace') {
+      setTextItems(prev => prev.map(i => i.id === activeItem ? { ...i, text: i.text.slice(0, -1) } : i));
+    } else if (e.key === 'Escape') {
+      setActiveItem(null);
+    } else if (e.key === 'Delete') {
+      setTextItems(prev => prev.filter(i => i.id !== activeItem));
+      setActiveItem(null);
+    } else if (e.key.length === 1) {
+      setTextItems(prev => prev.map(i => i.id === activeItem ? { ...i, text: i.text + e.key } : i));
+    }
   }
 
   async function handleDownload() {
@@ -120,26 +152,33 @@ export default function OverlayTextWorkspace() {
       const buf = await file.arrayBuffer();
       const pdfDoc = await PDFDocument.load(buf);
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const pdfPages = pdfDoc.getPages();
+      const pages = pdfDoc.getPages();
 
       for (const item of textItems) {
         if (!item.text.trim()) continue;
-        const pdfPage = pdfPages[item.page];
-        const { width: pdfW, height: pdfH } = pdfPage.getSize();
+        const page = pages[item.page];
+        const { width: pdfW, height: pdfH } = page.getSize();
+        const pageData = pdfPages[item.page];
 
-        const pdfX = (item.x / item.displayWidth) * pdfW;
-        // Add item.fontSize to push text UP to match where user clicked on screen
-        const pdfY = pdfH - (item.y / item.displayHeight) * pdfH + item.fontSize;
+        // item.x and item.y are in canvas pixels (at scale 2)
+        // Convert to PDF coordinates
+        const pdfX = (item.x / pageData.canvas.width) * pdfW;
+        // PDF Y is flipped — canvas Y=0 is top, PDF Y=0 is bottom
+        // item.y is baseline in canvas pixels
+        const pdfY = pdfH - (item.y / pageData.canvas.height) * pdfH;
 
         const hex = item.color.replace('#', '');
         const r = parseInt(hex.substring(0, 2), 16) / 255;
         const g = parseInt(hex.substring(2, 4), 16) / 255;
         const b = parseInt(hex.substring(4, 6), 16) / 255;
 
-        pdfPage.drawText(item.text, {
+        // fontSize is stored at scale*2, convert back to PDF points
+        const pdfFontSize = (item.fontSize / pageData.scale) / 2;
+
+        page.drawText(item.text, {
           x: Math.max(0, pdfX),
           y: Math.max(0, pdfY),
-          size: item.fontSize,
+          size: pdfFontSize,
           font,
           color: rgb(r, g, b),
         });
@@ -160,7 +199,7 @@ export default function OverlayTextWorkspace() {
 
   function reset() {
     setFile(null);
-    setPages([]);
+    setPdfPages([]);
     setTextItems([]);
     setActiveItem(null);
     setStep(1);
@@ -170,7 +209,6 @@ export default function OverlayTextWorkspace() {
     setAddMode(false);
   }
 
-  const currentPageItems = textItems.filter(item => item.page === currentPage);
   const filledItems = textItems.filter(i => i.text.trim());
 
   return (
@@ -197,12 +235,12 @@ export default function OverlayTextWorkspace() {
         </div>
       )}
 
-      {step === 2 && pages.length > 0 && (
+      {step === 2 && pdfPages.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <div>
               <p className="font-semibold text-ink text-sm">{file?.name}</p>
-              <p className="text-xs text-ink-soft">{pages.length} page{pages.length !== 1 ? 's' : ''}</p>
+              <p className="text-xs text-ink-soft">{pdfPages.length} page{pdfPages.length !== 1 ? 's' : ''}</p>
             </div>
             <button className="btn-ghost-sm" onClick={reset}>Change file</button>
           </div>
@@ -211,11 +249,11 @@ export default function OverlayTextWorkspace() {
           <div className="mb-3 p-3 rounded-xl text-xs" style={{ background: '#fef3c7', border: '1px solid #fde68a', color: '#92400e' }}>
             <p className="font-semibold mb-1">📝 How to fill this form:</p>
             <ol className="list-decimal list-inside flex flex-col gap-0.5">
-              <li>Set your font size and color below</li>
-              <li>Click <strong>"+ Add Text"</strong> button</li>
-              <li>Click exactly where you want to type on the PDF</li>
-              <li>Type your text in the box that appears</li>
-              <li>Repeat steps 2–4 for each field you want to fill</li>
+              <li>Set your font size and color</li>
+              <li>Click <strong>"+ Add Text"</strong> then click where you want to type on the PDF</li>
+              <li>Type your text — it appears directly on the PDF as you type</li>
+              <li>Press <strong>Escape</strong> when done with each field, then click "+ Add Text" again for the next one</li>
+              <li>Press <strong>Delete</strong> to remove the selected text item</li>
               <li>Click <strong>"Download Filled PDF"</strong> when done</li>
             </ol>
           </div>
@@ -246,7 +284,7 @@ export default function OverlayTextWorkspace() {
               />
             </div>
             <button
-              onClick={() => setAddMode(true)}
+              onClick={() => { setAddMode(true); canvasRef.current?.focus(); }}
               className="btn btn-primary ml-auto"
               style={{ fontSize: '0.8rem', padding: '6px 16px' }}
             >
@@ -256,78 +294,39 @@ export default function OverlayTextWorkspace() {
 
           {addMode && (
             <div className="text-xs font-semibold text-center py-2 mb-2 rounded-lg" style={{ background: '#dcfce7', color: '#166534', border: '1px solid #86efac' }}>
-              ✅ Add mode ON — click anywhere on the PDF below to place your text
+              ✅ Click anywhere on the PDF below to place your text
+            </div>
+          )}
+
+          {activeItem && !addMode && (
+            <div className="text-xs font-semibold text-center py-2 mb-2 rounded-lg" style={{ background: '#EFF6FF', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+              ⌨️ Type to add text · Press Escape when done · Press Delete to remove
             </div>
           )}
 
           {/* Page navigation */}
-          {pages.length > 1 && (
+          {pdfPages.length > 1 && (
             <div className="flex items-center gap-2 mb-3">
               <button className="btn-ghost-sm" disabled={currentPage === 0} onClick={() => setCurrentPage(p => p - 1)}>← Prev</button>
-              <span className="text-xs text-ink-soft">Page {currentPage + 1} of {pages.length}</span>
-              <button className="btn-ghost-sm" disabled={currentPage === pages.length - 1} onClick={() => setCurrentPage(p => p + 1)}>Next →</button>
+              <span className="text-xs text-ink-soft">Page {currentPage + 1} of {pdfPages.length}</span>
+              <button className="btn-ghost-sm" disabled={currentPage === pdfPages.length - 1} onClick={() => setCurrentPage(p => p + 1)}>Next →</button>
             </div>
           )}
 
-          {/* PDF display */}
-          <div
-            className="relative border rounded-xl mb-4 overflow-hidden"
-            style={{ borderColor: '#e2dcc9', cursor: addMode ? 'crosshair' : 'default' }}
-          >
-            <img
-              ref={imgRef}
-              src={pages[currentPage].dataUrl}
-              alt={`Page ${currentPage + 1}`}
-              style={{ display: 'block', width: '100%', userSelect: 'none' }}
-              draggable={false}
+          {/* Canvas — this IS the PDF with text drawn on it */}
+          <div ref={containerRef} className="mb-4 border rounded-xl overflow-hidden" style={{ borderColor: '#e2dcc9' }}>
+            <canvas
+              ref={canvasRef}
+              tabIndex={0}
               onClick={handleCanvasClick}
+              onKeyDown={handleCanvasKeyInput}
+              style={{
+                width: '100%',
+                display: 'block',
+                cursor: addMode ? 'crosshair' : 'text',
+                outline: 'none',
+              }}
             />
-
-            {currentPageItems.map(item => (
-              <div
-                key={item.id}
-                style={{
-                  position: 'absolute',
-                  left: `${(item.x / item.displayWidth) * 100}%`,
-                  top: `${(item.y / item.displayHeight) * 100}%`,
-                  zIndex: 10,
-                  transform: 'translateY(-50%)',
-                }}
-                onClick={e => { e.stopPropagation(); setActiveItem(item.id); }}
-              >
-                <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <input
-                    autoFocus={activeItem === item.id}
-                    type="text"
-                    value={item.text}
-                    onChange={e => updateText(item.id, e.target.value)}
-                    style={{
-                      fontSize: `${item.fontSize}px`,
-                      color: item.color,
-                      background: 'rgba(255,255,255,0.92)',
-                      border: `1.5px ${activeItem === item.id ? 'solid #2563EB' : 'dashed #94a3b8'}`,
-                      outline: 'none',
-                      padding: '1px 4px',
-                      borderRadius: '3px',
-                      width: `${Math.max(100, (item.text.length + 4) * (item.fontSize * 0.62))}px`,
-                      fontFamily: 'Helvetica, Arial, sans-serif',
-                      minWidth: '100px',
-                      maxWidth: '300px',
-                    }}
-                  />
-                  <button
-                    onClick={e => { e.stopPropagation(); removeItem(item.id); }}
-                    style={{
-                      width: 18, height: 18, borderRadius: '50%',
-                      background: '#ef4444', color: 'white',
-                      border: 'none', cursor: 'pointer',
-                      fontSize: '11px', lineHeight: '18px', textAlign: 'center',
-                      flexShrink: 0,
-                    }}
-                  >×</button>
-                </div>
-              </div>
-            ))}
           </div>
 
           {filledItems.length > 0 && (

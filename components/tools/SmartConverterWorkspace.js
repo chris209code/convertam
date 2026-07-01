@@ -173,7 +173,11 @@ export default function SmartConverterWorkspace() {
       )}
 
       <div className="actions">
-        <button className="btn btn-primary" disabled={!file || busy || !pdfjsReady} onClick={handleRun}>
+        <button
+          className="btn btn-primary"
+          disabled={!file || busy || (file?.type === 'application/pdf' && !pdfjsReady)}
+          onClick={handleRun}
+        >
           {busy ? 'Working…' : 'Extract with AI'}
         </button>
       </div>

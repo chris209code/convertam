@@ -18,6 +18,7 @@ import AddPageNumbersWorkspace from '@/components/tools/AddPageNumbersWorkspace'
 import ProtectPdfWorkspace from '@/components/tools/ProtectPdfWorkspace';
 import HtmlToPdfWorkspace from '@/components/tools/HtmlToPdfWorkspace';
 import OcrPdfWorkspace from '@/components/tools/OcrPdfWorkspace';
+import OverlayTextWorkspace from '@/components/tools/OverlayTextWorkspace';
 import PaymentGate from '@/components/PaymentGate';
 import ComingSoon from '@/components/tools/ComingSoon';
 import Link from 'next/link';
@@ -26,7 +27,7 @@ import { toolMeta } from '@/lib/tool-meta';
 
 const isFree = (mode) =>
   ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice',
-   'remove-pages', 'add-page-numbers', 'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize', 'fill'].includes(mode);
+   'remove-pages', 'add-page-numbers', 'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize', 'fill', 'write-on-pdf'].includes(mode);
 
 function getPriceBadge(mode) {
   if (isFree(mode)) return 'Free';
@@ -44,18 +45,14 @@ export default function ToolPageClient({ tool }) {
   return (
     <main className="max-w-5xl mx-auto px-5 md:px-10 py-10">
 
-      {/* Category */}
       <p className="font-mono text-xs text-stamp-amber tracking-wide mb-2">
         {tool.category.toUpperCase()}
       </p>
 
-      {/* Title */}
       <h1 className="font-display text-3xl md:text-4xl font-bold mb-2">{tool.title}</h1>
 
-      {/* Description */}
       <p className="text-ink-soft mb-4 max-w-xl">{tool.description}</p>
 
-      {/* Trust badges */}
       <div className="flex flex-wrap gap-2 mb-6">
         {[
           { icon: '⭐', label: getPriceBadge(tool.mode) },
@@ -73,7 +70,6 @@ export default function ToolPageClient({ tool }) {
         ))}
       </div>
 
-      {/* Steps */}
       {meta.steps && (
         <div className="flex items-center gap-2 flex-wrap mb-6">
           {meta.steps.map((step, i, arr) => (
@@ -92,7 +88,6 @@ export default function ToolPageClient({ tool }) {
         </div>
       )}
 
-      {/* Workspace */}
       {tool.mode === 'office' && (
         <OfficeConvertWorkspace accept={tool.accept} toFormat={tool.toFormat} toLabel={tool.toLabel} />
       )}
@@ -117,6 +112,7 @@ export default function ToolPageClient({ tool }) {
         </PaymentGate>
       )}
       {tool.mode === 'fill' && <FillPdfWorkspace />}
+      {tool.mode === 'write-on-pdf' && <OverlayTextWorkspace />}
       {tool.mode === 'sign' && <SignPdfWorkspace />}
       {tool.mode === 'reorder' && <ReorderPdfWorkspace />}
       {tool.mode === 'watermark' && <WatermarkPdfWorkspace />}
@@ -128,7 +124,6 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'ocr-pdf' && <OcrPdfWorkspace />}
       {tool.mode === 'soon' && <ComingSoon title={tool.title} note={tool.note} />}
 
-      {/* Privacy line */}
       <div
         className="flex items-center gap-2 mt-4 px-4 py-3 rounded-xl text-sm"
         style={{ background: '#f0f5ff', border: '1px solid #d0dcf5' }}
@@ -139,7 +134,6 @@ export default function ToolPageClient({ tool }) {
         </span>
       </div>
 
-      {/* Tips */}
       {meta.tips && (
         <div className="mt-6">
           <p className="text-xs font-semibold text-ink-soft uppercase tracking-widest mb-2">Tips</p>
@@ -154,7 +148,6 @@ export default function ToolPageClient({ tool }) {
         </div>
       )}
 
-      {/* Related tools */}
       {relatedTools.length > 0 && (
         <div className="mt-8">
           <p className="text-xs font-semibold text-ink-soft uppercase tracking-widest mb-3">Related Tools</p>

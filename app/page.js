@@ -30,12 +30,12 @@ export default function HomePage() {
         .hero-section {
           width: 100%;
           position: relative;
-          min-height: 620px;
+          height: 620px;
           display: flex;
           align-items: center;
           background-image: url(/hero.png);
-          background-size: 100% auto;
-          background-position: top center;
+          background-size: cover;
+          background-position: center center;
           background-repeat: no-repeat;
         }
         .hero-mobile-bg { display: none; }
@@ -56,7 +56,11 @@ export default function HomePage() {
         .cta-buttons { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
 
         @media (max-width: 768px) {
-          .hero-section { min-height: 520px; background-image: none !important; }
+          .hero-section {
+            height: auto;
+            min-height: 520px;
+            background-image: none !important;
+          }
           .hero-mobile-bg {
             display: block; position: absolute; inset: 0;
             width: 100%; height: 100%; object-fit: cover;

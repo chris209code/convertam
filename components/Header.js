@@ -40,7 +40,7 @@ export default function Header() {
           flex-direction: column;
           background: white;
           border-top: 1px solid #E5E7EB;
-          padding: 16px 24px;
+          padding: 16px 5%;
           gap: 4px;
         }
         .mobile-menu.open { display: flex; }
@@ -65,30 +65,24 @@ export default function Header() {
       `}</style>
 
       <div style={{
-        maxWidth: '1600px', margin: '0 auto',
-        padding: '0 24px', height: '64px',
+        width: '100%', padding: '0 4%', height: '64px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <Link href="/">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="Convertam" style={{ height: '44px', width: 'auto', display: 'block' }} />
         </Link>
-
-        {/* Desktop nav */}
         <div className="nav-links">
           <Link href="/#tools" className="nav-link">Tools</Link>
           <Link href="/#ai-tools" className="nav-link">AI Tools</Link>
           <Link href="/about" className="nav-link">About</Link>
           <Link href="/#tools" className="nav-cta">🚀 Start Converting</Link>
         </div>
-
-        {/* Mobile menu button */}
         <button className="menu-btn" onClick={() => setMenuOpen(!menuOpen)}>
           {menuOpen ? 'Close' : 'Menu'}
         </button>
       </div>
 
-      {/* Mobile dropdown */}
       <div className={`mobile-menu ${menuOpen ? 'open' : ''}`}>
         <Link href="/#tools" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>Tools</Link>
         <Link href="/#ai-tools" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>AI Tools</Link>

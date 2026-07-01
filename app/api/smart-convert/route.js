@@ -1,7 +1,7 @@
 export const runtime = 'nodejs';
-export const maxDuration = 10;
+export const maxDuration = 60;
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 const PROMPT = `You are a document digitization engine. Look at the attached image(s) of a document, scanned page, or photo and do the following:
@@ -95,31 +95,4 @@ export async function POST(request) {
       );
     }
 
-    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!raw) {
-      return Response.json(
-        { error: 'No readable content was returned. Try a clearer image.' },
-        { status: 422 }
-      );
-    }
-
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      return Response.json(
-        { error: 'Could not understand the AI response. Please try again.' },
-        { status: 502 }
-      );
-    }
-
-    return Response.json({
-      text: parsed.text || '',
-      tables: Array.isArray(parsed.tables) ? parsed.tables : [],
-    });
-
-  } catch (err) {
-    console.error('Smart convert error:', err);
-    return Response.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
-  }
-}
+    const raw = data?.candidates?.[0]?.content

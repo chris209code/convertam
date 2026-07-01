@@ -1,7 +1,7 @@
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+export const maxDuration = 10;
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 const PROMPT = `You are a document digitization engine. Look at the attached image(s) of a document, scanned page, or photo and do the following:
@@ -37,7 +37,6 @@ const responseSchema = {
 
 export async function POST(request) {
   const apiKey = process.env.GEMINI_API_KEY;
-
   if (!apiKey) {
     return Response.json(
       { error: 'This tool is not configured yet. (Missing GEMINI_API_KEY on the server.)' },
@@ -52,6 +51,7 @@ export async function POST(request) {
     if (!images.length) {
       return Response.json({ error: 'No images received.' }, { status: 400 });
     }
+
     if (images.length > 15) {
       return Response.json(
         { error: 'Too many pages — please try 15 pages or fewer at a time.' },
@@ -117,6 +117,7 @@ export async function POST(request) {
       text: parsed.text || '',
       tables: Array.isArray(parsed.tables) ? parsed.tables : [],
     });
+
   } catch (err) {
     console.error('Smart convert error:', err);
     return Response.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });

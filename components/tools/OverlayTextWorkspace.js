@@ -81,7 +81,6 @@ export default function OverlayTextWorkspace() {
     if (!addMode) return;
     const wrapper = wrapperRef.current;
     const rect = wrapper.getBoundingClientRect();
-    // Position as percentage of wrapper
     const xPct = (e.clientX - rect.left) / rect.width;
     const yPct = (e.clientY - rect.top) / rect.height;
 
@@ -114,10 +113,10 @@ export default function OverlayTextWorkspace() {
         const pdfPage = pdfPagesList[item.page];
         const { width: pdfW, height: pdfH } = pdfPage.getSize();
 
-        // Use percentage position — same ratio on screen and in PDF
         const pdfX = item.xPct * pdfW;
-        // PDF Y is flipped — subtract from height, then add font size so baseline matches click point
-        const pdfY = pdfH - (item.yPct * pdfH) - item.fontSize;
+        // Adjust Y: PDF baseline is at bottom of text, screen click is at center of input
+        // Subtract 0.2 * fontSize to fine-tune vertical alignment
+        const pdfY = pdfH - (item.yPct * pdfH) - (item.fontSize * 0.2);
 
         const hex = item.color.replace('#', '');
         const r = parseInt(hex.substring(0, 2), 16) / 255;
@@ -186,7 +185,6 @@ export default function OverlayTextWorkspace() {
             <button className="btn-ghost-sm" onClick={reset}>Change file</button>
           </div>
 
-          {/* Instructions */}
           <div className="mb-3 p-3 rounded-xl text-xs" style={{ background: '#fef3c7', border: '1px solid #fde68a', color: '#92400e' }}>
             <p className="font-semibold mb-1">📝 How to fill this form:</p>
             <ol className="list-decimal list-inside flex flex-col gap-0.5">
@@ -199,7 +197,6 @@ export default function OverlayTextWorkspace() {
             </ol>
           </div>
 
-          {/* Toolbar */}
           <div className="flex items-center gap-3 mb-3 flex-wrap p-3 rounded-xl" style={{ background: '#f0f5ff', border: '1px solid #d0dcf5' }}>
             <div className="flex items-center gap-2">
               <label className="text-xs font-semibold text-ink-soft">Size:</label>
@@ -227,7 +224,6 @@ export default function OverlayTextWorkspace() {
             </div>
           )}
 
-          {/* Page navigation */}
           {pages.length > 1 && (
             <div className="flex items-center gap-2 mb-3">
               <button className="btn-ghost-sm" disabled={currentPage === 0} onClick={() => setCurrentPage(p => p - 1)}>← Prev</button>
@@ -236,7 +232,6 @@ export default function OverlayTextWorkspace() {
             </div>
           )}
 
-          {/* PDF with overlaid inputs */}
           <div
             ref={wrapperRef}
             onClick={handleWrapperClick}
@@ -250,7 +245,6 @@ export default function OverlayTextWorkspace() {
               draggable={false}
             />
 
-            {/* Floating inputs positioned by percentage */}
             {currentItems.map(item => (
               <div
                 key={item.id}

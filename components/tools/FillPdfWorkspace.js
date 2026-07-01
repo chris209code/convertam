@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Script from 'next/script';
 import { PDFDocument } from 'pdf-lib';
 
 function downloadBlob(blob, filename) {
@@ -22,7 +21,7 @@ export default function FillPdfWorkspace() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
-  const [step, setStep] = useState(1); // 1=upload, 2=fill, 3=done
+  const [step, setStep] = useState(1);
 
   async function handleFile(e) {
     const f = e.target.files[0];
@@ -39,7 +38,7 @@ export default function FillPdfWorkspace() {
       const formFields = form.getFields();
 
       if (formFields.length === 0) {
-        setError('This PDF does not have fillable form fields. Try a different PDF or use the Smart AI Converter to extract text.');
+        setError('This PDF does not have digital form fields. It may be a scanned or printed form. Try the "Write on PDF" tool instead — it works on any PDF.');
         setStatus('');
         setBusy(false);
         return;
@@ -97,9 +96,7 @@ export default function FillPdfWorkspace() {
         } catch {}
       });
 
-      // Flatten the form so fields are embedded
       form.flatten();
-
       const bytes = await pdfDoc.save();
       const baseName = file.name.replace('.pdf', '');
       downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${baseName}-filled.pdf`);
@@ -126,17 +123,29 @@ export default function FillPdfWorkspace() {
   return (
     <div className="panel">
 
+      {/* Explainer */}
+      <div className="mb-5 p-4 rounded-xl text-sm" style={{ background: '#f0f5ff', border: '1px solid #d0dcf5' }}>
+        <p className="font-semibold text-ink mb-1">📋 What is a digital fillable PDF?</p>
+        <p className="text-ink-soft mb-2">
+          Some PDFs are created with built-in form fields — you can click inside boxes and type directly. 
+          Common examples: visa application forms, tax forms, job applications downloaded from official websites.
+        </p>
+        <p className="font-semibold text-ink mb-1">🖨️ Have a scanned or printed form instead?</p>
+        <p className="text-ink-soft">
+          If your PDF is a scan of a paper form (like bank transfer forms, government forms), use the{' '}
+          <a href="/write-on-pdf" className="underline text-stamp-blue font-semibold">Write on PDF</a>{' '}
+          tool instead — it lets you click anywhere and type on any PDF.
+        </p>
+      </div>
+
       {/* Step 1 — Upload */}
       {step === 1 && (
         <div>
-          <p className="text-sm text-ink-soft mb-4">
-            Upload a PDF with fillable form fields. Convertam will detect all fields and let you type directly into them.
-          </p>
           <label className="dropzone block cursor-pointer">
             <input type="file" accept="application/pdf" onChange={handleFile} hidden />
             <div className="dz-icon">[ PDF ]</div>
             <div className="dz-main">Click to choose a PDF form, or drag it here</div>
-            <div className="dz-sub">Works with government forms, job applications, bank forms, and more.</div>
+            <div className="dz-sub">Works with digital forms that have clickable fields built in.</div>
           </label>
           {status && <div className="status">{status}</div>}
           {error && <div className="status error">{error}</div>}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 function downloadBlob(blob, filename) {
@@ -25,10 +25,10 @@ export default function OverlayTextWorkspace() {
   const [error, setError] = useState('');
   const [step, setStep] = useState(1);
   const [pdfjsReady, setPdfjsReady] = useState(false);
-  const [fontSize, setFontSize] = useState(12);
+  const [fontSize, setFontSize] = useState(11);
   const [fontColor, setFontColor] = useState('#000000');
-  const [addMode, setAddMode] = useState(false); // only add text when in add mode
-  const canvasRef = useRef();
+  const [addMode, setAddMode] = useState(false);
+  const imgRef = useRef();
 
   useEffect(() => {
     if (window.pdfjsLib) { setPdfjsReady(true); return; }
@@ -62,9 +62,8 @@ export default function OverlayTextWorkspace() {
         await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
         rendered.push({
           dataUrl: canvas.toDataURL(),
-          width: viewport.width,
-          height: viewport.height,
-          scale: 1.5,
+          canvasWidth: viewport.width,
+          canvasHeight: viewport.height,
         });
       }
       setPages(rendered);
@@ -80,16 +79,12 @@ export default function OverlayTextWorkspace() {
   }
 
   function handleCanvasClick(e) {
-    if (!addMode) return; // only add text in add mode
+    if (!addMode) return;
 
-    const img = e.currentTarget;
+    const img = imgRef.current;
+    if (!img) return;
+
     const rect = img.getBoundingClientRect();
-
-    // Get the actual rendered size vs natural size ratio
-    const scaleX = img.naturalWidth / rect.width;
-    const scaleY = img.naturalHeight / rect.height;
-
-    // Position relative to the image element
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
@@ -97,14 +92,15 @@ export default function OverlayTextWorkspace() {
     setTextItems(prev => [...prev, {
       id,
       page: currentPage,
-      x, y, // in display pixels
-      scaleX, scaleY, // ratio for PDF conversion
+      x, y,
+      displayWidth: rect.width,
+      displayHeight: rect.height,
       text: '',
       fontSize,
       color: fontColor,
     }]);
     setActiveItem(id);
-    setAddMode(false); // turn off add mode after placing one box
+    setAddMode(false);
   }
 
   function updateText(id, text) {
@@ -126,33 +122,14 @@ export default function OverlayTextWorkspace() {
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const pdfPages = pdfDoc.getPages();
 
-      // Get the display image element to calculate correct coordinates
-      const imgEl = document.querySelector('.pdf-display-img');
-      const displayWidth = imgEl ? imgEl.getBoundingClientRect().width : pages[currentPage]?.width;
-      const displayHeight = imgEl ? imgEl.getBoundingClientRect().height : pages[currentPage]?.height;
-
       for (const item of textItems) {
         if (!item.text.trim()) continue;
         const pdfPage = pdfPages[item.page];
         const { width: pdfW, height: pdfH } = pdfPage.getSize();
-        const pageData = pages[item.page];
 
-        // Convert display coords to PDF coords
-        const ratioX = pdfW / (pageData.width / pageData.scale * pageData.scale);
-        const ratioY = pdfH / (pageData.height / pageData.scale * pageData.scale);
-
-        // item.x and item.y are in display pixels
-        // We need to find out how big the image is displayed
-        const imgDisplayWidth = pageData.width; // canvas width at scale 1.5
-        const imgDisplayHeight = pageData.height;
-
-        // The img element stretches to fill container width
-        // We need the actual rendered size
-        const imgW = imgEl ? imgEl.offsetWidth : imgDisplayWidth;
-        const imgH = imgEl ? imgEl.offsetHeight : imgDisplayHeight;
-
-        const pdfX = (item.x / imgW) * pdfW;
-        const pdfY = pdfH - (item.y / imgH) * pdfH - item.fontSize;
+        const pdfX = (item.x / item.displayWidth) * pdfW;
+        // Add item.fontSize to push text UP to match where user clicked on screen
+        const pdfY = pdfH - (item.y / item.displayHeight) * pdfH + item.fontSize;
 
         const hex = item.color.replace('#', '');
         const r = parseInt(hex.substring(0, 2), 16) / 255;
@@ -199,7 +176,6 @@ export default function OverlayTextWorkspace() {
   return (
     <div className="panel">
 
-      {/* Step 1 — Upload */}
       {step === 1 && (
         <div>
           <p className="text-sm text-ink-soft mb-4">
@@ -221,7 +197,6 @@ export default function OverlayTextWorkspace() {
         </div>
       )}
 
-      {/* Step 2 — Edit */}
       {step === 2 && pages.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
@@ -230,6 +205,19 @@ export default function OverlayTextWorkspace() {
               <p className="text-xs text-ink-soft">{pages.length} page{pages.length !== 1 ? 's' : ''}</p>
             </div>
             <button className="btn-ghost-sm" onClick={reset}>Change file</button>
+          </div>
+
+          {/* Instructions */}
+          <div className="mb-3 p-3 rounded-xl text-xs" style={{ background: '#fef3c7', border: '1px solid #fde68a', color: '#92400e' }}>
+            <p className="font-semibold mb-1">📝 How to fill this form:</p>
+            <ol className="list-decimal list-inside flex flex-col gap-0.5">
+              <li>Set your font size and color below</li>
+              <li>Click <strong>"+ Add Text"</strong> button</li>
+              <li>Click exactly where you want to type on the PDF</li>
+              <li>Type your text in the box that appears</li>
+              <li>Repeat steps 2–4 for each field you want to fill</li>
+              <li>Click <strong>"Download Filled PDF"</strong> when done</li>
+            </ol>
           </div>
 
           {/* Toolbar */}
@@ -259,16 +247,16 @@ export default function OverlayTextWorkspace() {
             </div>
             <button
               onClick={() => setAddMode(true)}
-              className="btn btn-primary text-xs px-4 py-2 ml-auto"
-              style={{ fontSize: '0.8rem', padding: '6px 14px' }}
+              className="btn btn-primary ml-auto"
+              style={{ fontSize: '0.8rem', padding: '6px 16px' }}
             >
-              {addMode ? '👆 Now click where you want to type…' : '+ Add Text'}
+              + Add Text
             </button>
           </div>
 
           {addMode && (
-            <div className="text-xs font-semibold text-center py-2 mb-2 rounded-lg" style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}>
-              👆 Click anywhere on the PDF below to place a text box
+            <div className="text-xs font-semibold text-center py-2 mb-2 rounded-lg" style={{ background: '#dcfce7', color: '#166534', border: '1px solid #86efac' }}>
+              ✅ Add mode ON — click anywhere on the PDF below to place your text
             </div>
           )}
 
@@ -283,70 +271,68 @@ export default function OverlayTextWorkspace() {
 
           {/* PDF display */}
           <div
-            className="relative border rounded-xl overflow-auto mb-4"
+            className="relative border rounded-xl mb-4 overflow-hidden"
             style={{ borderColor: '#e2dcc9', cursor: addMode ? 'crosshair' : 'default' }}
           >
-            <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
-              <img
-                className="pdf-display-img"
-                src={pages[currentPage].dataUrl}
-                alt={`Page ${currentPage + 1}`}
-                style={{ display: 'block', width: '100%', userSelect: 'none' }}
-                draggable={false}
-                onClick={handleCanvasClick}
-              />
+            <img
+              ref={imgRef}
+              src={pages[currentPage].dataUrl}
+              alt={`Page ${currentPage + 1}`}
+              style={{ display: 'block', width: '100%', userSelect: 'none' }}
+              draggable={false}
+              onClick={handleCanvasClick}
+            />
 
-              {/* Text overlays */}
-              {currentPageItems.map(item => (
-                <div
-                  key={item.id}
-                  style={{
-                    position: 'absolute',
-                    left: `${(item.x / pages[currentPage].width) * 100}%`,
-                    top: `${(item.y / pages[currentPage].height) * 100}%`,
-                    zIndex: 10,
-                    transform: 'translate(0, -50%)',
-                  }}
-                  onClick={e => { e.stopPropagation(); setActiveItem(item.id); }}
-                >
-                  <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                    <input
-                      autoFocus={activeItem === item.id}
-                      type="text"
-                      value={item.text}
-                      onChange={e => updateText(item.id, e.target.value)}
-                      style={{
-                        fontSize: `${item.fontSize}px`,
-                        color: item.color,
-                        background: 'rgba(255,255,255,0.9)',
-                        border: `1px ${activeItem === item.id ? 'solid #2563EB' : 'dashed #94a3b8'}`,
-                        outline: 'none',
-                        padding: '1px 4px',
-                        borderRadius: '3px',
-                        width: `${Math.max(120, (item.text.length + 2) * (item.fontSize * 0.6))}px`,
-                        fontFamily: 'Helvetica, Arial, sans-serif',
-                        minWidth: '120px',
-                      }}
-                    />
-                    <button
-                      onClick={e => { e.stopPropagation(); removeItem(item.id); }}
-                      style={{
-                        width: 18, height: 18, borderRadius: '50%',
-                        background: '#ef4444', color: 'white',
-                        border: 'none', cursor: 'pointer',
-                        fontSize: '11px', lineHeight: '18px', textAlign: 'center',
-                        marginLeft: 4, flexShrink: 0,
-                      }}
-                    >×</button>
-                  </div>
+            {currentPageItems.map(item => (
+              <div
+                key={item.id}
+                style={{
+                  position: 'absolute',
+                  left: `${(item.x / item.displayWidth) * 100}%`,
+                  top: `${(item.y / item.displayHeight) * 100}%`,
+                  zIndex: 10,
+                  transform: 'translateY(-50%)',
+                }}
+                onClick={e => { e.stopPropagation(); setActiveItem(item.id); }}
+              >
+                <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <input
+                    autoFocus={activeItem === item.id}
+                    type="text"
+                    value={item.text}
+                    onChange={e => updateText(item.id, e.target.value)}
+                    style={{
+                      fontSize: `${item.fontSize}px`,
+                      color: item.color,
+                      background: 'rgba(255,255,255,0.92)',
+                      border: `1.5px ${activeItem === item.id ? 'solid #2563EB' : 'dashed #94a3b8'}`,
+                      outline: 'none',
+                      padding: '1px 4px',
+                      borderRadius: '3px',
+                      width: `${Math.max(100, (item.text.length + 4) * (item.fontSize * 0.62))}px`,
+                      fontFamily: 'Helvetica, Arial, sans-serif',
+                      minWidth: '100px',
+                      maxWidth: '300px',
+                    }}
+                  />
+                  <button
+                    onClick={e => { e.stopPropagation(); removeItem(item.id); }}
+                    style={{
+                      width: 18, height: 18, borderRadius: '50%',
+                      background: '#ef4444', color: 'white',
+                      border: 'none', cursor: 'pointer',
+                      fontSize: '11px', lineHeight: '18px', textAlign: 'center',
+                      flexShrink: 0,
+                    }}
+                  >×</button>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
 
           {filledItems.length > 0 && (
             <p className="text-xs text-ink-soft mb-3">
-              {filledItems.length} text item{filledItems.length !== 1 ? 's' : ''} added.
+              ✅ {filledItems.length} text item{filledItems.length !== 1 ? 's' : ''} added.
             </p>
           )}
 
@@ -367,7 +353,6 @@ export default function OverlayTextWorkspace() {
         </div>
       )}
 
-      {/* Step 3 — Done */}
       {step === 3 && (
         <div className="text-center py-8">
           <div className="text-4xl mb-3">✅</div>

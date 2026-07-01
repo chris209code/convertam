@@ -95,4 +95,31 @@ export async function POST(request) {
       );
     }
 
-    const raw = data?.candidates?.[0]?.content
+    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!raw) {
+      return Response.json(
+        { error: 'No readable content was returned. Try a clearer image.' },
+        { status: 422 }
+      );
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return Response.json(
+        { error: 'Could not understand the AI response. Please try again.' },
+        { status: 502 }
+      );
+    }
+
+    return Response.json({
+      text: parsed.text || '',
+      tables: Array.isArray(parsed.tables) ? parsed.tables : [],
+    });
+
+  } catch (err) {
+    console.error('Smart convert error:', err);
+    return Response.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
+  }
+}

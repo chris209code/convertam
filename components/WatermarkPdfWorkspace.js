@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { PDFDocument, rgb, degrees } from 'pdf-lib';
 
 function downloadBlob(blob, filename) {
@@ -24,10 +24,10 @@ function hexToRgb(hex) {
 const PRESETS = ['CONFIDENTIAL', 'DRAFT', 'COPY', 'APPROVED', 'REJECTED', 'DO NOT DISTRIBUTE'];
 
 const POSITIONS = [
-  { id: 'diagonal-center', label: 'Diagonal (center)', angle: 45 },
-  { id: 'horizontal-center', label: 'Horizontal (center)', angle: 0 },
-  { id: 'top-left', label: 'Top left', angle: 0 },
-  { id: 'bottom-right', label: 'Bottom right', angle: 0 },
+  { id: 'diagonal-center', label: 'Diagonal (center)' },
+  { id: 'horizontal-center', label: 'Horizontal (center)' },
+  { id: 'top-left', label: 'Top left' },
+  { id: 'bottom-right', label: 'Bottom right' },
 ];
 
 const OPACITIES = [
@@ -58,11 +58,107 @@ export default function WatermarkPdfWorkspace() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [pdfjsReady, setPdfjsReady] = useState(false);
+  const [pdfPageData, setPdfPageData] = useState(null); // rendered first page canvas
+  const canvasRef = useRef();
 
-  function handleFiles(files) {
-    setFile(files[0] || null);
+  useEffect(() => {
+    if (window.pdfjsLib) { setPdfjsReady(true); return; }
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    script.onload = () => {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      setPdfjsReady(true);
+    };
+    document.body.appendChild(script);
+  }, []);
+
+  // Render preview on canvas whenever settings change
+  const renderPreview = useCallback(() => {
+    if (!pdfPageData || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const { pageCanvas } = pdfPageData;
+
+    canvas.width = pageCanvas.width;
+    canvas.height = pageCanvas.height;
+    ctx.drawImage(pageCanvas, 0, 0);
+
+    const w = canvas.width;
+    const h = canvas.height;
+    const displayFontSize = fontSize * 2; // scale up for canvas display
+    ctx.font = `bold ${displayFontSize}px Helvetica, Arial, sans-serif`;
+    ctx.globalAlpha = opacity;
+
+    const hex = useCustomColor ? customColor : color;
+    ctx.fillStyle = hex;
+
+    ctx.save();
+
+    switch (position) {
+      case 'diagonal-center':
+        ctx.translate(w / 2, h / 2);
+        ctx.rotate(-Math.PI / 4);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text || 'WATERMARK', 0, 0);
+        break;
+      case 'horizontal-center':
+        ctx.translate(w / 2, h / 2);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text || 'WATERMARK', 0, 0);
+        break;
+      case 'top-left':
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(text || 'WATERMARK', 40, 40);
+        break;
+      case 'bottom-right':
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(text || 'WATERMARK', w - 40, h - 40);
+        break;
+    }
+
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }, [pdfPageData, text, fontSize, opacity, color, customColor, useCustomColor, position]);
+
+  useEffect(() => {
+    renderPreview();
+  }, [renderPreview]);
+
+  async function handleFiles(files) {
+    const f = files[0];
+    if (!f) return;
+    setFile(f);
     setError('');
     setStatus('');
+    setPreviewUrl(null);
+    setPreviewing(true);
+
+    try {
+      if (!window.pdfjsLib) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      const buf = await f.arrayBuffer();
+      const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: 2 });
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width = viewport.width;
+      pageCanvas.height = viewport.height;
+      await page.render({ canvasContext: pageCanvas.getContext('2d'), viewport }).promise;
+      setPdfPageData({ pageCanvas });
+    } catch (err) {
+      setError('Could not render preview. The watermark will still apply correctly on download.');
+    } finally {
+      setPreviewing(false);
+    }
   }
 
   async function handleApply() {
@@ -80,7 +176,6 @@ export default function WatermarkPdfWorkspace() {
       const allPages = doc.getPages();
       const totalPages = allPages.length;
 
-      // Determine which pages to watermark
       let targetIndices = [];
       if (pages === 'all') {
         targetIndices = allPages.map((_, i) => i);
@@ -102,23 +197,26 @@ export default function WatermarkPdfWorkspace() {
       }
 
       const finalColor = hexToRgb(useCustomColor ? customColor : color);
-      const posConfig = POSITIONS.find((p) => p.id === position);
 
       for (const idx of targetIndices) {
         const page = allPages[idx];
         const { width, height } = page.getSize();
 
+        // Approximate text width for centering
+        const approxTextWidth = text.length * fontSize * 0.55;
+
         let x, y, rotation;
 
         switch (position) {
           case 'diagonal-center':
-            x = width / 2;
-            y = height / 2;
+            // Center the text taking rotation into account
+            x = width / 2 - (approxTextWidth / 2) * Math.cos(Math.PI / 4) + (fontSize / 2) * Math.sin(Math.PI / 4);
+            y = height / 2 - (approxTextWidth / 2) * Math.sin(Math.PI / 4) - (fontSize / 2) * Math.cos(Math.PI / 4);
             rotation = degrees(45);
             break;
           case 'horizontal-center':
-            x = width / 2;
-            y = height / 2;
+            x = (width - approxTextWidth) / 2;
+            y = height / 2 - fontSize / 2;
             rotation = degrees(0);
             break;
           case 'top-left':
@@ -127,19 +225,19 @@ export default function WatermarkPdfWorkspace() {
             rotation = degrees(0);
             break;
           case 'bottom-right':
-            x = width - (text.length * fontSize * 0.6) - 20;
+            x = width - approxTextWidth - 40;
             y = 20;
             rotation = degrees(0);
             break;
           default:
-            x = width / 2;
+            x = width / 2 - approxTextWidth / 2;
             y = height / 2;
             rotation = degrees(45);
         }
 
         page.drawText(text.trim(), {
-          x,
-          y,
+          x: Math.max(0, x),
+          y: Math.max(0, y),
           size: fontSize,
           color: finalColor,
           opacity,
@@ -203,29 +301,19 @@ export default function WatermarkPdfWorkspace() {
         />
         <div className="flex gap-2 flex-wrap mt-2">
           {PRESETS.map((p) => (
-            <button
-              key={p}
-              onClick={() => setText(p)}
-              className={`btn-ghost-sm ${text === p ? 'active-choice' : ''}`}
-            >
-              {p}
-            </button>
+            <button key={p} onClick={() => setText(p)}
+              className={`btn-ghost-sm ${text === p ? 'active-choice' : ''}`}>{p}</button>
           ))}
         </div>
       </div>
 
       {/* Font size */}
       <div className="mb-5">
-        <label className="text-sm font-medium block mb-2">
-          Size — <span className="text-ink-soft">{fontSize}pt</span>
-        </label>
+        <label className="text-sm font-medium block mb-2">Size — <span className="text-ink-soft">{fontSize}pt</span></label>
         <div className="flex gap-2">
           {[24, 36, 48, 64, 80].map((s) => (
-            <button
-              key={s}
-              onClick={() => setFontSize(s)}
-              className={`btn-ghost-sm ${fontSize === s ? 'active-choice' : ''}`}
-            >
+            <button key={s} onClick={() => setFontSize(s)}
+              className={`btn-ghost-sm ${fontSize === s ? 'active-choice' : ''}`}>
               {s === 24 ? 'XS' : s === 36 ? 'S' : s === 48 ? 'M' : s === 64 ? 'L' : 'XL'}
             </button>
           ))}
@@ -237,13 +325,8 @@ export default function WatermarkPdfWorkspace() {
         <label className="text-sm font-medium block mb-2">Opacity</label>
         <div className="flex gap-2">
           {OPACITIES.map((o) => (
-            <button
-              key={o.id}
-              onClick={() => setOpacity(o.id)}
-              className={`btn-ghost-sm ${opacity === o.id ? 'active-choice' : ''}`}
-            >
-              {o.label}
-            </button>
+            <button key={o.id} onClick={() => setOpacity(o.id)}
+              className={`btn-ghost-sm ${opacity === o.id ? 'active-choice' : ''}`}>{o.label}</button>
           ))}
         </div>
       </div>
@@ -253,25 +336,16 @@ export default function WatermarkPdfWorkspace() {
         <label className="text-sm font-medium block mb-2">Color</label>
         <div className="flex gap-2 flex-wrap items-center">
           {COLORS.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => { setColor(c.id); setUseCustomColor(false); }}
-              className={`btn-ghost-sm flex items-center gap-1.5 ${!useCustomColor && color === c.id ? 'active-choice' : ''}`}
-            >
-              <span
-                className="w-3 h-3 rounded-full inline-block flex-shrink-0"
-                style={{ background: c.id }}
-              />
+            <button key={c.id} onClick={() => { setColor(c.id); setUseCustomColor(false); }}
+              className={`btn-ghost-sm flex items-center gap-1.5 ${!useCustomColor && color === c.id ? 'active-choice' : ''}`}>
+              <span className="w-3 h-3 rounded-full inline-block flex-shrink-0" style={{ background: c.id }} />
               {c.label}
             </button>
           ))}
           <label className={`btn-ghost-sm flex items-center gap-1.5 cursor-pointer ${useCustomColor ? 'active-choice' : ''}`}>
-            <input
-              type="color"
-              value={customColor}
+            <input type="color" value={customColor}
               onChange={(e) => { setCustomColor(e.target.value); setUseCustomColor(true); }}
-              className="w-4 h-4 rounded cursor-pointer border-0 bg-transparent"
-            />
+              className="w-4 h-4 rounded cursor-pointer border-0 bg-transparent" />
             Custom
           </label>
         </div>
@@ -282,13 +356,8 @@ export default function WatermarkPdfWorkspace() {
         <label className="text-sm font-medium block mb-2">Position</label>
         <div className="flex gap-2 flex-wrap">
           {POSITIONS.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setPosition(p.id)}
-              className={`btn-ghost-sm ${position === p.id ? 'active-choice' : ''}`}
-            >
-              {p.label}
-            </button>
+            <button key={p.id} onClick={() => setPosition(p.id)}
+              className={`btn-ghost-sm ${position === p.id ? 'active-choice' : ''}`}>{p.label}</button>
           ))}
         </div>
       </div>
@@ -302,39 +371,36 @@ export default function WatermarkPdfWorkspace() {
             { id: 'first', label: 'First page only' },
             { id: 'range', label: 'Specific pages' },
           ].map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setPages(p.id)}
-              className={`btn-ghost-sm ${pages === p.id ? 'active-choice' : ''}`}
-            >
-              {p.label}
-            </button>
+            <button key={p.id} onClick={() => setPages(p.id)}
+              className={`btn-ghost-sm ${pages === p.id ? 'active-choice' : ''}`}>{p.label}</button>
           ))}
         </div>
         {pages === 'range' && (
-          <input
-            type="text"
-            value={pageRange}
-            onChange={(e) => setPageRange(e.target.value)}
-            placeholder="e.g. 1,3,5-8"
-            className="range-input mt-2"
-          />
+          <input type="text" value={pageRange} onChange={(e) => setPageRange(e.target.value)}
+            placeholder="e.g. 1,3,5-8" className="range-input mt-2" />
         )}
       </div>
 
+      {/* PREVIEW */}
+      {previewing && (
+        <div className="text-center py-6 text-sm text-ink-soft mb-4">Loading preview…</div>
+      )}
+      {pdfPageData && !previewing && (
+        <div className="mb-5">
+          <p className="text-xs font-semibold text-ink-soft uppercase tracking-widest mb-2">Preview (first page)</p>
+          <div className="border rounded-xl overflow-hidden" style={{ borderColor: '#e2dcc9' }}>
+            <canvas ref={canvasRef} style={{ width: '100%', display: 'block' }} />
+          </div>
+          <p className="text-xs text-ink-soft mt-1">Preview updates live as you change settings above.</p>
+        </div>
+      )}
+
       <div className="actions">
-        <button
-          className="btn btn-primary"
-          disabled={!file || !text.trim() || busy}
-          onClick={handleApply}
-        >
+        <button className="btn btn-primary" disabled={!file || !text.trim() || busy} onClick={handleApply}>
           {busy ? 'Applying…' : 'Apply Watermark & Download'}
         </button>
         {file && (
-          <button
-            className="btn btn-ghost"
-            onClick={() => { setFile(null); setStatus(''); setError(''); }}
-          >
+          <button className="btn btn-ghost" onClick={() => { setFile(null); setStatus(''); setError(''); setPdfPageData(null); }}>
             Clear
           </button>
         )}

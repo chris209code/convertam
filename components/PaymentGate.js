@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Script from 'next/script';
 
 const PAYSTACK_PUBLIC_KEY = 'pk_live_2ff0200994f7ed799e3066752fcf6b82442f58a6';
@@ -30,6 +30,8 @@ export default function PaymentGate({ children, toolName }) {
   const [paystackReady, setPaystackReady] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState('');
+  const callbackRef = useRef(null);
+  const onCloseRef = useRef(null);
 
   useEffect(() => {
     setCurrency(detectCurrency());
@@ -39,6 +41,41 @@ export default function PaymentGate({ children, toolName }) {
     }
   }, [toolName]);
 
+  useEffect(() => {
+    // Store callbacks in window so Paystack can always find them
+    window['paystackCallback_' + toolName] = function(response) {
+      setVerifying(true);
+      fetch('/api/payment/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reference: response.reference }),
+      })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data.verified) {
+            sessionStorage.setItem('convertam_paid_' + toolName, 'true');
+            setPaid(true);
+          } else {
+            setError(data.error || 'Payment verification failed. Please contact support.');
+          }
+          setVerifying(false);
+        })
+        .catch(function() {
+          setError('Could not verify payment. Please try again.');
+          setVerifying(false);
+        });
+    };
+
+    window['paystackClose_' + toolName] = function() {
+      setError('Payment was cancelled.');
+    };
+
+    return () => {
+      delete window['paystackCallback_' + toolName];
+      delete window['paystackClose_' + toolName];
+    };
+  }, [toolName]);
+
   function handlePay() {
     if (!window.PaystackPop) {
       setError('Payment system still loading. Please wait a moment and try again.');
@@ -46,39 +83,18 @@ export default function PaymentGate({ children, toolName }) {
     }
     setError('');
 
-    const email = `user_${Date.now()}@convertam.app`;
+    const email = 'user_' + Date.now() + '@convertam.app';
+    const cb = window['paystackCallback_' + toolName];
+    const cl = window['paystackClose_' + toolName];
 
     const handler = window.PaystackPop.setup({
       key: PAYSTACK_PUBLIC_KEY,
-      email,
+      email: email,
       amount: getAmount(currency),
-      currency,
+      currency: currency,
       metadata: { tool: toolName },
-      callback: function(response) {
-        setVerifying(true);
-        fetch('/api/payment/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reference: response.reference }),
-        })
-          .then(function(res) { return res.json(); })
-          .then(function(data) {
-            if (data.verified) {
-              sessionStorage.setItem(`convertam_paid_${toolName}`, 'true');
-              setPaid(true);
-            } else {
-              setError(data.error || 'Payment verification failed. Please contact support.');
-            }
-            setVerifying(false);
-          })
-          .catch(function() {
-            setError('Could not verify payment. Please try again.');
-            setVerifying(false);
-          });
-      },
-      onClose: function() {
-        setError('Payment was cancelled.');
-      },
+      callback: cb,
+      onClose: cl,
     });
 
     handler.openIframe();

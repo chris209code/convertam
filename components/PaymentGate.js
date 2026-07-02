@@ -21,7 +21,7 @@ function formatPrice(currency) {
 }
 
 function getAmount(currency) {
-  return currency === 'NGN' ? 50000 : 100; // kobo / cents
+  return currency === 'NGN' ? 50000 : 100;
 }
 
 export default function PaymentGate({ children, toolName }) {
@@ -54,29 +54,29 @@ export default function PaymentGate({ children, toolName }) {
       amount: getAmount(currency),
       currency,
       metadata: { tool: toolName },
-      callback: async (response) => {
+      callback: function(response) {
         setVerifying(true);
-        try {
-          const res = await fetch('/api/payment/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ reference: response.reference }),
+        fetch('/api/payment/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reference: response.reference }),
+        })
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
+            if (data.verified) {
+              sessionStorage.setItem(`convertam_paid_${toolName}`, 'true');
+              setPaid(true);
+            } else {
+              setError(data.error || 'Payment verification failed. Please contact support.');
+            }
+            setVerifying(false);
+          })
+          .catch(function() {
+            setError('Could not verify payment. Please try again.');
+            setVerifying(false);
           });
-          const data = await res.json();
-
-          if (data.verified) {
-            sessionStorage.setItem(`convertam_paid_${toolName}`, 'true');
-            setPaid(true);
-          } else {
-            setError(data.error || 'Payment verification failed. Please contact support.');
-          }
-        } catch {
-          setError('Could not verify payment. Please try again.');
-        } finally {
-          setVerifying(false);
-        }
       },
-      onClose: () => {
+      onClose: function() {
         setError('Payment was cancelled.');
       },
     });

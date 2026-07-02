@@ -55,7 +55,6 @@ export default function WatermarkPdfWorkspace() {
   const [posX, setPosX] = useState(0.5);
   const [posY, setPosY] = useState(0.5);
   const [dragging, setDragging] = useState(false);
-  const [debugMsg, setDebugMsg] = useState('');
   const canvasRef = useRef();
   const dragStart = useRef(null);
 
@@ -96,21 +95,16 @@ export default function WatermarkPdfWorkspace() {
   useEffect(() => { draw(); }, [draw]);
 
   async function handleFiles(files) {
-    console.log('handleFiles called', files);
     const f = files[0];
-    if (!f) { setDebugMsg('No file received'); return; }
-    console.log('file selected:', f.name, f.type, f.size);
-    setDebugMsg('File received: ' + f.name);
+    if (!f) return;
     setFile(f);
     setError(''); setStatus(''); setPageCanvas(null);
     setPosX(0.5); setPosY(0.5);
     setPreviewing(true);
-    setDebugMsg('Loading PDF.js...');
 
     try {
       let pdfjs = window.pdfjsLib;
       if (!pdfjs) {
-        setDebugMsg('Fetching PDF.js script...');
         await new Promise((resolve, reject) => {
           const existing = document.querySelector('script[src*="pdf.min.js"]');
           if (existing) { resolve(); return; }
@@ -121,28 +115,23 @@ export default function WatermarkPdfWorkspace() {
           document.body.appendChild(script);
         });
         pdfjs = window.pdfjsLib;
-        if (!pdfjs) { setDebugMsg('PDF.js failed to load'); return; }
+        if (!pdfjs) return;
         pdfjs.GlobalWorkerOptions.workerSrc =
           'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
       }
 
-      setDebugMsg('Reading file...');
       const buf = await f.arrayBuffer();
-      setDebugMsg('Opening PDF...');
       const pdf = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
-      setDebugMsg('Rendering page 1...');
       const page = await pdf.getPage(1);
       const viewport = page.getViewport({ scale: 2 });
       const c = document.createElement('canvas');
       c.width = viewport.width;
       c.height = viewport.height;
       await page.render({ canvasContext: c.getContext('2d'), viewport }).promise;
-      setDebugMsg('Preview ready!');
       setPageCanvas(c);
     } catch (err) {
       console.error('Preview error:', err);
-      setDebugMsg('Error: ' + err.message);
-      setError('Could not render preview: ' + err.message);
+      setError('Could not render preview. Watermark will still apply on download.');
     } finally {
       setPreviewing(false);
     }
@@ -219,12 +208,17 @@ export default function WatermarkPdfWorkspace() {
       for (const idx of targetIndices) {
         const page = allPages[idx];
         const { width, height } = page.getSize();
-        const pdfX = posX * width;
-        const pdfY = (1 - posY) * height;
+
+        // Center text around the blue dot position
+        const approxTextWidth = text.length * fontSize * 0.5;
+        const angleRad = (angle * Math.PI) / 180;
+
+        const pdfX = (posX * width) - (approxTextWidth / 2) * Math.cos(angleRad) + (fontSize / 2) * Math.sin(angleRad);
+        const pdfY = (1 - posY) * height - (approxTextWidth / 2) * Math.sin(angleRad) - (fontSize / 2) * Math.cos(angleRad);
 
         page.drawText(text.trim(), {
-          x: pdfX,
-          y: pdfY,
+          x: Math.max(0, pdfX),
+          y: Math.max(0, pdfY),
           size: fontSize,
           color: finalColor,
           opacity,
@@ -257,16 +251,8 @@ export default function WatermarkPdfWorkspace() {
         <div className="flex items-center justify-between px-4 py-3 rounded-xl text-sm mb-5"
           style={{ background: '#f0f5ff', border: '1px solid #d0dcf5' }}>
           <span className="font-medium text-ink">📄 {file.name}</span>
-          <button onClick={() => { setFile(null); setPageCanvas(null); setStatus(''); setError(''); setDebugMsg(''); }}
+          <button onClick={() => { setFile(null); setPageCanvas(null); setStatus(''); setError(''); }}
             className="text-xs text-ink-soft underline ml-3">Change</button>
-        </div>
-      )}
-
-      {/* Debug message — remove after fixing */}
-      {debugMsg && (
-        <div className="mb-3 px-3 py-2 rounded-lg text-xs font-mono"
-          style={{ background: '#f0fdf4', border: '1px solid #86efac', color: '#166534' }}>
-          🔍 {debugMsg}
         </div>
       )}
 
@@ -389,7 +375,7 @@ export default function WatermarkPdfWorkspace() {
           {busy ? 'Applying…' : 'Apply Watermark & Download'}
         </button>
         {file && (
-          <button className="btn btn-ghost" onClick={() => { setFile(null); setStatus(''); setError(''); setPageCanvas(null); setDebugMsg(''); }}>
+          <button className="btn btn-ghost" onClick={() => { setFile(null); setStatus(''); setError(''); setPageCanvas(null); }}>
             Clear
           </button>
         )}

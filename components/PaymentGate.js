@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Script from 'next/script';
 
-const PAYSTACK_PUBLIC_KEY = 'pk_test_d0ce0abc4daa9a22429362cdc4457fff2b5dbffd';
+const PAYSTACK_PUBLIC_KEY = 'pk_live_2ff0200994f7ed799e3066752fcf6b82442f58a6';
 
 function detectCurrency() {
   try {

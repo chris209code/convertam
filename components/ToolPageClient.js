@@ -88,6 +88,21 @@ export default function ToolPageClient({ tool }) {
         </div>
       )}
 
+      {/* Tips — shown BEFORE the tool workspace */}
+      {meta.tips && (
+        <div className="mb-6 p-4 rounded-xl" style={{ background: '#ECFDF5', border: '1px solid #A7F3D0' }}>
+          <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: '#065F46' }}>💡 Tips for best results</p>
+          <div className="flex flex-col gap-1.5">
+            {meta.tips.map((tip, i) => (
+              <div key={i} className="flex items-start gap-2 text-sm" style={{ color: '#065F46' }}>
+                <span style={{ flexShrink: 0 }}>✓</span>
+                <span>{tip}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {tool.mode === 'office' && (
         <OfficeConvertWorkspace accept={tool.accept} toFormat={tool.toFormat} toLabel={tool.toLabel} />
       )}
@@ -133,20 +148,6 @@ export default function ToolPageClient({ tool }) {
           Your files are automatically deleted after processing and are never shared with third parties.
         </span>
       </div>
-
-      {meta.tips && (
-        <div className="mt-6">
-          <p className="text-xs font-semibold text-ink-soft uppercase tracking-widest mb-2">Tips</p>
-          <div className="flex flex-col gap-1.5">
-            {meta.tips.map((tip, i) => (
-              <div key={i} className="flex items-start gap-2 text-sm text-ink-soft">
-                <span style={{ color: '#2f8f5b', flexShrink: 0 }}>✓</span>
-                <span>{tip}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {relatedTools.length > 0 && (
         <div className="mt-8">

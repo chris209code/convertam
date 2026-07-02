@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { PDFDocument, rgb, degrees } from 'pdf-lib';
+import UploadBox from '@/components/UploadBox';
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -35,20 +36,6 @@ const COLORS = [
   { id: '#1a7a3a', label: 'Green' },
 ];
 
-function loadPdfJs() {
-  return new Promise((resolve) => {
-    if (window.pdfjsLib) { resolve(window.pdfjsLib); return; }
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-    script.onload = () => {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      resolve(window.pdfjsLib);
-    };
-    document.body.appendChild(script);
-  });
-}
-
 export default function WatermarkPdfWorkspace() {
   const [file, setFile] = useState(null);
   const [text, setText] = useState('CONFIDENTIAL');
@@ -65,21 +52,18 @@ export default function WatermarkPdfWorkspace() {
   const [error, setError] = useState('');
   const [pageCanvas, setPageCanvas] = useState(null);
   const [previewing, setPreviewing] = useState(false);
-  // Position as percentage of canvas (0-1)
   const [posX, setPosX] = useState(0.5);
   const [posY, setPosY] = useState(0.5);
   const [dragging, setDragging] = useState(false);
   const canvasRef = useRef();
   const dragStart = useRef(null);
 
-  // Draw everything on canvas
   const draw = useCallback(() => {
     if (!pageCanvas || !canvasRef.current) return;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const w = pageCanvas.width;
     const h = pageCanvas.height;
-
     canvas.width = w;
     canvas.height = h;
     ctx.drawImage(pageCanvas, 0, 0);
@@ -91,22 +75,20 @@ export default function WatermarkPdfWorkspace() {
     ctx.font = `bold ${displayFontSize}px Helvetica, Arial, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-
     const cx = posX * w;
     const cy = posY * h;
-
     ctx.translate(cx, cy);
     ctx.rotate((-angle * Math.PI) / 180);
     ctx.fillText(text || 'WATERMARK', 0, 0);
     ctx.restore();
     ctx.globalAlpha = 1;
 
-    // Draw drag handle
+    // Blue drag handle
     ctx.beginPath();
-    ctx.arc(cx, cy, 8, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(37,99,235,0.5)';
+    ctx.arc(posX * w, posY * h, 10, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(37,99,235,0.6)';
     ctx.fill();
-    ctx.strokeStyle = '#2563EB';
+    ctx.strokeStyle = 'white';
     ctx.lineWidth = 2;
     ctx.stroke();
   }, [pageCanvas, text, fontSize, opacity, color, customColor, useCustomColor, angle, posX, posY]);
@@ -120,8 +102,23 @@ export default function WatermarkPdfWorkspace() {
     setError(''); setStatus(''); setPageCanvas(null);
     setPosX(0.5); setPosY(0.5);
     setPreviewing(true);
+
     try {
-      const pdfjs = await loadPdfJs();
+      // Load pdfjs
+      let pdfjs = window.pdfjsLib;
+      if (!pdfjs) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.body.appendChild(script);
+        });
+        pdfjs = window.pdfjsLib;
+        pdfjs.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+
       const buf = await f.arrayBuffer();
       const pdf = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
       const page = await pdf.getPage(1);
@@ -132,8 +129,8 @@ export default function WatermarkPdfWorkspace() {
       await page.render({ canvasContext: c.getContext('2d'), viewport }).promise;
       setPageCanvas(c);
     } catch (err) {
-      console.error(err);
-      setError('Could not render preview.');
+      console.error('Preview error:', err);
+      setError('Could not render preview. Watermark will still apply on download.');
     } finally {
       setPreviewing(false);
     }
@@ -153,11 +150,14 @@ export default function WatermarkPdfWorkspace() {
   function onMouseDown(e) {
     e.preventDefault();
     const pos = getCanvasPos(e);
-    // Check if clicking near the watermark center
     const dist = Math.sqrt(Math.pow(pos.x - posX, 2) + Math.pow(pos.y - posY, 2));
-    if (dist < 0.05) {
+    if (dist < 0.08) {
       setDragging(true);
-      dragStart.current = { x: pos.x - posX, y: pos.y - posY };
+      dragStart.current = { dx: pos.x - posX, dy: pos.y - posY };
+    } else {
+      // Click anywhere to move watermark there
+      setPosX(Math.max(0, Math.min(1, pos.x)));
+      setPosY(Math.max(0, Math.min(1, pos.y)));
     }
   }
 
@@ -165,8 +165,8 @@ export default function WatermarkPdfWorkspace() {
     if (!dragging) return;
     e.preventDefault();
     const pos = getCanvasPos(e);
-    setPosX(Math.max(0, Math.min(1, pos.x - dragStart.current.x)));
-    setPosY(Math.max(0, Math.min(1, pos.y - dragStart.current.y)));
+    setPosX(Math.max(0, Math.min(1, pos.x - dragStart.current.dx)));
+    setPosY(Math.max(0, Math.min(1, pos.y - dragStart.current.dy)));
   }
 
   function onMouseUp() { setDragging(false); }
@@ -208,10 +208,8 @@ export default function WatermarkPdfWorkspace() {
       for (const idx of targetIndices) {
         const page = allPages[idx];
         const { width, height } = page.getSize();
-
-        // Convert percentage position to PDF coordinates
         const pdfX = posX * width;
-        const pdfY = (1 - posY) * height; // flip Y for PDF
+        const pdfY = (1 - posY) * height;
 
         page.drawText(text.trim(), {
           x: pdfX,
@@ -236,26 +234,12 @@ export default function WatermarkPdfWorkspace() {
     }
   }
 
-  const activeColor = useCustomColor ? customColor : color;
-
   return (
     <div className="panel">
-      {/* File upload */}
+
       {!file && (
-        <div className="dropzone mb-5"
-          onClick={() => document.getElementById('wm-input').click()}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
-            if (files.length) handleFiles(files);
-          }}>
-          <input id="wm-input" type="file" accept="application/pdf" hidden
-            onChange={(e) => handleFiles(Array.from(e.target.files))} />
-          <div className="dz-icon">[ PDF ]</div>
-          <div className="dz-main">Click to choose a PDF, or drag it here</div>
-          <div className="dz-sub">Processed entirely in your browser.</div>
-        </div>
+        <UploadBox accept="application/pdf" multiple={false} onFiles={handleFiles}
+          label="Click to choose a PDF, or drag it here" />
       )}
 
       {file && (
@@ -267,7 +251,6 @@ export default function WatermarkPdfWorkspace() {
         </div>
       )}
 
-      {/* Settings */}
       <div className="mb-4">
         <label className="text-sm font-medium block mb-2">Watermark text</label>
         <input type="text" value={text} onChange={(e) => setText(e.target.value)}
@@ -322,30 +305,32 @@ export default function WatermarkPdfWorkspace() {
         </div>
       </div>
 
-      {/* Angle slider */}
       <div className="mb-5">
         <label className="text-sm font-medium block mb-2">Rotation — {angle}°</label>
         <input type="range" min={0} max={360} value={angle}
           onChange={(e) => setAngle(Number(e.target.value))}
           className="w-full" style={{ accentColor: '#2563EB' }} />
         <div className="flex justify-between text-xs text-ink-soft mt-1">
-          <span>0° (horizontal)</span>
-          <span>45° (diagonal)</span>
-          <span>90° (vertical)</span>
+          <span>0° horizontal</span>
+          <span>45° diagonal</span>
+          <span>90° vertical</span>
         </div>
       </div>
 
-      {/* LIVE PREVIEW */}
       {previewing && (
-        <div className="text-center py-8 text-sm text-ink-soft mb-4">⏳ Loading preview…</div>
+        <div className="text-center py-8 rounded-xl mb-4 text-sm font-medium"
+          style={{ background: '#f0f5ff', border: '1px solid #d0dcf5', color: '#3a63b8' }}>
+          ⏳ Loading preview…
+        </div>
       )}
 
       {pageCanvas && !previewing && (
         <div className="mb-5">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-ink-soft uppercase tracking-widest">👁 Live Preview — drag the blue dot to reposition</p>
-          </div>
-          <div className="border rounded-xl overflow-hidden" style={{ borderColor: '#2563EB', cursor: dragging ? 'grabbing' : 'grab' }}>
+          <p className="text-xs font-semibold text-ink-soft uppercase tracking-widest mb-2">
+            👁 Live Preview — click anywhere to move watermark
+          </p>
+          <div className="border rounded-xl overflow-hidden"
+            style={{ borderColor: '#2563EB', cursor: dragging ? 'grabbing' : 'crosshair' }}>
             <canvas
               ref={canvasRef}
               style={{ width: '100%', display: 'block', touchAction: 'none' }}
@@ -358,11 +343,10 @@ export default function WatermarkPdfWorkspace() {
               onTouchEnd={onMouseUp}
             />
           </div>
-          <p className="text-xs text-ink-soft mt-1">Drag the 🔵 blue dot to move the watermark. Use the rotation slider above to rotate it.</p>
+          <p className="text-xs text-ink-soft mt-1">Click anywhere on the preview to move the watermark. Use the rotation slider to rotate it.</p>
         </div>
       )}
 
-      {/* Which pages */}
       <div className="mb-5">
         <label className="text-sm font-medium block mb-2">Apply to</label>
         <div className="flex gap-2 flex-wrap">

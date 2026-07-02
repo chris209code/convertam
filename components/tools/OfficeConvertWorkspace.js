@@ -75,7 +75,7 @@ function loadPaystack() {
   return new Promise(function(resolve) {
     if (window.PaystackPop) { resolve(); return; }
     const script = document.createElement('script');
-    script.src = 'https://js.paystack.co/v1/inline.js';
+    script.src = 'https://js.paystack.co/v2/inline.js';
     script.onload = function() { resolve(); };
     script.onerror = function() { resolve(); };
     document.body.appendChild(script);
@@ -115,7 +115,6 @@ export default function OfficeConvertWorkspace({ accept, toFormat, toLabel }) {
     } else {
       setAnalysis({ pages: 0, isScanned: false, fileSizeMB: f.size / (1024 * 1024) });
     }
-    // Preload Paystack in background
     loadPaystack();
   }
 
@@ -136,45 +135,40 @@ export default function OfficeConvertWorkspace({ accept, toFormat, toLabel }) {
       analysis.isScanned
     );
 
-    var toolName = toFormat;
-    var ref = 'user_' + Date.now() + '@convertam.app';
     var amt = getAmountInSmallestUnit(currency, ngn, usd);
     var cur = currency;
+    var ref = 'user_' + Date.now() + '@convertam.app';
 
-    window['_psCallback'] = function(response) {
-      setVerifying(true);
-      fetch('/api/payment/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reference: response.reference }),
-      })
-        .then(function(res) { return res.json(); })
-        .then(function(data) {
-          if (data.verified) {
-            setPaid(true);
-          } else {
-            setError(data.error || 'Payment verification failed. Please contact support.');
-          }
-          setVerifying(false);
-        })
-        .catch(function() {
-          setError('Could not verify payment. Please try again.');
-          setVerifying(false);
-        });
-    };
-
-    window['_psClose'] = function() {
-      setError('Payment was cancelled.');
-    };
-
-    window.PaystackPop.newTransaction({
+    var popup = new window.PaystackPop();
+    popup.newTransaction({
       key: 'pk_live_2ff0200994f7ed799e3066752fcf6b82442f58a6',
       email: ref,
       amount: amt,
       currency: cur,
-      metadata: { tool: toolName },
-      onSuccess: window['_psCallback'],
-      onCancel: window['_psClose'],
+      onSuccess: function(transaction) {
+        setVerifying(true);
+        fetch('/api/payment/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reference: transaction.reference }),
+        })
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
+            if (data.verified) {
+              setPaid(true);
+            } else {
+              setError(data.error || 'Payment verification failed. Please contact support.');
+            }
+            setVerifying(false);
+          })
+          .catch(function() {
+            setError('Could not verify payment. Please try again.');
+            setVerifying(false);
+          });
+      },
+      onCancel: function() {
+        setError('Payment was cancelled.');
+      },
     });
   }
 

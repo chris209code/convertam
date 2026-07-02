@@ -18,9 +18,8 @@ export default function Footer() {
 
       <div className="footer-inner">
 
-        {/* All in one compact row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '16px' }}>
-          <a href="https://paystack.com/pay/convertam-donate"
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          <a href="https://paystack.shop/pay/kilvwot5rx"
             target="_blank" rel="noopener noreferrer"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px',
@@ -47,7 +46,6 @@ export default function Footer() {
           </button>
         </div>
 
-        {/* Nav links */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
           {[
             { label: 'About', href: '/about', internal: true },
@@ -67,11 +65,10 @@ export default function Footer() {
           ))}
         </div>
 
-        {/* Bottom line */}
         <div style={{ borderTop: '1px solid #E5EDF8', paddingTop: '12px', textAlign: 'center' }}>
           <p style={{ fontSize: '0.72rem', color: '#94A3B8', margin: 0 }}>
             convertam.app is free to use. Tolerate the ads or{' '}
-            <a href="https://paystack.com/pay/convertam-donate" target="_blank" rel="noopener noreferrer"
+            <a href="https://paystack.shop/pay/kilvwot5rx" target="_blank" rel="noopener noreferrer"
               style={{ color: '#2563EB', textDecoration: 'underline' }}>leave a tip</a>.
             {' '}· © {new Date().getFullYear()} Convertam · Files deleted after processing.
           </p>

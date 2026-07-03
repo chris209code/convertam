@@ -64,6 +64,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
       <head>
+        {/* Google Analytics */}
         <Script
           src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
           strategy="afterInteractive"
@@ -78,6 +79,13 @@ export default function RootLayout({ children }) {
             });
           `}
         </Script>
+        {/* Google AdSense */}
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1326542748060099"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
       </head>
       <body className="text-ink font-body min-h-screen">
         <Header />

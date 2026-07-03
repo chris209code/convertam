@@ -66,31 +66,8 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* About */}
-      <section className="mb-12">
-        <p className="font-mono text-xs text-stamp-amber tracking-wide mb-2">ABOUT</p>
-        <h2 className="font-display text-2xl font-bold mb-4">
-          What is Convertam?
-        </h2>
-        <p className="text-ink-soft mb-4">
-          Convertam is a free online file conversion platform built around one simple promise:
-          <strong className="text-ink"> Upload. Convert am. Download.</strong>
-        </p>
-        <p className="text-ink-soft mb-4">
-          We provide fast, reliable document conversion tools that work directly in your browser —
-          no account, no watermark, no subscription required. Whether you need to convert a PDF
-          to Word, merge documents, sign a PDF, or extract data from a receipt, Convertam has
-          a tool for it.
-        </p>
-        <p className="text-ink-soft">
-          Convertam was built and is maintained by <strong className="text-ink">Christopher Okeke</strong>,
-          a Nigerian entrepreneur building simple digital tools for everyday people and businesses
-          across Africa and beyond.
-        </p>
-      </section>
-
       {/* Privacy Policy */}
-      <section className="mb-12">
+      <section className="mb-12" id="privacy">
         <p className="font-mono text-xs text-stamp-amber tracking-wide mb-2">PRIVACY POLICY</p>
         <h2 className="font-display text-2xl font-bold mb-4">Your Privacy Matters</h2>
 

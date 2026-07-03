@@ -75,7 +75,7 @@ export default function Header() {
         <div className="nav-links">
           <Link href="/#tools" className="nav-link">Tools</Link>
           <Link href="/#ai-tools" className="nav-link">AI Tools</Link>
-          <Link href="/about" className="nav-link">About</Link>
+          <Link href="/about" className="nav-link">Our Story</Link>
           <Link href="/#tools" className="nav-cta">🚀 Start Converting</Link>
         </div>
         <button className="menu-btn" onClick={() => setMenuOpen(!menuOpen)}>
@@ -86,7 +86,7 @@ export default function Header() {
       <div className={`mobile-menu ${menuOpen ? 'open' : ''}`}>
         <Link href="/#tools" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>Tools</Link>
         <Link href="/#ai-tools" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>AI Tools</Link>
-        <Link href="/about" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>About</Link>
+        <Link href="/about" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>Our Story</Link>
         <Link href="/#tools" className="mobile-cta" onClick={() => setMenuOpen(false)}>🚀 Start Converting</Link>
       </div>
     </header>

@@ -14,7 +14,7 @@ const categories = [
 const isFreeMode = (mode) =>
   ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder',
    'watermark', 'invoice', 'remove-pages', 'add-page-numbers',
-   'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize', 'fill'].includes(mode);
+   'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize', 'fill', 'write-on-pdf'].includes(mode);
 
 function AdSlot({ id }) {
   const hasAd = false;

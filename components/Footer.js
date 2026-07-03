@@ -48,8 +48,8 @@ export default function Footer() {
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
           {[
-            { label: 'About', href: '/about', internal: true },
-            { label: 'Privacy Policy', href: '/about', internal: true },
+            { label: 'Our Story', href: '/about', internal: true },
+            { label: 'Privacy Policy', href: '/about#privacy', internal: true },
             { label: 'Contact', href: 'mailto:okekechris24@yahoo.com', internal: false },
             { label: '𝕏 @chrisndz', href: 'https://x.com/chrisndz', internal: false },
           ].map(({ label, href, internal }, i) => (
@@ -66,6 +66,10 @@ export default function Footer() {
         </div>
 
         <div style={{ borderTop: '1px solid #E5EDF8', paddingTop: '12px', textAlign: 'center' }}>
+          <p style={{ fontSize: '0.72rem', color: '#94A3B8', margin: '0 0 4px' }}>
+            Built out of frustration. Made for everyone.{' '}
+            <Link href="/about" style={{ color: '#2563EB', textDecoration: 'underline' }}>Our story →</Link>
+          </p>
           <p style={{ fontSize: '0.72rem', color: '#94A3B8', margin: 0 }}>
             convertam.app is free to use. Tolerate the ads or{' '}
             <a href="https://paystack.shop/pay/kilvwot5rx" target="_blank" rel="noopener noreferrer"

@@ -40,7 +40,7 @@ export default function HomePage() {
         }
         .hero-mobile-bg { display: none; }
         .hero-overlay { display: none; }
-        .inner { width: 100%; padding: 80px 4%; }
+        .inner { width: 100%; padding: 80px 4%; position: relative; z-index: 2; }
         .stats-inner { width: 100%; padding: 0 4%; }
         .tools-inner { width: 100%; padding: 0 4%; }
         .why-inner { width: 100%; padding: 0 4%; }
@@ -101,7 +101,7 @@ export default function HomePage() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/hero-mobile.png" alt="" className="hero-mobile-bg" aria-hidden="true" />
         <div className="hero-overlay" />
-        <div className="inner" style={{ position: 'relative', zIndex: 2 }}>
+        <div className="inner">
           <div style={{ maxWidth: '520px' }}>
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: '8px',
@@ -149,15 +149,7 @@ export default function HomePage() {
                 color: 'white', textDecoration: 'none', background: '#2563EB',
                 boxShadow: '0 8px 24px rgba(37,99,235,0.35)',
               }}>⬆️ Choose a file</Link>
-              <Link href="#tools" style={{
-                display: 'inline-flex', alignItems: 'center', gap: '8px',
-                padding: '14px 28px', borderRadius: '12px', fontSize: '0.95rem', fontWeight: 600,
-                color: '#2563EB', textDecoration: 'none',
-                background: 'rgba(255,255,255,0.7)', border: '1.5px solid rgba(37,99,235,0.3)',
-                backdropFilter: 'blur(8px)',
-              }}>🔍 Search for a tool</Link>
             </div>
-            <p style={{ fontSize: '0.8rem', color: '#3B5280' }}>or drag and drop your file here</p>
           </div>
         </div>
       </section>

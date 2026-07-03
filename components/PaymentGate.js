@@ -23,13 +23,13 @@ function getAmount(currency) {
   return currency === 'NGN' ? 50000 : 100;
 }
 
-function loadPaystackScript() {
-  return new Promise((resolve) => {
+function loadPaystack() {
+  return new Promise(function(resolve) {
     if (window.PaystackPop) { resolve(); return; }
     const script = document.createElement('script');
-    script.src = 'https://js.paystack.co/v1/inline.js';
-    script.onload = () => resolve();
-    script.onerror = () => resolve(); // resolve anyway, handlePay will catch it
+    script.src = 'https://js.paystack.co/v2/inline.js';
+    script.onload = function() { resolve(); };
+    script.onerror = function() { resolve(); };
     document.body.appendChild(script);
   });
 }
@@ -46,26 +46,22 @@ export default function PaymentGate({ children, toolName }) {
     if (sessionStorage.getItem('convertam_paid_' + toolName) === 'true') {
       setPaid(true);
     }
-    // Preload Paystack script
-    loadPaystackScript();
+    loadPaystack();
   }, [toolName]);
 
   async function handlePay() {
     setLoading(true);
     setError('');
-
-    // Load script if not already loaded
-    await loadPaystackScript();
+    await loadPaystack();
+    setLoading(false);
 
     if (!window.PaystackPop) {
-      setError('Payment system could not load. Please check your internet connection and try again.');
-      setLoading(false);
+      setError('Payment system could not load. Please check your internet and try again.');
       return;
     }
 
-    setLoading(false);
-
-    window.PaystackPop.newTransaction({
+    var popup = new window.PaystackPop();
+    popup.newTransaction({
       key: PAYSTACK_PUBLIC_KEY,
       email: 'user_' + Date.now() + '@convertam.app',
       amount: getAmount(currency),

@@ -15,22 +15,47 @@ export async function POST(request) {
       return Response.json({ error: 'No CV text provided.' }, { status: 400 });
     }
 
-    const prompt = `You are a professional CV writer and career coach with 20 years of experience. 
-Your task is to improve the following CV to make it more professional, impactful, and ATS-friendly.
+    const prompt = `You are a professional CV writer. Improve the CV below and return it as a structured JSON object.
 
-${jobTitle ? `The person is targeting a role as: ${jobTitle}` : ''}
+STRICT RULES:
+- Extract and use ONLY real information from the CV — names, contacts, companies, dates, achievements
+- NEVER invent placeholders like [Your Name] or [Your Email]
+- If something is missing from the CV, omit that field entirely or use an empty string
+- Improve language, use strong action verbs, fix grammar and spelling
+- Make it ATS-friendly and professional
+- Include ALL experience entries, ALL education entries, ALL skills — do not truncate or cut off
+- Return the complete CV — never stop mid-way
+${jobTitle ? `- Optimize for the role: ${jobTitle}` : ''}
 
-Instructions:
-- Fix grammar, spelling, and punctuation
-- Use strong action verbs (Led, Managed, Developed, Achieved, etc.)
-- Quantify achievements where possible
-- Make the language more professional and impactful
-- Improve the structure and flow
-- Keep all the original information — do not invent new facts
-- Format it cleanly with proper sections
-- Return ONLY the improved CV text, no explanations or commentary
+Return ONLY valid JSON in this exact format, nothing else:
+{
+  "name": "Full name from CV",
+  "title": "Professional title or headline",
+  "email": "email from CV or empty string",
+  "phone": "phone from CV or empty string",
+  "location": "location from CV or empty string",
+  "linkedin": "linkedin from CV or empty string",
+  "summary": "Improved professional summary paragraph",
+  "experience": [
+    {
+      "role": "Job title",
+      "company": "Company name",
+      "period": "Date range",
+      "bullets": ["Achievement 1", "Achievement 2", "Achievement 3"]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Degree name",
+      "institution": "School name",
+      "year": "Year"
+    }
+  ],
+  "skills": ["Skill 1", "Skill 2", "Skill 3"],
+  "certifications": ["Certification 1"]
+}
 
-CV to improve:
+CV TO IMPROVE:
 ${cvText}`;
 
     const res = await fetch(GEMINI_URL, {
@@ -38,7 +63,10 @@ ${cvText}`;
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 65536, // Maximum allowed — handles very large CVs
+        },
       }),
     });
 
@@ -47,12 +75,20 @@ ${cvText}`;
       return Response.json({ error: 'AI could not process your CV. Please try again.' }, { status: 502 });
     }
 
-    const improved = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    if (!improved) {
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (!raw) {
       return Response.json({ error: 'No response from AI. Please try again.' }, { status: 422 });
     }
 
-    return Response.json({ improved });
+    let parsed;
+    try {
+      const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      parsed = JSON.parse(cleaned);
+    } catch {
+      return Response.json({ improved: raw, structured: null });
+    }
+
+    return Response.json({ improved: raw, structured: parsed });
   } catch (err) {
     console.error('CV improver error:', err);
     return Response.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });

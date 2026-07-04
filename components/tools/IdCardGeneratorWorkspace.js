@@ -34,6 +34,51 @@ function formatDate(d) {
   return `${day}/${months[parseInt(m, 10) - 1]}/${y}`;
 }
 
+function hexToHsl(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  const rn = r / 255, gn = g / 255, bn = b / 255;
+  const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+  let h = 0, s = 0;
+  const l = (max + min) / 2;
+  const d = max - min;
+  if (d !== 0) {
+    s = d / (1 - Math.abs(2 * l - 1));
+    switch (max) {
+      case rn: h = 60 * (((gn - bn) / d) % 6); break;
+      case gn: h = 60 * ((bn - rn) / d + 2); break;
+      case bn: h = 60 * ((rn - gn) / d + 4); break;
+    }
+  }
+  if (h < 0) h += 360;
+  return { h, s: s * 100, l: l * 100 };
+}
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) { r = c; g = x; } else if (h < 120) { r = x; g = c; }
+  else if (h < 180) { g = c; b = x; } else if (h < 240) { g = x; b = c; }
+  else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
+  const toHex = (v) => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+// Never let a raw brand hex flood a large area: keep only its hue, clamp
+// saturation into a sane band, and fix lightness per role — same recipe
+// used for accessible design-token systems. Neon input → muted, legible output.
+const ROLE_RECIPE = {
+  surface: { minS: 30, maxS: 55, l: 14 }, // large fills — Prestige bg, Edge diagonal panel
+  accent: { minS: 45, maxS: 75, l: 42 },  // top bar, seal, underline, field labels
+};
+function deriveRole(hex, role) {
+  const { h, s } = hexToHsl(hex);
+  const r = ROLE_RECIPE[role];
+  const safeS = Math.min(r.maxS, Math.max(r.minS, s));
+  return hslToHex(h, safeS, r.l);
+}
+const INK = '#0F1F3D'; // fixed neutral ink — not brand-derived, matches the approved token
+
 function drawRoundedRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -248,7 +293,7 @@ function buildRows(form, toggles, industry) {
 function drawClassic(ctx, d) {
   const { colors, logoImg, photoImg, customCodeImg, form, toggles, cardId, industry } = d;
   const bg = '#FDFCF8';
-  const ink = colors.primary;
+  const ink = colors.ink;
   const sub = '#5A6472';
 
   ctx.fillStyle = bg;
@@ -399,9 +444,10 @@ function drawExecutive(ctx, d) {
     colX += w + gap;
   });
 
-  // gold seal
-  const sealY = statY + px(30) + px(24);
+  // gold seal — sits a full margin below the value text's descenders, never overlapping
+  const rowBottomY = statY + px(24) + px(10);
   const sealR = px(39);
+  const sealY = rowBottomY + px(24) + sealR;
   ctx.save();
   ctx.beginPath();
   ctx.arc(bx, sealY, sealR, 0, Math.PI * 2);
@@ -483,7 +529,7 @@ function drawSplit(ctx, d) {
   const headerTextX = padL + logoSize + px(12);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = colors.primary;
+  ctx.fillStyle = colors.ink;
   ctx.font = `800 ${px(20)}px Arial, sans-serif`;
   ctx.fillText(form.orgName || 'Your Organization', headerTextX, px(24) + px(18));
   ctx.font = `400 ${px(11)}px Arial, sans-serif`;
@@ -492,7 +538,7 @@ function drawSplit(ctx, d) {
   ctx.fillText(tagline, headerTextX, px(24) + px(18) + px(15));
 
   let cy = px(24) + px(40) + px(26) + px(28);
-  ctx.fillStyle = colors.primary;
+  ctx.fillStyle = colors.ink;
   ctx.font = `800 ${px(28)}px Arial, sans-serif`;
   ctx.textBaseline = 'top';
   const nameH = wrapText(ctx, (form.fullName || 'Full Name').toUpperCase(), padL, cy - px(28), leftW - padL - px(24), px(28) * 1.1, 'left');
@@ -516,7 +562,7 @@ function drawSplit(ctx, d) {
     ctx.fillText(row.label.toUpperCase(), padL, cy);
     cy += px(12) + px(4);
     ctx.font = `800 ${px(18)}px Arial, sans-serif`;
-    ctx.fillStyle = colors.primary;
+    ctx.fillStyle = colors.ink;
     ctx.fillText(row.value, padL, cy);
     cy += px(18) + px(14);
   });
@@ -540,7 +586,7 @@ function drawSplit(ctx, d) {
 
 function drawBack(ctx, d) {
   const { colors, form, toggles, cardId, customCodeImg } = d;
-  const ink = colors.primary;
+  const ink = colors.ink;
   drawRoundedRect(ctx, 0, 0, CARD_W, CARD_H, px(16));
   ctx.fillStyle = '#FDFCF8';
   ctx.fill();
@@ -696,14 +742,19 @@ export default function IdCardGeneratorWorkspace() {
     reader.readAsDataURL(file);
   }
 
-  const colors = { primary: primaryColor, accent: accentColor };
+  // Never pass raw brand hex into draw functions — derive safe roles first.
+  const colors = useMemo(() => ({
+    primary: deriveRole(primaryColor, 'surface'), // large fills: Prestige bg, Edge diagonal panel
+    accent: deriveRole(accentColor, 'accent'),    // top bar, seal, underline, field labels
+    ink: INK,                                     // fixed neutral text — never brand-derived
+  }), [primaryColor, accentColor]);
 
   const render = useCallback(() => {
     if (!industry) return;
     const opts = { layout, colors, logoImg, photoImg, customCodeImg, form, toggles, cardId, industry };
     if (frontCanvasRef.current) drawCard(frontCanvasRef.current, { ...opts, side: 'front' });
     if (backCanvasRef.current) drawCard(backCanvasRef.current, { ...opts, side: 'back' });
-  }, [industry, layout, colors.primary, colors.accent, logoImg, photoImg, customCodeImg, form, toggles, cardId]);
+  }, [industry, layout, colors, logoImg, photoImg, customCodeImg, form, toggles, cardId]);
 
   useEffect(() => { render(); }, [render]);
 
@@ -882,9 +933,9 @@ export default function IdCardGeneratorWorkspace() {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'center', padding: 24, background: '#F8FAFC', borderRadius: 16 }}>
-            <div style={{ width: CARD_W * PREVIEW_SCALE, height: CARD_H * PREVIEW_SCALE, boxShadow: '0 12px 32px rgba(15,31,61,0.14)', borderRadius: 12, overflow: 'hidden' }}>
-              <canvas ref={frontCanvasRef} style={{ width: '100%', height: '100%', display: side === 'front' ? 'block' : 'none' }} />
-              <canvas ref={backCanvasRef} style={{ width: '100%', height: '100%', display: side === 'back' ? 'block' : 'none' }} />
+            <div style={{ width: '100%', maxWidth: CARD_W * PREVIEW_SCALE, aspectRatio: `${CARD_W} / ${CARD_H}`, boxShadow: '0 12px 32px rgba(15,31,61,0.14)', borderRadius: 12, overflow: 'hidden' }}>
+              <canvas ref={frontCanvasRef} style={{ width: '100%', height: '100%', display: side === 'front' ? 'block' : 'none', objectFit: 'contain' }} />
+              <canvas ref={backCanvasRef} style={{ width: '100%', height: '100%', display: side === 'back' ? 'block' : 'none', objectFit: 'contain' }} />
             </div>
           </div>
 

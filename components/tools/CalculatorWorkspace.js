@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import SalaryCalculator from '@/components/tools/SalaryCalculator';
+
 
 const CALCULATORS = [
   { id: 'vat', label: 'VAT Calculator', icon: '🧾', color: '#2563EB' },
@@ -88,41 +90,7 @@ function LoanCalc() {
   );
 }
 
-function SalaryCalc() {
-  const [gross, setGross] = useState('');
-  const g = parseFloat(gross) || 0;
-  const pension = g * 0.08;
-  const taxable = g - pension;
-  let tax = 0;
-  const brackets = [[300000,0.07],[300000,0.11],[500000,0.15],[500000,0.19],[1600000,0.21],[Infinity,0.24]];
-  let remaining = taxable;
-  brackets.forEach(([limit, pct]) => {
-    const chunk = Math.min(remaining, limit);
-    tax += chunk * pct;
-    remaining -= chunk;
-    if (remaining <= 0) return;
-  });
-  const net = g - pension - tax;
-
-  return (
-    <div>
-      <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Annual Gross Salary (₦)</label>
-      <input type="number" value={gross} onChange={e => setGross(e.target.value)} placeholder="e.g. 3000000" style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.9rem', fontFamily: 'inherit', marginBottom: 16, outline: 'none' }} />
-      {g > 0 && (
-        <div style={{ background: '#F5F3FF', borderRadius: 12, padding: 16 }}>
-          {[['Gross Salary', g], ['Pension (8%)', -pension], ['Income Tax (PAYE)', -tax], ['Net Annual Salary', net], ['Net Monthly Salary', net/12]].map(([label, val]) => (
-            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, borderBottom: label.includes('Monthly') ? 'none' : '1px solid #DDD6FE', paddingBottom: label.includes('Monthly') ? 0 : 8 }}>
-              <span style={{ fontSize: '0.82rem', color: '#475569' }}>{label}</span>
-              <span style={{ fontSize: '0.82rem', fontWeight: label.includes('Net') ? 700 : 400, color: val < 0 ? '#DC2626' : label.includes('Net') ? '#7C3AED' : '#0F172A' }}>
-                {val < 0 ? '-' : ''}₦{Math.abs(val).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+// SalaryCalc moved to SalaryCalculator component
 
 function BMICalc() {
   const [weight, setWeight] = useState('');
@@ -287,7 +255,7 @@ function TipCalc() {
   );
 }
 
-const CALC_COMPONENTS = { vat: VATCalc, loan: LoanCalc, salary: SalaryCalc, bmi: BMICalc, age: AgeCalc, discount: DiscountCalc, profit: ProfitCalc, tip: TipCalc };
+const CALC_COMPONENTS = { vat: VATCalc, loan: LoanCalc, salary: SalaryCalculator, bmi: BMICalc, age: AgeCalc, discount: DiscountCalc, profit: ProfitCalc, tip: TipCalc };
 
 export default function CalculatorWorkspace() {
   const [active, setActive] = useState('vat');

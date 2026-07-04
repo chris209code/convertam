@@ -41,9 +41,13 @@ export default function Header() {
           font-family: inherit; padding: 0;
         }
         .tools-dropdown-btn:hover { color: #111827; }
-        .dropdown-wrapper { position: relative; }
+        .dropdown-wrapper {
+          position: relative;
+          padding-bottom: 16px;
+          margin-bottom: -16px;
+        }
         .dropdown-menu {
-          position: absolute; top: calc(100% + 12px); left: 50%;
+          position: absolute; top: 100%; left: 50%;
           transform: translateX(-50%);
           background: white; border-radius: 16px;
           box-shadow: 0 20px 48px rgba(0,0,0,0.12);

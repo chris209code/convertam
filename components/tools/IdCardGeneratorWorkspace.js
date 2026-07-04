@@ -230,7 +230,7 @@ function buildInfoRows(form, toggles, industry) {
   return rows;
 }
 
-function drawFooter(ctx, { toggles, cardId, textColor, subtextColor, x1 = 48, x2Right }) {
+function drawFooter(ctx, { toggles, cardId, textColor, subtextColor, x1 = 48, customCodeImg }) {
   if (toggles.signatureStrip) {
     ctx.strokeStyle = subtextColor;
     ctx.lineWidth = 2;
@@ -249,8 +249,21 @@ function drawFooter(ctx, { toggles, cardId, textColor, subtextColor, x1 = 48, x2
     ctx.textAlign = 'left';
     ctx.fillText(cardId, x1, CARD_H - 30);
   }
-  if (toggles.barcode) drawBarcode(ctx, CARD_W - 260, CARD_H - 70, 210, 40, cardId, textColor);
-  if (toggles.securityPattern) drawSecurityPattern(ctx, CARD_W - 130, CARD_H - 190, 90, cardId, textColor);
+
+  if (customCodeImg) {
+    // User-supplied QR/barcode image takes priority over generated patterns
+    const size = 96;
+    const cx = CARD_W - size - 44, cy = CARD_H - size - 24;
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    drawRoundedRect(ctx, cx - 6, cy - 6, size + 12, size + 12, 8);
+    ctx.fill();
+    ctx.drawImage(customCodeImg, cx, cy, size, size);
+    ctx.restore();
+  } else {
+    if (toggles.barcode) drawBarcode(ctx, CARD_W - 260, CARD_H - 70, 210, 40, cardId, textColor);
+    if (toggles.securityPattern) drawSecurityPattern(ctx, CARD_W - 130, CARD_H - 190, 90, cardId, textColor);
+  }
 }
 
 function drawFrontClassic(ctx, ctxData) {
@@ -285,34 +298,49 @@ function drawFrontClassic(ctx, ctxData) {
   drawPhotoBox(ctx, photoX, photoY, photoSize, photoImg, subtextColor, colors.accent, false);
 
   const infoX = photoX + photoSize + 40;
-  let infoY = photoY;
+  const infoW = CARD_W - infoX - 40;
+  let infoY = photoY + 4;
   ctx.fillStyle = textColor;
-  ctx.font = '700 32px Arial, sans-serif';
+  ctx.font = '700 36px Arial, sans-serif';
   ctx.fillText(form.fullName || 'Full Name', infoX, infoY);
-  infoY += 42;
-  ctx.font = '400 22px Arial, sans-serif';
+  infoY += 44;
+  ctx.font = '400 24px Arial, sans-serif';
   ctx.fillStyle = subtextColor;
   ctx.fillText(form.role || 'Title / Role', infoX, infoY);
-  infoY += 46;
+  infoY += 30;
+  if (form.orgTagline) {
+    ctx.font = 'italic 400 16px Arial, sans-serif';
+    ctx.fillText(form.orgTagline, infoX, infoY);
+    infoY += 26;
+  }
+  infoY += 14;
 
   buildInfoRows(form, toggles, industry).forEach(([label, val]) => {
-    ctx.font = '600 16px Arial, sans-serif';
+    ctx.save();
+    ctx.globalAlpha = 0.14;
+    drawRoundedRect(ctx, infoX, infoY - 6, infoW, 60, 10);
     ctx.fillStyle = colors.accent;
-    ctx.fillText(label.toUpperCase(), infoX, infoY);
-    ctx.font = '400 22px Arial, sans-serif';
+    ctx.fill();
+    ctx.restore();
+
+    ctx.font = '700 15px Arial, sans-serif';
+    ctx.fillStyle = colors.accent;
+    ctx.fillText(label.toUpperCase(), infoX + 16, infoY);
+    ctx.font = '700 24px Arial, sans-serif';
     ctx.fillStyle = textColor;
-    ctx.fillText(val, infoX, infoY + 22);
-    infoY += 56;
+    ctx.fillText(val, infoX + 16, infoY + 24);
+    infoY += 70;
   });
 
-  drawFooter(ctx, { toggles, cardId, textColor, subtextColor });
+  drawFooter(ctx, { toggles, cardId, textColor, subtextColor, customCodeImg: ctxData.customCodeImg });
 }
 
 function drawFrontExecutive(ctx, ctxData) {
   const { colors, logoImg, photoImg, form, toggles, cardId, industry, textColor, subtextColor } = ctxData;
 
-  // Top banner
-  const bannerH = 150;
+  // Top banner — logo and org name live here, top-LEFT only, so nothing sits
+  // behind the centered photo below.
+  const bannerH = 118;
   ctx.save();
   ctx.fillStyle = shade(colors.primary, isLight(colors.primary) ? -0.08 : -0.2);
   ctx.fillRect(0, 0, CARD_W, bannerH);
@@ -320,63 +348,86 @@ function drawFrontExecutive(ctx, ctxData) {
   ctx.fillStyle = colors.accent;
   ctx.fillRect(0, bannerH, CARD_W, 6);
 
-  let bx = CARD_W / 2;
-  ctx.textAlign = 'center';
+  ctx.textAlign = 'left';
+  let headerX = 40;
   if (logoImg) {
     const logoSize = 56;
+    const logoY = (bannerH - logoSize) / 2;
     ctx.save();
-    drawRoundedRect(ctx, bx - logoSize / 2, 22, logoSize, logoSize, 10);
+    drawRoundedRect(ctx, headerX, logoY, logoSize, logoSize, 10);
     ctx.clip();
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.fillRect(bx - logoSize / 2, 22, logoSize, logoSize);
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.fillRect(headerX, logoY, logoSize, logoSize);
     const ratio = Math.min(logoSize / logoImg.width, logoSize / logoImg.height);
     const lw = logoImg.width * ratio, lh = logoImg.height * ratio;
-    ctx.drawImage(logoImg, bx - lw / 2, 22 + (logoSize - lh) / 2, lw, lh);
+    ctx.drawImage(logoImg, headerX + (logoSize - lw) / 2, logoY + (logoSize - lh) / 2, lw, lh);
     ctx.restore();
+    headerX += logoSize + 18;
   }
   ctx.fillStyle = textColor;
-  ctx.font = '700 30px Arial, sans-serif';
-  ctx.textBaseline = 'top';
-  ctx.fillText(form.orgName || 'Your Organization', bx, 86);
-  ctx.font = '400 18px Arial, sans-serif';
-  ctx.fillStyle = subtextColor;
-  ctx.fillText(form.orgTagline || `${industry.label} ID Card`, bx, 116);
+  ctx.font = '700 32px Arial, sans-serif';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(form.orgName || 'Your Organization', headerX, bannerH / 2);
 
-  // Centered circular photo overlapping banner
-  const photoSize = 180;
-  const photoX = CARD_W / 2 - photoSize / 2, photoY = bannerH - photoSize / 2 - 8;
+  // Card type badge, top-right of banner (fills the empty corner)
+  ctx.textAlign = 'right';
+  ctx.font = '700 16px Arial, sans-serif';
+  ctx.fillStyle = colors.accent;
+  ctx.fillText(industry.label.toUpperCase(), CARD_W - 40, bannerH / 2);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+
+  // Centered circular photo, overlapping the banner bottom edge only
+  const bx = CARD_W / 2;
+  const photoSize = 200;
+  const photoX = bx - photoSize / 2, photoY = bannerH - photoSize / 2 - 4;
   ctx.save();
   ctx.beginPath();
-  ctx.arc(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2 + 6, 0, Math.PI * 2);
+  ctx.arc(bx, photoY + photoSize / 2, photoSize / 2 + 7, 0, Math.PI * 2);
   ctx.fillStyle = isLight(colors.primary) ? '#FFFFFF' : shade(colors.primary, 0.1);
   ctx.fill();
   ctx.restore();
   drawPhotoBox(ctx, photoX, photoY, photoSize, photoImg, subtextColor, colors.accent, true);
 
-  let ty = photoY + photoSize + 24;
+  ctx.textAlign = 'center';
+  let ty = photoY + photoSize + 20;
   ctx.fillStyle = textColor;
-  ctx.font = '700 34px Arial, sans-serif';
+  ctx.font = '700 38px Arial, sans-serif';
   ctx.fillText(form.fullName || 'Full Name', bx, ty);
-  ty += 40;
-  ctx.font = '400 22px Arial, sans-serif';
+  ty += 42;
+  ctx.font = '400 24px Arial, sans-serif';
   ctx.fillStyle = subtextColor;
   ctx.fillText(form.role || 'Title / Role', bx, ty);
-  ty += 46;
+  ty += 30;
+  if (form.orgTagline) {
+    ctx.font = 'italic 400 17px Arial, sans-serif';
+    ctx.fillText(form.orgTagline, bx, ty);
+    ty += 26;
+  }
+  ty += 14;
 
   const rows = buildInfoRows(form, toggles, industry);
   const colW = (CARD_W - 96) / rows.length;
   rows.forEach(([label, val], i) => {
     const cx = 48 + colW * i + colW / 2;
-    ctx.font = '600 15px Arial, sans-serif';
+    // filled pill behind each stat so the row reads as a solid block, not floating text
+    ctx.save();
+    ctx.globalAlpha = 0.14;
+    drawRoundedRect(ctx, 48 + colW * i + 10, ty - 6, colW - 20, 64, 10);
+    ctx.fillStyle = colors.accent;
+    ctx.fill();
+    ctx.restore();
+
+    ctx.font = '700 15px Arial, sans-serif';
     ctx.fillStyle = colors.accent;
     ctx.fillText(label.toUpperCase(), cx, ty);
-    ctx.font = '400 20px Arial, sans-serif';
+    ctx.font = '700 22px Arial, sans-serif';
     ctx.fillStyle = textColor;
-    ctx.fillText(val, cx, ty + 24);
+    ctx.fillText(val, cx, ty + 26);
   });
 
   ctx.textAlign = 'left';
-  drawFooter(ctx, { toggles, cardId, textColor, subtextColor });
+  drawFooter(ctx, { toggles, cardId, textColor, subtextColor, customCodeImg: ctxData.customCodeImg });
 }
 
 function drawFrontSplit(ctx, ctxData) {
@@ -426,32 +477,46 @@ function drawFrontSplit(ctx, ctxData) {
   drawPhotoBox(ctx, photoX, photoY, photoSize, photoImg, 'rgba(255,255,255,0.8)', colors.accent, false);
 
   // Info on the left
-  let infoY = 150;
+  let infoY = 148;
   const infoX = 48;
+  const infoW = photoX - infoX - 30;
   ctx.fillStyle = textColor;
-  ctx.font = '700 32px Arial, sans-serif';
+  ctx.font = '700 36px Arial, sans-serif';
   ctx.fillText(form.fullName || 'Full Name', infoX, infoY);
   infoY += 42;
-  ctx.font = '400 22px Arial, sans-serif';
+  ctx.font = '400 23px Arial, sans-serif';
   ctx.fillStyle = subtextColor;
   ctx.fillText(form.role || 'Title / Role', infoX, infoY);
-  infoY += 50;
+  infoY += 28;
+  if (form.orgTagline) {
+    ctx.font = 'italic 400 16px Arial, sans-serif';
+    ctx.fillText(form.orgTagline, infoX, infoY);
+    infoY += 26;
+  }
+  infoY += 16;
 
   buildInfoRows(form, toggles, industry).forEach(([label, val]) => {
-    ctx.font = '600 16px Arial, sans-serif';
+    ctx.save();
+    ctx.globalAlpha = 0.16;
+    drawRoundedRect(ctx, infoX, infoY - 6, infoW, 62, 10);
     ctx.fillStyle = colors.accent;
-    ctx.fillText(label.toUpperCase(), infoX, infoY);
-    ctx.font = '400 22px Arial, sans-serif';
+    ctx.fill();
+    ctx.restore();
+
+    ctx.font = '700 15px Arial, sans-serif';
+    ctx.fillStyle = colors.accent;
+    ctx.fillText(label.toUpperCase(), infoX + 16, infoY);
+    ctx.font = '700 24px Arial, sans-serif';
     ctx.fillStyle = textColor;
-    ctx.fillText(val, infoX, infoY + 22);
-    infoY += 56;
+    ctx.fillText(val, infoX + 16, infoY + 24);
+    infoY += 72;
   });
 
-  drawFooter(ctx, { toggles, cardId, textColor, subtextColor, x2Right: photoX - 20 });
+  drawFooter(ctx, { toggles, cardId, textColor, subtextColor, customCodeImg: ctxData.customCodeImg });
 }
 
 function drawBack(ctx, ctxData) {
-  const { colors, form, toggles, cardId, textColor, subtextColor } = ctxData;
+  const { colors, form, toggles, cardId, textColor, subtextColor, customCodeImg } = ctxData;
   ctx.fillStyle = colors.accent;
   ctx.fillRect(0, 0, CARD_W, 14);
 
@@ -493,7 +558,16 @@ function drawBack(ctx, ctxData) {
     ctx.fillText('Holder Signature', 48, CARD_H - 80);
   }
 
-  if (toggles.barcode) drawBarcode(ctx, 48, CARD_H - 56, 260, 34, cardId + 'b', textColor);
+  if (customCodeImg) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    drawRoundedRect(ctx, 42, CARD_H - 130, 92, 92, 8);
+    ctx.fill();
+    ctx.drawImage(customCodeImg, 48, CARD_H - 124, 80, 80);
+    ctx.restore();
+  } else if (toggles.barcode) {
+    drawBarcode(ctx, 48, CARD_H - 56, 260, 34, cardId + 'b', textColor);
+  }
   if (toggles.cardSerial) {
     ctx.font = '400 15px Arial, sans-serif';
     ctx.fillStyle = subtextColor;
@@ -526,7 +600,7 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
   ctx.fillText(line, x, curY);
 }
 
-function drawCard(canvas, { side, layout, colors, logoImg, photoImg, form, toggles, cardId, industry }) {
+function drawCard(canvas, { side, layout, colors, logoImg, photoImg, customCodeImg, form, toggles, cardId, industry }) {
   const ctx = canvas.getContext('2d');
   canvas.width = CARD_W;
   canvas.height = CARD_H;
@@ -548,7 +622,7 @@ function drawCard(canvas, { side, layout, colors, logoImg, photoImg, form, toggl
   if (toggles.guilloche) drawGuilloche(ctx, CARD_W, CARD_H, colors.accent);
   if (toggles.watermark) drawWatermarkTiles(ctx, CARD_W, CARD_H, form.orgName, textColor);
 
-  const ctxData = { colors, logoImg, photoImg, form, toggles, cardId, industry, textColor, subtextColor };
+  const ctxData = { colors, logoImg, photoImg, customCodeImg, form, toggles, cardId, industry, textColor, subtextColor };
 
   if (side === 'front') {
     if (toggles.ghostPhoto) drawGhostPhoto(ctx, photoImg, CARD_W, CARD_H);
@@ -583,6 +657,7 @@ export default function IdCardGeneratorWorkspace() {
   const [side, setSide] = useState('front');
   const [photoImg, setPhotoImg] = useState(null);
   const [logoImg, setLogoImg] = useState(null);
+  const [customCodeImg, setCustomCodeImg] = useState(null);
   const [cardId, setCardId] = useState('');
   const frontCanvasRef = useRef(null);
   const backCanvasRef = useRef(null);
@@ -636,17 +711,29 @@ export default function IdCardGeneratorWorkspace() {
     reader.readAsDataURL(file);
   }
 
+  function handleCustomCode(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onload = () => setCustomCodeImg(img);
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
   const colors = { primary: primaryColor, accent: accentColor };
 
   const render = useCallback(() => {
     if (!industry) return;
     if (frontCanvasRef.current) {
-      drawCard(frontCanvasRef.current, { side: 'front', layout, colors, logoImg, photoImg, form, toggles, cardId, industry });
+      drawCard(frontCanvasRef.current, { side: 'front', layout, colors, logoImg, photoImg, customCodeImg, form, toggles, cardId, industry });
     }
     if (backCanvasRef.current) {
-      drawCard(backCanvasRef.current, { side: 'back', layout, colors, logoImg, photoImg, form, toggles, cardId, industry });
+      drawCard(backCanvasRef.current, { side: 'back', layout, colors, logoImg, photoImg, customCodeImg, form, toggles, cardId, industry });
     }
-  }, [industry, layout, colors.primary, colors.accent, logoImg, photoImg, form, toggles, cardId]);
+  }, [industry, layout, colors.primary, colors.accent, logoImg, photoImg, customCodeImg, form, toggles, cardId]);
 
   useEffect(() => { render(); }, [render]);
 
@@ -803,11 +890,21 @@ export default function IdCardGeneratorWorkspace() {
             <label style={checkRow}><input type="checkbox" checked={toggles.guilloche} onChange={() => toggle('guilloche')} /> Guilloche pattern</label>
             <label style={checkRow}><input type="checkbox" checked={toggles.watermark} onChange={() => toggle('watermark')} /> Watermark tiling</label>
             <label style={checkRow}><input type="checkbox" checked={toggles.ghostPhoto} onChange={() => toggle('ghostPhoto')} /> Ghost photo</label>
-            <label style={checkRow}><input type="checkbox" checked={toggles.barcode} onChange={() => toggle('barcode')} /> Barcode strip</label>
-            <label style={checkRow}><input type="checkbox" checked={toggles.securityPattern} onChange={() => toggle('securityPattern')} /> Verification pattern</label>
+            <label style={checkRow}><input type="checkbox" checked={toggles.barcode} onChange={() => toggle('barcode')} disabled={!!customCodeImg} /> Barcode strip</label>
+            <label style={checkRow}><input type="checkbox" checked={toggles.securityPattern} onChange={() => toggle('securityPattern')} disabled={!!customCodeImg} /> Verification pattern</label>
             <label style={checkRow}><input type="checkbox" checked={toggles.cardSerial} onChange={() => toggle('cardSerial')} /> Unique card serial</label>
           </div>
           <p style={{ fontSize: '0.7rem', color: '#94A3B8', marginTop: 4 }}>These are visual only — they make the card look authentic but aren't a scannable/verifiable code.</p>
+
+          <div style={fieldWrap}>
+            <label style={labelStyle}>Your own QR code or barcode image (optional)</label>
+            <input type="file" accept="image/*" onChange={handleCustomCode} style={inputStyle} />
+            <p style={{ fontSize: '0.7rem', color: '#94A3B8', marginTop: 4 }}>
+              {customCodeImg
+                ? 'Using your uploaded code — it replaces the generated barcode/pattern above.'
+                : "Upload a QR code you've already generated elsewhere and it'll be placed on the card, fully scannable."}
+            </p>
+          </div>
 
           <p style={{ fontSize: '0.75rem', fontWeight: 700, color: '#334155', margin: '16px 0 8px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Back of Card</p>
           <div style={fieldWrap}>

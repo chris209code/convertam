@@ -6,13 +6,14 @@ export const metadata = {
 };
 
 const TOOLS = [
-  { slug: 'invoice-generator', title: 'Invoice Generator', desc: 'Create professional PDF invoices in seconds', free: true, available: true },
-  { slug: 'quotation-generator', title: 'Quotation Generator', desc: 'Generate professional quotations and proforma invoices', free: true, available: false },
-  { slug: 'receipt-generator', title: 'Receipt Generator', desc: 'Create payment receipts instantly', free: true, available: false },
-  { slug: 'delivery-note', title: 'Delivery Note', desc: 'Generate delivery notes for your orders', free: true, available: false },
-  { slug: 'id-card-generator', title: 'ID Card Generator', desc: 'Design and print professional ID cards', free: true, available: false },
-  { slug: 'certificate-generator', title: 'Certificate Generator', desc: 'Create certificates of completion or achievement', free: true, available: false },
-  { slug: 'business-card', title: 'Business Card Generator', desc: 'Design and download professional business cards', free: true, available: false },
+  { slug: 'invoice-generator', title: 'Invoice Generator', desc: 'Create professional PDF invoices in seconds', available: true },
+  { slug: 'quotation-generator', title: 'Quotation Generator', desc: 'Generate professional quotations and proforma invoices', available: true },
+  { slug: 'resume-builder', title: 'Resume Builder', desc: 'Build a professional resume from scratch and download as PDF', available: true },
+  { slug: 'receipt-generator', title: 'Receipt Generator', desc: 'Create payment receipts instantly', available: false },
+  { slug: 'delivery-note', title: 'Delivery Note', desc: 'Generate delivery notes for your orders', available: false },
+  { slug: 'id-card-generator', title: 'ID Card Generator', desc: 'Design and print professional ID cards', available: false },
+  { slug: 'certificate-generator', title: 'Certificate Generator', desc: 'Create certificates of completion or achievement', available: false },
+  { slug: 'business-card', title: 'Business Card Generator', desc: 'Design and download professional business cards', available: false },
 ];
 
 export default function BusinessPage() {
@@ -59,7 +60,7 @@ export default function BusinessPage() {
 
       <div className="page-inner" style={{ padding: '48px 4%' }}>
         <div className="tools-grid">
-          {TOOLS.map(({ slug, title, desc, free, available }) => (
+          {TOOLS.map(({ slug, title, desc, available }) => (
             <Link key={slug} href={available ? `/${slug}` : '#'} className={`tool-card ${!available ? 'coming' : ''}`}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="tool-title">{title}</div>

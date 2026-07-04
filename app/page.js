@@ -246,7 +246,7 @@ function HeroCards() {
   ];
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: 460 }}>
+    <div style={{ position: 'relative', width: '100%', height: 380 }}>
       <style>{`
         @keyframes float1 { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-10px)} }
         @keyframes float2 { 0%,100%{transform:translateY(-5px)} 50%{transform:translateY(8px)} }
@@ -331,18 +331,18 @@ export default function HomePage() {
       <style>{`
         * { box-sizing: border-box; }
         .si { width: 100%; padding: 0 4%; }
-        .st { font-size: clamp(1.4rem,3vw,1.75rem); font-weight: 800; color: #0F172A; margin: 0 0 6px; }
+        .st { font-size: clamp(1.2rem,2.5vw,1.5rem); font-weight: 800; color: #0F172A; margin: 0 0 6px; }
         .ss { font-size: 0.9rem; color: #64748B; margin: 0 0 40px; }
-        .sh { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 32px; }
+        .sh { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 24px; }
         .va { font-size: 0.82rem; font-weight: 600; color: #2566EB; text-decoration: none; }
         .va:hover { text-decoration: underline; }
 
         /* Hero */
         .hero {
-          width: 100%; min-height: 100vh;
+          width: 100%; min-height: auto;
           display: grid; grid-template-columns: 1fr 1fr;
           align-items: center; gap: 40px;
-          padding: 100px 4% 60px;
+          padding: 60px 4% 40px;
           background: linear-gradient(160deg, #FFFFFF 0%, #F0F7FF 50%, #EEF5FF 100%);
           position: relative; overflow: hidden;
         }
@@ -359,7 +359,7 @@ export default function HomePage() {
           background: #EFF6FF; border: 1px solid #BFDBFE;
         }
         .hero-title {
-          font-size: clamp(2.2rem,4vw,3.6rem); font-weight: 900;
+          font-size: clamp(1.8rem,3.5vw,3rem); font-weight: 900;
           line-height: 1.05; letter-spacing: -0.02em;
           color: #0F172A; margin: 0 0 16px;
         }
@@ -391,7 +391,7 @@ export default function HomePage() {
         /* Categories */
         .cat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; }
         .cat-card {
-          border-radius: 20px; padding: 24px; border: 1px solid;
+          border-radius: 16px; padding: 18px; border: 1px solid;
           text-decoration: none; transition: all 0.25s ease;
           box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
@@ -400,7 +400,7 @@ export default function HomePage() {
         /* Audiences */
         .aud-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
         .aud-card {
-          padding: 24px; border-radius: 16px; text-align: center;
+          padding: 18px; border-radius: 14px; text-align: center;
           border: 1px solid #E5E7EB; background: #FAFAFA; transition: all 0.2s;
         }
         .aud-card:hover { border-color: #BFDBFE; background: #EFF6FF; transform: translateY(-2px); }
@@ -408,7 +408,7 @@ export default function HomePage() {
         /* Featured */
         .feat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
         .feat-card {
-          background: white; border-radius: 16px; padding: 20px;
+          background: white; border-radius: 12px; padding: 14px;
           border: 1px solid #E5E7EB; transition: all 0.2s;
           box-shadow: 0 2px 8px rgba(0,0,0,0.04); position: relative;
         }
@@ -425,7 +425,7 @@ export default function HomePage() {
         /* Recent */
         .rec-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
         .rec-card {
-          background: white; border-radius: 14px; padding: 16px;
+          background: white; border-radius: 12px; padding: 14px;
           border: 1px solid #E5E7EB; text-decoration: none;
           transition: all 0.2s; box-shadow: 0 2px 6px rgba(0,0,0,0.04);
         }
@@ -435,14 +435,14 @@ export default function HomePage() {
         .mu-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
         .mu-card {
           display: flex; align-items: center; gap: 10px;
-          padding: 14px 16px; border-radius: 12px; border: 1px solid #E5E7EB;
+          padding: 10px 14px; border-radius: 10px; border: 1px solid #E5E7EB;
           text-decoration: none; background: #FAFAFA; transition: all 0.15s;
         }
         .mu-card:hover { background: #EFF6FF; border-color: #BFDBFE; transform: translateY(-1px); }
 
         /* Footer */
-        .footer { background: #0F172A; padding: 64px 0 32px; }
-        .foot-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 40px; margin-bottom: 48px; }
+        .footer { background: #0F172A; padding: 32px 0 20px; }
+        .foot-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 40px; margin-bottom: 24px; }
         .foot-col-title { font-size: 0.72rem; font-weight: 700; color: white; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px; }
         .foot-link { display: block; font-size: 0.8rem; color: rgba(255,255,255,0.55); text-decoration: none; margin-bottom: 8px; transition: color 0.15s; }
         .foot-link:hover { color: white; }
@@ -514,7 +514,7 @@ export default function HomePage() {
       </section>
 
       {/* ── CATEGORIES ── */}
-      <section id="categories" style={{ padding:'80px 0', background:'#F8FAFC' }}>
+      <section id="categories" style={{ padding:'40px 0', background:'#F8FAFC' }}>
         <div className="si">
           <h2 className="st">Browse by Category</h2>
           <p className="ss">Everything you need to work smarter — all in one place.</p>
@@ -542,7 +542,7 @@ export default function HomePage() {
       </section>
 
       {/* ── BUILT FOR EVERYONE ── */}
-      <section style={{ padding:'80px 0', background:'white' }}>
+      <section style={{ padding:'40px 0', background:'white' }}>
         <div className="si">
           <h2 className="st">Built for everyone</h2>
           <p className="ss">Powerful tools for every need and every person.</p>
@@ -559,7 +559,7 @@ export default function HomePage() {
       </section>
 
       {/* ── FEATURED TOOLS ── */}
-      <section style={{ padding:'80px 0', background:'#F8FAFC' }}>
+      <section style={{ padding:'40px 0', background:'#F8FAFC' }}>
         <div className="si">
           <div className="sh">
             <div>
@@ -588,7 +588,7 @@ export default function HomePage() {
       </section>
 
       {/* ── HOW IT WORKS ── */}
-      <section style={{ padding:'80px 0', background:'white' }}>
+      <section style={{ padding:'40px 0', background:'white' }}>
         <div className="si">
           <div className="how-grid">
             <div>
@@ -631,7 +631,7 @@ export default function HomePage() {
       </section>
 
       {/* ── RECENTLY ADDED ── */}
-      <section style={{ padding:'80px 0', background:'#F8FAFC' }}>
+      <section style={{ padding:'40px 0', background:'#F8FAFC' }}>
         <div className="si">
           <div className="sh">
             <div>
@@ -656,7 +656,7 @@ export default function HomePage() {
       </section>
 
       {/* ── MOST USED ── */}
-      <section style={{ padding:'80px 0', background:'white' }}>
+      <section style={{ padding:'40px 0', background:'white' }}>
         <div className="si">
           <div className="sh">
             <div>

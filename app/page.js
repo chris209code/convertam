@@ -1,96 +1,170 @@
 import Link from 'next/link';
 import { tools } from '@/lib/tools-config';
-import ToolCard from '@/components/tools/ToolCard';
-import AIToolCard from '@/components/tools/AIToolCard';
 
-const categories = [
-  { key: 'Smart Converter', label: 'Smart AI Tools', desc: 'AI-powered tools for smart document processing', icon: '🤖', accent: '#10B981', bg: '#ECFDF5', highlight: true },
-  { key: 'PDF Editor', label: 'PDF Editor', desc: 'Edit, sign, annotate and manage your PDFs', icon: '✍️', accent: '#2563EB', bg: '#EFF6FF' },
-  { key: 'PDF Utilities', label: 'PDF Utilities', desc: 'Organize, edit and optimize your PDF documents', icon: '📄', accent: '#8B5CF6', bg: '#F5F3FF' },
-  { key: 'Image Tools', label: 'Image Tools', desc: 'Convert and optimize image files', icon: '🖼️', accent: '#F59E0B', bg: '#FFFBEB' },
-  { key: 'Document Conversion', label: 'Document Conversion', desc: 'Convert between documents and formats', icon: '📑', accent: '#2563EB', bg: '#EFF6FF' },
+const POPULAR_TOOLS = [
+  { slug: 'pdf-to-word', icon: '📄', title: 'PDF to Word' },
+  { slug: 'invoice-generator', icon: '🧾', title: 'Invoice Generator' },
+  { slug: 'compress-pdf', icon: '🗜️', title: 'Compress PDF' },
+  { slug: 'ocr-pdf', icon: '🤖', title: 'OCR PDF' },
+  { slug: 'merge-pdf', icon: '🔗', title: 'Merge PDF' },
+  { slug: 'sign-pdf', icon: '✍️', title: 'Sign PDF' },
 ];
 
-const isFreeMode = (mode) =>
-  ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder',
-   'watermark', 'invoice', 'remove-pages', 'add-page-numbers',
-   'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize', 'fill', 'write-on-pdf'].includes(mode);
-
-function AdSlot({ id }) {
-  const hasAd = false;
-  if (!hasAd) return null;
-  return <div id={id} style={{ width: '100%', margin: '32px 0' }} />;
-}
+const CATEGORIES = [
+  {
+    slug: 'pdf-tools',
+    icon: '📄',
+    title: 'PDF Tools',
+    desc: 'Convert, edit, merge, split, compress and secure your PDFs',
+    color: '#2563EB',
+    bg: '#EFF6FF',
+    border: '#BFDBFE',
+    count: 14,
+  },
+  {
+    slug: 'business',
+    icon: '🧾',
+    title: 'Business Tools',
+    desc: 'Invoices, quotations, receipts, ID cards and more',
+    color: '#059669',
+    bg: '#ECFDF5',
+    border: '#A7F3D0',
+    count: 1,
+  },
+  {
+    slug: 'ai-tools',
+    icon: '🤖',
+    title: 'AI Tools',
+    desc: 'AI-powered summarization, OCR, CV improvement and more',
+    color: '#7C3AED',
+    bg: '#F5F3FF',
+    border: '#DDD6FE',
+    count: 4,
+  },
+  {
+    slug: 'image-tools',
+    icon: '🖼️',
+    title: 'Image Tools',
+    desc: 'Convert, resize, compress and edit images',
+    color: '#D97706',
+    bg: '#FFFBEB',
+    border: '#FDE68A',
+    count: 4,
+  },
+  {
+    slug: 'calculators',
+    icon: '🧮',
+    title: 'Calculators',
+    desc: 'VAT, loan, salary, BMI and more calculators',
+    color: '#DC2626',
+    bg: '#FEF2F2',
+    border: '#FECACA',
+    count: 0,
+  },
+  {
+    slug: 'utilities',
+    icon: '⚙️',
+    title: 'Utilities',
+    desc: 'QR codes, password generator, word counter and more',
+    color: '#475569',
+    bg: '#F8FAFC',
+    border: '#E2E8F0',
+    count: 0,
+  },
+];
 
 export default function HomePage() {
   return (
     <main style={{ width: '100%', minHeight: '100vh', overflowX: 'hidden' }}>
-
       <style>{`
         .hero-section {
           width: 100%;
           position: relative;
-          height: 620px;
+          min-height: 580px;
           display: flex;
           align-items: center;
-          background-image: url(/hero.png);
-          background-size: cover;
-          background-position: center center;
-          background-repeat: no-repeat;
+          background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 50%, #1E40AF 100%);
         }
-        .hero-mobile-bg { display: none; }
-        .hero-overlay { display: none; }
-        .inner { width: 100%; padding: 80px 4%; position: relative; z-index: 2; }
+        .hero-inner { width: 100%; padding: 80px 4%; position: relative; z-index: 2; text-align: center; }
+        .search-bar {
+          display: flex; align-items: center; gap: 0;
+          max-width: 600px; margin: 0 auto 40px;
+          background: white; border-radius: 16px;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+          overflow: hidden;
+        }
+        .search-input {
+          flex: 1; padding: 16px 20px;
+          font-size: 1rem; border: none; outline: none;
+          font-family: inherit; color: #0F172A;
+        }
+        .search-btn {
+          padding: 16px 24px; background: #2563EB;
+          color: white; border: none; cursor: pointer;
+          font-size: 0.95rem; font-weight: 600;
+          font-family: inherit; white-space: nowrap;
+        }
+        .search-btn:hover { background: #1D4ED8; }
+        .popular-grid {
+          display: grid;
+          grid-template-columns: repeat(6, 1fr);
+          gap: 12px;
+          max-width: 900px;
+          margin: 0 auto;
+        }
+        .popular-card {
+          display: flex; flex-direction: column; align-items: center;
+          gap: 8px; padding: 16px 8px;
+          background: rgba(255,255,255,0.08);
+          border: 1px solid rgba(255,255,255,0.15);
+          border-radius: 16px; text-decoration: none;
+          transition: all 0.2s ease;
+        }
+        .popular-card:hover {
+          background: rgba(255,255,255,0.15);
+          transform: translateY(-2px);
+        }
+        .popular-icon { font-size: 1.8rem; }
+        .popular-title { font-size: 0.72rem; font-weight: 600; color: white; text-align: center; line-height: 1.3; }
         .stats-inner { width: 100%; padding: 0 4%; }
-        .tools-inner { width: 100%; padding: 0 4%; }
-        .why-inner { width: 100%; padding: 0 4%; }
         .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); }
-        .tools-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-        .ai-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 16px; }
-        .why-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-        .why-card { display: flex; align-items: center; gap: 14px; padding: 18px 20px; border-radius: 16px; border: 1px solid #E5EDF8; }
-        .why-icon { font-size: 1.6rem; flex-shrink: 0; }
-        .why-title { font-weight: 700; font-size: 0.88rem; color: #152238; margin-bottom: 2px; }
-        .why-desc { font-size: 0.75rem; color: #64748B; line-height: 1.4; }
-        .feature-badges { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 36px; }
-        .cta-buttons { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+        .categories-inner { width: 100%; padding: 0 4%; }
+        .categories-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 24px;
+        }
+        .category-card {
+          display: flex; flex-direction: column;
+          padding: 28px; border-radius: 24px;
+          text-decoration: none;
+          transition: all 0.25s ease;
+          border: 1px solid;
+        }
+        .category-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 20px 48px rgba(0,0,0,0.1);
+        }
+        .category-icon { font-size: 2.5rem; margin-bottom: 16px; }
+        .category-title { font-size: 1.1rem; font-weight: 700; color: #152238; margin-bottom: 8px; }
+        .category-desc { font-size: 0.82rem; color: #64748B; line-height: 1.5; flex: 1; }
+        .category-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
+        .category-count { font-size: 0.75rem; font-weight: 600; }
+        .category-arrow { font-size: 1rem; }
 
         @media (max-width: 768px) {
-          .hero-section {
-            height: auto;
-            min-height: 520px;
-            background-image: none !important;
-          }
-          .hero-mobile-bg {
-            display: block; position: absolute; inset: 0;
-            width: 100%; height: 100%; object-fit: cover;
-            object-position: right center; z-index: 0;
-          }
-          .hero-overlay {
-            display: block; position: absolute; inset: 0; z-index: 1;
-            background: linear-gradient(90deg, rgba(243,247,255,0.92) 0%, rgba(243,247,255,0.72) 34%, rgba(243,247,255,0.28) 58%, rgba(243,247,255,0.08) 100%);
-          }
-          .inner { padding: 40px 5%; }
+          .hero-inner { padding: 60px 5%; }
+          .popular-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
           .stats-inner { padding: 0 5%; }
-          .tools-inner { padding: 0 5%; }
-          .why-inner { padding: 0 5%; }
+          .categories-inner { padding: 0 5%; }
+          .categories-grid { grid-template-columns: 1fr; gap: 16px; }
           .stats-grid { grid-template-columns: repeat(2, 1fr); }
           .stats-grid > div { border-left: none !important; border-top: 1px solid #E5EDF8; padding: 20px 16px; }
           .stats-grid > div:nth-child(2) { border-left: 1px solid #E5EDF8 !important; }
-          .tools-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-          .ai-grid { grid-template-columns: minmax(0, 1fr); }
-          .why-grid { grid-template-columns: 1fr; gap: 10px; }
-          .why-card { padding: 12px 14px; border-radius: 12px; }
-          .why-icon { font-size: 1.3rem; }
-          .why-title { font-size: 0.82rem; }
-          .why-desc { font-size: 0.72rem; }
-          .category-container { padding: 20px !important; border-radius: 16px !important; }
-          .cta-buttons { flex-direction: column; }
-          .cta-buttons a { text-align: center; justify-content: center; }
         }
 
         @media (max-width: 480px) {
-          .tools-grid { grid-template-columns: minmax(0, 1fr); }
+          .popular-grid { grid-template-columns: repeat(3, 1fr); }
           .stats-grid { grid-template-columns: 1fr; }
           .stats-grid > div { border-left: none !important; border-top: 1px solid #E5EDF8; }
         }
@@ -98,64 +172,65 @@ export default function HomePage() {
 
       {/* ── HERO ── */}
       <section className="hero-section">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/hero-mobile.png" alt="" className="hero-mobile-bg" aria-hidden="true" />
-        <div className="hero-overlay" />
-        <div className="inner">
-          <div style={{ maxWidth: '520px' }}>
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: '8px',
-              padding: '7px 16px', borderRadius: '99px', fontSize: '0.8rem', fontWeight: 600,
-              background: 'rgba(255,255,255,0.25)', color: '#1e3a6e',
-              border: '1px solid rgba(255,255,255,0.4)', marginBottom: '28px',
-              backdropFilter: 'blur(8px)',
-            }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', display: 'inline-block' }} />
-              100% Free Forever
-            </div>
-            <h1 style={{ fontSize: 'clamp(1.8rem, 5vw, 3.4rem)', fontWeight: 900, lineHeight: 1.1, letterSpacing: '-0.02em', color: '#0A1628', marginBottom: '20px' }}>
-              Convert{' '}
-              <span style={{ color: '#2563EB' }}>any file.</span>
-              <br />Instantly. Securely.
-            </h1>
-            <p style={{ fontSize: 'clamp(0.9rem, 2vw, 1.05rem)', color: '#1e3a6e', lineHeight: 1.7, marginBottom: '32px', maxWidth: '420px' }}>
-              Convert PDFs, images, documents, and more in seconds. 100% free, private, and secure.
-            </p>
-            <div className="feature-badges">
-              {[
-                { icon: '⚡', title: 'Instant', sub: 'Conversion' },
-                { icon: '🔒', title: 'Private', sub: '& Secure' },
-                { icon: '🛡️', title: 'No Sign-up', sub: 'Required' },
-                { icon: '✦', title: '25+ Tools', sub: 'Free to Use' },
-              ].map(({ icon, title, sub }) => (
-                <div key={title} style={{
-                  display: 'flex', alignItems: 'center', gap: '8px',
-                  padding: '10px 14px', borderRadius: '12px',
-                  background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(8px)',
-                  border: '1px solid rgba(255,255,255,0.7)',
-                }}>
-                  <span style={{ fontSize: '1rem' }}>{icon}</span>
-                  <div>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0A1628', lineHeight: 1.1 }}>{title}</div>
-                    <div style={{ fontSize: '0.68rem', color: '#3B5280', lineHeight: 1.1 }}>{sub}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="cta-buttons">
-              <Link href="#tools" style={{
-                display: 'inline-flex', alignItems: 'center', gap: '8px',
-                padding: '14px 28px', borderRadius: '12px', fontSize: '0.95rem', fontWeight: 700,
-                color: 'white', textDecoration: 'none', background: '#2563EB',
-                boxShadow: '0 8px 24px rgba(37,99,235,0.35)',
-              }}>⬆️ Choose a file</Link>
-            </div>
+        <div className="hero-inner">
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: '8px',
+            padding: '6px 16px', borderRadius: '99px',
+            background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+            marginBottom: '24px',
+          }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', display: 'inline-block' }} />
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>100% Free Forever</span>
+          </div>
+
+          <h1 style={{
+            fontSize: 'clamp(2rem, 5vw, 3.5rem)',
+            fontWeight: 900, lineHeight: 1.1,
+            letterSpacing: '-0.02em',
+            color: 'white', marginBottom: '16px',
+          }}>
+            One platform.<br />
+            <span style={{ color: '#60A5FA' }}>Endless productivity.</span>
+          </h1>
+
+          <p style={{
+            fontSize: 'clamp(0.95rem, 2vw, 1.1rem)',
+            color: 'rgba(255,255,255,0.75)',
+            lineHeight: 1.7, marginBottom: '40px',
+            maxWidth: '560px', margin: '0 auto 40px',
+          }}>
+            Powerful tools for PDFs, AI-powered features, images, documents, and business essentials.
+          </p>
+
+          {/* Search */}
+          <div className="search-bar">
+            <input
+              className="search-input"
+              type="text"
+              placeholder="Search for a tool — try 'invoice', 'compress', 'OCR'..."
+              readOnly
+              onClick={() => document.getElementById('categories-section').scrollIntoView({ behavior: 'smooth' })}
+            />
+            <button className="search-btn">Explore Tools</button>
+          </div>
+
+          {/* Popular tools */}
+          <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.5)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            Popular Tools
+          </p>
+          <div className="popular-grid">
+            {POPULAR_TOOLS.map(({ slug, icon, title }) => (
+              <Link key={slug} href={`/${slug}`} className="popular-card">
+                <span className="popular-icon">{icon}</span>
+                <span className="popular-title">{title}</span>
+              </Link>
+            ))}
           </div>
         </div>
       </section>
 
       {/* ── STATS ── */}
-      <section style={{ width: '100%', background: 'linear-gradient(180deg, #F8FBFF 0%, #F3F8FF 100%)', padding: '0 0 40px' }}>
+      <section style={{ width: '100%', background: 'linear-gradient(180deg, #F8FBFF 0%, #F3F8FF 100%)', padding: '0 0 48px' }}>
         <div className="stats-inner">
           <div className="stats-grid" style={{
             background: '#FFFFFF', border: '1px solid #E5EDF8',
@@ -185,76 +260,56 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── TOOLS ── */}
-      <section id="tools" style={{ width: '100%', background: 'linear-gradient(180deg, #F3F8FF 0%, #EEF5FF 100%)', padding: '40px 0 60px' }}>
-        <div className="tools-inner">
-          {categories.map(({ key, label, desc, icon, accent, bg, highlight }, catIdx) => {
-            const items = tools.filter(t => t.category === key);
-            if (!items.length) return null;
-            const isAI = highlight;
-            return (
-              <div key={key} id={isAI ? 'ai-tools' : undefined}
-                className="category-container"
-                style={{
-                  background: '#FFFFFF', border: '1px solid #E5EDF8',
-                  borderRadius: '28px', padding: '36px', marginBottom: '24px',
-                  boxShadow: '0 15px 45px rgba(30,64,175,0.06)',
-                }}>
-                <div style={{ borderBottom: '1px solid #E6EEF9', paddingBottom: '16px', marginBottom: '24px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
-                      <span style={{ color: accent }}>{icon}</span>
-                    </div>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#152238', margin: 0 }}>{label}</h2>
-                        {isAI && <span style={{ fontSize: '0.6rem', fontWeight: 700, padding: '3px 10px', borderRadius: '99px', background: '#ECFDF5', color: '#10B981', border: '1px solid #A7F3D0' }}>NEW</span>}
-                      </div>
-                      <p style={{ fontSize: '0.78rem', color: '#64748B', margin: '2px 0 0' }}>{desc}</p>
-                    </div>
-                  </div>
+      {/* ── CATEGORIES ── */}
+      <section id="categories-section" style={{ width: '100%', background: 'linear-gradient(180deg, #F3F8FF 0%, #EEF5FF 100%)', padding: '60px 0 80px' }}>
+        <div className="categories-inner">
+          <h2 style={{ fontSize: 'clamp(1.4rem, 3vw, 1.75rem)', fontWeight: 800, textAlign: 'center', color: '#152238', marginBottom: '8px' }}>
+            Browse by Category
+          </h2>
+          <p style={{ textAlign: 'center', color: '#64748B', fontSize: '0.95rem', marginBottom: '48px' }}>
+            Everything you need to work smarter — in one place.
+          </p>
+
+          <div className="categories-grid">
+            {CATEGORIES.map(({ slug, icon, title, desc, color, bg, border, count }) => (
+              <Link key={slug} href={`/${slug}`} className="category-card" style={{ background: bg, borderColor: border }}>
+                <div className="category-icon">{icon}</div>
+                <div className="category-title">{title}</div>
+                <div className="category-desc">{desc}</div>
+                <div className="category-footer">
+                  <span className="category-count" style={{ color }}>
+                    {count > 0 ? `${count} tools` : 'Coming soon'}
+                  </span>
+                  <span className="category-arrow" style={{ color }}>→</span>
                 </div>
-                {isAI ? (
-                  <div className="ai-grid">
-                    {items.map(t => (
-                      <AIToolCard key={t.slug} slug={t.slug} title={t.title} description={t.description} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="tools-grid">
-                    {items.map(t => (
-                      <ToolCard key={t.slug} slug={t.slug} title={t.title} mode={t.mode} bg={bg} isFree={isFreeMode(t.mode)} />
-                    ))}
-                  </div>
-                )}
-                <AdSlot id={`ad-slot-${catIdx}`} />
-              </div>
-            );
-          })}
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* ── WHY CONVERTAM ── */}
-      <section style={{ width: '100%', background: '#FFFFFF', borderTop: '1px solid #E5EDF8', padding: '32px 0' }}>
-        <div className="why-inner">
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 800, textAlign: 'center', color: '#152238', marginBottom: '4px' }}>
+      <section style={{ width: '100%', background: '#FFFFFF', borderTop: '1px solid #E5EDF8', padding: '60px 0' }}>
+        <div style={{ width: '100%', padding: '0 4%' }}>
+          <h2 style={{ fontSize: 'clamp(1.4rem, 3vw, 1.75rem)', fontWeight: 800, textAlign: 'center', color: '#152238', marginBottom: '8px' }}>
             Why Choose Convertam?
           </h2>
-          <p style={{ textAlign: 'center', color: '#64748B', fontSize: '0.82rem', marginBottom: '20px' }}>
-            Built for people who just need it done. Fast.
+          <p style={{ textAlign: 'center', color: '#64748B', fontSize: '0.95rem', marginBottom: '40px' }}>
+            Built out of frustration. Made for everyone.{' '}
+            <Link href="/about" style={{ color: '#2563EB', textDecoration: 'underline' }}>Our story →</Link>
           </p>
-          <div className="why-grid">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', maxWidth: '900px', margin: '0 auto' }}>
             {[
               { icon: '⚡', title: 'Lightning Fast', desc: 'Conversions in seconds, not minutes.', bg: '#FFFBEB' },
               { icon: '🔒', title: 'Privacy First', desc: 'Files deleted immediately after conversion.', bg: '#ECFDF5' },
               { icon: '🚫', title: 'No Registration', desc: 'Just upload and go. No account needed.', bg: '#F5F3FF' },
               { icon: '📱', title: 'Works Everywhere', desc: 'Any device. Any browser. Any time.', bg: '#EFF6FF' },
             ].map(({ icon, title, desc, bg }) => (
-              <div key={title} className="why-card" style={{ background: bg }}>
-                <div className="why-icon">{icon}</div>
+              <div key={title} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '18px 20px', borderRadius: '16px', border: '1px solid #E5EDF8', background: bg }}>
+                <div style={{ fontSize: '1.6rem', flexShrink: 0 }}>{icon}</div>
                 <div>
-                  <div className="why-title">{title}</div>
-                  <div className="why-desc">{desc}</div>
+                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#152238', marginBottom: '2px' }}>{title}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748B', lineHeight: 1.4 }}>{desc}</div>
                 </div>
               </div>
             ))}

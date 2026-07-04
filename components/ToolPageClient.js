@@ -23,6 +23,7 @@ import CalculatorWorkspace from '@/components/tools/CalculatorWorkspace';
 import UtilitiesWorkspace from '@/components/tools/UtilitiesWorkspace';
 import CVImproverWorkspace from '@/components/tools/CVImproverWorkspace';
 import ResumeBuilderWorkspace from '@/components/tools/ResumeBuilderWorkspace';
+import IdCardGeneratorWorkspace from '@/components/tools/IdCardGeneratorWorkspace';
 import PaymentGate from '@/components/PaymentGate';
 import ComingSoon from '@/components/tools/ComingSoon';
 import Link from 'next/link';
@@ -32,7 +33,8 @@ import { toolMeta } from '@/lib/tool-meta';
 const isFree = (mode) =>
   ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice',
    'remove-pages', 'add-page-numbers', 'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize',
-   'fill', 'write-on-pdf', 'quotation', 'calculator-hub', 'utilities-hub', 'cv-improver', 'resume-builder'].includes(mode);
+   'fill', 'write-on-pdf', 'quotation', 'calculator-hub', 'utilities-hub', 'cv-improver', 'resume-builder',
+   'id-card-generator'].includes(mode);
 
 function getPriceBadge(mode) {
   if (isFree(mode)) return 'Free';
@@ -108,6 +110,7 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'utilities-hub' && <UtilitiesWorkspace />}
       {tool.mode === 'cv-improver' && <CVImproverWorkspace />}
       {tool.mode === 'resume-builder' && <ResumeBuilderWorkspace />}
+      {tool.mode === 'id-card-generator' && <IdCardGeneratorWorkspace />}
       {tool.mode === 'soon' && <ComingSoon title={tool.title} note={tool.note} />}
 
       <div className="flex items-center gap-2 mt-4 px-4 py-3 rounded-xl text-sm" style={{ background: '#f0f5ff', border: '1px solid #d0dcf5' }}>

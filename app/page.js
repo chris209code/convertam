@@ -2,46 +2,36 @@
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 
-// ── Data ──────────────────────────────────────────────────────────────────────
-
-const TRENDING = ['PDF to Word', 'Invoice Generator', 'Resume Builder', 'OCR PDF', 'Compress PDF', 'Passport Photo'];
-
-const FLOATING_TOOLS = [
-  { icon: '📄', title: 'PDF to Word', desc: 'Convert PDF to editable Word documents', color: '#2563EB', bg: '#EFF6FF', popular: false },
-  { icon: '🧾', title: 'Invoice Generator', desc: 'Create professional invoices in seconds', color: '#059669', bg: '#ECFDF5', popular: true },
-  { icon: '🤖', title: 'OCR PDF', desc: 'Extract text from scanned PDFs and images', color: '#7C3AED', bg: '#F5F3FF', popular: false },
-  { icon: '🗜️', title: 'Compress PDF', desc: 'Reduce PDF file size without losing quality', color: '#DC2626', bg: '#FEF2F2', popular: false },
-  { icon: '📊', title: 'Resume Builder', desc: 'Create a professional resume in minutes', color: '#D97706', bg: '#FFFBEB', popular: false },
-];
+const TRENDING = ['PDF to Word', 'Invoice Generator', 'Resume Builder', 'OCR PDF', 'Compress PDF'];
 
 const CATEGORIES = [
   {
-    slug: 'pdf-tools', icon: '📄', title: 'PDF Tools', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE',
+    slug: 'pdf-tools', icon: '📄', title: 'PDF Tools', color: '#2566EB', bg: '#EFF6FF', border: '#BFDBFE',
     count: '12+', desc: 'Convert, merge, split, compress and secure your PDFs',
     examples: ['PDF to Word', 'Merge PDF', 'Compress PDF', 'Sign PDF', 'Protect PDF'],
   },
   {
-    slug: 'business', icon: '🧾', title: 'Business Tools', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0',
+    slug: 'business', icon: '🧾', title: 'Business Tools', color: '#22C55E', bg: '#ECFDF5', border: '#A7F3D0',
     count: '8+', desc: 'Invoices, receipts, quotes, ID cards and more',
     examples: ['Invoice Generator', 'Receipt Generator', 'Quotation Maker', 'ID Card Generator', 'Delivery Note'],
   },
   {
-    slug: 'ai-tools', icon: '🤖', title: 'AI Tools', color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE',
+    slug: 'ai-tools', icon: '🤖', title: 'AI Tools', color: '#BB5CF6', bg: '#F5F3FF', border: '#DDD6FE',
     count: '10+', desc: 'AI-powered features for smarter work',
     examples: ['AI Summarizer', 'OCR PDF', 'CV Improver', 'AI Translator', 'AI Writer'],
   },
   {
-    slug: 'image-tools', icon: '🖼️', title: 'Image Tools', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A',
+    slug: 'image-tools', icon: '🖼️', title: 'Image Tools', color: '#F97316', bg: '#FFF7ED', border: '#FED7AA',
     count: '9+', desc: 'Convert, edit, resize and optimize images',
     examples: ['Image to PDF', 'Compress Image', 'Resize Image', 'Crop Image', 'Convert to WebP'],
   },
   {
-    slug: 'calculator', icon: '🧮', title: 'Calculators', color: '#CA8A04', bg: '#FEFCE8', border: '#FEF08A',
+    slug: 'calculator', icon: '🧮', title: 'Calculators', color: '#EAB308', bg: '#FEFCE8', border: '#FEF08A',
     count: '25+', desc: 'Finance, health, business and more',
     examples: ['VAT Calculator', 'Loan Calculator', 'BMI Calculator', 'Profit Calculator', 'Age Calculator'],
   },
   {
-    slug: 'utilities', icon: '⚙️', title: 'Utilities', color: '#475569', bg: '#F8FAFC', border: '#E2E8F0',
+    slug: 'utilities', icon: '⚙️', title: 'Utilities', color: '#64748B', bg: '#F8FAFC', border: '#E2E8F0',
     count: '20+', desc: 'Everyday tools to make life easier',
     examples: ['QR Code Generator', 'Password Generator', 'Word Counter', 'JSON Formatter', 'URL Encoder'],
   },
@@ -57,18 +47,18 @@ const AUDIENCES = [
 ];
 
 const FEATURED_TOOLS = [
-  { slug: 'pdf-to-word', icon: '📄', title: 'PDF to Word', desc: 'Convert PDF files to editable Word documents in seconds.', rating: 4.9, color: '#2563EB', popular: false },
-  { slug: 'invoice-generator', icon: '🧾', title: 'Invoice Generator', desc: 'Create professional invoices instantly. Download as PDF.', rating: 4.8, color: '#059669', popular: false },
-  { slug: 'ocr-pdf', icon: '🤖', title: 'OCR PDF', desc: 'Extract text from scanned PDFs and images using AI.', rating: 4.8, color: '#7C3AED', popular: false },
+  { slug: 'pdf-to-word', icon: '📄', title: 'PDF to Word', desc: 'Convert PDF files to editable Word documents in seconds.', rating: 4.9, color: '#2566EB', popular: false },
+  { slug: 'invoice-generator', icon: '🧾', title: 'Invoice Generator', desc: 'Create professional invoices instantly. Download as PDF.', rating: 4.8, color: '#22C55E', popular: false },
+  { slug: 'ocr-pdf', icon: '🤖', title: 'OCR PDF', desc: 'Extract text from scanned PDFs and images using AI.', rating: 4.8, color: '#BB5CF6', popular: false },
   { slug: 'compress-pdf', icon: '🗜️', title: 'Compress PDF', desc: 'Reduce PDF file size without losing quality.', rating: 4.7, color: '#DC2626', popular: false },
   { slug: 'merge-pdf', icon: '🔗', title: 'Merge PDF', desc: 'Combine multiple PDFs into one single file.', rating: 4.8, color: '#0891B2', popular: false },
-  { slug: 'sign-pdf', icon: '✍️', title: 'Sign PDF', desc: 'Create a professional resume in minutes.', rating: 4.9, color: '#D97706', popular: true },
+  { slug: 'sign-pdf', icon: '✍️', title: 'Sign PDF', desc: 'Place your signature anywhere on a PDF document.', rating: 4.9, color: '#D97706', popular: true },
 ];
 
 const RECENTLY_ADDED = [
-  { slug: 'write-on-pdf', icon: '✏️', title: 'Write on PDF', desc: 'Type text directly onto any scanned PDF form.', color: '#2563EB' },
-  { slug: 'ocr-pdf', icon: '🤖', title: 'OCR PDF', desc: 'Extract text from scanned PDFs using AI.', color: '#7C3AED' },
-  { slug: 'summarize-pdf', icon: '📝', title: 'AI Summarizer', desc: 'Summarize any PDF document instantly.', color: '#059669' },
+  { slug: 'write-on-pdf', icon: '✏️', title: 'Write on PDF', desc: 'Type text directly onto any scanned PDF form.', color: '#2566EB' },
+  { slug: 'ocr-pdf', icon: '🤖', title: 'OCR PDF', desc: 'Extract text from scanned PDFs using AI.', color: '#BB5CF6' },
+  { slug: 'summarize-pdf', icon: '📝', title: 'AI Summarizer', desc: 'Summarize any PDF document instantly.', color: '#22C55E' },
   { slug: 'watermark-pdf', icon: '💧', title: 'Watermark PDF', desc: 'Add custom watermarks to your PDFs.', color: '#D97706' },
   { slug: 'receipt-scanner', icon: '🧾', title: 'Receipt Scanner', desc: 'Extract data from receipts using AI.', color: '#DC2626' },
   { slug: 'protect-pdf', icon: '🔒', title: 'Protect PDF', desc: 'Add password protection to your PDFs.', color: '#475569' },
@@ -85,38 +75,249 @@ const MOST_USED = [
   { slug: 'jpg-to-pdf', icon: '🖼️', title: 'JPG to PDF' },
 ];
 
-const STATS = [
-  { icon: '📁', value: '100,000+', label: 'Files Processed', sub: 'And counting every day' },
-  { icon: '🛠️', value: '25+', label: 'Free Tools', sub: 'And more coming soon' },
-  { icon: '📂', value: '12+', label: 'Tool Categories', sub: 'Everything in one place' },
-  { icon: '✅', value: '99.9%', label: 'Success Rate', sub: 'Reliable and accurate results' },
-  { icon: '🗑️', value: '24 hrs', label: 'Auto Deletion', sub: 'Your files stay private' },
-];
+// ── Mini tool card widgets ─────────────────────────────────────────────────────
 
-// ── Counter animation hook ────────────────────────────────────────────────────
-function useCounter(target, duration = 2000, start = false) {
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    if (!start) return;
-    const num = parseInt(target.replace(/[^0-9]/g, ''));
-    if (!num) return;
-    let startTime = null;
-    const animate = (timestamp) => {
-      if (!startTime) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / duration, 1);
-      setCount(Math.floor(progress * num));
-      if (progress < 1) requestAnimationFrame(animate);
-    };
-    requestAnimationFrame(animate);
-  }, [start, target, duration]);
-  return count;
+function PDFtoWordCard() {
+  return (
+    <div style={{ background: 'white', borderRadius: 16, padding: 16, boxShadow: '0 8px 32px rgba(37,99,235,0.12)', border: '1px solid #EFF6FF', width: 200 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <div style={{ width: 28, height: 28, borderRadius: 8, background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>📄</div>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#1E3A5F' }}>PDF to Word</span>
+      </div>
+      <div style={{ background: '#F8FAFC', borderRadius: 8, padding: 8, marginBottom: 8 }}>
+        {['Introduction', 'Chapter 1', 'Summary'].map((line, i) => (
+          <div key={i} style={{ height: 6, background: i === 0 ? '#2566EB' : '#E2E8F0', borderRadius: 3, marginBottom: 4, width: i === 0 ? '60%' : i === 1 ? '80%' : '45%' }} />
+        ))}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span style={{ fontSize: 9, color: '#10B981', fontWeight: 600 }}>✓ Converted</span>
+        <div style={{ flex: 1, height: 2, background: '#DCFCE7', borderRadius: 2 }}>
+          <div style={{ width: '100%', height: 2, background: '#10B981', borderRadius: 2 }} />
+        </div>
+      </div>
+    </div>
+  );
 }
 
-// ── Star rating ───────────────────────────────────────────────────────────────
+function InvoiceCard() {
+  return (
+    <div style={{ background: 'white', borderRadius: 16, padding: 16, boxShadow: '0 8px 32px rgba(34,197,94,0.12)', border: '1px solid #ECFDF5', width: 210 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 24, height: 24, borderRadius: 6, background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>🧾</div>
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#065F46' }}>Invoice #001</span>
+        </div>
+        <span style={{ fontSize: 8, background: '#DCFCE7', color: '#16A34A', padding: '2px 6px', borderRadius: 99, fontWeight: 600 }}>PAID</span>
+      </div>
+      {[['Web Design', '₦45,000'], ['Hosting', '₦12,000'], ['Support', '₦8,000']].map(([item, price]) => (
+        <div key={item} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+          <span style={{ fontSize: 9, color: '#6B7280' }}>{item}</span>
+          <span style={{ fontSize: 9, fontWeight: 600, color: '#0F172A' }}>{price}</span>
+        </div>
+      ))}
+      <div style={{ borderTop: '1px solid #E5E7EB', marginTop: 6, paddingTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 9, fontWeight: 700, color: '#0F172A' }}>Total</span>
+        <span style={{ fontSize: 10, fontWeight: 800, color: '#22C55E' }}>₦65,000</span>
+      </div>
+    </div>
+  );
+}
+
+function OCRCard() {
+  return (
+    <div style={{ background: 'white', borderRadius: 16, padding: 16, boxShadow: '0 8px 32px rgba(187,92,246,0.12)', border: '1px solid #F5F3FF', width: 190 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <div style={{ width: 24, height: 24, borderRadius: 6, background: '#F5F3FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>🤖</div>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#4C1D95' }}>OCR PDF</span>
+        <span style={{ fontSize: 8, background: '#F5F3FF', color: '#7C3AED', padding: '1px 5px', borderRadius: 99, fontWeight: 600, marginLeft: 'auto' }}>AI</span>
+      </div>
+      <div style={{ background: '#FAFAFA', borderRadius: 8, padding: 8, marginBottom: 8, fontFamily: 'monospace' }}>
+        {['Name: Christopher', 'Date: 15/06/2026', 'Amount: ₦500,000'].map((line, i) => (
+          <div key={i} style={{ fontSize: 8, color: i % 2 === 0 ? '#7C3AED' : '#374151', marginBottom: 3 }}>{line}</div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981' }} />
+        <span style={{ fontSize: 8, color: '#6B7280' }}>Text extracted successfully</span>
+      </div>
+    </div>
+  );
+}
+
+function CompressCard() {
+  return (
+    <div style={{ background: 'white', borderRadius: 16, padding: 16, boxShadow: '0 8px 32px rgba(220,38,38,0.1)', border: '1px solid #FEF2F2', width: 185 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <div style={{ width: 24, height: 24, borderRadius: 6, background: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>🗜️</div>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#991B1B' }}>Compress PDF</span>
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+          <span style={{ fontSize: 8, color: '#9CA3AF' }}>Original</span>
+          <span style={{ fontSize: 8, fontWeight: 600, color: '#DC2626' }}>12.4 MB</span>
+        </div>
+        <div style={{ height: 4, background: '#FEE2E2', borderRadius: 2, marginBottom: 6 }}>
+          <div style={{ height: 4, width: '100%', background: '#DC2626', borderRadius: 2 }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+          <span style={{ fontSize: 8, color: '#9CA3AF' }}>Compressed</span>
+          <span style={{ fontSize: 8, fontWeight: 600, color: '#10B981' }}>2.1 MB</span>
+        </div>
+        <div style={{ height: 4, background: '#DCFCE7', borderRadius: 2 }}>
+          <div style={{ height: 4, width: '17%', background: '#10B981', borderRadius: 2 }} />
+        </div>
+      </div>
+      <div style={{ textAlign: 'center', fontSize: 9, fontWeight: 700, color: '#10B981', background: '#DCFCE7', padding: '4px 8px', borderRadius: 99 }}>
+        83% smaller ✓
+      </div>
+    </div>
+  );
+}
+
+function ResumeCard() {
+  return (
+    <div style={{ background: 'white', borderRadius: 16, padding: 16, boxShadow: '0 8px 32px rgba(217,119,6,0.12)', border: '1px solid #FFFBEB', width: 180 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <div style={{ width: 24, height: 24, borderRadius: 6, background: '#FFFBEB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>📋</div>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#92400E' }}>Resume Builder</span>
+      </div>
+      <div style={{ background: '#FFFBEB', borderRadius: 8, padding: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+          <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#FDE68A' }} />
+          <div>
+            <div style={{ height: 5, background: '#D97706', borderRadius: 2, width: 60, marginBottom: 2 }} />
+            <div style={{ height: 3, background: '#FDE68A', borderRadius: 2, width: 40 }} />
+          </div>
+        </div>
+        {['Experience', 'Education', 'Skills'].map((s, i) => (
+          <div key={s} style={{ marginBottom: 4 }}>
+            <div style={{ fontSize: 7, fontWeight: 700, color: '#D97706', marginBottom: 2 }}>{s}</div>
+            <div style={{ height: 3, background: '#FDE68A', borderRadius: 2, width: ['80%', '65%', '70%'][i] }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SummaryCard() {
+  return (
+    <div style={{ background: 'white', borderRadius: 16, padding: 16, boxShadow: '0 8px 32px rgba(8,145,178,0.12)', border: '1px solid #ECFEFF', width: 195 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <div style={{ width: 24, height: 24, borderRadius: 6, background: '#ECFEFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>📝</div>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#164E63' }}>AI Summarizer</span>
+        <span style={{ fontSize: 8, background: '#ECFEFF', color: '#0891B2', padding: '1px 5px', borderRadius: 99, fontWeight: 600, marginLeft: 'auto' }}>AI</span>
+      </div>
+      <div style={{ background: '#F0FDFE', borderRadius: 8, padding: 8 }}>
+        <div style={{ fontSize: 8, color: '#164E63', fontWeight: 600, marginBottom: 4 }}>Key Points:</div>
+        {['Document outlines the Q2 results', 'Revenue grew by 24% YoY', 'New markets identified in Africa'].map((point, i) => (
+          <div key={i} style={{ display: 'flex', gap: 4, marginBottom: 3 }}>
+            <span style={{ color: '#0891B2', fontSize: 8 }}>•</span>
+            <span style={{ fontSize: 8, color: '#374151', lineHeight: 1.3 }}>{point}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Floating cards composition ─────────────────────────────────────────────────
+function HeroCards() {
+  const [mouse, setMouse] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const handleMouse = (e) => {
+      setMouse({
+        x: (e.clientX / window.innerWidth - 0.5) * 20,
+        y: (e.clientY / window.innerHeight - 0.5) * 20,
+      });
+    };
+    window.addEventListener('mousemove', handleMouse);
+    return () => window.removeEventListener('mousemove', handleMouse);
+  }, []);
+
+  const cards = [
+    { component: <PDFtoWordCard />, x: 0, y: 0, delay: '0s', depth: 1 },
+    { component: <InvoiceCard />, x: 220, y: -20, delay: '0.5s', depth: 1.5, popular: true },
+    { component: <OCRCard />, x: 440, y: 10, delay: '1s', depth: 1 },
+    { component: <CompressCard />, x: 60, y: 220, delay: '1.5s', depth: 0.8 },
+    { component: <ResumeCard />, x: 260, y: 210, delay: '2s', depth: 1.2 },
+    { component: <SummaryCard />, x: 450, y: 200, delay: '0.8s', depth: 0.9 },
+  ];
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: 460 }}>
+      <style>{`
+        @keyframes float1 { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-10px)} }
+        @keyframes float2 { 0%,100%{transform:translateY(-5px)} 50%{transform:translateY(8px)} }
+        @keyframes float3 { 0%,100%{transform:translateY(4px)} 50%{transform:translateY(-8px)} }
+        @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
+        .hero-card-wrap { position: absolute; transition: transform 0.1s ease; }
+        .hero-card-wrap:nth-child(1) { animation: float1 4s ease-in-out infinite; }
+        .hero-card-wrap:nth-child(2) { animation: float2 5s ease-in-out infinite; }
+        .hero-card-wrap:nth-child(3) { animation: float3 4.5s ease-in-out infinite; }
+        .hero-card-wrap:nth-child(4) { animation: float2 3.5s ease-in-out infinite; }
+        .hero-card-wrap:nth-child(5) { animation: float1 5.5s ease-in-out infinite; }
+        .hero-card-wrap:nth-child(6) { animation: float3 4s ease-in-out infinite; }
+      `}</style>
+
+      {/* Dotted connector lines SVG */}
+      <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+        <defs>
+          <marker id="dot" viewBox="0 0 4 4" refX="2" refY="2" markerWidth="4" markerHeight="4">
+            <circle cx="2" cy="2" r="1.5" fill="#CBD5E1" />
+          </marker>
+        </defs>
+        {[
+          [100, 80, 320, 60],
+          [320, 60, 540, 80],
+          [100, 80, 160, 260],
+          [320, 60, 360, 250],
+          [540, 80, 550, 250],
+          [160, 260, 360, 250],
+          [360, 250, 550, 250],
+        ].map(([x1, y1, x2, y2], i) => (
+          <line key={i} x1={x1} y1={y1} x2={x2} y2={y2}
+            stroke="#CBD5E1" strokeWidth="1.5" strokeDasharray="4 4"
+            opacity="0.6" />
+        ))}
+        {/* Glow dots at intersections */}
+        {[[100,80],[320,60],[540,80],[160,260],[360,250],[550,250]].map(([cx,cy], i) => (
+          <circle key={i} cx={cx} cy={cy} r="4" fill="#2566EB" opacity="0.4">
+            <animate attributeName="opacity" values="0.4;0.8;0.4" dur={`${2+i*0.5}s`} repeatCount="indefinite" />
+            <animate attributeName="r" values="3;5;3" dur={`${2+i*0.5}s`} repeatCount="indefinite" />
+          </circle>
+        ))}
+      </svg>
+
+      {cards.map(({ component, x, y, delay, depth, popular }, i) => (
+        <div key={i} className="hero-card-wrap"
+          style={{
+            left: x,
+            top: y,
+            animationDelay: delay,
+            transform: `translate(${mouse.x * depth * 0.3}px, ${mouse.y * depth * 0.3}px)`,
+            zIndex: popular ? 10 : 1,
+          }}>
+          {popular && (
+            <div style={{
+              position: 'absolute', top: -10, right: 8, zIndex: 20,
+              background: '#F59E0B', color: 'white',
+              fontSize: 9, fontWeight: 700, padding: '3px 10px',
+              borderRadius: 99, boxShadow: '0 2px 8px rgba(245,158,11,0.4)',
+            }}>Most Popular</div>
+          )}
+          {component}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Stars({ rating }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-      {[1, 2, 3, 4, 5].map(i => (
+      {[1,2,3,4,5].map(i => (
         <span key={i} style={{ color: i <= Math.round(rating) ? '#F59E0B' : '#E5E7EB', fontSize: '0.75rem' }}>★</span>
       ))}
       <span style={{ fontSize: '0.72rem', color: '#6B7280', marginLeft: 4 }}>{rating}</span>
@@ -124,364 +325,216 @@ function Stars({ rating }) {
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
 export default function HomePage() {
-  const [statsVisible, setStatsVisible] = useState(false);
-  const statsRef = useRef(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setStatsVisible(true); },
-      { threshold: 0.3 }
-    );
-    if (statsRef.current) observer.observe(statsRef.current);
-    return () => observer.disconnect();
-  }, []);
-
   return (
     <main style={{ width: '100%', minHeight: '100vh', overflowX: 'hidden', background: '#FFFFFF' }}>
       <style>{`
         * { box-sizing: border-box; }
-        .section-inner { width: 100%; padding: 0 4%; }
-        .section-title { font-size: clamp(1.4rem, 3vw, 1.75rem); font-weight: 800; color: #0F172A; margin-bottom: 6px; }
-        .section-sub { font-size: 0.9rem; color: #64748B; margin-bottom: 40px; }
+        .si { width: 100%; padding: 0 4%; }
+        .st { font-size: clamp(1.4rem,3vw,1.75rem); font-weight: 800; color: #0F172A; margin: 0 0 6px; }
+        .ss { font-size: 0.9rem; color: #64748B; margin: 0 0 40px; }
+        .sh { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 32px; }
+        .va { font-size: 0.82rem; font-weight: 600; color: #2566EB; text-decoration: none; }
+        .va:hover { text-decoration: underline; }
 
         /* Hero */
-        .hero-section {
+        .hero {
           width: 100%; min-height: 100vh;
           display: grid; grid-template-columns: 1fr 1fr;
-          align-items: center;
-          background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 60%, #1E40AF 100%);
-          padding: 80px 4% 60px;
-          gap: 40px;
+          align-items: center; gap: 40px;
+          padding: 100px 4% 60px;
+          background: linear-gradient(160deg, #FFFFFF 0%, #F0F7FF 50%, #EEF5FF 100%);
+          position: relative; overflow: hidden;
         }
-        .hero-left { max-width: 560px; }
+        .hero::before {
+          content: '';
+          position: absolute; top: -200px; right: -200px;
+          width: 600px; height: 600px; border-radius: 50%;
+          background: radial-gradient(circle, rgba(37,99,235,0.08) 0%, transparent 70%);
+          pointer-events: none;
+        }
         .hero-badge {
           display: inline-flex; align-items: center; gap: 8px;
-          padding: 6px 16px; border-radius: 99px;
-          background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-          margin-bottom: 24px;
+          padding: 6px 16px; border-radius: 99px; margin-bottom: 24px;
+          background: #EFF6FF; border: 1px solid #BFDBFE;
         }
         .hero-title {
-          font-size: clamp(2.2rem, 4vw, 3.5rem);
-          font-weight: 900; line-height: 1.05;
-          letter-spacing: -0.02em; color: white; margin-bottom: 16px;
+          font-size: clamp(2.2rem,4vw,3.6rem); font-weight: 900;
+          line-height: 1.05; letter-spacing: -0.02em;
+          color: #0F172A; margin: 0 0 16px;
         }
-        .hero-subtitle {
-          font-size: clamp(0.95rem, 1.5vw, 1.1rem);
-          color: rgba(255,255,255,0.7); line-height: 1.7; margin-bottom: 32px;
+        .hero-sub {
+          font-size: clamp(0.95rem,1.5vw,1.05rem); color: #475569;
+          line-height: 1.7; margin: 0 0 32px; max-width: 480px;
         }
         .search-wrap {
-          display: flex; align-items: center;
-          background: white; border-radius: 14px;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+          display: flex; align-items: center; background: white;
+          border-radius: 14px; border: 1.5px solid #E2E8F0;
+          box-shadow: 0 4px 24px rgba(37,99,235,0.08);
           overflow: hidden; margin-bottom: 16px;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
-        .search-icon { padding: 0 14px; color: #94A3B8; font-size: 1rem; }
-        .search-input-fake {
-          flex: 1; padding: 14px 0; font-size: 0.9rem;
-          color: #94A3B8; text-decoration: none; display: block;
-        }
-        .search-btn-fake {
-          padding: 14px 20px; background: #2563EB; color: white;
-          font-size: 0.9rem; font-weight: 600; text-decoration: none;
-          white-space: nowrap;
-        }
-        .search-btn-fake:hover { background: #1D4ED8; }
-        .trending-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .trend-label { font-size: 0.75rem; color: rgba(255,255,255,0.5); white-space: nowrap; }
+        .search-wrap:hover { border-color: #BFDBFE; box-shadow: 0 8px 32px rgba(37,99,235,0.12); }
+        .search-icon { padding: 0 14px; color: #94A3B8; }
+        .search-fake { flex:1; padding: 14px 0; font-size: 0.88rem; color: #94A3B8; text-decoration: none; display: block; }
+        .search-btn { padding: 14px 20px; background: #2566EB; color: white; font-size: 0.88rem; font-weight: 600; text-decoration: none; white-space: nowrap; }
+        .search-btn:hover { background: #1D4ED8; }
+        .trend-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .trend-label { font-size: 0.72rem; color: #94A3B8; white-space: nowrap; }
         .trend-chip {
-          font-size: 0.72rem; font-weight: 500;
-          padding: 4px 12px; border-radius: 99px;
-          background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-          color: rgba(255,255,255,0.8); text-decoration: none;
-          transition: all 0.2s ease; white-space: nowrap;
+          font-size: 0.7rem; font-weight: 500; padding: 4px 10px;
+          border-radius: 99px; background: #F1F5F9; border: 1px solid #E2E8F0;
+          color: #475569; text-decoration: none; transition: all 0.15s;
         }
-        .trend-chip:hover { background: rgba(255,255,255,0.2); }
-
-        /* Floating tool cards */
-        .hero-right { position: relative; display: flex; align-items: center; justify-content: center; }
-        .floating-grid {
-          display: grid; grid-template-columns: 1fr 1fr;
-          gap: 12px; max-width: 380px; width: 100%;
-        }
-        .float-card {
-          background: white; border-radius: 16px;
-          padding: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.15);
-          transition: transform 0.3s ease, box-shadow 0.3s ease;
-          text-decoration: none; display: block;
-          border: 1px solid rgba(255,255,255,0.1);
-          position: relative;
-        }
-        .float-card:hover { transform: translateY(-4px); box-shadow: 0 16px 48px rgba(0,0,0,0.2); }
-        .float-card.featured { grid-column: span 2; }
-        .float-icon { font-size: 1.5rem; margin-bottom: 8px; }
-        .float-title { font-size: 0.85rem; font-weight: 700; color: #0F172A; margin-bottom: 4px; }
-        .float-desc { font-size: 0.72rem; color: #64748B; line-height: 1.4; }
-        .popular-badge {
-          position: absolute; top: -8px; right: 12px;
-          background: #F59E0B; color: white;
-          font-size: 0.6rem; font-weight: 700;
-          padding: 2px 8px; border-radius: 99px;
-        }
+        .trend-chip:hover { background: #EFF6FF; border-color: #BFDBFE; color: #2566EB; }
 
         /* Categories */
-        .categories-section { padding: 80px 0; background: #F8FAFC; }
-        .cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .cat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; }
         .cat-card {
-          background: white; border-radius: 20px; padding: 24px;
-          border: 1px solid; text-decoration: none;
-          transition: all 0.25s ease;
+          border-radius: 20px; padding: 24px; border: 1px solid;
+          text-decoration: none; transition: all 0.25s ease;
           box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
         .cat-card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0,0,0,0.1); }
-        .cat-icon-wrap { font-size: 2rem; margin-bottom: 12px; }
-        .cat-count { font-size: 0.72rem; font-weight: 700; margin-bottom: 4px; }
-        .cat-title { font-size: 1rem; font-weight: 700; color: #0F172A; margin-bottom: 6px; }
-        .cat-desc { font-size: 0.78rem; color: #64748B; line-height: 1.5; margin-bottom: 12px; }
-        .cat-examples { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
-        .cat-example { font-size: 0.72rem; color: #475569; display: flex; align-items: center; gap: 6px; }
-        .cat-explore {
-          display: inline-flex; align-items: center; gap: 6px;
-          font-size: 0.78rem; font-weight: 600; text-decoration: none;
-          transition: gap 0.2s ease;
-        }
-        .cat-card:hover .cat-explore { gap: 10px; }
 
         /* Audiences */
-        .audiences-section { padding: 80px 0; background: white; }
-        .aud-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .aud-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
         .aud-card {
-          padding: 24px; border-radius: 16px;
-          border: 1px solid #E5E7EB; background: #FAFAFA;
-          transition: all 0.2s ease; text-align: center;
+          padding: 24px; border-radius: 16px; text-align: center;
+          border: 1px solid #E5E7EB; background: #FAFAFA; transition: all 0.2s;
         }
         .aud-card:hover { border-color: #BFDBFE; background: #EFF6FF; transform: translateY(-2px); }
-        .aud-icon { font-size: 2rem; margin-bottom: 12px; }
-        .aud-title { font-size: 0.9rem; font-weight: 700; color: #0F172A; margin-bottom: 6px; }
-        .aud-desc { font-size: 0.78rem; color: #64748B; line-height: 1.5; }
 
-        /* Featured tools */
-        .featured-section { padding: 80px 0; background: #F8FAFC; }
-        .featured-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        /* Featured */
+        .feat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
         .feat-card {
           background: white; border-radius: 16px; padding: 20px;
-          border: 1px solid #E5E7EB;
-          transition: all 0.2s ease;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-          position: relative;
+          border: 1px solid #E5E7EB; transition: all 0.2s;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.04); position: relative;
         }
         .feat-card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,0.1); border-color: #BFDBFE; }
-        .feat-icon { font-size: 1.8rem; margin-bottom: 10px; }
-        .feat-title { font-size: 0.9rem; font-weight: 700; color: #0F172A; margin-bottom: 4px; }
-        .feat-desc { font-size: 0.75rem; color: #64748B; line-height: 1.4; margin-bottom: 10px; }
-        .feat-launch {
-          display: block; width: 100%; text-align: center;
-          padding: 8px; border-radius: 10px; font-size: 0.78rem;
-          font-weight: 600; text-decoration: none; color: white;
-          margin-top: 12px; transition: opacity 0.2s ease;
-        }
-        .feat-launch:hover { opacity: 0.85; }
-        .feat-popular {
-          position: absolute; top: -8px; right: 12px;
-          background: #F59E0B; color: white;
-          font-size: 0.6rem; font-weight: 700;
-          padding: 2px 8px; border-radius: 99px;
-        }
 
-        /* How it works + stats */
-        .how-section { padding: 80px 0; background: white; }
+        /* How */
         .how-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
-        .steps-list { display: flex; flex-direction: column; gap: 32px; }
-        .step { display: flex; align-items: flex-start; gap: 16px; }
-        .step-num {
-          width: 44px; height: 44px; border-radius: 50%;
-          background: #2563EB; color: white;
-          font-size: 1.1rem; font-weight: 800;
-          display: flex; align-items: center; justify-content: center;
-          flex-shrink: 0;
-        }
-        .step-title { font-size: 1rem; font-weight: 700; color: #0F172A; margin-bottom: 4px; }
-        .step-desc { font-size: 0.82rem; color: #64748B; line-height: 1.5; }
         .stats-dark {
-          background: linear-gradient(135deg, #0F172A, #1E3A5F);
+          background: linear-gradient(135deg,#0F172A,#1E3A5F);
           border-radius: 24px; padding: 32px;
           display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
         }
-        .stat-item { text-align: center; }
-        .stat-icon { font-size: 1.5rem; margin-bottom: 8px; }
-        .stat-value { font-size: 1.4rem; font-weight: 800; color: white; margin-bottom: 4px; }
-        .stat-label { font-size: 0.78rem; font-weight: 600; color: rgba(255,255,255,0.8); margin-bottom: 2px; }
-        .stat-sub { font-size: 0.68rem; color: rgba(255,255,255,0.5); }
 
-        /* Recently added */
-        .recent-section { padding: 80px 0; background: #F8FAFC; }
-        .recent-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-        .recent-card {
+        /* Recent */
+        .rec-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+        .rec-card {
           background: white; border-radius: 14px; padding: 16px;
           border: 1px solid #E5E7EB; text-decoration: none;
-          transition: all 0.2s ease; position: relative;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+          transition: all 0.2s; box-shadow: 0 2px 6px rgba(0,0,0,0.04);
         }
-        .recent-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); border-color: #BFDBFE; }
-        .new-badge {
-          display: inline-block; font-size: 0.6rem; font-weight: 700;
-          padding: 2px 7px; border-radius: 99px;
-          background: #10B981; color: white; margin-bottom: 8px;
-        }
-        .recent-title { font-size: 0.85rem; font-weight: 700; color: #0F172A; margin-bottom: 4px; }
-        .recent-desc { font-size: 0.72rem; color: #64748B; line-height: 1.4; }
+        .rec-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); border-color: #BFDBFE; }
 
         /* Most used */
-        .most-used-section { padding: 80px 0; background: white; }
-        .most-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-        .most-card {
+        .mu-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+        .mu-card {
           display: flex; align-items: center; gap: 10px;
-          padding: 14px 16px; border-radius: 12px;
-          border: 1px solid #E5E7EB; text-decoration: none;
-          transition: all 0.2s ease; background: #FAFAFA;
+          padding: 14px 16px; border-radius: 12px; border: 1px solid #E5E7EB;
+          text-decoration: none; background: #FAFAFA; transition: all 0.15s;
         }
-        .most-card:hover { background: #EFF6FF; border-color: #BFDBFE; transform: translateY(-1px); }
-        .most-icon { font-size: 1.3rem; flex-shrink: 0; }
-        .most-title { font-size: 0.8rem; font-weight: 600; color: #0F172A; }
+        .mu-card:hover { background: #EFF6FF; border-color: #BFDBFE; transform: translateY(-1px); }
 
         /* Footer */
-        .footer-section { background: #0F172A; padding: 64px 0 32px; }
-        .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 40px; margin-bottom: 48px; }
-        .footer-col-title { font-size: 0.78rem; font-weight: 700; color: white; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 16px; }
-        .footer-link { display: block; font-size: 0.82rem; color: rgba(255,255,255,0.6); text-decoration: none; margin-bottom: 8px; transition: color 0.15s; }
-        .footer-link:hover { color: white; }
-        .footer-brand-desc { font-size: 0.82rem; color: rgba(255,255,255,0.5); line-height: 1.6; margin: 12px 0 20px; }
-        .footer-socials { display: flex; gap: 12px; }
+        .footer { background: #0F172A; padding: 64px 0 32px; }
+        .foot-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 40px; margin-bottom: 48px; }
+        .foot-col-title { font-size: 0.72rem; font-weight: 700; color: white; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px; }
+        .foot-link { display: block; font-size: 0.8rem; color: rgba(255,255,255,0.55); text-decoration: none; margin-bottom: 8px; transition: color 0.15s; }
+        .foot-link:hover { color: white; }
+        .foot-bottom { border-top: 1px solid rgba(255,255,255,0.1); padding-top: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+        .foot-copy { font-size: 0.75rem; color: rgba(255,255,255,0.35); }
         .social-btn {
-          width: 36px; height: 36px; border-radius: 8px;
-          background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+          width: 34px; height: 34px; border-radius: 8px;
+          background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
           display: flex; align-items: center; justify-content: center;
-          text-decoration: none; font-size: 0.85rem; color: rgba(255,255,255,0.7);
-          transition: all 0.15s ease;
+          text-decoration: none; font-size: 0.8rem; color: rgba(255,255,255,0.6);
+          transition: all 0.15s;
         }
-        .social-btn:hover { background: rgba(255,255,255,0.2); color: white; }
-        .newsletter-row { display: flex; gap: 0; margin-top: 16px; border-radius: 10px; overflow: hidden; }
-        .newsletter-input {
-          flex: 1; padding: 10px 14px; background: rgba(255,255,255,0.08);
-          border: 1px solid rgba(255,255,255,0.15); border-right: none;
-          color: white; font-size: 0.82rem; font-family: inherit; outline: none;
-          border-radius: 10px 0 0 10px;
-        }
-        .newsletter-input::placeholder { color: rgba(255,255,255,0.4); }
-        .newsletter-btn {
-          padding: 10px 16px; background: #2563EB; color: white;
-          border: none; font-size: 0.82rem; font-weight: 600;
-          cursor: pointer; font-family: inherit; white-space: nowrap;
-          border-radius: 0 10px 10px 0;
-        }
-        .footer-bottom {
-          border-top: 1px solid rgba(255,255,255,0.1);
-          padding-top: 24px; display: flex;
-          align-items: center; justify-content: space-between;
-          flex-wrap: wrap; gap: 12px;
-        }
-        .footer-copy { font-size: 0.78rem; color: rgba(255,255,255,0.4); }
-
-        /* Section header row */
-        .section-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 32px; }
-        .view-all { font-size: 0.82rem; font-weight: 600; color: #2563EB; text-decoration: none; }
-        .view-all:hover { text-decoration: underline; }
+        .social-btn:hover { background: rgba(255,255,255,0.15); color: white; }
 
         /* Responsive */
         @media (max-width: 1024px) {
-          .hero-section { grid-template-columns: 1fr; min-height: auto; padding: 60px 5% 40px; }
-          .hero-right { display: none; }
-          .cat-grid { grid-template-columns: repeat(2, 1fr); }
-          .featured-grid { grid-template-columns: repeat(2, 1fr); }
-          .footer-grid { grid-template-columns: 1fr 1fr; }
+          .hero { grid-template-columns: 1fr; min-height: auto; padding: 80px 5% 40px; }
+          .hero-right-wrap { display: none; }
+          .cat-grid { grid-template-columns: repeat(2,1fr); }
+          .feat-grid { grid-template-columns: repeat(2,1fr); }
           .how-grid { grid-template-columns: 1fr; }
+          .foot-grid { grid-template-columns: 1fr 1fr; }
         }
         @media (max-width: 768px) {
-          .section-inner { padding: 0 5%; }
-          .cat-grid { grid-template-columns: 1fr; }
-          .aud-grid { grid-template-columns: repeat(2, 1fr); }
-          .featured-grid { grid-template-columns: 1fr; }
-          .recent-grid { grid-template-columns: repeat(2, 1fr); }
-          .most-grid { grid-template-columns: repeat(2, 1fr); }
+          .si { padding: 0 5%; }
+          .cat-grid,.aud-grid { grid-template-columns: 1fr; }
+          .feat-grid,.rec-grid { grid-template-columns: 1fr; }
+          .mu-grid { grid-template-columns: repeat(2,1fr); }
           .stats-dark { grid-template-columns: 1fr 1fr; }
-          .footer-grid { grid-template-columns: 1fr; gap: 24px; }
-          .footer-bottom { flex-direction: column; text-align: center; }
+          .foot-grid { grid-template-columns: 1fr; gap: 24px; }
+          .foot-bottom { flex-direction: column; text-align: center; }
         }
         @media (max-width: 480px) {
-          .aud-grid { grid-template-columns: 1fr; }
-          .recent-grid { grid-template-columns: 1fr; }
-          .most-grid { grid-template-columns: 1fr; }
+          .mu-grid { grid-template-columns: 1fr; }
         }
       `}</style>
 
       {/* ── HERO ── */}
-      <section className="hero-section">
-        <div className="hero-left">
+      <section className="hero">
+        <div>
           <div className="hero-badge">
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', display: 'inline-block' }} />
-            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>100% Free Forever</span>
+            <span style={{ width:7,height:7,borderRadius:'50%',background:'#10B981',display:'inline-block' }} />
+            <span style={{ fontSize:'0.78rem',fontWeight:600,color:'#2566EB' }}>100% Free Forever</span>
           </div>
           <h1 className="hero-title">
             One platform.<br />
-            <span style={{ color: '#60A5FA' }}>Endless productivity.</span>
+            <span style={{ color:'#2566EB' }}>Endless productivity.</span>
           </h1>
-          <p className="hero-subtitle">
+          <p className="hero-sub">
             Powerful tools for PDFs, AI-powered features, images, documents, and business essentials.
           </p>
           <div className="search-wrap">
             <span className="search-icon">🔍</span>
-            <Link href="#categories" className="search-input-fake">
+            <Link href="#categories" className="search-fake">
               Search for any tool... Try &quot;invoice&quot;, &quot;compress PDF&quot;, &quot;OCR&quot;...
             </Link>
-            <Link href="#categories" className="search-btn-fake">Search</Link>
+            <Link href="#categories" className="search-btn">Search</Link>
           </div>
-          <div className="trending-row">
+          <div className="trend-row">
             <span className="trend-label">Trending:</span>
             {TRENDING.map(t => (
               <Link key={t} href="#categories" className="trend-chip">{t}</Link>
             ))}
           </div>
         </div>
-
-        {/* Floating product showcase */}
-        <div className="hero-right">
-          <div className="floating-grid">
-            {FLOATING_TOOLS.map((tool, i) => (
-              <Link key={tool.title} href={`/${tool.slug || '#'}`}
-                className={`float-card ${i === 1 ? 'featured' : ''}`}
-                style={{ background: tool.bg, borderColor: tool.color + '33' }}>
-                {tool.popular && <span className="popular-badge">Most Popular</span>}
-                <div className="float-icon">{tool.icon}</div>
-                <div className="float-title" style={{ color: tool.color }}>{tool.title}</div>
-                <div className="float-desc">{tool.desc}</div>
-              </Link>
-            ))}
-          </div>
+        <div className="hero-right-wrap">
+          <HeroCards />
         </div>
       </section>
 
       {/* ── CATEGORIES ── */}
-      <section id="categories" className="categories-section">
-        <div className="section-inner">
-          <h2 className="section-title">Browse by Category</h2>
-          <p className="section-sub">Everything you need to work smarter — all in one place.</p>
+      <section id="categories" style={{ padding:'80px 0', background:'#F8FAFC' }}>
+        <div className="si">
+          <h2 className="st">Browse by Category</h2>
+          <p className="ss">Everything you need to work smarter — all in one place.</p>
           <div className="cat-grid">
             {CATEGORIES.map(({ slug, icon, title, color, bg, border, count, desc, examples }) => (
-              <Link key={slug} href={`/${slug}`} className="cat-card" style={{ borderColor: border, background: bg }}>
-                <div className="cat-icon-wrap">{icon}</div>
-                <div className="cat-count" style={{ color }}>{count} tools</div>
-                <div className="cat-title">{title}</div>
-                <div className="cat-desc">{desc}</div>
-                <div className="cat-examples">
+              <Link key={slug} href={`/${slug}`} className="cat-card" style={{ background:bg, borderColor:border }}>
+                <div style={{ fontSize:'2rem', marginBottom:12 }}>{icon}</div>
+                <div style={{ fontSize:'0.72rem', fontWeight:700, color, marginBottom:4 }}>{count} tools</div>
+                <div style={{ fontSize:'1rem', fontWeight:700, color:'#0F172A', marginBottom:6 }}>{title}</div>
+                <div style={{ fontSize:'0.78rem', color:'#64748B', lineHeight:1.5, marginBottom:12 }}>{desc}</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:14 }}>
                   {examples.map(ex => (
-                    <div key={ex} className="cat-example">
-                      <span style={{ color, fontSize: '0.6rem' }}>●</span>
-                      {ex}
+                    <div key={ex} style={{ display:'flex', alignItems:'center', gap:6, fontSize:'0.72rem', color:'#475569' }}>
+                      <span style={{ color, fontSize:'0.55rem' }}>●</span>{ex}
                     </div>
                   ))}
                 </div>
-                <span className="cat-explore" style={{ color }}>Explore →</span>
+                <span style={{ fontSize:'0.78rem', fontWeight:600, color, display:'inline-flex', alignItems:'center', gap:4 }}>
+                  Explore →
+                </span>
               </Link>
             ))}
           </div>
@@ -489,16 +542,16 @@ export default function HomePage() {
       </section>
 
       {/* ── BUILT FOR EVERYONE ── */}
-      <section className="audiences-section">
-        <div className="section-inner">
-          <h2 className="section-title">Built for everyone</h2>
-          <p className="section-sub">Powerful tools for every need and every person.</p>
+      <section style={{ padding:'80px 0', background:'white' }}>
+        <div className="si">
+          <h2 className="st">Built for everyone</h2>
+          <p className="ss">Powerful tools for every need and every person.</p>
           <div className="aud-grid">
             {AUDIENCES.map(({ icon, title, desc }) => (
               <div key={title} className="aud-card">
-                <div className="aud-icon">{icon}</div>
-                <div className="aud-title">{title}</div>
-                <div className="aud-desc">{desc}</div>
+                <div style={{ fontSize:'2rem', marginBottom:12 }}>{icon}</div>
+                <div style={{ fontSize:'0.9rem', fontWeight:700, color:'#0F172A', marginBottom:6 }}>{title}</div>
+                <div style={{ fontSize:'0.78rem', color:'#64748B', lineHeight:1.5 }}>{desc}</div>
               </div>
             ))}
           </div>
@@ -506,24 +559,26 @@ export default function HomePage() {
       </section>
 
       {/* ── FEATURED TOOLS ── */}
-      <section className="featured-section">
-        <div className="section-inner">
-          <div className="section-header">
+      <section style={{ padding:'80px 0', background:'#F8FAFC' }}>
+        <div className="si">
+          <div className="sh">
             <div>
-              <h2 className="section-title">Featured Tools</h2>
-              <p className="section-sub" style={{ marginBottom: 0 }}>Hand-picked tools that our users love the most.</p>
+              <h2 className="st">Featured Tools</h2>
+              <p className="ss" style={{ marginBottom:0 }}>Hand-picked tools that our users love the most.</p>
             </div>
-            <Link href="/pdf-tools" className="view-all">View all tools →</Link>
+            <Link href="/pdf-tools" className="va">View all tools →</Link>
           </div>
-          <div className="featured-grid">
+          <div className="feat-grid">
             {FEATURED_TOOLS.map(({ slug, icon, title, desc, rating, color, popular }) => (
               <div key={slug} className="feat-card">
-                {popular && <span className="feat-popular">Popular</span>}
-                <div className="feat-icon">{icon}</div>
-                <div className="feat-title">{title}</div>
-                <div className="feat-desc">{desc}</div>
+                {popular && (
+                  <div style={{ position:'absolute', top:-8, right:12, background:'#F59E0B', color:'white', fontSize:9, fontWeight:700, padding:'2px 8px', borderRadius:99 }}>Popular</div>
+                )}
+                <div style={{ fontSize:'1.8rem', marginBottom:10 }}>{icon}</div>
+                <div style={{ fontSize:'0.9rem', fontWeight:700, color:'#0F172A', marginBottom:4 }}>{title}</div>
+                <div style={{ fontSize:'0.75rem', color:'#64748B', lineHeight:1.4, marginBottom:10 }}>{desc}</div>
                 <Stars rating={rating} />
-                <Link href={`/${slug}`} className="feat-launch" style={{ background: color }}>
+                <Link href={`/${slug}`} style={{ display:'block', width:'100%', textAlign:'center', padding:'8px', borderRadius:10, fontSize:'0.78rem', fontWeight:600, textDecoration:'none', color:'white', marginTop:12, background:color }}>
                   Launch Tool
                 </Link>
               </div>
@@ -532,36 +587,42 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── HOW IT WORKS + STATS ── */}
-      <section className="how-section">
-        <div className="section-inner">
+      {/* ── HOW IT WORKS ── */}
+      <section style={{ padding:'80px 0', background:'white' }}>
+        <div className="si">
           <div className="how-grid">
             <div>
-              <h2 className="section-title">How Convertam Works</h2>
-              <p className="section-sub">Three simple steps to get your work done.</p>
-              <div className="steps-list">
+              <h2 className="st">How Convertam Works</h2>
+              <p className="ss">Three simple steps to get your work done.</p>
+              <div style={{ display:'flex', flexDirection:'column', gap:32 }}>
                 {[
-                  { num: '1', title: 'Upload', desc: 'Upload your file securely from your device. No account needed.' },
-                  { num: '2', title: 'Choose Tool', desc: 'Select the right tool and customize it if needed.' },
-                  { num: '3', title: 'Download', desc: 'Get your result instantly. Fast, easy, secure.' },
-                ].map(({ num, title, desc }) => (
-                  <div key={num} className="step">
-                    <div className="step-num">{num}</div>
+                  { n:'1', t:'Upload', d:'Upload your file securely from your device. No account needed.' },
+                  { n:'2', t:'Choose Tool', d:'Select the right tool and customize it if needed.' },
+                  { n:'3', t:'Download', d:'Get your result instantly. Fast, easy, secure.' },
+                ].map(({ n, t, d }) => (
+                  <div key={n} style={{ display:'flex', alignItems:'flex-start', gap:16 }}>
+                    <div style={{ width:44, height:44, borderRadius:'50%', background:'#2566EB', color:'white', fontSize:'1.1rem', fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{n}</div>
                     <div>
-                      <div className="step-title">{title}</div>
-                      <div className="step-desc">{desc}</div>
+                      <div style={{ fontSize:'1rem', fontWeight:700, color:'#0F172A', marginBottom:4 }}>{t}</div>
+                      <div style={{ fontSize:'0.82rem', color:'#64748B', lineHeight:1.5 }}>{d}</div>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-            <div ref={statsRef} className="stats-dark">
-              {STATS.map(({ icon, value, label, sub }) => (
-                <div key={label} className="stat-item">
-                  <div className="stat-icon">{icon}</div>
-                  <div className="stat-value">{value}</div>
-                  <div className="stat-label">{label}</div>
-                  <div className="stat-sub">{sub}</div>
+            <div className="stats-dark">
+              {[
+                { icon:'📁', value:'100,000+', label:'Files Processed', sub:'And counting every day' },
+                { icon:'🛠️', value:'25+', label:'Free Tools', sub:'And more coming soon' },
+                { icon:'📂', value:'12+', label:'Tool Categories', sub:'Everything in one place' },
+                { icon:'✅', value:'99.9%', label:'Success Rate', sub:'Reliable and accurate' },
+                { icon:'🗑️', value:'24 hrs', label:'Auto Deletion', sub:'Your files stay private' },
+              ].map(({ icon, value, label, sub }) => (
+                <div key={label} style={{ textAlign:'center' }}>
+                  <div style={{ fontSize:'1.4rem', marginBottom:8 }}>{icon}</div>
+                  <div style={{ fontSize:'1.3rem', fontWeight:800, color:'white', marginBottom:4 }}>{value}</div>
+                  <div style={{ fontSize:'0.75rem', fontWeight:600, color:'rgba(255,255,255,0.8)', marginBottom:2 }}>{label}</div>
+                  <div style={{ fontSize:'0.65rem', color:'rgba(255,255,255,0.5)' }}>{sub}</div>
                 </div>
               ))}
             </div>
@@ -570,24 +631,24 @@ export default function HomePage() {
       </section>
 
       {/* ── RECENTLY ADDED ── */}
-      <section className="recent-section">
-        <div className="section-inner">
-          <div className="section-header">
+      <section style={{ padding:'80px 0', background:'#F8FAFC' }}>
+        <div className="si">
+          <div className="sh">
             <div>
-              <h2 className="section-title">Recently Added</h2>
-              <p className="section-sub" style={{ marginBottom: 0 }}>New tools to boost your productivity.</p>
+              <h2 className="st">Recently Added</h2>
+              <p className="ss" style={{ marginBottom:0 }}>New tools to boost your productivity.</p>
             </div>
-            <Link href="/pdf-tools" className="view-all">View all new tools →</Link>
+            <Link href="/pdf-tools" className="va">View all new tools →</Link>
           </div>
-          <div className="recent-grid">
+          <div className="rec-grid">
             {RECENTLY_ADDED.map(({ slug, icon, title, desc, color }) => (
-              <Link key={slug} href={`/${slug}`} className="recent-card">
-                <span className="new-badge">NEW</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                  <span style={{ fontSize: '1.4rem' }}>{icon}</span>
-                  <span className="recent-title">{title}</span>
+              <Link key={slug} href={`/${slug}`} className="rec-card">
+                <span style={{ display:'inline-block', fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:99, background:'#10B981', color:'white', marginBottom:8 }}>NEW</span>
+                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:6 }}>
+                  <span style={{ fontSize:'1.4rem' }}>{icon}</span>
+                  <span style={{ fontSize:'0.85rem', fontWeight:700, color:'#0F172A' }}>{title}</span>
                 </div>
-                <div className="recent-desc">{desc}</div>
+                <div style={{ fontSize:'0.72rem', color:'#64748B', lineHeight:1.4 }}>{desc}</div>
               </Link>
             ))}
           </div>
@@ -595,20 +656,20 @@ export default function HomePage() {
       </section>
 
       {/* ── MOST USED ── */}
-      <section className="most-used-section">
-        <div className="section-inner">
-          <div className="section-header">
+      <section style={{ padding:'80px 0', background:'white' }}>
+        <div className="si">
+          <div className="sh">
             <div>
-              <h2 className="section-title">Most Used Tools</h2>
-              <p className="section-sub" style={{ marginBottom: 0 }}>See what others are using the most.</p>
+              <h2 className="st">Most Used Tools</h2>
+              <p className="ss" style={{ marginBottom:0 }}>See what others are using the most.</p>
             </div>
-            <Link href="/pdf-tools" className="view-all">View all tools →</Link>
+            <Link href="/pdf-tools" className="va">View all tools →</Link>
           </div>
-          <div className="most-grid">
+          <div className="mu-grid">
             {MOST_USED.map(({ slug, icon, title }) => (
-              <Link key={slug} href={`/${slug}`} className="most-card">
-                <span className="most-icon">{icon}</span>
-                <span className="most-title">{title}</span>
+              <Link key={slug} href={`/${slug}`} className="mu-card">
+                <span style={{ fontSize:'1.3rem', flexShrink:0 }}>{icon}</span>
+                <span style={{ fontSize:'0.8rem', fontWeight:600, color:'#0F172A' }}>{title}</span>
               </Link>
             ))}
           </div>
@@ -616,76 +677,64 @@ export default function HomePage() {
       </section>
 
       {/* ── FOOTER ── */}
-      <footer className="footer-section">
-        <div className="section-inner">
-          <div className="footer-grid">
-            {/* Brand */}
+      <footer className="footer">
+        <div className="si">
+          <div className="foot-grid">
             <div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" alt="Convertam" style={{ height: 40, marginBottom: 12, filter: 'brightness(0) invert(1)' }} />
-              <p className="footer-brand-desc">
+              <img src="/logo.png" alt="Convertam" style={{ height:38, marginBottom:12, filter:'brightness(0) invert(1)' }} />
+              <p style={{ fontSize:'0.8rem', color:'rgba(255,255,255,0.5)', lineHeight:1.6, margin:'0 0 20px' }}>
                 Powerful tools for PDFs, AI, images, documents, and business essentials.
               </p>
-              <div className="footer-socials">
-                <a href="https://x.com/chrisndz" target="_blank" rel="noopener noreferrer" className="social-btn">𝕏</a>
-                <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="social-btn">in</a>
-                <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="social-btn">f</a>
+              <div style={{ display:'flex', gap:10 }}>
+                {[['𝕏','https://x.com/chrisndz'],['in','#'],['f','#']].map(([label, href]) => (
+                  <a key={label} href={href} target="_blank" rel="noopener noreferrer" className="social-btn">{label}</a>
+                ))}
               </div>
             </div>
-
-            {/* Tools */}
             <div>
-              <div className="footer-col-title">Tools</div>
-              {['PDF Tools', 'Business Tools', 'AI Tools', 'Image Tools', 'Calculators', 'Utilities'].map((t, i) => (
-                <Link key={t} href={`/${['pdf-tools','business','ai-tools','image-tools','calculator','utilities'][i]}`} className="footer-link">{t}</Link>
+              <div className="foot-col-title">Tools</div>
+              {[['PDF Tools','pdf-tools'],['Business Tools','business'],['AI Tools','ai-tools'],['Image Tools','image-tools'],['Calculators','calculator'],['Utilities','utilities']].map(([t,s]) => (
+                <Link key={t} href={`/${s}`} className="foot-link">{t}</Link>
               ))}
             </div>
-
-            {/* Resources */}
             <div>
-              <div className="footer-col-title">Resources</div>
-              {['Blog', 'Guides', 'Templates', 'Use Cases', 'API'].map(t => (
-                <span key={t} className="footer-link" style={{ cursor: 'default' }}>{t}</span>
+              <div className="foot-col-title">Resources</div>
+              {['Blog','Guides','Templates','Use Cases','API'].map(t => (
+                <span key={t} className="foot-link" style={{ cursor:'default' }}>{t}</span>
               ))}
             </div>
-
-            {/* Support */}
             <div>
-              <div className="footer-col-title">Support</div>
-              <Link href="/about" className="footer-link">Help Center</Link>
-              <Link href="/about" className="footer-link">Contact Us</Link>
-              <Link href="/about" className="footer-link">FAQ</Link>
-              <Link href="/about" className="footer-link">Privacy</Link>
-              <Link href="/about" className="footer-link">Report Issue</Link>
+              <div className="foot-col-title">Support</div>
+              <Link href="/about" className="foot-link">Help Center</Link>
+              <Link href="/about" className="foot-link">Contact Us</Link>
+              <Link href="/about" className="foot-link">FAQ</Link>
+              <Link href="/about" className="foot-link">Privacy</Link>
+              <Link href="/about" className="foot-link">Report Issue</Link>
             </div>
-
-            {/* Company + Newsletter */}
             <div>
-              <div className="footer-col-title">Company</div>
-              <Link href="/about" className="footer-link">Our Story</Link>
-              <Link href="/about" className="footer-link">Careers</Link>
-              <span className="footer-link" style={{ cursor: 'default' }}>Press</span>
-
-              <div style={{ marginTop: 24 }}>
-                <div className="footer-col-title">Stay Updated</div>
-                <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>
+              <div className="foot-col-title">Company</div>
+              <Link href="/about" className="foot-link">Our Story</Link>
+              <Link href="/about" className="foot-link">Careers</Link>
+              <span className="foot-link" style={{ cursor:'default' }}>Press</span>
+              <div style={{ marginTop:24 }}>
+                <div className="foot-col-title">Stay Updated</div>
+                <p style={{ fontSize:'0.75rem', color:'rgba(255,255,255,0.45)', marginBottom:10, lineHeight:1.5 }}>
                   Get new tools and productivity tips straight to your inbox.
                 </p>
-                <div className="newsletter-row">
-                  <input className="newsletter-input" type="email" placeholder="Enter your email" />
-                  <button className="newsletter-btn">Subscribe</button>
+                <div style={{ display:'flex', borderRadius:10, overflow:'hidden' }}>
+                  <input style={{ flex:1, padding:'9px 12px', background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.12)', borderRight:'none', color:'white', fontSize:'0.78rem', fontFamily:'inherit', outline:'none', borderRadius:'10px 0 0 10px' }} type="email" placeholder="Enter your email" />
+                  <button style={{ padding:'9px 14px', background:'#2566EB', color:'white', border:'none', fontSize:'0.78rem', fontWeight:600, cursor:'pointer', fontFamily:'inherit', borderRadius:'0 10px 10px 0' }}>Subscribe</button>
                 </div>
               </div>
             </div>
           </div>
-
-          <div className="footer-bottom">
-            <span className="footer-copy">© {new Date().getFullYear()} Convertam. All rights reserved.</span>
-            <span className="footer-copy">Made with ❤️ in Nigeria</span>
+          <div className="foot-bottom">
+            <span className="foot-copy">© {new Date().getFullYear()} Convertam. All rights reserved.</span>
+            <span className="foot-copy">Made with ❤️ in Nigeria</span>
           </div>
         </div>
       </footer>
-
     </main>
   );
 }

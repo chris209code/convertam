@@ -2,7 +2,6 @@
 
 import PdfLibWorkspace from '@/components/tools/PdfLibWorkspace';
 import OfficeConvertWorkspace from '@/components/tools/OfficeConvertWorkspace';
-import GoogleDriveConvertWorkspace from '@/components/tools/GoogleDriveConvertWorkspace';
 import PdfToImageWorkspace from '@/components/tools/PdfToImageWorkspace';
 import SmartConverterWorkspace from '@/components/tools/SmartConverterWorkspace';
 import SummarizePdfWorkspace from '@/components/tools/SummarizePdfWorkspace';
@@ -19,15 +18,21 @@ import ProtectPdfWorkspace from '@/components/tools/ProtectPdfWorkspace';
 import HtmlToPdfWorkspace from '@/components/tools/HtmlToPdfWorkspace';
 import OcrPdfWorkspace from '@/components/tools/OcrPdfWorkspace';
 import OverlayTextWorkspace from '@/components/tools/OverlayTextWorkspace';
+import QuotationWorkspace from '@/components/tools/QuotationWorkspace';
+import CalculatorWorkspace from '@/components/tools/CalculatorWorkspace';
+import UtilitiesWorkspace from '@/components/tools/UtilitiesWorkspace';
+import CVImproverWorkspace from '@/components/tools/CVImproverWorkspace';
+import ResumeBuilderWorkspace from '@/components/tools/ResumeBuilderWorkspace';
 import PaymentGate from '@/components/PaymentGate';
 import ComingSoon from '@/components/tools/ComingSoon';
 import Link from 'next/link';
-import { tools, getTool } from '@/lib/tools-config';
+import { getTool } from '@/lib/tools-config';
 import { toolMeta } from '@/lib/tool-meta';
 
 const isFree = (mode) =>
   ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice',
-   'remove-pages', 'add-page-numbers', 'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize', 'fill', 'write-on-pdf'].includes(mode);
+   'remove-pages', 'add-page-numbers', 'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize',
+   'fill', 'write-on-pdf', 'quotation', 'calculator-hub', 'utilities-hub', 'cv-improver', 'resume-builder'].includes(mode);
 
 function getPriceBadge(mode) {
   if (isFree(mode)) return 'Free';
@@ -38,33 +43,17 @@ function getPriceBadge(mode) {
 
 export default function ToolPageClient({ tool }) {
   const meta = toolMeta[tool.slug] || {};
-  const relatedTools = (meta.related || [])
-    .map((slug) => getTool(slug))
-    .filter(Boolean);
+  const relatedTools = (meta.related || []).map((slug) => getTool(slug)).filter(Boolean);
 
   return (
     <main className="max-w-5xl mx-auto px-5 md:px-10 py-10">
-
-      <p className="font-mono text-xs text-stamp-amber tracking-wide mb-2">
-        {tool.category.toUpperCase()}
-      </p>
-
+      <p className="font-mono text-xs text-stamp-amber tracking-wide mb-2">{tool.category.toUpperCase()}</p>
       <h1 className="font-display text-3xl md:text-4xl font-bold mb-2">{tool.title}</h1>
-
       <p className="text-ink-soft mb-4 max-w-xl">{tool.description}</p>
 
       <div className="flex flex-wrap gap-2 mb-6">
-        {[
-          { icon: '⭐', label: getPriceBadge(tool.mode) },
-          { icon: '⚡', label: 'Fast' },
-          { icon: '🔒', label: 'Secure' },
-          { icon: '🚫', label: 'No Login Required' },
-        ].map(({ icon, label }) => (
-          <span
-            key={label}
-            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full"
-            style={{ background: '#fffefb', border: '1px solid #e2dcc9', color: '#1c2333' }}
-          >
+        {[{ icon: '⭐', label: getPriceBadge(tool.mode) }, { icon: '⚡', label: 'Fast' }, { icon: '🔒', label: 'Secure' }, { icon: '🚫', label: 'No Login Required' }].map(({ icon, label }) => (
+          <span key={label} className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full" style={{ background: '#fffefb', border: '1px solid #e2dcc9', color: '#1c2333' }}>
             {icon} {label}
           </span>
         ))}
@@ -74,21 +63,14 @@ export default function ToolPageClient({ tool }) {
         <div className="flex items-center gap-2 flex-wrap mb-6">
           {meta.steps.map((step, i, arr) => (
             <div key={i} className="flex items-center gap-2">
-              <span
-                className="text-xs font-medium px-3 py-1.5 rounded-full"
-                style={{ background: '#f0f5ff', color: '#3a63b8', border: '1px solid #d0dcf5' }}
-              >
-                {step}
-              </span>
-              {i < arr.length - 1 && (
-                <span className="text-ink-soft text-xs">→</span>
-              )}
+              <span className="text-xs font-medium px-3 py-1.5 rounded-full" style={{ background: '#f0f5ff', color: '#3a63b8', border: '1px solid #d0dcf5' }}>{step}</span>
+              {i < arr.length - 1 && <span className="text-ink-soft text-xs">→</span>}
             </div>
           ))}
         </div>
       )}
 
-      {/* Tips — shown BEFORE the tool workspace */}
+      {/* Tips before workspace */}
       {meta.tips && (
         <div className="mb-6 p-4 rounded-xl" style={{ background: '#ECFDF5', border: '1px solid #A7F3D0' }}>
           <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: '#065F46' }}>💡 Tips for best results</p>
@@ -103,29 +85,13 @@ export default function ToolPageClient({ tool }) {
         </div>
       )}
 
-      {tool.mode === 'office' && (
-        <OfficeConvertWorkspace accept={tool.accept} toFormat={tool.toFormat} toLabel={tool.toLabel} />
-      )}
-      {tool.mode === 'drive' && (
-        <GoogleDriveConvertWorkspace
-          accept={tool.accept}
-          sourceMimeType={tool.sourceMimeType}
-          googleNativeType={tool.googleNativeType}
-          exportMimeType={tool.exportMimeType}
-          downloadExt={tool.downloadExt}
-          toLabel={tool.toLabel}
-        />
-      )}
+      {tool.mode === 'office' && <OfficeConvertWorkspace accept={tool.accept} toFormat={tool.toFormat} toLabel={tool.toLabel} />}
       {tool.mode === 'pdf-lib' && <PdfLibWorkspace mode={tool.pdfLibMode} accept={tool.accept} />}
       {tool.mode === 'pdf-to-image' && <PdfToImageWorkspace format={tool.imageFormat} />}
       {tool.mode === 'smart' && <SmartConverterWorkspace />}
       {tool.mode === 'summarize' && <SummarizePdfWorkspace />}
       {tool.mode === 'receipt' && <ReceiptScanWorkspace />}
-      {tool.mode === 'compress' && (
-        <PaymentGate toolName={tool.slug}>
-          <CompressPdfWorkspace />
-        </PaymentGate>
-      )}
+      {tool.mode === 'compress' && <PaymentGate toolName={tool.slug}><CompressPdfWorkspace /></PaymentGate>}
       {tool.mode === 'fill' && <FillPdfWorkspace />}
       {tool.mode === 'write-on-pdf' && <OverlayTextWorkspace />}
       {tool.mode === 'sign' && <SignPdfWorkspace />}
@@ -137,16 +103,16 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'protect-pdf' && <ProtectPdfWorkspace />}
       {tool.mode === 'html-to-pdf' && <HtmlToPdfWorkspace />}
       {tool.mode === 'ocr-pdf' && <OcrPdfWorkspace />}
+      {tool.mode === 'quotation' && <QuotationWorkspace />}
+      {tool.mode === 'calculator-hub' && <CalculatorWorkspace />}
+      {tool.mode === 'utilities-hub' && <UtilitiesWorkspace />}
+      {tool.mode === 'cv-improver' && <CVImproverWorkspace />}
+      {tool.mode === 'resume-builder' && <ResumeBuilderWorkspace />}
       {tool.mode === 'soon' && <ComingSoon title={tool.title} note={tool.note} />}
 
-      <div
-        className="flex items-center gap-2 mt-4 px-4 py-3 rounded-xl text-sm"
-        style={{ background: '#f0f5ff', border: '1px solid #d0dcf5' }}
-      >
+      <div className="flex items-center gap-2 mt-4 px-4 py-3 rounded-xl text-sm" style={{ background: '#f0f5ff', border: '1px solid #d0dcf5' }}>
         <span>🔒</span>
-        <span className="text-ink-soft">
-          Your files are automatically deleted after processing and are never shared with third parties.
-        </span>
+        <span className="text-ink-soft">Your files are automatically deleted after processing and are never shared with third parties.</span>
       </div>
 
       {relatedTools.length > 0 && (
@@ -154,19 +120,13 @@ export default function ToolPageClient({ tool }) {
           <p className="text-xs font-semibold text-ink-soft uppercase tracking-widest mb-3">Related Tools</p>
           <div className="flex flex-wrap gap-2">
             {relatedTools.map((t) => (
-              <Link
-                key={t.slug}
-                href={`/${t.slug}`}
-                className="text-sm font-medium px-4 py-2 rounded-lg transition-colors hover:border-stamp-blue"
-                style={{ background: '#fffefb', border: '1px solid #e2dcc9', color: '#1c2333' }}
-              >
+              <Link key={t.slug} href={`/${t.slug}`} className="text-sm font-medium px-4 py-2 rounded-lg transition-colors" style={{ background: '#fffefb', border: '1px solid #e2dcc9', color: '#1c2333', textDecoration: 'none' }}>
                 {t.title} →
               </Link>
             ))}
           </div>
         </div>
       )}
-
     </main>
   );
 }

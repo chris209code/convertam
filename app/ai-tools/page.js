@@ -6,15 +6,15 @@ export const metadata = {
 };
 
 const TOOLS = [
-  { slug: 'summarize-pdf', title: 'Summarize PDF', desc: 'Upload a PDF and AI summarizes it instantly', free: true, available: true },
-  { slug: 'smart-converter', title: 'Smart AI Converter', desc: 'Photograph a document and get back a Word or Excel file', free: true, available: true },
-  { slug: 'receipt-scanner', title: 'Receipt & Invoice Scanner', desc: 'Scan a receipt and AI extracts vendor, items, totals', free: true, available: true },
-  { slug: 'ocr-pdf', title: 'OCR PDF', desc: 'Extract text from scanned PDFs and images using AI', free: true, available: true },
-  { slug: 'cv-improver', title: 'CV Improver', desc: 'Upload your CV and AI rewrites and improves it', free: true, available: false },
-  { slug: 'cover-letter', title: 'Cover Letter Writer', desc: 'Generate a professional cover letter with AI', free: true, available: false },
-  { slug: 'contract-summarizer', title: 'Contract Summarizer', desc: 'Upload a contract and AI highlights key points', free: true, available: false },
-  { slug: 'grammar-fixer', title: 'Grammar Fixer', desc: 'Fix grammar, spelling and style issues in your text', free: true, available: false },
-  { slug: 'email-writer', title: 'Email Writer', desc: 'AI writes professional emails from a few bullet points', free: true, available: false },
+  { slug: 'summarize-pdf', title: 'Summarize PDF', desc: 'Upload a PDF and AI summarizes it instantly', available: true },
+  { slug: 'smart-converter', title: 'Smart AI Converter', desc: 'Photograph a document and get back a Word or Excel file', available: true },
+  { slug: 'receipt-scanner', title: 'Receipt & Invoice Scanner', desc: 'Scan a receipt and AI extracts vendor, items, totals', available: true },
+  { slug: 'ocr-pdf', title: 'OCR PDF', desc: 'Extract text from scanned PDFs and images using AI', available: true },
+  { slug: 'cv-improver', title: 'CV Improver', desc: 'Upload your CV and AI rewrites and improves it', available: true },
+  { slug: 'cover-letter', title: 'Cover Letter Writer', desc: 'Generate a professional cover letter with AI', available: false },
+  { slug: 'contract-summarizer', title: 'Contract Summarizer', desc: 'Upload a contract and AI highlights key points', available: false },
+  { slug: 'grammar-fixer', title: 'Grammar Fixer', desc: 'Fix grammar, spelling and style issues in your text', available: false },
+  { slug: 'email-writer', title: 'Email Writer', desc: 'AI writes professional emails from a few bullet points', available: false },
 ];
 
 export default function AIToolsPage() {
@@ -61,7 +61,7 @@ export default function AIToolsPage() {
 
       <div className="page-inner" style={{ padding: '48px 4%' }}>
         <div className="tools-grid">
-          {TOOLS.map(({ slug, title, desc, free, available }) => (
+          {TOOLS.map(({ slug, title, desc, available }) => (
             <Link key={slug} href={available ? `/${slug}` : '#'} className={`tool-card ${!available ? 'coming' : ''}`}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="tool-title">{title}</div>

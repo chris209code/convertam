@@ -295,7 +295,7 @@ export default function CVImproverWorkspace() {
             )}
 
             {structured.skills?.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 16, marginTop: 12, paddingTop: 4 }}>
                 <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#2563EB', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Skills</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {structured.skills.map((skill, i) => (

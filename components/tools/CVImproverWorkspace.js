@@ -1,97 +1,96 @@
-'use client';
+export const runtime = 'nodejs';
+export const maxDuration = 60;
 
-import { useState } from 'react';
+const GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
-export default function CVImproverWorkspace() {
-  const [cvText, setCvText] = useState('');
-  const [jobTitle, setJobTitle] = useState('');
-  const [result, setResult] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  async function handleImprove() {
-    if (!cvText.trim()) { setError('Please paste your CV text first.'); return; }
-    setBusy(true); setError(''); setResult('');
-    try {
-      const res = await fetch('/api/cv-improver', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cvText, jobTitle }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Something went wrong.');
-      setResult(data.improved);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
+export async function POST(request) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return Response.json({ error: 'AI service not configured.' }, { status: 500 });
+  }
+  try {
+    const { cvText, jobTitle } = await request.json();
+    if (!cvText?.trim()) {
+      return Response.json({ error: 'No CV text provided.' }, { status: 400 });
     }
+
+    const prompt = `You are a professional CV writer. Improve the CV below and return it as a structured JSON object.
+
+STRICT RULES:
+- Extract and use ONLY real information from the CV — names, contacts, companies, dates, achievements
+- NEVER invent placeholders like [Your Name] or [Your Email]
+- If something is missing from the CV, omit that field entirely or use an empty string
+- Improve language, use strong action verbs, fix grammar and spelling
+- Make it ATS-friendly and professional
+- Include ALL experience entries, ALL education entries, ALL skills — do not truncate or cut off
+- Return the complete CV — never stop mid-way
+${jobTitle ? `- Optimize for the role: ${jobTitle}` : ''}
+
+Return ONLY valid JSON in this exact format, nothing else:
+{
+  "name": "Full name from CV",
+  "title": "Professional title or headline",
+  "email": "email from CV or empty string",
+  "phone": "phone from CV or empty string",
+  "location": "location from CV or empty string",
+  "linkedin": "linkedin from CV or empty string",
+  "summary": "Improved professional summary paragraph",
+  "experience": [
+    {
+      "role": "Job title",
+      "company": "Company name",
+      "period": "Date range",
+      "bullets": ["Achievement 1", "Achievement 2", "Achievement 3"]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Degree name",
+      "institution": "School name",
+      "year": "Year"
+    }
+  ],
+  "skills": ["Skill 1", "Skill 2", "Skill 3"],
+  "certifications": ["Certification 1"]
+}
+
+CV TO IMPROVE:
+${cvText}`;
+
+    const res = await fetch(GEMINI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 65536, // Maximum allowed — handles very large CVs
+        },
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      return Response.json({ error: 'AI could not process your CV. Please try again.' }, { status: 502 });
+    }
+
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (!raw) {
+      return Response.json({ error: 'No response from AI. Please try again.' }, { status: 422 });
+    }
+
+    let parsed;
+    try {
+      const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      parsed = JSON.parse(cleaned);
+    } catch {
+      return Response.json({ improved: raw, structured: null });
+    }
+
+    return Response.json({ improved: raw, structured: parsed });
+  } catch (err) {
+    console.error('CV improver error:', err);
+    return Response.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
   }
-
-  function copyResult() { navigator.clipboard.writeText(result); }
-
-  function downloadResult() {
-    const blob = new Blob([result], { type: 'text/plain' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'improved-cv.txt';
-    a.click();
-  }
-
-  return (
-    <div className="panel">
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>
-          Target Job Title (optional)
-        </label>
-        <input
-          type="text"
-          value={jobTitle}
-          onChange={e => setJobTitle(e.target.value)}
-          placeholder="e.g. Software Engineer, Marketing Manager, Accountant"
-          style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }}
-        />
-      </div>
-
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>
-          Paste Your CV / Resume Text
-        </label>
-        <textarea
-          value={cvText}
-          onChange={e => setCvText(e.target.value)}
-          placeholder="Paste your full CV or resume text here. Include your experience, education, skills, and any other sections..."
-          style={{ width: '100%', minHeight: 250, padding: '10px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none', resize: 'vertical', lineHeight: 1.6 }}
-        />
-        <p style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: 4 }}>{cvText.length} characters</p>
-      </div>
-
-      <div className="actions">
-        <button className="btn btn-primary" disabled={busy || !cvText.trim()} onClick={handleImprove}>
-          {busy ? '✦ AI is improving your CV…' : '✦ Improve My CV with AI'}
-        </button>
-      </div>
-
-      {error && <div className="status error">{error}</div>}
-
-      {result && (
-        <div style={{ marginTop: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>✅ Improved CV</p>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={copyResult} style={{ fontSize: '0.75rem', padding: '5px 12px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer', fontFamily: 'inherit' }}>📋 Copy</button>
-              <button onClick={downloadResult} style={{ fontSize: '0.75rem', padding: '5px 12px', borderRadius: 8, border: 'none', background: '#7C3AED', color: 'white', cursor: 'pointer', fontFamily: 'inherit' }}>⬇️ Download</button>
-            </div>
-          </div>
-          <textarea
-            value={result}
-            onChange={e => setResult(e.target.value)}
-            style={{ width: '100%', minHeight: 300, padding: '12px', borderRadius: 8, border: '1px solid #DDD6FE', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none', resize: 'vertical', lineHeight: 1.6, background: '#FAFAFA' }}
-          />
-        </div>
-      )}
-
-      <p className="privacy-note">Your CV is sent securely to our AI engine and never stored.</p>
-    </div>
-  );
 }

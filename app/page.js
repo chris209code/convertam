@@ -1,5 +1,5 @@
+'use client';
 import Link from 'next/link';
-import { tools } from '@/lib/tools-config';
 
 const POPULAR_TOOLS = [
   { slug: 'pdf-to-word', icon: '📄', title: 'PDF to Word' },
@@ -91,18 +91,18 @@ export default function HomePage() {
           max-width: 600px; margin: 0 auto 40px;
           background: white; border-radius: 16px;
           box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-          overflow: hidden;
+          overflow: hidden; text-decoration: none;
         }
         .search-input {
           flex: 1; padding: 16px 20px;
-          font-size: 1rem; border: none; outline: none;
-          font-family: inherit; color: #0F172A;
+          font-size: 1rem; color: #94A3B8;
+          display: flex; align-items: center;
+          text-decoration: none;
         }
         .search-btn {
           padding: 16px 24px; background: #2563EB;
-          color: white; border: none; cursor: pointer;
-          font-size: 0.95rem; font-weight: 600;
-          font-family: inherit; white-space: nowrap;
+          color: white; font-size: 0.95rem; font-weight: 600;
+          white-space: nowrap; text-decoration: none;
         }
         .search-btn:hover { background: #1D4ED8; }
         .popular-grid {
@@ -129,11 +129,7 @@ export default function HomePage() {
         .stats-inner { width: 100%; padding: 0 4%; }
         .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); }
         .categories-inner { width: 100%; padding: 0 4%; }
-        .categories-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 24px;
-        }
+        .categories-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
         .category-card {
           display: flex; flex-direction: column;
           padding: 28px; border-radius: 24px;
@@ -141,10 +137,7 @@ export default function HomePage() {
           transition: all 0.25s ease;
           border: 1px solid;
         }
-        .category-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 20px 48px rgba(0,0,0,0.1);
-        }
+        .category-card:hover { transform: translateY(-4px); box-shadow: 0 20px 48px rgba(0,0,0,0.1); }
         .category-icon { font-size: 2.5rem; margin-bottom: 16px; }
         .category-title { font-size: 1.1rem; font-weight: 700; color: #152238; margin-bottom: 8px; }
         .category-desc { font-size: 0.82rem; color: #64748B; line-height: 1.5; flex: 1; }
@@ -164,7 +157,6 @@ export default function HomePage() {
         }
 
         @media (max-width: 480px) {
-          .popular-grid { grid-template-columns: repeat(3, 1fr); }
           .stats-grid { grid-template-columns: 1fr; }
           .stats-grid > div { border-left: none !important; border-top: 1px solid #E5EDF8; }
         }
@@ -196,22 +188,20 @@ export default function HomePage() {
           <p style={{
             fontSize: 'clamp(0.95rem, 2vw, 1.1rem)',
             color: 'rgba(255,255,255,0.75)',
-            lineHeight: 1.7, marginBottom: '40px',
+            lineHeight: 1.7,
             maxWidth: '560px', margin: '0 auto 40px',
           }}>
             Powerful tools for PDFs, AI-powered features, images, documents, and business essentials.
           </p>
 
-          {/* Search */}
+          {/* Search bar — links to categories */}
           <div className="search-bar">
-            <input
-              className="search-input"
-              type="text"
-              placeholder="Search for a tool — try 'invoice', 'compress', 'OCR'..."
-              readOnly
-              onClick={() => document.getElementById('categories-section').scrollIntoView({ behavior: 'smooth' })}
-            />
-            <button className="search-btn">Explore Tools</button>
+            <Link href="#categories-section" className="search-input">
+              🔍 Search for a tool — try &apos;invoice&apos;, &apos;compress&apos;, &apos;OCR&apos;...
+            </Link>
+            <Link href="#categories-section" className="search-btn">
+              Explore Tools
+            </Link>
           </div>
 
           {/* Popular tools */}

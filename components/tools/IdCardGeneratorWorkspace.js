@@ -129,7 +129,7 @@ function drawWatermarkTiles(ctx, w, h, text, color) {
   ctx.save();
   ctx.globalAlpha = 0.08;
   ctx.fillStyle = color;
-  ctx.font = '700 20px Arial, sans-serif';
+  ctx.font = '700 26px Arial, sans-serif';
   ctx.translate(w / 2, h / 2);
   ctx.rotate(-Math.PI / 10);
   ctx.translate(-w / 2, -h / 2);
@@ -204,7 +204,7 @@ function drawPhotoBox(ctx, x, y, size, photoImg, subtextColor, accent, circle) {
     ctx.drawImage(photoImg, x + (size - w) / 2, y + (size - h) / 2, w, h);
   } else {
     ctx.fillStyle = subtextColor;
-    ctx.font = '400 18px Arial, sans-serif';
+    ctx.font = '400 23px Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('PHOTO', x + size / 2, y + size / 2 - 10);
     ctx.textAlign = 'left';
@@ -238,13 +238,13 @@ function drawFooter(ctx, { toggles, cardId, textColor, subtextColor, x1 = 48, cu
     ctx.moveTo(x1, CARD_H - 66);
     ctx.lineTo(x1 + 252, CARD_H - 66);
     ctx.stroke();
-    ctx.font = '400 16px Arial, sans-serif';
+    ctx.font = '400 21px Arial, sans-serif';
     ctx.fillStyle = subtextColor;
     ctx.textAlign = 'left';
     ctx.fillText('Authorized Signature', x1, CARD_H - 56);
   }
   if (toggles.cardSerial) {
-    ctx.font = '400 16px Arial, sans-serif';
+    ctx.font = '400 21px Arial, sans-serif';
     ctx.fillStyle = subtextColor;
     ctx.textAlign = 'left';
     ctx.fillText(cardId, x1, CARD_H - 30);
@@ -273,63 +273,63 @@ function drawFrontClassic(ctx, ctxData) {
 
   let headerX = 48;
   if (logoImg) {
-    const logoSize = 64;
+    const logoSize = 80;
     ctx.save();
-    drawRoundedRect(ctx, headerX, 40, logoSize, logoSize, 10);
+    drawRoundedRect(ctx, headerX, 36, logoSize, logoSize, 10);
     ctx.clip();
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.fillRect(headerX, 40, logoSize, logoSize);
+    ctx.fillRect(headerX, 36, logoSize, logoSize);
     const ratio = Math.min(logoSize / logoImg.width, logoSize / logoImg.height);
     const lw = logoImg.width * ratio, lh = logoImg.height * ratio;
-    ctx.drawImage(logoImg, headerX + (logoSize - lw) / 2, 40 + (logoSize - lh) / 2, lw, lh);
+    ctx.drawImage(logoImg, headerX + (logoSize - lw) / 2, 36 + (logoSize - lh) / 2, lw, lh);
     ctx.restore();
     headerX += logoSize + 20;
   }
   ctx.fillStyle = textColor;
-  ctx.font = '700 38px Arial, sans-serif';
+  ctx.font = '700 49px Arial, sans-serif';
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
-  ctx.fillText(form.orgName || 'Your Organization', headerX, 42);
-  ctx.font = '400 22px Arial, sans-serif';
+  ctx.fillText(form.orgName || 'Your Organization', headerX, 34);
+  ctx.font = '400 29px Arial, sans-serif';
   ctx.fillStyle = subtextColor;
-  ctx.fillText(form.orgTagline || `${industry.label} ID Card`, headerX, 88);
+  ctx.fillText(form.orgTagline || `${industry.label} ID Card`, headerX, 92);
 
-  const photoX = 48, photoY = 150, photoSize = 270;
+  const photoX = 48, photoY = 152, photoSize = 260;
   drawPhotoBox(ctx, photoX, photoY, photoSize, photoImg, subtextColor, colors.accent, false);
 
   const infoX = photoX + photoSize + 40;
   const infoW = CARD_W - infoX - 40;
-  let infoY = photoY + 4;
+  let infoY = photoY;
   ctx.fillStyle = textColor;
-  ctx.font = '700 36px Arial, sans-serif';
+  ctx.font = '700 47px Arial, sans-serif';
   ctx.fillText(form.fullName || 'Full Name', infoX, infoY);
-  infoY += 44;
-  ctx.font = '400 24px Arial, sans-serif';
+  infoY += 58;
+  ctx.font = '400 31px Arial, sans-serif';
   ctx.fillStyle = subtextColor;
   ctx.fillText(form.role || 'Title / Role', infoX, infoY);
-  infoY += 30;
+  infoY += 40;
   if (form.orgTagline) {
-    ctx.font = 'italic 400 16px Arial, sans-serif';
+    ctx.font = 'italic 400 21px Arial, sans-serif';
     ctx.fillText(form.orgTagline, infoX, infoY);
-    infoY += 26;
+    infoY += 30;
   }
-  infoY += 14;
+  infoY += 10;
 
   buildInfoRows(form, toggles, industry).forEach(([label, val]) => {
     ctx.save();
     ctx.globalAlpha = 0.14;
-    drawRoundedRect(ctx, infoX, infoY - 6, infoW, 60, 10);
+    drawRoundedRect(ctx, infoX, infoY - 8, infoW, 78, 10);
     ctx.fillStyle = colors.accent;
     ctx.fill();
     ctx.restore();
 
-    ctx.font = '700 15px Arial, sans-serif';
+    ctx.font = '700 20px Arial, sans-serif';
     ctx.fillStyle = colors.accent;
-    ctx.fillText(label.toUpperCase(), infoX + 16, infoY);
-    ctx.font = '700 24px Arial, sans-serif';
+    ctx.fillText(label.toUpperCase(), infoX + 18, infoY);
+    ctx.font = '700 31px Arial, sans-serif';
     ctx.fillStyle = textColor;
-    ctx.fillText(val, infoX + 16, infoY + 24);
-    infoY += 70;
+    ctx.fillText(val, infoX + 18, infoY + 30);
+    infoY += 92;
   });
 
   drawFooter(ctx, { toggles, cardId, textColor, subtextColor, customCodeImg: ctxData.customCodeImg });
@@ -340,7 +340,7 @@ function drawFrontExecutive(ctx, ctxData) {
 
   // Top banner — logo and org name live here, top-LEFT only, so nothing sits
   // behind the centered photo below.
-  const bannerH = 118;
+  const bannerH = 130;
   ctx.save();
   ctx.fillStyle = shade(colors.primary, isLight(colors.primary) ? -0.08 : -0.2);
   ctx.fillRect(0, 0, CARD_W, bannerH);
@@ -351,7 +351,7 @@ function drawFrontExecutive(ctx, ctxData) {
   ctx.textAlign = 'left';
   let headerX = 40;
   if (logoImg) {
-    const logoSize = 56;
+    const logoSize = 68;
     const logoY = (bannerH - logoSize) / 2;
     ctx.save();
     drawRoundedRect(ctx, headerX, logoY, logoSize, logoSize, 10);
@@ -365,13 +365,13 @@ function drawFrontExecutive(ctx, ctxData) {
     headerX += logoSize + 18;
   }
   ctx.fillStyle = textColor;
-  ctx.font = '700 32px Arial, sans-serif';
+  ctx.font = '700 42px Arial, sans-serif';
   ctx.textBaseline = 'middle';
   ctx.fillText(form.orgName || 'Your Organization', headerX, bannerH / 2);
 
   // Card type badge, top-right of banner (fills the empty corner)
   ctx.textAlign = 'right';
-  ctx.font = '700 16px Arial, sans-serif';
+  ctx.font = '700 21px Arial, sans-serif';
   ctx.fillStyle = colors.accent;
   ctx.fillText(industry.label.toUpperCase(), CARD_W - 40, bannerH / 2);
   ctx.textAlign = 'left';
@@ -379,7 +379,7 @@ function drawFrontExecutive(ctx, ctxData) {
 
   // Centered circular photo, overlapping the banner bottom edge only
   const bx = CARD_W / 2;
-  const photoSize = 200;
+  const photoSize = 210;
   const photoX = bx - photoSize / 2, photoY = bannerH - photoSize / 2 - 4;
   ctx.save();
   ctx.beginPath();
@@ -390,21 +390,21 @@ function drawFrontExecutive(ctx, ctxData) {
   drawPhotoBox(ctx, photoX, photoY, photoSize, photoImg, subtextColor, colors.accent, true);
 
   ctx.textAlign = 'center';
-  let ty = photoY + photoSize + 20;
+  let ty = photoY + photoSize + 26;
   ctx.fillStyle = textColor;
-  ctx.font = '700 38px Arial, sans-serif';
+  ctx.font = '700 49px Arial, sans-serif';
   ctx.fillText(form.fullName || 'Full Name', bx, ty);
-  ty += 42;
-  ctx.font = '400 24px Arial, sans-serif';
+  ty += 56;
+  ctx.font = '400 31px Arial, sans-serif';
   ctx.fillStyle = subtextColor;
   ctx.fillText(form.role || 'Title / Role', bx, ty);
-  ty += 30;
+  ty += 38;
   if (form.orgTagline) {
-    ctx.font = 'italic 400 17px Arial, sans-serif';
+    ctx.font = 'italic 400 22px Arial, sans-serif';
     ctx.fillText(form.orgTagline, bx, ty);
-    ty += 26;
+    ty += 30;
   }
-  ty += 14;
+  ty += 8;
 
   const rows = buildInfoRows(form, toggles, industry);
   const colW = (CARD_W - 96) / rows.length;
@@ -413,17 +413,17 @@ function drawFrontExecutive(ctx, ctxData) {
     // filled pill behind each stat so the row reads as a solid block, not floating text
     ctx.save();
     ctx.globalAlpha = 0.14;
-    drawRoundedRect(ctx, 48 + colW * i + 10, ty - 6, colW - 20, 64, 10);
+    drawRoundedRect(ctx, 48 + colW * i + 10, ty - 8, colW - 20, 80, 10);
     ctx.fillStyle = colors.accent;
     ctx.fill();
     ctx.restore();
 
-    ctx.font = '700 15px Arial, sans-serif';
+    ctx.font = '700 20px Arial, sans-serif';
     ctx.fillStyle = colors.accent;
     ctx.fillText(label.toUpperCase(), cx, ty);
-    ctx.font = '700 22px Arial, sans-serif';
+    ctx.font = '700 29px Arial, sans-serif';
     ctx.fillStyle = textColor;
-    ctx.fillText(val, cx, ty + 26);
+    ctx.fillText(val, cx, ty + 32);
   });
 
   ctx.textAlign = 'left';
@@ -450,66 +450,66 @@ function drawFrontSplit(ctx, ctxData) {
 
   let headerX = 48;
   if (logoImg) {
-    const logoSize = 56;
+    const logoSize = 68;
     ctx.save();
-    drawRoundedRect(ctx, headerX, 36, logoSize, logoSize, 10);
+    drawRoundedRect(ctx, headerX, 34, logoSize, logoSize, 10);
     ctx.clip();
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.fillRect(headerX, 36, logoSize, logoSize);
+    ctx.fillRect(headerX, 34, logoSize, logoSize);
     const ratio = Math.min(logoSize / logoImg.width, logoSize / logoImg.height);
     const lw = logoImg.width * ratio, lh = logoImg.height * ratio;
-    ctx.drawImage(logoImg, headerX + (logoSize - lw) / 2, 36 + (logoSize - lh) / 2, lw, lh);
+    ctx.drawImage(logoImg, headerX + (logoSize - lw) / 2, 34 + (logoSize - lh) / 2, lw, lh);
     ctx.restore();
     headerX += logoSize + 16;
   }
   ctx.textAlign = 'left';
   ctx.fillStyle = textColor;
-  ctx.font = '700 30px Arial, sans-serif';
+  ctx.font = '700 39px Arial, sans-serif';
   ctx.textBaseline = 'top';
-  ctx.fillText(form.orgName || 'Your Organization', headerX, 40);
-  ctx.font = '400 18px Arial, sans-serif';
+  ctx.fillText(form.orgName || 'Your Organization', headerX, 32);
+  ctx.font = '400 23px Arial, sans-serif';
   ctx.fillStyle = subtextColor;
-  ctx.fillText(form.orgTagline || `${industry.label} ID Card`, headerX, 74);
+  ctx.fillText(form.orgTagline || `${industry.label} ID Card`, headerX, 82);
 
   // Photo on the right diagonal block
   const photoSize = 220;
-  const photoX = CARD_W - photoSize - 60, photoY = 130;
+  const photoX = CARD_W - photoSize - 60, photoY = 138;
   drawPhotoBox(ctx, photoX, photoY, photoSize, photoImg, 'rgba(255,255,255,0.8)', colors.accent, false);
 
   // Info on the left
-  let infoY = 148;
+  let infoY = 150;
   const infoX = 48;
   const infoW = photoX - infoX - 30;
   ctx.fillStyle = textColor;
-  ctx.font = '700 36px Arial, sans-serif';
+  ctx.font = '700 47px Arial, sans-serif';
   ctx.fillText(form.fullName || 'Full Name', infoX, infoY);
-  infoY += 42;
-  ctx.font = '400 23px Arial, sans-serif';
+  infoY += 58;
+  ctx.font = '400 30px Arial, sans-serif';
   ctx.fillStyle = subtextColor;
   ctx.fillText(form.role || 'Title / Role', infoX, infoY);
-  infoY += 28;
+  infoY += 38;
   if (form.orgTagline) {
-    ctx.font = 'italic 400 16px Arial, sans-serif';
+    ctx.font = 'italic 400 21px Arial, sans-serif';
     ctx.fillText(form.orgTagline, infoX, infoY);
-    infoY += 26;
+    infoY += 30;
   }
-  infoY += 16;
+  infoY += 12;
 
   buildInfoRows(form, toggles, industry).forEach(([label, val]) => {
     ctx.save();
     ctx.globalAlpha = 0.16;
-    drawRoundedRect(ctx, infoX, infoY - 6, infoW, 62, 10);
+    drawRoundedRect(ctx, infoX, infoY - 8, infoW, 78, 10);
     ctx.fillStyle = colors.accent;
     ctx.fill();
     ctx.restore();
 
-    ctx.font = '700 15px Arial, sans-serif';
+    ctx.font = '700 20px Arial, sans-serif';
     ctx.fillStyle = colors.accent;
-    ctx.fillText(label.toUpperCase(), infoX + 16, infoY);
-    ctx.font = '700 24px Arial, sans-serif';
+    ctx.fillText(label.toUpperCase(), infoX + 18, infoY);
+    ctx.font = '700 31px Arial, sans-serif';
     ctx.fillStyle = textColor;
-    ctx.fillText(val, infoX + 16, infoY + 24);
-    infoY += 72;
+    ctx.fillText(val, infoX + 18, infoY + 30);
+    infoY += 92;
   });
 
   drawFooter(ctx, { toggles, cardId, textColor, subtextColor, customCodeImg: ctxData.customCodeImg });
@@ -522,11 +522,11 @@ function drawBack(ctx, ctxData) {
 
   ctx.textAlign = 'left';
   ctx.fillStyle = textColor;
-  ctx.font = '700 28px Arial, sans-serif';
+  ctx.font = '700 36px Arial, sans-serif';
   ctx.textBaseline = 'top';
   ctx.fillText('Contact & Information', 48, 46);
 
-  ctx.font = '400 21px Arial, sans-serif';
+  ctx.font = '400 27px Arial, sans-serif';
   ctx.fillStyle = subtextColor;
   const lines = [
     form.address && `Address: ${form.address}`,
@@ -535,16 +535,16 @@ function drawBack(ctx, ctxData) {
     toggles.emergencyContact && form.emergencyContact && `Emergency Contact: ${form.emergencyContact}`,
   ].filter(Boolean);
 
-  let y = 110;
+  let y = 116;
   lines.forEach((line) => {
     ctx.fillText(line, 48, y);
-    y += 38;
+    y += 42;
   });
 
   if (form.terms) {
-    ctx.font = '400 17px Arial, sans-serif';
+    ctx.font = '400 22px Arial, sans-serif';
     ctx.fillStyle = subtextColor;
-    wrapText(ctx, form.terms, 48, y + 16, CARD_W - 96, 24);
+    wrapText(ctx, form.terms, 48, y + 16, CARD_W - 96, 30);
   }
 
   if (toggles.signatureStrip) {
@@ -554,7 +554,7 @@ function drawBack(ctx, ctxData) {
     ctx.moveTo(48, CARD_H - 90);
     ctx.lineTo(300, CARD_H - 90);
     ctx.stroke();
-    ctx.font = '400 16px Arial, sans-serif';
+    ctx.font = '400 21px Arial, sans-serif';
     ctx.fillText('Holder Signature', 48, CARD_H - 80);
   }
 
@@ -569,14 +569,14 @@ function drawBack(ctx, ctxData) {
     drawBarcode(ctx, 48, CARD_H - 56, 260, 34, cardId + 'b', textColor);
   }
   if (toggles.cardSerial) {
-    ctx.font = '400 15px Arial, sans-serif';
+    ctx.font = '400 20px Arial, sans-serif';
     ctx.fillStyle = subtextColor;
     ctx.textAlign = 'right';
     ctx.fillText(cardId, CARD_W - 48, CARD_H - 40);
     ctx.textAlign = 'left';
   }
 
-  ctx.font = '400 16px Arial, sans-serif';
+  ctx.font = '400 21px Arial, sans-serif';
   ctx.fillStyle = subtextColor;
   ctx.textAlign = 'center';
   ctx.fillText('If found, please return to the organization above.', CARD_W / 2, CARD_H - 30);

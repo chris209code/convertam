@@ -793,7 +793,7 @@ export default function HomePage() {
           </div>
         </div>
         <div className="category-grid">
-          <article className="category-card bg-blue"><div className="tile-icon" style={{ background: 'var(--accent)' }}><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2Z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg></div><h3>PDF Tools</h3><span className="count">12+ Tools</span><p className="card-copy">Convert, merge, split, compress and secure PDFs.</p><a className="card-link" href="/pdf-tools">Explore all →</a></article>
+          <article className="category-card bg-blue"><div className="tile-icon" style={{ background: 'var(--accent)' }}><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2Z"/><path d="M14 2v6h6"/><rect x="5.3" y="13.2" width="11.4" height="6.2" rx="1" fill="rgba(0,0,0,0.32)" stroke="none"/><text x="11" y="17.9" fontSize="5.4" fontWeight="800" fontFamily="Arial, sans-serif" textAnchor="middle" fill="currentColor" stroke="none">PDF</text></svg></div><h3>PDF Tools</h3><span className="count">12+ Tools</span><p className="card-copy">Convert, merge, split, compress and secure PDFs.</p><a className="card-link" href="/pdf-tools">Explore all →</a></article>
           <article className="category-card bg-green"><div className="tile-icon" style={{ background: 'var(--accent)' }}><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect x="2" y="6" width="20" height="14" rx="2"/></svg></div><h3>Business Tools</h3><span className="count">8+ Tools</span><p className="card-copy">Invoices, receipts, quotes, ID cards and more.</p><a className="card-link" href="/business">Explore all →</a></article>
           <article className="category-card bg-purple"><div className="tile-icon" style={{ background: 'var(--accent)' }}><svg width="27" height="27" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/><path d="M19 13l.75 2.25L22 16l-2.25.75L19 19l-.75-2.25L16 16l2.25-.75L19 13z"/></svg></div><h3>AI Tools</h3><span className="count">10+ Tools</span><p className="card-copy">AI-powered features for smarter everyday work.</p><a className="card-link" href="/ai-tools">Explore all →</a></article>
           <article className="category-card bg-orange"><div className="tile-icon" style={{ background: 'var(--accent)' }}><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></div><h3>Image Tools</h3><span className="count">9+ Tools</span><p className="card-copy">Convert, edit, resize and optimize images.</p><a className="card-link" href="/image-tools">Explore all →</a></article>
@@ -872,28 +872,6 @@ export default function HomePage() {
         </div>
       </div>
     </section>
-
-    <footer className="footer" id="story">
-      <div className="shell">
-        <div className="footer-grid">
-          <div>
-            <a className="brand" href="/" aria-label="Convertam home">
-              <span>
-                <span className="brand-name">Convertam</span>
-                <span className="brand-line">One platform. Endless possibilities.</span>
-              </span>
-            </a>
-            <p>Powerful tools for PDFs, AI, images, documents, and business essentials. Built with care in Nigeria.</p>
-            <div className="socials"><a href="#">f</a><a href="#">X</a><a href="#">ig</a><a href="#">in</a></div>
-          </div>
-          <div><h4>Tools</h4><ul><li>PDF Tools</li><li>Business Tools</li><li>AI Tools</li><li>Image Tools</li><li>Calculators</li><li>Utilities</li></ul></div>
-          <div><h4>Resources</h4><ul><li>Blog</li><li>Guides</li><li>Templates</li><li>Use Cases</li><li>API</li></ul></div>
-          <div><h4>Company</h4><ul><li>Our Story</li><li>Careers</li><li>Press</li><li>Contact Us</li><li>Partner Program</li></ul></div>
-          <div><h4>Stay updated</h4><p>Get new tools and productivity tips.</p><form className="subscribe"><input type="email" placeholder="Enter your email" aria-label="Email address" /><button type="submit">Subscribe</button></form><p>No spam. Unsubscribe anytime.</p></div>
-        </div>
-        <div className="footer-bottom"><span>© 2026 Convertam. All rights reserved.</span><div className="legal"><a href="#">Terms of Service</a><a href="#">Privacy Policy</a></div></div>
-      </div>
-    </footer>
   </main>
     </>
   );

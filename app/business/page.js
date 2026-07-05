@@ -12,7 +12,7 @@ const TOOLS = [
   { slug: 'receipt-generator', title: 'Receipt Generator', desc: 'Create payment receipts instantly', available: false },
   { slug: 'delivery-note-waybill', title: 'Delivery Note & Waybill Generator', desc: 'Confirm delivery or document goods in transit', available: true },
   { slug: 'id-card-generator', title: 'ID Card Generator', desc: 'Design and print professional ID cards', available: true },
-  { slug: 'certificate-generator', title: 'Certificate Generator', desc: 'Create certificates of completion or achievement', available: false },
+  { slug: 'certificate-generator', title: 'Certificate Generator', desc: 'Create certificates of completion or achievement', available: true },
   { slug: 'business-card', title: 'Business Card Generator', desc: 'Design and download professional business cards', available: false },
 ];
 

@@ -105,21 +105,6 @@ export default function HomePage() {
       gap: 13px;
       min-width: 220px;
     }
-    .brand-mark {
-      position: relative;
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: conic-gradient(from 36deg, #ff6b52 0 19%, #ff4f92 19% 37%, #7c4dff 37% 66%, #2684ff 66% 83%, #18b869 83% 100%);
-      box-shadow: 0 0 28px rgba(124,77,255,0.35);
-    }
-    .brand-mark::after {
-      content: "";
-      position: absolute;
-      inset: 12px 7px 12px 18px;
-      border-radius: 999px;
-      background: var(--navy-950);
-    }
     .brand-name { display: block; font-size: 23px; font-weight: 850; letter-spacing: -0.02em; line-height: 1; }
     .brand-line { display: block; margin-top: 5px; color: rgba(255,255,255,0.74); font-size: 13px; letter-spacing: -0.01em; }
     .nav-links { display: flex; align-items: center; gap: 44px; color: rgba(255,255,255,0.90); font-size: 14px; font-weight: 750; }
@@ -271,30 +256,6 @@ export default function HomePage() {
       position: absolute;
       inset: 0;
     }
-    .float-icon {
-      position: absolute;
-      z-index: 4;
-      display: grid;
-      place-items: center;
-      width: 54px;
-      height: 54px;
-      border-radius: 8px;
-      color: #fff;
-      font-size: 15px;
-      font-weight: 900;
-      box-shadow: 0 18px 36px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.22);
-      animation: float 5.5s ease-in-out infinite;
-    }
-    .float-icon.pdf { left: 10px; top: 70px; background: linear-gradient(135deg, #ff554d, #fb2d53); transform: rotate(-5deg); }
-    .float-icon.word { left: 48px; top: 155px; width: 46px; height: 46px; background: linear-gradient(135deg, #2994ff, #2055ff); animation-delay: -1s; }
-    .float-icon.chart { left: 16px; top: 240px; background: linear-gradient(135deg, #14b96a, #0d7f61); animation-delay: -2s; }
-    .float-icon.ai { right: 2px; top: 38px; background: linear-gradient(135deg, #8d5cff, #6f36d7); font-size: 18px; transform: rotate(8deg); animation-delay: -1.7s; }
-    .float-icon.lock { right: 8px; bottom: 92px; width: 40px; height: 40px; color: #8fa0c8; background: rgba(12,24,48,0.82); border: 1px solid rgba(127,146,190,0.25); animation-delay: -3s; }
-    @keyframes float {
-      0%, 100% { translate: 0 0; }
-      50% { translate: 0 -10px; }
-    }
-
     .laptop {
       position: absolute;
       right: 62px;
@@ -411,6 +372,19 @@ export default function HomePage() {
       gap: 24px;
       margin-bottom: 28px;
     }
+    .section-head.centered {
+      display: block;
+      text-align: center;
+    }
+    #solutions .section-head.centered h2 {
+      font-size: clamp(24px, 2.1vw, 30px);
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+    }
+    #solutions .section-copy {
+      margin-top: 6px;
+      font-size: 15px;
+    }
     .eyebrow {
       color: var(--blue);
       font-size: 12px;
@@ -485,32 +459,19 @@ export default function HomePage() {
     .card-copy { color: #2f3a4f; margin: 14px 0 0; font-size: 13px; line-height: 1.55; }
     .card-link { margin-top: auto; padding-top: 18px; color: var(--accent); font-size: 13px; font-weight: 850; }
 
-    .bento {
+    .persona-grid {
       display: grid;
-      grid-template-columns: repeat(12, 1fr);
-      grid-auto-rows: minmax(150px, auto);
+      grid-template-columns: repeat(6, 1fr);
       gap: 18px;
     }
     .persona-card {
       position: relative;
       overflow: hidden;
-      padding: 26px;
-      min-height: 178px;
+      min-height: 166px;
+      padding: 20px 16px 18px;
+      text-align: center;
     }
-    .persona-card.large { grid-column: span 5; grid-row: span 2; }
-    .persona-card.medium { grid-column: span 4; }
-    .persona-card.small { grid-column: span 3; }
-    .persona-card::after {
-      content: "";
-      position: absolute;
-      width: 170px;
-      height: 170px;
-      right: -74px;
-      bottom: -88px;
-      border-radius: 50%;
-      background: color-mix(in srgb, var(--accent) 14%, transparent);
-    }
-    .persona-top { display: flex; align-items: center; gap: 14px; }
+    .persona-top { display: flex; flex-direction: column; align-items: center; gap: 10px; }
     .persona-icon {
       width: 54px;
       height: 54px;
@@ -520,11 +481,8 @@ export default function HomePage() {
       color: var(--accent);
       background: color-mix(in srgb, var(--accent) 12%, #fff);
     }
-    .persona-card.large h3 { font-size: 30px; }
-    .persona-card.large .card-copy { max-width: 390px; font-size: 16px; }
-    .persona-list { display: grid; gap: 10px; margin-top: 28px; color: #334155; font-size: 14px; font-weight: 700; }
-    .persona-list span { display: flex; align-items: center; gap: 9px; }
-    .persona-list span::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+    .persona-card h3 { margin-top: 0; font-size: 15px; line-height: 1.25; }
+    .persona-card .card-copy { margin-top: 9px; color: #111827; font-size: 12px; }
 
     .stats-band {
       padding: 30px;
@@ -652,7 +610,6 @@ export default function HomePage() {
       grid-template-columns: 1.6fr repeat(3, 1fr) 1.45fr;
       gap: 42px;
     }
-    .footer .brand-mark::after { background: #06101f; }
     .footer p { margin: 16px 0 0; max-width: 310px; color: rgba(255,255,255,0.72); line-height: 1.65; font-size: 14px; }
     .footer h4 { margin: 0 0 17px; color: #fff; font-size: 14px; }
     .footer ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 11px; font-size: 14px; }
@@ -699,7 +656,7 @@ export default function HomePage() {
       .device-stage { min-height: 430px; }
       .laptop { left: 8%; right: auto; }
       .phone { right: 12%; }
-      .category-grid, .tools-grid { grid-template-columns: repeat(3, 1fr); }
+      .category-grid, .persona-grid, .tools-grid { grid-template-columns: repeat(3, 1fr); }
       .stats-band { grid-template-columns: repeat(2, 1fr); row-gap: 22px; }
       .stat-card:nth-child(2) { border-right: 0; }
       .footer-grid { grid-template-columns: 1.5fr repeat(2, 1fr); }
@@ -723,9 +680,7 @@ export default function HomePage() {
       .section { padding: 46px 0; }
       .section-head { display: block; }
       .view-link { display: inline-block; margin-top: 14px; }
-      .category-grid, .tools-grid { grid-template-columns: repeat(2, 1fr); }
-      .bento { grid-template-columns: 1fr; }
-      .persona-card.large, .persona-card.medium, .persona-card.small { grid-column: auto; grid-row: auto; }
+      .category-grid, .persona-grid, .tools-grid { grid-template-columns: repeat(2, 1fr); }
       .steps { grid-template-columns: 1fr; }
       .arrow { display: none; }
       .step-card { padding-left: 106px; }
@@ -736,7 +691,6 @@ export default function HomePage() {
 
     @media (max-width: 560px) {
       .shell { width: min(100% - 24px, 520px); }
-      .brand-mark { width: 38px; height: 38px; }
       .icon-button { width: 42px; height: 42px; }
       .hero-grid { padding-top: 34px; }
       .status-pill { font-size: 11px; }
@@ -746,12 +700,11 @@ export default function HomePage() {
       .search-wrap { margin-top: 28px; }
       .trending { font-size: 12px; }
       .device-stage { min-height: 292px; transform: scale(0.64); width: 156%; margin-left: -28%; }
-      .category-grid, .tools-grid, .stats-band, .footer-grid { grid-template-columns: 1fr; }
+      .category-grid, .persona-grid, .tools-grid, .stats-band, .footer-grid { grid-template-columns: 1fr; }
       .stat-card { border-right: 0; border-bottom: 1px solid rgba(255,255,255,0.10); padding: 10px 0 22px; }
       .stat-card:last-child { border-bottom: 0; }
       .category-card { min-height: 198px; }
       .persona-card { padding: 22px; }
-      .persona-card.large h3 { font-size: 24px; }
       .subscribe { flex-direction: column; }
       .subscribe input, .subscribe button { min-height: 44px; }
       .legal { flex-wrap: wrap; gap: 16px; }
@@ -760,28 +713,6 @@ export default function HomePage() {
 <main className="page">
     <section className="hero">
       <div className="shell">
-        <nav className="nav" aria-label="Primary navigation">
-          <a className="brand" href="/" aria-label="Convertam home">
-            <span className="brand-mark" aria-hidden="true"></span>
-            <span>
-              <span className="brand-name">Convertam</span>
-              <span className="brand-line">One platform. Endless possibilities.</span>
-            </span>
-          </a>
-          <div className="nav-links">
-            <a className="nav-link" href="#tools">Tools <span className="chevron" aria-hidden="true"></span></a>
-            <a className="nav-link" href="#solutions">Solutions <span className="chevron" aria-hidden="true"></span></a>
-            <a className="nav-link" href="#resources">Resources <span className="chevron" aria-hidden="true"></span></a>
-            <a href="#story">Our Story</a>
-          </div>
-          <div className="nav-actions">
-            <button className="icon-button" type="button" aria-label="Search">
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m21 21-4.35-4.35M10.8 18a7.2 7.2 0 1 1 0-14.4 7.2 7.2 0 0 1 0 14.4Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-            </button>
-            <a className="primary-button" href="#tools">Start Free</a>
-          </div>
-        </nav>
-
         <div className="hero-grid">
           <div>
             <div className="status-pill"><span className="status-dot"></span>100% free to start</div>
@@ -806,12 +737,6 @@ export default function HomePage() {
           <div className="device-stage" aria-label="Convertam app preview">
             <div className="halo"></div>
             <div className="device-css-render">
-              <div className="float-icon pdf">PDF</div>
-              <div className="float-icon word">W</div>
-              <div className="float-icon chart"><svg viewBox="0 0 24 24" fill="none"><path d="M4 19V5M4 19h16M8 16v-4m4 4V9m4 7V7m3 0-5 5-3-3-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
-              <div className="float-icon ai">AI</div>
-              <div className="float-icon lock"><svg viewBox="0 0 24 24" fill="none"><path d="M7 11V8a5 5 0 0 1 10 0v3M6.5 11h11A1.5 1.5 0 0 1 19 12.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19.5v-7A1.5 1.5 0 0 1 6.5 11Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div>
-
               <div className="laptop">
                 <div className="laptop-lid">
                   <div className="screen">
@@ -880,20 +805,19 @@ export default function HomePage() {
 
     <section className="section soft" id="solutions">
       <div className="shell">
-        <div className="section-head">
+        <div className="section-head centered">
           <div>
-            <div className="eyebrow">Built for everyone</div>
-            <h2>Serious tools for real daily work.</h2>
-            <p className="section-copy">Not equal cards, because every workflow needs a different surface.</p>
+            <h2>Built for everyone doing the work.</h2>
+            <p className="section-copy">Six kinds of people. Same 63+ tools.</p>
           </div>
         </div>
-        <div className="bento">
-          <article className="persona-card large bg-purple"><div className="persona-top"><div className="persona-icon"><svg width="27" height="27" viewBox="0 0 24 24" fill="none"><path d="M22 10 12 5 2 10l10 5 10-5Z" stroke="currentColor" strokeWidth="2"/><path d="M6 12.5V17c3.5 2 8.5 2 12 0v-4.5" stroke="currentColor" strokeWidth="2"/></svg></div><h3>Students</h3></div><p className="card-copy">Convert assignments, summarize PDFs, build resumes and finish admin tasks without switching apps.</p><div className="persona-list"><span>PDF summaries</span><span>Resume Builder</span><span>OCR for scanned notes</span></div></article>
-          <article className="persona-card medium bg-blue"><div className="persona-top"><div className="persona-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M4 9h16v10H4V9Z" stroke="currentColor" strokeWidth="2"/></svg></div><h3>Professionals</h3></div><p className="card-copy">Edit PDFs, sign documents, compress files and keep work moving.</p></article>
-          <article className="persona-card small bg-green"><div className="persona-top"><div className="persona-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="M4 10h16v10H4V10Z" stroke="currentColor" strokeWidth="2"/><path d="M7 10V6h10v4M8 14h2M14 14h2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div><h3>Businesses</h3></div><p className="card-copy">Create invoices, quotes, receipts and customer paperwork.</p></article>
-          <article className="persona-card small bg-orange"><div className="persona-top"><div className="persona-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div><h3>Developers</h3></div><p className="card-copy">Format JSON, encode Base64 and generate UUIDs fast.</p></article>
-          <article className="persona-card medium bg-pink"><div className="persona-top"><div className="persona-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="M5 8h3l1.5-2h5L16 8h3v11H5V8Z" stroke="currentColor" strokeWidth="2"/><path d="M12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" strokeWidth="2"/></svg></div><h3>Creators</h3></div><p className="card-copy">Resize, watermark, optimize and prepare image assets.</p></article>
-          <article className="persona-card small bg-cyan"><div className="persona-top"><div className="persona-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM16 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM2 21a6 6 0 0 1 12 0M10 21a6 6 0 0 1 12 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div><h3>Churches</h3></div><p className="card-copy">Prepare programs, forms, IDs and event documents.</p></article>
+        <div className="persona-grid">
+          <article className="persona-card bg-purple"><div className="persona-top"><div className="persona-icon"><svg width="27" height="27" viewBox="0 0 24 24" fill="none"><path d="M22 10 12 5 2 10l10 5 10-5Z" stroke="currentColor" strokeWidth="2"/><path d="M6 12.5V17c3.5 2 8.5 2 12 0v-4.5" stroke="currentColor" strokeWidth="2"/></svg></div><h3>For Students</h3></div><p className="card-copy">Convert assignments, summarize PDFs, build resumes.</p></article>
+          <article className="persona-card bg-blue"><div className="persona-top"><div className="persona-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M4 9h16v10H4V9Z" stroke="currentColor" strokeWidth="2"/></svg></div><h3>For Professionals</h3></div><p className="card-copy">Edit PDFs, sign documents, compress files.</p></article>
+          <article className="persona-card bg-green"><div className="persona-top"><div className="persona-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="M4 10h16v10H4V10Z" stroke="currentColor" strokeWidth="2"/><path d="M7 10V6h10v4M8 14h2M14 14h2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div><h3>For Small Businesses</h3></div><p className="card-copy">Create invoices, quotes, receipts.</p></article>
+          <article className="persona-card bg-orange"><div className="persona-top"><div className="persona-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div><h3>For Developers</h3></div><p className="card-copy">JSON formatter, Base64, UUID generator.</p></article>
+          <article className="persona-card bg-pink"><div className="persona-top"><div className="persona-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="M5 8h3l1.5-2h5L16 8h3v11H5V8Z" stroke="currentColor" strokeWidth="2"/><path d="M12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" strokeWidth="2"/></svg></div><h3>For Creators</h3></div><p className="card-copy">Image tools, watermarking, resizing.</p></article>
+          <article className="persona-card bg-cyan"><div className="persona-top"><div className="persona-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM16 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM2 21a6 6 0 0 1 12 0M10 21a6 6 0 0 1 12 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div><h3>For Everyone</h3></div><p className="card-copy">AI summaries, OCR, file conversions.</p></article>
         </div>
       </div>
     </section>
@@ -954,7 +878,6 @@ export default function HomePage() {
         <div className="footer-grid">
           <div>
             <a className="brand" href="/" aria-label="Convertam home">
-              <span className="brand-mark" aria-hidden="true"></span>
               <span>
                 <span className="brand-name">Convertam</span>
                 <span className="brand-line">One platform. Endless possibilities.</span>

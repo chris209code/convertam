@@ -505,15 +505,11 @@ function drawExecutive(ctx, d) {
   ctx.strokeStyle = 'rgba(15,31,61,0.5)';
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = '#0F1F3D';
-  ctx.font = `800 ${px(7)}px Arial, sans-serif`;
-  ctx.fillText((form.orgName || 'YOUR ORG').toUpperCase(), bx, sealY - px(9));
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = `800 ${px(16)}px Arial, sans-serif`;
-  ctx.fillText((form.orgName || 'C').trim().charAt(0).toUpperCase(), bx, sealY + px(2));
-  ctx.font = `400 ${px(8)}px Arial, sans-serif`;
-  ctx.fillStyle = '#0F1F3D';
-  ctx.fillText('★ ★ ★', bx, sealY + px(13));
+  ctx.font = `800 ${px(26)}px Arial, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText((form.orgName || 'C').trim().charAt(0).toUpperCase(), bx, sealY + px(1));
   ctx.restore();
 
   // footer: italic "Authorized Signature" + QR

@@ -201,7 +201,7 @@ export default function CertificateGeneratorWorkspace() {
   const hasCertId = Boolean(state.certificateId);
   const certType = titleCase(emptyToDefault(state, 'certificateType'));
 
-  const registerFit = useAutoFit([template, state.recipientName, state.programTitle, state.issuerName, state.secondIssuerName]);
+  const registerFit = useAutoFit([template, state.recipientName, state.programTitle, state.issuerName, state.secondIssuerName, state.issuerPosition, state.secondIssuerPosition]);
   const certRef = useRef(null);
 
   const cssVars = { '--brand': state.brandColor, '--accent': state.accentColor };
@@ -441,7 +441,7 @@ export default function CertificateGeneratorWorkspace() {
         .cp-sig-block.cp-sig-solo { left: 50%; right: auto; transform: translateX(-50%); }
         .cp-sig-line { height: 26px; border-bottom: 1px solid #B0A98C; margin-bottom: 6px; }
         .cp-sig-printed-name { font-family: 'Playfair Display', serif; font-weight: 600; font-size: clamp(10px, 1.3cqw, 15px); white-space: nowrap; overflow: hidden; }
-        .cp-sig-title { margin-top: 4px; padding-top: 4px; font-size: clamp(7px, 0.875cqw, 10.5px); letter-spacing: clamp(1px, 0.125cqw, 1.5px); color: #8A8262; text-transform: uppercase; }
+        .cp-sig-title { margin-top: 4px; padding-top: 4px; font-size: clamp(7px, 0.875cqw, 10.5px); letter-spacing: clamp(1px, 0.125cqw, 1.5px); color: #8A8262; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
         .cp-meta { position: absolute; bottom: 11.779%; font-size: clamp(7px, 0.917cqw, 11px); letter-spacing: clamp(0.5px, 0.083cqw, 1px); color: #8A8262; }
         .cp-meta.left { left: 9.167%; }
         .cp-meta.right { right: 9.167%; }
@@ -707,7 +707,7 @@ export default function CertificateGeneratorWorkspace() {
                 <div className={`cp-sig-block left ${!hasSecondIssuer ? 'cp-sig-solo' : ''}`}>
                   <div className="cp-sig-line" />
                   <div ref={registerFit} className="cp-sig-printed-name">{emptyToDefault(state, 'issuerName')}</div>
-                  <div className="cp-sig-title">{emptyToDefault(state, 'issuerPosition')}</div>
+                  <div ref={registerFit} className="cp-sig-title">{emptyToDefault(state, 'issuerPosition')}</div>
                 </div>
                 {renderClassicSeal()}
                 {sealStyle === 'As Designed' && (
@@ -720,7 +720,7 @@ export default function CertificateGeneratorWorkspace() {
                   <div className="cp-sig-block right">
                     <div className="cp-sig-line" />
                     <div ref={registerFit} className="cp-sig-printed-name">{emptyToDefault(state, 'secondIssuerName')}</div>
-                    <div className="cp-sig-title">{emptyToDefault(state, 'secondIssuerPosition')}</div>
+                    <div ref={registerFit} className="cp-sig-title">{emptyToDefault(state, 'secondIssuerPosition')}</div>
                   </div>
                 )}
 

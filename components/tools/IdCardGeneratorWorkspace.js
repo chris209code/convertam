@@ -140,9 +140,10 @@ function extractDominantColor(img) {
   }
 }
 
-// Wraps text up to maxLines (merging any overflow into the last line) and
-// returns the pixel height consumed — used anywhere text could otherwise be
-// silently clipped by the canvas (org name, person name).
+// Wraps text to fit maxWidth. Every line is always measured and guaranteed
+// to fit — if a name genuinely needs more than "maxLines" to fit, it gets
+// more lines (callers push subsequent content down dynamically) rather than
+// silently merging overflow words past the edge of the card.
 function wrapCapped(ctx, text, x, y, maxWidth, lineHeight, maxLines, align = 'left') {
   ctx.textAlign = align;
   const words = (text || '').split(' ');
@@ -153,15 +154,13 @@ function wrapCapped(ctx, text, x, y, maxWidth, lineHeight, maxLines, align = 'le
     if (ctx.measureText(test).width > maxWidth && current) {
       lines.push(current);
       current = word;
-      if (lines.length === maxLines - 1) continue;
     } else {
       current = test;
     }
   }
   if (current) lines.push(current);
-  const finalLines = lines.length > maxLines ? [...lines.slice(0, maxLines - 1), lines.slice(maxLines - 1).join(' ')] : lines;
-  finalLines.forEach((line, i) => ctx.fillText(line, x, y + i * lineHeight));
-  return finalLines.length * lineHeight;
+  lines.forEach((line, i) => ctx.fillText(line, x, y + i * lineHeight));
+  return lines.length * lineHeight;
 }
 
 function wrapText(ctx, text, x, y, maxWidth, lineHeight, align = 'left') {
@@ -261,15 +260,22 @@ function drawLogoOrPlaceholder(ctx, x, y, size, logoImg, colors, orgName) {
   }
 }
 
-function drawPhotoOrPlaceholder(ctx, x, y, w, h, photoImg, borderColor, radius, darkColor, bgColor) {
+function drawPhotoOrPlaceholder(ctx, x, y, w, h, photoImg, borderColor, radius, darkColor, bgColor, adjust) {
+  const zoom = adjust?.zoom ?? 1;
+  const panX = adjust?.panX ?? 0; // -50..50, percent of available shift
+  const panY = adjust?.panY ?? 0;
   if (photoImg) {
     ctx.save();
     drawRoundedRect(ctx, x, y, w, h, radius);
     ctx.clip();
     if (bgColor) { ctx.fillStyle = bgColor; ctx.fillRect(x, y, w, h); }
-    const ratio = Math.max(w / photoImg.width, h / photoImg.height);
+    const ratio = Math.max(w / photoImg.width, h / photoImg.height) * zoom;
     const iw = photoImg.width * ratio, ih = photoImg.height * ratio;
-    ctx.drawImage(photoImg, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih);
+    const maxShiftX = Math.max(0, (iw - w) / 2);
+    const maxShiftY = Math.max(0, (ih - h) / 2);
+    const drawX = x + (w - iw) / 2 + (panX / 50) * maxShiftX;
+    const drawY = y + (h - ih) / 2 + (panY / 50) * maxShiftY;
+    ctx.drawImage(photoImg, drawX, drawY, iw, ih);
     ctx.restore();
   } else {
     if (bgColor) {
@@ -350,10 +356,10 @@ function drawClassic(ctx, d) {
   ctx.fillText(form.orgTagline || `${industry.label} ID Card`, headerTextX, tagY);
 
   // body: photo 140x170 rounded 12, border 3 gold; text column beside it
-  const bodyTop = Math.max(px(22) + px(44) + px(14) + px(6), tagY + px(16) + px(16));
+  const bodyTop = Math.max(px(22) + px(44) + px(14) + px(6), tagY + px(16) + px(26));
   const photoW = px(140), photoH = px(170);
   const photoX = px(24), photoY = bodyTop + px(6);
-  drawPhotoOrPlaceholder(ctx, photoX, photoY, photoW, photoH, photoImg, colors.accent, px(12), ink, null);
+  drawPhotoOrPlaceholder(ctx, photoX, photoY, photoW, photoH, photoImg, colors.accent, px(12), ink, null, d.photoAdjust);
 
   const textX = photoX + photoW + px(18);
   const textMaxW = CARD_W - textX - px(24);
@@ -437,16 +443,20 @@ function drawExecutive(ctx, d) {
   const bx = CARD_W / 2;
   const photoD = px(140);
   const photoY = dividerY + px(20);
-  drawPhotoOrPlaceholder(ctx, bx - photoD / 2, photoY, photoD, photoD, photoImg, colors.accent, photoD / 2, textOn('#FDFCF8'), '#FDFCF8');
+  drawPhotoOrPlaceholder(ctx, bx - photoD / 2, photoY, photoD, photoD, photoImg, colors.accent, photoD / 2, textOn('#FDFCF8'), '#FDFCF8', d.photoAdjust);
 
   ctx.textAlign = 'center';
-  let cy = photoY + photoD + px(16) + px(26);
+  ctx.textBaseline = 'top';
+  let cy = photoY + photoD + px(24) + px(26);
   ctx.fillStyle = ink;
   ctx.font = `800 ${px(26)}px Arial, sans-serif`;
-  ctx.fillText((form.fullName || 'Full Name').toUpperCase(), bx, cy);
-  cy += px(4) + px(17);
+  const nameLineH = px(26) * 1.1;
+  const nameH = wrapCapped(ctx, (form.fullName || 'Full Name').toUpperCase(), bx, cy, CARD_W - px(64), nameLineH, 2, 'center');
+  cy += nameH + px(8);
   ctx.font = `600 ${px(17)}px Arial, sans-serif`;
   ctx.fillStyle = sub;
+  ctx.textBaseline = 'alphabetic';
+  cy += px(14);
   ctx.fillText(form.role || 'Title / Role', bx, cy);
 
   // two/more-column stat block, vertical dividers
@@ -570,7 +580,7 @@ function drawSplit(ctx, d) {
   const tagY = orgTopY + orgH + px(4);
   ctx.fillText(tagline, headerTextX, tagY);
 
-  let cy = Math.max(px(24) + px(40) + px(26) + px(28), tagY + px(15) + px(28));
+  let cy = Math.max(px(24) + px(40) + px(26) + px(28), tagY + px(15) + px(40));
   ctx.fillStyle = colors.ink;
   ctx.font = `800 ${px(28)}px Arial, sans-serif`;
   ctx.textBaseline = 'top';
@@ -608,7 +618,7 @@ function drawSplit(ctx, d) {
   // right panel: photo near top-right, code box near bottom-right
   const photoW = px(130), photoH = px(150);
   const photoX = CARD_W - px(22) - photoW, photoY = px(36);
-  drawPhotoOrPlaceholder(ctx, photoX, photoY, photoW, photoH, photoImg, colors.accent, px(12), rightInk, shade(colors.primary, 0.12));
+  drawPhotoOrPlaceholder(ctx, photoX, photoY, photoW, photoH, photoImg, colors.accent, px(12), rightInk, shade(colors.primary, 0.12), d.photoAdjust);
 
   const qrSize = px(66);
   const qrX = CARD_W - px(22) - qrSize, qrY = CARD_H - px(34) - qrSize;
@@ -713,6 +723,9 @@ export default function IdCardGeneratorWorkspace() {
   });
   const [side, setSide] = useState('front');
   const [photoImg, setPhotoImg] = useState(null);
+  const [photoZoom, setPhotoZoom] = useState(1);
+  const [photoPanX, setPhotoPanX] = useState(0);
+  const [photoPanY, setPhotoPanY] = useState(0);
   const [logoImg, setLogoImg] = useState(null);
   const [customCodeImg, setCustomCodeImg] = useState(null);
   const [cardId, setCardId] = useState('');
@@ -743,7 +756,12 @@ export default function IdCardGeneratorWorkspace() {
     const reader = new FileReader();
     reader.onload = () => {
       const img = new window.Image();
-      img.onload = () => setPhotoImg(img);
+      img.onload = () => {
+        setPhotoImg(img);
+        setPhotoZoom(1);
+        setPhotoPanX(0);
+        setPhotoPanY(0);
+      };
       img.src = reader.result;
     };
     reader.readAsDataURL(file);
@@ -784,10 +802,11 @@ export default function IdCardGeneratorWorkspace() {
 
   const render = useCallback(() => {
     if (!industry) return;
-    const opts = { layout, colors, logoImg, photoImg, customCodeImg, form, toggles, cardId, industry };
+    const photoAdjust = { zoom: photoZoom, panX: photoPanX, panY: photoPanY };
+    const opts = { layout, colors, logoImg, photoImg, photoAdjust, customCodeImg, form, toggles, cardId, industry };
     if (frontCanvasRef.current) drawCard(frontCanvasRef.current, { ...opts, side: 'front' });
     if (backCanvasRef.current) drawCard(backCanvasRef.current, { ...opts, side: 'back' });
-  }, [industry, layout, colors, logoImg, photoImg, customCodeImg, form, toggles, cardId]);
+  }, [industry, layout, colors, logoImg, photoImg, photoZoom, photoPanX, photoPanY, customCodeImg, form, toggles, cardId]);
 
   useEffect(() => { render(); }, [render]);
 
@@ -869,6 +888,26 @@ export default function IdCardGeneratorWorkspace() {
               <input type="file" accept="image/*" onChange={handlePhoto} style={inputStyle} />
             </div>
           </div>
+
+          {photoImg && (
+            <div style={{ ...fieldWrap, background: '#F8FAFC', borderRadius: 10, padding: 12, border: '1px solid #E2E8F0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>Adjust photo crop</label>
+                <button
+                  onClick={() => { setPhotoZoom(1); setPhotoPanX(0); setPhotoPanY(0); }}
+                  style={{ fontSize: '0.72rem', color: '#3A63B8', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Reset
+                </button>
+              </div>
+              <label style={{ fontSize: '0.72rem', color: '#64748B' }}>Zoom</label>
+              <input type="range" min="1" max="2.5" step="0.05" value={photoZoom} onChange={(e) => setPhotoZoom(Number(e.target.value))} style={{ width: '100%' }} />
+              <label style={{ fontSize: '0.72rem', color: '#64748B' }}>Move horizontal</label>
+              <input type="range" min="-50" max="50" step="1" value={photoPanX} onChange={(e) => setPhotoPanX(Number(e.target.value))} style={{ width: '100%' }} />
+              <label style={{ fontSize: '0.72rem', color: '#64748B' }}>Move vertical</label>
+              <input type="range" min="-50" max="50" step="1" value={photoPanY} onChange={(e) => setPhotoPanY(Number(e.target.value))} style={{ width: '100%' }} />
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div style={fieldWrap}>

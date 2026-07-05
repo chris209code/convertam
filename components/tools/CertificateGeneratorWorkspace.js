@@ -109,14 +109,44 @@ export default function CertificateGeneratorWorkspace() {
     setState({ ...defaults, ...templateDefaults[template] });
   }
 
-  function handlePrint() {
-    window.print();
+  const [downloading, setDownloading] = useState(false);
+
+  // Captures ONLY the certificate element (not the whole browser page — that
+  // was the bug with window.print()) and saves a real PDF directly, matching
+  // every other tool's one-click download instead of opening a print dialog.
+  async function handleDownload() {
+    if (!certRef.current || downloading) return;
+    setDownloading(true);
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
+      const canvas = await html2canvas(certRef.current, {
+        scale: 2.5,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+      });
+      const imgData = canvas.toDataURL('image/png', 1.0);
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      pdf.addImage(imgData, 'PNG', 0, 0, pageW, pageH);
+      const fileName = `${(state.recipientName || 'certificate').trim().replace(/\s+/g, '-').toLowerCase()}-certificate.pdf`;
+      pdf.save(fileName);
+    } catch (err) {
+      console.error('Certificate PDF export failed:', err);
+      window.alert('Something went wrong generating the PDF. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
   }
 
   const hasVerification = Boolean(state.verificationUrl);
   const certType = titleCase(emptyToDefault(state, 'certificateType'));
 
   const registerFit = useAutoFit([template, state.recipientName, state.programTitle]);
+  const certRef = useRef(null);
 
   const cssVars = { '--brand': state.brandColor, '--accent': state.accentColor };
   const logoInitial = (state.companyName || 'C').trim().charAt(0).toUpperCase();
@@ -187,7 +217,7 @@ export default function CertificateGeneratorWorkspace() {
     if (sealStyle === 'Laurel Medallion') return <ClassicLaurelMedallion letter={logoInitial} />;
     if (sealStyle === 'Rosette Ribbon') return <ClassicRosette letter={logoInitial} />;
     if (sealStyle === 'Engraved Seal') return <ClassicEngraved letter={logoInitial} />;
-    if (sealStyle === 'Custom Seal (Your Image)') {
+    if (sealStyle === 'Royal Seal') {
       return <img className="cp-seal-wrap cp-seal-custom-img" src={customSealImg || '/certificates/seal-custom.png'} alt="Organization seal" />;
     }
     return null;
@@ -523,10 +553,10 @@ export default function CertificateGeneratorWorkspace() {
                   <option>Laurel Medallion</option>
                   <option>Rosette Ribbon</option>
                   <option>Engraved Seal</option>
-                  <option>Custom Seal (Your Image)</option>
+                  <option>Royal Seal</option>
                 </select>
               </label>
-              {sealStyle === 'Custom Seal (Your Image)' && (
+              {sealStyle === 'Royal Seal' && (
                 <label>Upload your seal image
                   <input type="file" accept="image/*" onChange={handleCustomSealUpload} />
                 </label>
@@ -564,7 +594,7 @@ export default function CertificateGeneratorWorkspace() {
         </section>
 
         <section className="cert-control-section cert-actions">
-          <button type="button" onClick={handlePrint}>Print or Save PDF</button>
+          <button type="button" onClick={handleDownload} disabled={downloading}>{downloading ? 'Preparing PDF…' : 'Download PDF'}</button>
           <button type="button" onClick={resetSample}>Reset Sample Text</button>
         </section>
       </aside>
@@ -579,7 +609,7 @@ export default function CertificateGeneratorWorkspace() {
         </div>
 
         <div className="cert-stage">
-          <article className="certificate" style={cssVars}>
+          <article ref={certRef} className="certificate" style={cssVars}>
             {template === 'classic' && (
               <div className="classic-template">
                 {ornamentLevel === 'Ornate'

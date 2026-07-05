@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 
 const defaults = {
   companyName: 'Convertam',
-  tagline: 'One platform, endless possibilities',
+  tagline: '',
   certificateType: 'Completion',
   recipientName: 'Recipient Name',
   programTitle: 'Program or Achievement Title',
@@ -75,8 +75,17 @@ const emptyToDefault = (state, key) => state[key] || defaults[key] || '';
 export default function CertificateGeneratorWorkspace() {
   const [template, setTemplate] = useState('classic');
   const [state, setState] = useState({ ...defaults, ...templateDefaults.classic });
+  const [logoImg, setLogoImg] = useState(null);
 
   const update = (key, val) => setState((s) => ({ ...s, [key]: val }));
+
+  function handleLogoUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setLogoImg(reader.result);
+    reader.readAsDataURL(file);
+  }
 
   function handleTemplateChange(next) {
     setTemplate(next);
@@ -97,6 +106,15 @@ export default function CertificateGeneratorWorkspace() {
   const registerFit = useAutoFit([template, state.recipientName, state.programTitle]);
 
   const cssVars = { '--brand': state.brandColor, '--accent': state.accentColor };
+  const logoInitial = (state.companyName || 'C').trim().charAt(0).toUpperCase();
+
+  function LogoMark({ extraClass = '' }) {
+    return (
+      <span className={`cert-logo-mark ${logoImg ? 'cert-logo-mark-img' : ''} ${extraClass}`}>
+        {logoImg ? <img src={logoImg} alt="" /> : logoInitial}
+      </span>
+    );
+  }
 
   return (
     <div className="cert-app-shell">
@@ -116,7 +134,10 @@ export default function CertificateGeneratorWorkspace() {
         .cert-brand-mark, .cert-logo-mark {
           display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 8px;
           background: linear-gradient(135deg, var(--brand), #2563eb); color: #fff; font-weight: 900;
+          overflow: hidden;
         }
+        .cert-logo-mark-img { background: #fff; padding: 2px; }
+        .cert-logo-mark-img img { width: 100%; height: 100%; object-fit: contain; }
         .cert-brand h1, .cert-preview-toolbar h2 { margin: 0; font-size: 20px; line-height: 1.1; }
         .cert-brand p, .cert-preview-toolbar p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
         .cert-control-section { padding: 18px 0; border-top: 1px solid var(--line); }
@@ -147,17 +168,17 @@ export default function CertificateGeneratorWorkspace() {
         .cert-preview-toolbar p { color: #aab5cc; }
         .cert-preview-toolbar span { border: 1px solid rgba(255,255,255,0.18); border-radius: 999px; padding: 7px 12px; color: #d7deec; font-size: 12px; }
         .cert-stage { display: grid; place-items: center; min-height: 560px; }
-        .certificate { position: relative; width: min(100%, 1120px); aspect-ratio: var(--certificate-ratio); background: #fff; box-shadow: 0 30px 80px rgba(0,0,0,0.34); overflow: hidden; }
+        .certificate { position: relative; width: min(100%, 1120px); aspect-ratio: var(--certificate-ratio); background: #fff; box-shadow: 0 30px 80px rgba(0,0,0,0.34); overflow: hidden; container-type: inline-size; }
         .cert-logo-row { display: flex; align-items: center; gap: 9px; font-weight: 900; }
         .cert-logo-row.center { justify-content: center; }
         .cert-description, .cert-recipient, .cert-program, .cert-highlight, .cert-quote { overflow-wrap: anywhere; }
         .cert-signature-block { display: grid; gap: 4px; min-width: 150px; text-align: center; }
         .cert-signature-block.right { text-align: right; }
-        .cert-signature-line { min-height: 22px; border-bottom: 1px solid currentColor; font-family: "Brush Script MT", "Segoe Script", cursive; font-size: clamp(14px, 1.55vw, 24px); opacity: 0.92; }
-        .cert-signature-block strong, .cert-date-block strong, .cert-modern-footer strong, .cert-info-rail strong { font-size: clamp(8px, 0.9vw, 13px); }
-        .cert-signature-block span, .cert-date-block span, .cert-modern-footer span, .cert-info-rail span, .cert-qr-wrap span { font-size: clamp(7px, 0.72vw, 10px); text-transform: uppercase; letter-spacing: 0.04em; }
+        .cert-signature-line { min-height: 22px; border-bottom: 1px solid currentColor; font-family: "Brush Script MT", "Segoe Script", cursive; font-size: clamp(14px, 1.55cqw, 24px); opacity: 0.92; }
+        .cert-signature-block strong, .cert-date-block strong, .cert-modern-footer strong, .cert-info-rail strong { font-size: clamp(8px, 0.9cqw, 13px); }
+        .cert-signature-block span, .cert-date-block span, .cert-modern-footer span, .cert-info-rail span, .cert-qr-wrap span { font-size: clamp(7px, 0.72cqw, 10px); text-transform: uppercase; letter-spacing: 0.04em; }
         .cert-qr-box {
-          width: clamp(30px, 4vw, 54px); aspect-ratio: 1;
+          width: clamp(30px, 4cqw, 54px); aspect-ratio: 1;
           background: linear-gradient(90deg, #111 44%, transparent 44% 56%, #111 56%) 0 0/35% 35%, linear-gradient(#111 44%, transparent 44% 56%, #111 56%) 100% 100%/35% 35%, repeating-linear-gradient(45deg, #111 0 4px, transparent 4px 8px);
           border: 4px solid #fff; outline: 1px solid rgba(0,0,0,0.2);
         }
@@ -174,53 +195,53 @@ export default function CertificateGeneratorWorkspace() {
         .cert-corner-tr { top: 5%; right: 5%; border-top: 2px solid; border-right: 2px solid; transform: scaleX(-1); }
         .cert-corner-bl { bottom: 5%; left: 5%; border-bottom: 2px solid; border-left: 2px solid; transform: scaleY(-1); }
         .cert-corner-br { right: 5%; bottom: 5%; border-right: 2px solid; border-bottom: 2px solid; transform: scale(-1); }
-        .classic-head p { margin: 0.8% 0 2.5%; font-size: clamp(8px, 0.85vw, 13px); letter-spacing: 0.14em; text-transform: uppercase; }
-        .classic-content h3 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(38px, 6vw, 76px); font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; }
-        .classic-content h4 { margin: -0.5% 0 2%; color: var(--accent); font-family: Georgia, "Times New Roman", serif; font-size: clamp(16px, 2.35vw, 32px); font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; }
-        .classic-content .cert-intro { margin: 0 0 1.1%; font-size: clamp(8px, 0.9vw, 12px); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
-        .classic-content .cert-recipient { margin: 0 auto; max-width: 76%; font-size: clamp(38px, 5.7vw, 72px); line-height: 1.05; white-space: nowrap; display: block; }
+        .classic-head p { margin: 0.8% 0 2.5%; font-size: clamp(8px, 0.85cqw, 13px); letter-spacing: 0.14em; text-transform: uppercase; }
+        .classic-content h3 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(38px, 6cqw, 76px); font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; }
+        .classic-content h4 { margin: -0.5% 0 2%; color: var(--accent); font-family: Georgia, "Times New Roman", serif; font-size: clamp(16px, 2.35cqw, 32px); font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; }
+        .classic-content .cert-intro { margin: 0 0 1.1%; font-size: clamp(8px, 0.9cqw, 12px); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+        .classic-content .cert-recipient { margin: 0 auto; max-width: 76%; font-size: clamp(38px, 5.7cqw, 72px); line-height: 1.05; white-space: nowrap; display: block; }
         .cert-script { font-family: "Brush Script MT", "Segoe Script", Georgia, serif; }
         .cert-ornament-line { width: 58%; height: 1px; margin: 1.4% auto 2%; background: linear-gradient(90deg, transparent, var(--accent), transparent); }
-        .classic-content .cert-description { width: 58%; margin: 0 auto 0.9%; font-size: clamp(9px, 1vw, 14px); line-height: 1.45; text-transform: uppercase; }
-        .classic-content .cert-program { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(16px, 2vw, 28px); font-weight: 800; }
+        .classic-content .cert-description { width: 58%; margin: 0 auto 0.9%; font-size: clamp(9px, 1cqw, 14px); line-height: 1.45; text-transform: uppercase; }
+        .classic-content .cert-program { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(16px, 2cqw, 28px); font-weight: 800; }
         .classic-footer { position: absolute; left: 16%; right: 16%; bottom: 9%; display: flex; align-items: end; justify-content: space-between; }
-        .cert-seal { display: grid; place-items: center; width: clamp(54px, 8vw, 94px); aspect-ratio: 1; border: 6px double var(--accent); border-radius: 50%; color: var(--accent); font-family: Georgia, "Times New Roman", serif; font-weight: 900; text-transform: uppercase; }
-        .classic-meta { position: absolute; right: 8%; bottom: 4.8%; display: flex; gap: 16px; font-size: clamp(7px, 0.75vw, 10px); text-transform: uppercase; }
+        .cert-seal { display: grid; place-items: center; width: clamp(54px, 8cqw, 94px); aspect-ratio: 1; border: 6px double var(--accent); border-radius: 50%; color: var(--accent); font-family: Georgia, "Times New Roman", serif; font-weight: 900; text-transform: uppercase; }
+        .classic-meta { position: absolute; right: 8%; bottom: 4.8%; display: flex; gap: 16px; font-size: clamp(7px, 0.75cqw, 10px); text-transform: uppercase; }
 
         /* Modern Professional */
         .modern-template { display: grid; grid-template-columns: 25% 75%; background: #f8fafc; height: 100%; }
         .modern-rail { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 8%; padding: 8% 7%; color: #fff; background: linear-gradient(135deg, color-mix(in srgb, var(--brand), #081827 32%), #062a36), var(--brand); overflow: hidden; }
         .modern-rail::after { content: ""; position: absolute; inset: auto -18% -10% 22%; height: 48%; background: rgba(255,255,255,0.06); transform: skewX(-26deg); }
-        .modern-rail p, .cert-split-brand p { margin: 0; font-size: clamp(7px, 0.8vw, 11px); line-height: 1.35; text-transform: uppercase; }
+        .modern-rail p, .cert-split-brand p { margin: 0; font-size: clamp(7px, 0.8cqw, 11px); line-height: 1.35; text-transform: uppercase; }
         .cert-rail-title { display: grid; gap: 8px; margin-top: 8%; }
-        .cert-rail-title span { font-size: clamp(10px, 1vw, 14px); text-transform: uppercase; }
-        .cert-rail-title strong { font-size: clamp(22px, 3vw, 42px); line-height: 1; text-transform: uppercase; }
-        .cert-line-icon { display: grid; place-items: center; width: clamp(52px, 7vw, 86px); aspect-ratio: 1; margin-top: auto; border: 2px solid #45f0c2; border-radius: 50%; color: #45f0c2; font-size: clamp(8px, 0.9vw, 12px); text-transform: uppercase; }
+        .cert-rail-title span { font-size: clamp(10px, 1cqw, 14px); text-transform: uppercase; }
+        .cert-rail-title strong { font-size: clamp(22px, 3cqw, 42px); line-height: 1; text-transform: uppercase; }
+        .cert-line-icon { display: grid; place-items: center; width: clamp(52px, 7cqw, 86px); aspect-ratio: 1; margin-top: auto; border: 2px solid #45f0c2; border-radius: 50%; color: #45f0c2; font-size: clamp(8px, 0.9cqw, 12px); text-transform: uppercase; }
         .modern-body { position: relative; padding: 13% 8% 6%; overflow: hidden; height: 100%; }
         .cert-geo-mark { position: absolute; top: -12%; right: -4%; width: 36%; aspect-ratio: 1; border: 1px solid rgba(15,118,110,0.18); transform: rotate(45deg); }
         .cert-geo-mark::before, .cert-geo-mark::after { content: ""; position: absolute; inset: 18%; border: 1px solid rgba(15,118,110,0.15); }
-        .modern-body .cert-intro, .cert-split-body .cert-intro { margin: 0 0 1.6%; font-size: clamp(10px, 1.1vw, 15px); text-transform: uppercase; }
-        .modern-body h3, .cert-split-body h3 { margin: 0; max-width: 78%; font-size: clamp(38px, 5vw, 68px); line-height: 1.05; white-space: nowrap; }
+        .modern-body .cert-intro, .cert-split-body .cert-intro { margin: 0 0 1.6%; font-size: clamp(10px, 1.1cqw, 15px); text-transform: uppercase; }
+        .modern-body h3, .cert-split-body h3 { margin: 0; max-width: 78%; font-size: clamp(38px, 5cqw, 68px); line-height: 1.05; white-space: nowrap; }
         .cert-accent-line { width: 8%; height: 3px; margin: 2.2% 0 4.5%; background: var(--brand); }
-        .modern-body p { margin: 0 0 1.6%; font-size: clamp(11px, 1.2vw, 17px); }
-        .cert-highlight { display: inline-block; max-width: 68%; padding: 1.3% 3%; border-radius: 7px; background: color-mix(in srgb, var(--brand) 18%, white); font-size: clamp(19px, 2vw, 30px) !important; font-weight: 850; white-space: nowrap; }
-        .modern-body .cert-description { max-width: 66%; font-size: clamp(10px, 1vw, 14px); line-height: 1.55; }
+        .modern-body p { margin: 0 0 1.6%; font-size: clamp(11px, 1.2cqw, 17px); }
+        .cert-highlight { display: inline-block; max-width: 68%; padding: 1.3% 3%; border-radius: 7px; background: color-mix(in srgb, var(--brand) 18%, white); font-size: clamp(19px, 2cqw, 30px) !important; font-weight: 850; white-space: nowrap; }
+        .modern-body .cert-description { max-width: 66%; font-size: clamp(10px, 1cqw, 14px); line-height: 1.55; }
         .modern-footer { position: absolute; left: 8%; right: 7%; bottom: 7%; display: grid; grid-template-columns: 1fr 1.1fr 0.9fr 1.6fr; align-items: end; gap: 3%; }
         .modern-footer > div { display: grid; gap: 6px; }
 
         /* Executive Signature */
         .executive-template { display: grid; grid-template-rows: auto 1fr auto; padding: 4.5% 7%; color: #ffe7b5; background: radial-gradient(circle at 74% 34%, rgba(201,147,45,0.13), transparent 28%), linear-gradient(135deg, #071424, #0b1728 56%, #151414); text-align: center; height: 100%; position: relative; }
         .cert-gold-frame { position: absolute; inset: 3.2%; border: 2px solid var(--accent); pointer-events: none; }
-        .cert-monogram { position: absolute; top: 22%; right: 14%; color: rgba(255,231,181,0.06); font-size: clamp(150px, 22vw, 310px); font-weight: 900; }
+        .cert-monogram { position: absolute; top: 22%; right: 14%; color: rgba(255,231,181,0.06); font-size: clamp(150px, 22cqw, 310px); font-weight: 900; }
         .executive-template header { position: relative; z-index: 1; }
-        .executive-template header p { margin: 0.8% 0 0; font-size: clamp(7px, 0.8vw, 10px); letter-spacing: 0.18em; text-transform: uppercase; }
+        .executive-template header p { margin: 0.8% 0 0; font-size: clamp(7px, 0.8cqw, 10px); letter-spacing: 0.18em; text-transform: uppercase; }
         .executive-template .cert-gold .cert-logo-mark { background: linear-gradient(135deg, var(--accent), #f5df9b); color: #0c1424; }
         .executive-template section { position: relative; z-index: 1; align-self: center; }
-        .cert-distinction { margin: 0 0 1.2%; color: #e6bc62; font-size: clamp(11px, 1.15vw, 16px); letter-spacing: 0.16em; text-transform: uppercase; }
-        .executive-template h3 { margin: 0 0 2.3%; font-family: Georgia, "Times New Roman", serif; font-size: clamp(34px, 4.4vw, 62px); font-weight: 500; text-transform: uppercase; }
-        .executive-template .cert-recipient { margin: 0 auto 2.1%; max-width: 76%; color: #ffd17d; font-family: Georgia, "Times New Roman", serif; font-size: clamp(44px, 6vw, 82px); line-height: 1.05; white-space: nowrap; display: block; }
-        .executive-template .cert-description { max-width: 70%; margin: 0 auto 2%; color: #fff6e4; font-size: clamp(13px, 1.35vw, 19px); line-height: 1.45; }
-        .cert-quote { display: inline-block; max-width: 70%; margin: 0; color: #ffdd8a; font-family: Georgia, "Times New Roman", serif; font-size: clamp(15px, 1.7vw, 25px); font-style: italic; }
+        .cert-distinction { margin: 0 0 1.2%; color: #e6bc62; font-size: clamp(11px, 1.15cqw, 16px); letter-spacing: 0.16em; text-transform: uppercase; }
+        .executive-template h3 { margin: 0 0 2.3%; font-family: Georgia, "Times New Roman", serif; font-size: clamp(34px, 4.4cqw, 62px); font-weight: 500; text-transform: uppercase; }
+        .executive-template .cert-recipient { margin: 0 auto 2.1%; max-width: 76%; color: #ffd17d; font-family: Georgia, "Times New Roman", serif; font-size: clamp(44px, 6cqw, 82px); line-height: 1.05; white-space: nowrap; display: block; }
+        .executive-template .cert-description { max-width: 70%; margin: 0 auto 2%; color: #fff6e4; font-size: clamp(13px, 1.35cqw, 19px); line-height: 1.45; }
+        .cert-quote { display: inline-block; max-width: 70%; margin: 0; color: #ffdd8a; font-family: Georgia, "Times New Roman", serif; font-size: clamp(15px, 1.7cqw, 25px); font-style: italic; }
         .executive-template footer { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 8%; color: #fff6e4; }
         .executive-template .cert-qr-wrap { display: grid; justify-items: end; gap: 6px; }
 
@@ -233,8 +254,8 @@ export default function CertificateGeneratorWorkspace() {
         .cert-split-brand .cert-rail-title { margin-top: 28%; }
         .cert-dot-grid { position: absolute; left: 8%; bottom: 8%; width: 26%; aspect-ratio: 1; background-image: radial-gradient(rgba(255,255,255,0.65) 1.2px, transparent 1.2px); background-size: 10px 10px; }
         .cert-split-body { position: relative; padding: 14% 8% 7% 10%; height: 100%; }
-        .cert-split-body .cert-program { max-width: 84%; margin: 0 0 1.3%; color: #5f22b4; font-size: clamp(21px, 2.35vw, 35px); font-weight: 850; white-space: nowrap; }
-        .cert-split-body .cert-description { max-width: 78%; font-size: clamp(11px, 1.1vw, 16px); line-height: 1.5; }
+        .cert-split-body .cert-program { max-width: 84%; margin: 0 0 1.3%; color: #5f22b4; font-size: clamp(21px, 2.35cqw, 35px); font-weight: 850; white-space: nowrap; }
+        .cert-split-body .cert-description { max-width: 78%; font-size: clamp(11px, 1.1cqw, 16px); line-height: 1.5; }
         .cert-split-body .cert-signature-block { position: absolute; right: 9%; bottom: 28%; color: #0f172a; }
         .cert-info-rail { position: absolute; left: -8%; right: 8%; bottom: 6%; display: grid; grid-template-columns: 1fr 1.2fr 1fr; align-items: center; gap: 2%; padding: 2.4% 4%; border: 1px solid #ccd3df; border-radius: 999px; background: rgba(248,250,252,0.95); }
         .cert-info-rail > div { display: grid; gap: 5px; }
@@ -280,8 +301,16 @@ export default function CertificateGeneratorWorkspace() {
           <label>Issuing company / institution
             <input value={state.companyName} onChange={(e) => update('companyName', e.target.value)} />
           </label>
-          <label>Tagline
-            <input value={state.tagline} onChange={(e) => update('tagline', e.target.value)} />
+          <label>Company logo (optional)
+            <input type="file" accept="image/*" onChange={handleLogoUpload} />
+          </label>
+          {logoImg && (
+            <button type="button" onClick={() => setLogoImg(null)} style={{ justifySelf: 'start', background: 'none', border: 'none', color: '#0f766e', fontSize: '11px', fontWeight: 700, cursor: 'pointer', padding: 0 }}>
+              Remove logo — use "{logoInitial}" mark instead
+            </button>
+          )}
+          <label>Tagline (optional)
+            <input value={state.tagline} onChange={(e) => update('tagline', e.target.value)} placeholder="Leave blank for none" />
           </label>
           <label>Certificate type
             <select value={state.certificateType} onChange={(e) => update('certificateType', e.target.value)}>
@@ -362,10 +391,10 @@ export default function CertificateGeneratorWorkspace() {
                 <div className="cert-inner-border" />
                 <header className="classic-head">
                   <div className="cert-logo-row center">
-                    <span className="cert-logo-mark">C</span>
+                    <LogoMark />
                     <span>{emptyToDefault(state, 'companyName')}</span>
                   </div>
-                  <p>{emptyToDefault(state, 'tagline')}</p>
+                  {state.tagline && <p>{state.tagline}</p>}
                 </header>
                 <section className="classic-content">
                   <h3>Certificate</h3>
@@ -400,10 +429,10 @@ export default function CertificateGeneratorWorkspace() {
               <div className="modern-template">
                 <aside className="modern-rail">
                   <div className="cert-logo-row">
-                    <span className="cert-logo-mark">C</span>
+                    <LogoMark />
                     <span>{emptyToDefault(state, 'companyName')}</span>
                   </div>
-                  <p>{emptyToDefault(state, 'tagline')}</p>
+                  {state.tagline && <p>{state.tagline}</p>}
                   <div className="cert-rail-title">
                     <span>Certificate of</span>
                     <strong>{certType}</strong>
@@ -438,10 +467,10 @@ export default function CertificateGeneratorWorkspace() {
                 <div className="cert-monogram">C</div>
                 <header>
                   <div className="cert-logo-row center cert-gold">
-                    <span className="cert-logo-mark">C</span>
+                    <LogoMark />
                     <span>{emptyToDefault(state, 'companyName')}</span>
                   </div>
-                  <p>{emptyToDefault(state, 'tagline')}</p>
+                  {state.tagline && <p>{state.tagline}</p>}
                 </header>
                 <section>
                   <p className="cert-distinction">Presented with distinction</p>
@@ -474,10 +503,10 @@ export default function CertificateGeneratorWorkspace() {
                   <div className="cert-split-shape" />
                   <div className="cert-dot-grid" />
                   <div className="cert-logo-row">
-                    <span className="cert-logo-mark">C</span>
+                    <LogoMark />
                     <span>{emptyToDefault(state, 'companyName')}</span>
                   </div>
-                  <p>{emptyToDefault(state, 'tagline')}</p>
+                  {state.tagline && <p>{state.tagline}</p>}
                   <div className="cert-rail-title">
                     <span>Certificate of</span>
                     <strong>{certType}</strong>

@@ -10,7 +10,7 @@ const TOOLS = [
   { slug: 'quotation-generator', title: 'Quotation Generator', desc: 'Generate professional quotations and proforma invoices', available: true },
   { slug: 'resume-builder', title: 'Resume Builder', desc: 'Build a professional resume from scratch and download as PDF', available: true },
   { slug: 'receipt-generator', title: 'Receipt Generator', desc: 'Create payment receipts instantly', available: false },
-  { slug: 'delivery-note', title: 'Delivery Note', desc: 'Generate delivery notes for your orders', available: false },
+  { slug: 'delivery-note-waybill', title: 'Delivery Note & Waybill Generator', desc: 'Confirm delivery or document goods in transit', available: true },
   { slug: 'id-card-generator', title: 'ID Card Generator', desc: 'Design and print professional ID cards', available: true },
   { slug: 'certificate-generator', title: 'Certificate Generator', desc: 'Create certificates of completion or achievement', available: false },
   { slug: 'business-card', title: 'Business Card Generator', desc: 'Design and download professional business cards', available: false },

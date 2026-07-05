@@ -785,7 +785,7 @@ export default function HomePage() {
         <div className="hero-grid">
           <div>
             <div className="status-pill"><span className="status-dot"></span>100% free to start</div>
-            <h1>One platform,<br><span className="gradient-text">endless possibilities.</span></h1>
+            <h1>One platform,<br /><span className="gradient-text">endless possibilities.</span></h1>
             <p className="hero-copy">Convert, edit, scan, generate, calculate and organize documents, images and business essentials in seconds.</p>
             <form className="search-wrap" action="#tools">
               <input ref={searchRef} id="toolSearch" type="search" aria-label="Search Convertam tools" placeholder="Search 63+ tools (PDF to Word, Invoice Generator...)" />

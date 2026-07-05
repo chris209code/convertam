@@ -78,7 +78,7 @@ function useAutoFit(deps) {
       if (!el.dataset.baseFontSize) el.dataset.baseFontSize = String(baseSize);
       el.style.fontSize = `${baseSize}px`;
       let size = baseSize;
-      const minSize = baseSize * 0.28;
+      const minSize = baseSize * 0.15;
       let guard = 0;
       while (el.scrollWidth > el.clientWidth + 1 && size > minSize && guard < 40) {
         size -= 0.5;
@@ -430,14 +430,14 @@ export default function CertificateGeneratorWorkspace() {
         .cp-title { position: absolute; top: 20.024%; left: 0; right: 0; font-family: 'Playfair Display', serif; font-weight: 800; font-size: clamp(28px, 5.667cqw, 68px); letter-spacing: clamp(2px, 0.5cqw, 6px); }
         .cp-subtitle { position: absolute; top: 30.624%; left: 0; right: 0; font-family: 'Playfair Display', serif; font-weight: 600; font-size: clamp(13px, 2.25cqw, 27px); color: var(--accent); letter-spacing: clamp(3px, 0.75cqw, 9px); }
         .cp-intro { position: absolute; top: 37.456%; left: 0; right: 0; font-size: clamp(8px, 1.083cqw, 13px); letter-spacing: clamp(1px, 0.25cqw, 3px); color: #8A8262; }
-        .cp-recipient { position: absolute; top: 40.99%; left: 0; right: 0; font-size: clamp(24px, 5.5cqw, 66px); max-width: 76%; margin: 0 auto; white-space: nowrap; overflow: hidden; }
-        .cp-divider { position: absolute; top: 51.001%; left: 50%; transform: translateX(-50%); width: 23.333%; height: 1px; background: #B08D3F; }
+        .cp-recipient { position: absolute; top: 40.99%; left: 0; right: 0; font-size: clamp(24px, 5.5cqw, 66px); max-width: 88%; margin: 0 auto; white-space: nowrap; overflow: hidden; }
+        .cp-divider { position: absolute; top: 52.6%; left: 50%; transform: translateX(-50%); width: 23.333%; height: 1px; background: #B08D3F; }
         .cp-citation { position: absolute; top: 53.239%; left: 50%; transform: translateX(-50%); width: 58.333%; font-size: clamp(9px, 1.125cqw, 13.5px); letter-spacing: clamp(1px, 0.125cqw, 1.5px); line-height: 1.8; color: #7D765E; }
         .cp-course { position: absolute; top: 59.835%; left: 0; right: 0; font-family: 'Playfair Display', serif; font-weight: 700; font-size: clamp(13px, 2.25cqw, 27px); overflow-wrap: anywhere; }
         .cp-date-sentence { position: absolute; top: 64.782%; left: 0; right: 0; font-family: 'Playfair Display', serif; font-style: italic; font-size: clamp(9px, 1.25cqw, 15px); color: #7D765E; }
-        .cp-sig-block { position: absolute; top: 76.325%; width: 19.167%; text-align: center; }
-        .cp-sig-block.left { left: 8.333%; }
-        .cp-sig-block.right { right: 8.333%; }
+        .cp-sig-block { position: absolute; top: 76.325%; width: 24%; text-align: center; }
+        .cp-sig-block.left { left: 6%; }
+        .cp-sig-block.right { right: 6%; }
         .cp-sig-block.cp-sig-solo { left: 50%; right: auto; transform: translateX(-50%); }
         .cp-sig-line { height: 26px; border-bottom: 1px solid #B0A98C; margin-bottom: 6px; }
         .cp-sig-printed-name { font-family: 'Playfair Display', serif; font-weight: 600; font-size: clamp(10px, 1.3cqw, 15px); white-space: nowrap; overflow: hidden; }

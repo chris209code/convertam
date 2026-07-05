@@ -116,6 +116,50 @@ export default function CertificateGeneratorWorkspace() {
     );
   }
 
+  function LaurelSeal({ size = 84 }) {
+    const leaf = (side, i, count) => {
+      const t = i / (count - 1);
+      const angle = side === 'l' ? 200 - t * 130 : -20 + t * 130; // degrees, sweeping up each side
+      const rad = (angle * Math.PI) / 180;
+      const r = 34;
+      const cx = 50 + r * Math.cos(rad);
+      const cy = 50 - r * Math.sin(rad);
+      const scale = 0.55 + t * 0.55;
+      const rot = angle + (side === 'l' ? 100 : 80);
+      return <ellipse key={`${side}-${i}`} cx={cx} cy={cy} rx={5.2 * scale} ry={2.6 * scale} transform={`rotate(${rot} ${cx} ${cy})`} fill="currentColor" />;
+    };
+    const leaves = [];
+    for (let i = 0; i < 7; i++) { leaves.push(leaf('l', i, 7)); leaves.push(leaf('r', i, 7)); }
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" className="cert-laurel-seal">
+        <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="1" />
+        {leaves}
+        <path d="M50 32 L54.5 44.5 L68 44.5 L57 52.5 L61 65 L50 57 L39 65 L43 52.5 L32 44.5 L45.5 44.5 Z" fill="currentColor" />
+      </svg>
+    );
+  }
+
+  // Best-effort stylistic reconstruction of an ornate corner flourish (curling
+  // vine + leaves) — traced by hand from a raster reference, not vector source,
+  // so treat as a close match in the same spirit rather than a pixel trace.
+  function CornerFlourish({ corner }) {
+    const transforms = { tl: '', tr: 'scale(-1,1)', bl: 'scale(1,-1)', br: 'scale(-1,-1)' };
+    return (
+      <svg width="54" height="54" viewBox="0 0 54 54" className={`cert-corner-flourish cert-corner-flourish-${corner}`}>
+        <g transform={transforms[corner]} fill="none" stroke="currentColor" strokeWidth="1.4">
+          <path d="M4 4 C4 20 10 34 26 40 C36 44 44 42 50 36" />
+          <path d="M4 4 C16 4 28 8 34 20 C38 28 38 36 32 42" />
+          <ellipse cx="12" cy="10" rx="4.5" ry="2.4" transform="rotate(35 12 10)" fill="currentColor" stroke="none" />
+          <ellipse cx="20" cy="8" rx="4" ry="2.1" transform="rotate(20 20 8)" fill="currentColor" stroke="none" />
+          <ellipse cx="8" cy="20" rx="4" ry="2.1" transform="rotate(70 8 20)" fill="currentColor" stroke="none" />
+          <ellipse cx="27" cy="15" rx="3.2" ry="1.7" transform="rotate(15 27 15)" fill="currentColor" stroke="none" />
+          <ellipse cx="16" cy="28" rx="3.2" ry="1.7" transform="rotate(70 16 28)" fill="currentColor" stroke="none" />
+        </g>
+      </svg>
+    );
+  }
+
   return (
     <div className="cert-app-shell">
       <style>{`
@@ -187,14 +231,12 @@ export default function CertificateGeneratorWorkspace() {
         /* Classic Prestige */
         .classic-template { background: linear-gradient(rgba(255,255,255,0.52), rgba(255,255,255,0.52)), repeating-linear-gradient(35deg, #f7ecd8 0 8px, #fbf3e5 8px 16px); color: #081842; padding: 5.4%; text-align: center; height: 100%; position: relative; }
         .classic-template .cert-inner-border { position: absolute; inset: 4%; border: 3px double var(--accent); pointer-events: none; }
-        .cert-corner { position: absolute; width: 12%; aspect-ratio: 1; border-color: var(--accent); opacity: 0.9; }
-        .cert-corner::before, .cert-corner::after { content: ""; position: absolute; border: 1px solid var(--accent); border-radius: 50%; }
-        .cert-corner::before { inset: 18% 4% 38% 38%; }
-        .cert-corner::after { inset: 40% 40% 10% 10%; }
-        .cert-corner-tl { top: 5%; left: 5%; border-top: 2px solid; border-left: 2px solid; }
-        .cert-corner-tr { top: 5%; right: 5%; border-top: 2px solid; border-right: 2px solid; transform: scaleX(-1); }
-        .cert-corner-bl { bottom: 5%; left: 5%; border-bottom: 2px solid; border-left: 2px solid; transform: scaleY(-1); }
-        .cert-corner-br { right: 5%; bottom: 5%; border-right: 2px solid; border-bottom: 2px solid; transform: scale(-1); }
+        .cert-corner-flourish-wrap { position: absolute; width: 15%; aspect-ratio: 1; color: var(--accent); opacity: 0.95; }
+        .cert-corner-flourish-wrap svg { width: 100%; height: 100%; }
+        .cert-corner-tl-pos { top: 4%; left: 4%; }
+        .cert-corner-tr-pos { top: 4%; right: 4%; }
+        .cert-corner-bl-pos { bottom: 4%; left: 4%; }
+        .cert-corner-br-pos { bottom: 4%; right: 4%; }
         .classic-head p { margin: 0.8% 0 2.5%; font-size: clamp(8px, 0.85cqw, 13px); letter-spacing: 0.14em; text-transform: uppercase; }
         .classic-content h3 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(38px, 6cqw, 76px); font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; }
         .classic-content h4 { margin: -0.5% 0 2%; color: var(--accent); font-family: Georgia, "Times New Roman", serif; font-size: clamp(16px, 2.35cqw, 32px); font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; }
@@ -205,7 +247,9 @@ export default function CertificateGeneratorWorkspace() {
         .classic-content .cert-description { width: 58%; margin: 0 auto 0.9%; font-size: clamp(9px, 1cqw, 14px); line-height: 1.45; text-transform: uppercase; }
         .classic-content .cert-program { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(16px, 2cqw, 28px); font-weight: 800; }
         .classic-footer { position: absolute; left: 16%; right: 16%; bottom: 9%; display: flex; align-items: end; justify-content: space-between; }
-        .cert-seal { display: grid; place-items: center; width: clamp(54px, 8cqw, 94px); aspect-ratio: 1; border: 6px double var(--accent); border-radius: 50%; color: var(--accent); font-family: Georgia, "Times New Roman", serif; font-weight: 900; text-transform: uppercase; }
+        .cert-seal { display: grid; place-items: center; width: clamp(54px, 8cqw, 94px); aspect-ratio: 1; color: var(--accent); }
+        .cert-seal svg { width: 100%; height: 100%; }
+        .cert-seal-executive { color: var(--accent); }
         .classic-meta { position: absolute; right: 8%; bottom: 4.8%; display: flex; gap: 16px; font-size: clamp(7px, 0.75cqw, 10px); text-transform: uppercase; }
 
         /* Modern Professional */
@@ -242,7 +286,7 @@ export default function CertificateGeneratorWorkspace() {
         .executive-template .cert-recipient { margin: 0 auto 2.1%; max-width: 76%; color: #ffd17d; font-family: Georgia, "Times New Roman", serif; font-size: clamp(44px, 6cqw, 82px); line-height: 1.05; white-space: nowrap; display: block; }
         .executive-template .cert-description { max-width: 70%; margin: 0 auto 2%; color: #fff6e4; font-size: clamp(13px, 1.35cqw, 19px); line-height: 1.45; }
         .cert-quote { display: inline-block; max-width: 70%; margin: 0; color: #ffdd8a; font-family: Georgia, "Times New Roman", serif; font-size: clamp(15px, 1.7cqw, 25px); font-style: italic; }
-        .executive-template footer { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 8%; color: #fff6e4; }
+        .executive-template footer { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr auto auto 1fr; align-items: end; gap: 5%; color: #fff6e4; }
         .executive-template .cert-qr-wrap { display: grid; justify-items: end; gap: 6px; }
 
         /* Contemporary Split */
@@ -384,10 +428,10 @@ export default function CertificateGeneratorWorkspace() {
           <article className="certificate" style={cssVars}>
             {template === 'classic' && (
               <div className="classic-template">
-                <div className="cert-corner cert-corner-tl" />
-                <div className="cert-corner cert-corner-tr" />
-                <div className="cert-corner cert-corner-bl" />
-                <div className="cert-corner cert-corner-br" />
+                <div className="cert-corner-flourish-wrap cert-corner-tl-pos"><CornerFlourish corner="tl" /></div>
+                <div className="cert-corner-flourish-wrap cert-corner-tr-pos"><CornerFlourish corner="tr" /></div>
+                <div className="cert-corner-flourish-wrap cert-corner-bl-pos"><CornerFlourish corner="bl" /></div>
+                <div className="cert-corner-flourish-wrap cert-corner-br-pos"><CornerFlourish corner="br" /></div>
                 <div className="cert-inner-border" />
                 <header className="classic-head">
                   <div className="cert-logo-row center">
@@ -411,7 +455,7 @@ export default function CertificateGeneratorWorkspace() {
                     <strong>{emptyToDefault(state, 'issuerName')}</strong>
                     <span>{emptyToDefault(state, 'issuerPosition')}</span>
                   </div>
-                  <div className="cert-seal">Seal</div>
+                  <div className="cert-seal"><LaurelSeal /></div>
                   <div className="cert-signature-block">
                     <div className="cert-signature-line">Signature</div>
                     <strong>{emptyToDefault(state, 'secondIssuerName')}</strong>
@@ -485,6 +529,7 @@ export default function CertificateGeneratorWorkspace() {
                     <strong>{emptyToDefault(state, 'issuerName')}</strong>
                     <span>{emptyToDefault(state, 'issuerPosition')}</span>
                   </div>
+                  <div className="cert-seal cert-seal-executive"><LaurelSeal size={70} /></div>
                   <div className="cert-date-block">
                     <span>Date</span>
                     <strong>{emptyToDefault(state, 'issueDate')}</strong>

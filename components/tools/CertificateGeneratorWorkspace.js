@@ -117,25 +117,37 @@ export default function CertificateGeneratorWorkspace() {
   }
 
   function LaurelSeal({ size = 84 }) {
-    const leaf = (side, i, count) => {
-      const t = i / (count - 1);
-      const angle = side === 'l' ? 200 - t * 130 : -20 + t * 130; // degrees, sweeping up each side
-      const rad = (angle * Math.PI) / 180;
-      const r = 34;
-      const cx = 50 + r * Math.cos(rad);
-      const cy = 50 - r * Math.sin(rad);
-      const scale = 0.55 + t * 0.55;
-      const rot = angle + (side === 'l' ? 100 : 80);
-      return <ellipse key={`${side}-${i}`} cx={cx} cy={cy} rx={5.2 * scale} ry={2.6 * scale} transform={`rotate(${rot} ${cx} ${cy})`} fill="currentColor" />;
+    const Leaf = ({ cx, cy, len, angleDeg }) => (
+      <path
+        d={`M ${cx} ${cy} C ${cx + len * 0.15} ${cy - len * 0.4}, ${cx + len * 0.75} ${cy - len * 0.32}, ${cx + len} ${cy} C ${cx + len * 0.75} ${cy + len * 0.32}, ${cx + len * 0.15} ${cy + len * 0.4}, ${cx} ${cy} Z`}
+        fill="currentColor"
+        transform={`rotate(${angleDeg} ${cx} ${cy})`}
+      />
+    );
+    const branch = (side) => {
+      const leaves = [];
+      const count = 6;
+      for (let i = 0; i < count; i++) {
+        const t = i / (count - 1);
+        const leftAngle = 200 - t * 80; // sweeps lower-left to upper-left, degrees
+        const theta = side === 'l' ? leftAngle : 180 - leftAngle;
+        const rad = (theta * Math.PI) / 180;
+        const r = 30;
+        const x = 50 + r * Math.cos(rad);
+        const y = 50 - r * Math.sin(rad);
+        const leafLen = 10 + t * 6;
+        const leafAngle = side === 'l' ? theta - 90 : theta + 90;
+        leaves.push(<Leaf key={`${side}-${i}`} cx={x} cy={y} len={leafLen} angleDeg={leafAngle} />);
+      }
+      return leaves;
     };
-    const leaves = [];
-    for (let i = 0; i < 7; i++) { leaves.push(leaf('l', i, 7)); leaves.push(leaf('r', i, 7)); }
     return (
       <svg width={size} height={size} viewBox="0 0 100 100" className="cert-laurel-seal">
-        <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" strokeWidth="1.6" />
         <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="1" />
-        {leaves}
-        <path d="M50 32 L54.5 44.5 L68 44.5 L57 52.5 L61 65 L50 57 L39 65 L43 52.5 L32 44.5 L45.5 44.5 Z" fill="currentColor" />
+        {branch('l')}
+        {branch('r')}
+        <path d="M50 30 L55 43 L69 43 L57.5 51.5 L62 65 L50 56.5 L38 65 L42.5 51.5 L31 43 L45 43 Z" fill="currentColor" />
       </svg>
     );
   }
@@ -144,17 +156,24 @@ export default function CertificateGeneratorWorkspace() {
   // vine + leaves) — traced by hand from a raster reference, not vector source,
   // so treat as a close match in the same spirit rather than a pixel trace.
   function CornerFlourish({ corner }) {
-    const transforms = { tl: '', tr: 'scale(-1,1)', bl: 'scale(1,-1)', br: 'scale(-1,-1)' };
+    const transforms = { tl: '', tr: 'translate(64,0) scale(-1,1)', bl: 'translate(0,64) scale(1,-1)', br: 'translate(64,64) scale(-1,-1)' };
+    // A proper almond-shaped leaf, not a squashed dot — recognizable at a distance.
+    const Leaf = ({ cx, cy, len, angleDeg }) => (
+      <path
+        d={`M ${cx} ${cy} C ${cx + len * 0.15} ${cy - len * 0.35}, ${cx + len * 0.75} ${cy - len * 0.28}, ${cx + len} ${cy} C ${cx + len * 0.75} ${cy + len * 0.28}, ${cx + len * 0.15} ${cy + len * 0.35}, ${cx} ${cy} Z`}
+        fill="currentColor"
+        transform={`rotate(${angleDeg} ${cx} ${cy})`}
+      />
+    );
     return (
-      <svg width="54" height="54" viewBox="0 0 54 54" className={`cert-corner-flourish cert-corner-flourish-${corner}`}>
-        <g transform={transforms[corner]} fill="none" stroke="currentColor" strokeWidth="1.4">
-          <path d="M4 4 C4 20 10 34 26 40 C36 44 44 42 50 36" />
-          <path d="M4 4 C16 4 28 8 34 20 C38 28 38 36 32 42" />
-          <ellipse cx="12" cy="10" rx="4.5" ry="2.4" transform="rotate(35 12 10)" fill="currentColor" stroke="none" />
-          <ellipse cx="20" cy="8" rx="4" ry="2.1" transform="rotate(20 20 8)" fill="currentColor" stroke="none" />
-          <ellipse cx="8" cy="20" rx="4" ry="2.1" transform="rotate(70 8 20)" fill="currentColor" stroke="none" />
-          <ellipse cx="27" cy="15" rx="3.2" ry="1.7" transform="rotate(15 27 15)" fill="currentColor" stroke="none" />
-          <ellipse cx="16" cy="28" rx="3.2" ry="1.7" transform="rotate(70 16 28)" fill="currentColor" stroke="none" />
+      <svg width="64" height="64" viewBox="0 0 64 64" className={`cert-corner-flourish cert-corner-flourish-${corner}`}>
+        <g transform={transforms[corner]}>
+          <path d="M6 6 C6 22 10 38 24 48 C34 55 44 54 52 47" fill="none" stroke="currentColor" strokeWidth="1.6" />
+          <Leaf cx={9} cy={9} len={13} angleDeg={35} />
+          <Leaf cx={14} cy={22} len={12} angleDeg={65} />
+          <Leaf cx={19} cy={35} len={11} angleDeg={95} />
+          <Leaf cx={28} cy={45} len={10} angleDeg={125} />
+          <Leaf cx={40} cy={50} len={9} angleDeg={155} />
         </g>
       </svg>
     );

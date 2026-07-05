@@ -26,6 +26,7 @@ import ResumeBuilderWorkspace from '@/components/tools/ResumeBuilderWorkspace';
 import IdCardGeneratorWorkspace from '@/components/tools/IdCardGeneratorWorkspace';
 import DocumentEnhancerWorkspace from '@/components/tools/DocumentEnhancerWorkspace';
 import DeliveryNoteWaybillWorkspace from '@/components/tools/DeliveryNoteWaybillWorkspace';
+import CertificateGeneratorWorkspace from '@/components/tools/CertificateGeneratorWorkspace';
 import PaymentGate from '@/components/PaymentGate';
 import ComingSoon from '@/components/tools/ComingSoon';
 import Link from 'next/link';
@@ -36,7 +37,7 @@ const isFree = (mode) =>
   ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice',
    'remove-pages', 'add-page-numbers', 'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize',
    'fill', 'write-on-pdf', 'quotation', 'calculator-hub', 'utilities-hub', 'cv-improver', 'resume-builder',
-   'id-card-generator', 'document-enhancer', 'delivery-note-waybill'].includes(mode);
+   'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'certificate-generator'].includes(mode);
 
 function getPriceBadge(mode) {
   if (isFree(mode)) return 'Free';
@@ -115,6 +116,7 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'id-card-generator' && <IdCardGeneratorWorkspace />}
       {tool.mode === 'document-enhancer' && <DocumentEnhancerWorkspace />}
       {tool.mode === 'delivery-note-waybill' && <DeliveryNoteWaybillWorkspace />}
+      {tool.mode === 'certificate-generator' && <CertificateGeneratorWorkspace />}
       {tool.mode === 'soon' && <ComingSoon title={tool.title} note={tool.note} />}
 
       <div className="flex items-center gap-2 mt-4 px-4 py-3 rounded-xl text-sm" style={{ background: '#f0f5ff', border: '1px solid #d0dcf5' }}>

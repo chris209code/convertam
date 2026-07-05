@@ -10,6 +10,7 @@ const defaults = {
   programTitle: 'Program or Achievement Title',
   description: 'Description text goes here and remains editable.',
   issueDate: 'Date',
+  dateSentence: 'Awarded this day',
   certificateId: 'Certificate ID',
   verificationUrl: '',
   issuerName: 'Issuer Name',
@@ -76,6 +77,10 @@ export default function CertificateGeneratorWorkspace() {
   const [template, setTemplate] = useState('classic');
   const [state, setState] = useState({ ...defaults, ...templateDefaults.classic });
   const [logoImg, setLogoImg] = useState(null);
+  const [customSealImg, setCustomSealImg] = useState(null);
+  const [ornamentLevel, setOrnamentLevel] = useState('Ornate');
+  const [sealStyle, setSealStyle] = useState('As Designed');
+  const [nameStyle, setNameStyle] = useState('As Designed');
 
   const update = (key, val) => setState((s) => ({ ...s, [key]: val }));
 
@@ -84,6 +89,14 @@ export default function CertificateGeneratorWorkspace() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => setLogoImg(reader.result);
+    reader.readAsDataURL(file);
+  }
+
+  function handleCustomSealUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setCustomSealImg(reader.result);
     reader.readAsDataURL(file);
   }
 
@@ -107,6 +120,78 @@ export default function CertificateGeneratorWorkspace() {
 
   const cssVars = { '--brand': state.brandColor, '--accent': state.accentColor };
   const logoInitial = (state.companyName || 'C').trim().charAt(0).toUpperCase();
+
+  // Exact token mapping per the Classic Prestige design spec's "Name Style" enum
+  const nameFonts = {
+    'As Designed': { fontFamily: "'Great Vibes', cursive", fontWeight: 400, fontStyle: 'normal', letterSpacing: '0px' },
+    'Elegant Script': { fontFamily: "'Great Vibes', cursive", fontWeight: 400, fontStyle: 'normal', letterSpacing: '0px' },
+    'Classic Serif': { fontFamily: "'Playfair Display', serif", fontWeight: 700, fontStyle: 'italic', letterSpacing: '0px' },
+    'Bold Modern': { fontFamily: "'Inter', sans-serif", fontWeight: 800, fontStyle: 'normal', letterSpacing: '-1px' },
+  };
+  const classicNameStyle = nameFonts[nameStyle] || nameFonts['As Designed'];
+
+  // Exact Classic Prestige seal variants, reproduced from the design spec's literal
+  // coordinates — a distinct set from LaurelSeal (which Executive uses; untouched).
+  const laurelTransforms = [
+    [86, 50, 90], [84.8, 59.3, 105], [81.2, 68, 120], [75.5, 75.5, 135], [68, 81.2, 150],
+    [59.3, 84.8, 165], [50, 86, 180], [40.7, 84.8, 195], [32, 81.2, 210], [24.5, 75.5, 225],
+    [18.8, 68, 240], [15.2, 59.3, 255], [14, 50, 270], [15.2, 40.7, 285], [18.8, 32, 300],
+    [24.5, 24.5, 315], [32, 18.8, 330], [40.7, 15.2, 345], [50, 14, 0], [59.3, 15.2, 15],
+    [68, 18.8, 30], [75.5, 24.5, 45], [81.2, 32, 60], [84.8, 40.7, 75],
+  ];
+  function ClassicLaurelMedallion({ letter }) {
+    return (
+      <svg viewBox="0 0 100 100" className="cp-seal-svg cp-seal-wrap">
+        <defs><path id="cpLeaf" d="M0,0 C2.4,-4.8 2.4,-11.2 0,-16 C-2.4,-11.2 -2.4,-4.8 0,0 Z" /></defs>
+        <circle cx="50" cy="50" r="16" fill="none" stroke="#B08D3F" strokeWidth="1" />
+        <text x="50" y="57" fontFamily="Playfair Display, serif" fontWeight="700" fontSize="20" fill="#B08D3F" textAnchor="middle">{letter}</text>
+        <g fill="#B08D3F">
+          {laurelTransforms.map(([x, y, r], i) => (
+            <use key={i} href="#cpLeaf" transform={`translate(${x},${y}) rotate(${r}) scale(0.6)`} />
+          ))}
+        </g>
+      </svg>
+    );
+  }
+  function ClassicRosette({ letter }) {
+    return (
+      <svg viewBox="0 0 100 100" className="cp-seal-rosette cp-seal-wrap">
+        <polygon points="50,8 57.7,23.5 74,18 68.5,34.3 84,42 68.5,49.7 74,66 57.7,60.5 50,76 42.3,60.5 26,66 31.5,49.7 16,42 31.5,34.3 26,18 42.3,23.5" fill="#B08D3F" />
+        <circle cx="50" cy="42" r="15" fill="#FBF6EA" stroke="#B08D3F" strokeWidth="1.5" />
+        <text x="50" y="48" fontFamily="Playfair Display, serif" fontWeight="700" fontSize="16" fill="#B08D3F" textAnchor="middle">{letter}</text>
+        <path d="M40,56 L46,56 L46,90 L43,82 L40,90 Z" fill="#B08D3F" />
+        <path d="M54,56 L60,56 L60,90 L57,82 L54,90 Z" fill="#B08D3F" />
+      </svg>
+    );
+  }
+  function ClassicEngraved({ letter }) {
+    return (
+      <svg viewBox="0 0 100 100" className="cp-seal-engraved cp-seal-wrap">
+        <circle cx="50" cy="50" r="46" fill="none" stroke="#B08D3F" strokeWidth="1.5" />
+        <circle cx="50" cy="50" r="41" fill="none" stroke="#B08D3F" strokeWidth="4" strokeDasharray="1.6 3.2" />
+        <circle cx="50" cy="50" r="35" fill="none" stroke="#B08D3F" strokeWidth="0.75" />
+        <circle cx="50" cy="50" r="24" fill="none" stroke="#B08D3F" strokeWidth="1" />
+        <text x="50" y="59" fontFamily="Playfair Display, serif" fontWeight="700" fontStyle="italic" fontSize="26" fill="#B08D3F" textAnchor="middle">{letter}</text>
+        <polygon points="50,6 51.8,10.5 56.5,10.8 52.8,13.7 54.1,18.2 50,15.6 45.9,18.2 47.2,13.7 43.5,10.8 48.2,10.5" fill="#B08D3F" />
+      </svg>
+    );
+  }
+  function renderClassicSeal() {
+    if (sealStyle === 'As Designed') {
+      return (
+        <div className="cp-seal-wrap cp-seal-as-designed">
+          <div className="cp-seal-as-designed-inner">{logoInitial}</div>
+        </div>
+      );
+    }
+    if (sealStyle === 'Laurel Medallion') return <ClassicLaurelMedallion letter={logoInitial} />;
+    if (sealStyle === 'Rosette Ribbon') return <ClassicRosette letter={logoInitial} />;
+    if (sealStyle === 'Engraved Seal') return <ClassicEngraved letter={logoInitial} />;
+    if (sealStyle === 'Custom Seal (Your Image)') {
+      return <img className="cp-seal-wrap cp-seal-custom-img" src={customSealImg || '/certificates/seal-custom.png'} alt="Organization seal" />;
+    }
+    return null;
+  }
 
   function LogoMark({ extraClass = '' }) {
     return (
@@ -182,6 +267,7 @@ export default function CertificateGeneratorWorkspace() {
   return (
     <div className="cert-app-shell">
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;0,800;0,900;1,600&family=Great+Vibes&family=Dancing+Script:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
         .cert-app-shell {
           --ink: #0b1530; --muted: #65708a; --panel: #ffffff; --page: #edf1f7; --line: #d8deea;
           --brand: #0f766e; --accent: #c9932d; --certificate-ratio: 1.4142;
@@ -247,29 +333,39 @@ export default function CertificateGeneratorWorkspace() {
         }
         .cert-qr-wrap.is-hidden { visibility: hidden; }
 
-        /* Classic Prestige */
-        .classic-template { background: linear-gradient(rgba(255,255,255,0.52), rgba(255,255,255,0.52)), repeating-linear-gradient(35deg, #f7ecd8 0 8px, #fbf3e5 8px 16px); color: #081842; padding: 5.4%; text-align: center; height: 100%; position: relative; }
-        .classic-template .cert-inner-border { position: absolute; inset: 4%; border: 3px double var(--accent); pointer-events: none; }
-        .cert-corner-flourish-wrap { position: absolute; width: 15%; aspect-ratio: 1; color: var(--accent); opacity: 0.95; }
-        .cert-corner-flourish-wrap svg { width: 100%; height: 100%; }
-        .cert-corner-tl-pos { top: 4%; left: 4%; }
-        .cert-corner-tr-pos { top: 4%; right: 4%; }
-        .cert-corner-bl-pos { bottom: 4%; left: 4%; }
-        .cert-corner-br-pos { bottom: 4%; right: 4%; }
-        .classic-head p { margin: 0.8% 0 2.5%; font-size: clamp(8px, 0.85cqw, 13px); letter-spacing: 0.14em; text-transform: uppercase; }
-        .classic-content h3 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(38px, 6cqw, 76px); font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; }
-        .classic-content h4 { margin: -0.5% 0 2%; color: var(--accent); font-family: Georgia, "Times New Roman", serif; font-size: clamp(16px, 2.35cqw, 32px); font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; }
-        .classic-content .cert-intro { margin: 0 0 1.1%; font-size: clamp(8px, 0.9cqw, 12px); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
-        .classic-content .cert-recipient { margin: 0 auto; max-width: 76%; font-size: clamp(38px, 5.7cqw, 72px); line-height: 1.05; white-space: nowrap; display: block; }
-        .cert-script { font-family: "Brush Script MT", "Segoe Script", Georgia, serif; }
-        .cert-ornament-line { width: 58%; height: 1px; margin: 1.4% auto 2%; background: linear-gradient(90deg, transparent, var(--accent), transparent); }
-        .classic-content .cert-description { width: 58%; margin: 0 auto 0.9%; font-size: clamp(9px, 1cqw, 14px); line-height: 1.45; text-transform: uppercase; }
-        .classic-content .cert-program { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(16px, 2cqw, 28px); font-weight: 800; }
-        .classic-footer { position: absolute; left: 16%; right: 16%; bottom: 9%; display: flex; align-items: end; justify-content: space-between; }
-        .cert-seal { display: grid; place-items: center; width: clamp(54px, 8cqw, 94px); aspect-ratio: 1; color: var(--accent); }
-        .cert-seal svg { width: 100%; height: 100%; }
-        .cert-seal-executive { color: var(--accent); }
-        .classic-meta { position: absolute; right: 8%; bottom: 4.8%; display: flex; gap: 16px; font-size: clamp(7px, 0.75cqw, 10px); text-transform: uppercase; }
+        /* Classic Prestige — exact positions converted proportionally from the spec's 1200×849 canvas */
+        .classic-template { background: #FBF6EA; color: #1B2A4A; height: 100%; position: relative; text-align: center; }
+        .cp-border-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
+        .cp-border-minimal { position: absolute; inset: 4.712%; border: 1px solid #B08D3F; pointer-events: none; }
+        .cp-logo-box { position: absolute; top: 7.774%; left: 50%; transform: translateX(-50%); width: 12.5%; height: 6.125%; border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        .cp-logo-box img { width: 100%; height: 100%; object-fit: contain; }
+        .cp-org-name { position: absolute; top: 15.783%; left: 0; right: 0; font-size: clamp(9px, 1.25cqw, 15px); letter-spacing: clamp(2px, 0.417cqw, 5px); font-weight: 700; }
+        .cp-title { position: absolute; top: 20.024%; left: 0; right: 0; font-family: 'Playfair Display', serif; font-weight: 800; font-size: clamp(28px, 5.667cqw, 68px); letter-spacing: clamp(2px, 0.5cqw, 6px); }
+        .cp-subtitle { position: absolute; top: 30.624%; left: 0; right: 0; font-family: 'Playfair Display', serif; font-weight: 600; font-size: clamp(13px, 2.25cqw, 27px); color: var(--accent); letter-spacing: clamp(3px, 0.75cqw, 9px); }
+        .cp-intro { position: absolute; top: 37.456%; left: 0; right: 0; font-size: clamp(8px, 1.083cqw, 13px); letter-spacing: clamp(1px, 0.25cqw, 3px); color: #8A8262; }
+        .cp-recipient { position: absolute; top: 40.99%; left: 0; right: 0; font-size: clamp(24px, 5.5cqw, 66px); max-width: 76%; margin: 0 auto; overflow-wrap: anywhere; }
+        .cp-divider { position: absolute; top: 51.001%; left: 50%; transform: translateX(-50%); width: 23.333%; height: 1px; background: #B08D3F; }
+        .cp-citation { position: absolute; top: 53.239%; left: 50%; transform: translateX(-50%); width: 58.333%; font-size: clamp(9px, 1.125cqw, 13.5px); letter-spacing: clamp(1px, 0.125cqw, 1.5px); line-height: 1.8; color: #7D765E; }
+        .cp-course { position: absolute; top: 59.835%; left: 0; right: 0; font-family: 'Playfair Display', serif; font-weight: 700; font-size: clamp(13px, 2.25cqw, 27px); overflow-wrap: anywhere; }
+        .cp-date-sentence { position: absolute; top: 64.782%; left: 0; right: 0; font-family: 'Playfair Display', serif; font-style: italic; font-size: clamp(9px, 1.25cqw, 15px); color: #7D765E; }
+        .cp-sig-block { position: absolute; top: 76.325%; width: 19.167%; text-align: center; }
+        .cp-sig-block.left { left: 8.333%; }
+        .cp-sig-block.right { right: 8.333%; }
+        .cp-sig-name { font-family: 'Dancing Script', cursive; font-size: clamp(14px, 2cqw, 24px); font-weight: 600; }
+        .cp-sig-title { border-top: 1px solid #B0A98C; margin-top: 6px; padding-top: 6px; font-size: clamp(7px, 0.875cqw, 10.5px); letter-spacing: clamp(1px, 0.125cqw, 1.5px); color: #8A8262; text-transform: uppercase; }
+        .cp-meta { position: absolute; bottom: 11.779%; font-size: clamp(7px, 0.917cqw, 11px); letter-spacing: clamp(0.5px, 0.083cqw, 1px); color: #8A8262; }
+        .cp-meta.left { left: 9.167%; }
+        .cp-meta.right { right: 9.167%; }
+        .cp-seal-wrap { position: absolute; left: 50%; transform: translateX(-50%); color: var(--accent); }
+        .cp-seal-as-designed { top: 79.741%; width: 7.667cqw; height: 7.667cqw; border-radius: 50%; border: 1.5px solid #B08D3F; display: flex; align-items: center; justify-content: center; }
+        .cp-seal-as-designed-inner { width: 78%; height: 78%; border-radius: 50%; border: 1px solid #B08D3F; display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', serif; font-weight: 700; font-size: 2.833cqw; }
+        .cp-seal-diamond { position: absolute; top: 84.57%; width: 6px; height: 6px; background: #B08D3F; transform: rotate(45deg); }
+        .cp-seal-diamond.left { left: 46%; }
+        .cp-seal-diamond.right { right: 46%; }
+        .cp-seal-svg { top: 78.328%; width: 10cqw; height: 10cqw; }
+        .cp-seal-rosette { top: 77.503%; width: 8cqw; height: 10.333cqw; }
+        .cp-seal-engraved { top: 78.563%; width: 9.333cqw; height: 9.333cqw; }
+        .cp-seal-custom-img { top: 76.325%; width: 12cqw; height: auto; filter: drop-shadow(0 10px 16px rgba(0,0,0,.3)); }
 
         /* Modern Professional */
         .modern-template { display: grid; grid-template-columns: 25% 75%; background: #f8fafc; height: 100%; }
@@ -399,6 +495,45 @@ export default function CertificateGeneratorWorkspace() {
               <input value={state.certificateId} onChange={(e) => update('certificateId', e.target.value)} />
             </label>
           </div>
+
+          {template === 'classic' && (
+            <>
+              <label>Date line (Classic Prestige only)
+                <input value={state.dateSentence} onChange={(e) => update('dateSentence', e.target.value)} placeholder="e.g. Awarded this 5th day of July, 2026" />
+              </label>
+              <div className="cert-two-fields">
+                <label>Border style
+                  <select value={ornamentLevel} onChange={(e) => setOrnamentLevel(e.target.value)}>
+                    <option>Ornate</option>
+                    <option>Minimal</option>
+                  </select>
+                </label>
+                <label>Name style
+                  <select value={nameStyle} onChange={(e) => setNameStyle(e.target.value)}>
+                    <option>As Designed</option>
+                    <option>Elegant Script</option>
+                    <option>Classic Serif</option>
+                    <option>Bold Modern</option>
+                  </select>
+                </label>
+              </div>
+              <label>Seal style
+                <select value={sealStyle} onChange={(e) => setSealStyle(e.target.value)}>
+                  <option>As Designed</option>
+                  <option>Laurel Medallion</option>
+                  <option>Rosette Ribbon</option>
+                  <option>Engraved Seal</option>
+                  <option>Custom Seal (Your Image)</option>
+                </select>
+              </label>
+              {sealStyle === 'Custom Seal (Your Image)' && (
+                <label>Upload your seal image
+                  <input type="file" accept="image/*" onChange={handleCustomSealUpload} />
+                </label>
+              )}
+            </>
+          )}
+
           <label>Verification URL
             <input value={state.verificationUrl} onChange={(e) => update('verificationUrl', e.target.value)} placeholder="Optional verification URL" />
           </label>
@@ -447,44 +582,45 @@ export default function CertificateGeneratorWorkspace() {
           <article className="certificate" style={cssVars}>
             {template === 'classic' && (
               <div className="classic-template">
-                <div className="cert-corner-flourish-wrap cert-corner-tl-pos"><CornerFlourish corner="tl" /></div>
-                <div className="cert-corner-flourish-wrap cert-corner-tr-pos"><CornerFlourish corner="tr" /></div>
-                <div className="cert-corner-flourish-wrap cert-corner-bl-pos"><CornerFlourish corner="bl" /></div>
-                <div className="cert-corner-flourish-wrap cert-corner-br-pos"><CornerFlourish corner="br" /></div>
-                <div className="cert-inner-border" />
-                <header className="classic-head">
-                  <div className="cert-logo-row center">
-                    <LogoMark />
-                    <span>{emptyToDefault(state, 'companyName')}</span>
-                  </div>
-                  {state.tagline && <p>{state.tagline}</p>}
-                </header>
-                <section className="classic-content">
-                  <h3>Certificate</h3>
-                  <h4>of {certType}</h4>
-                  <p className="cert-intro">This certificate is proudly presented to</p>
-                  <p ref={registerFit} className="cert-recipient cert-script">{emptyToDefault(state, 'recipientName')}</p>
-                  <div className="cert-ornament-line" />
-                  <p className="cert-description">{emptyToDefault(state, 'description')}</p>
-                  <p className="cert-program">{emptyToDefault(state, 'programTitle')}</p>
-                </section>
-                <footer className="classic-footer">
-                  <div className="cert-signature-block">
-                    <div className="cert-signature-line">Signature</div>
-                    <strong>{emptyToDefault(state, 'issuerName')}</strong>
-                    <span>{emptyToDefault(state, 'issuerPosition')}</span>
-                  </div>
-                  <div className="cert-seal"><LaurelSeal /></div>
-                  <div className="cert-signature-block">
-                    <div className="cert-signature-line">Signature</div>
-                    <strong>{emptyToDefault(state, 'secondIssuerName')}</strong>
-                    <span>{emptyToDefault(state, 'secondIssuerPosition')}</span>
-                  </div>
-                </footer>
-                <div className="classic-meta">
-                  <span>{emptyToDefault(state, 'certificateId')}</span>
-                  <span>{emptyToDefault(state, 'issueDate')}</span>
+                {ornamentLevel === 'Ornate'
+                  ? <img src="/certificates/border-classic.png" alt="" className="cp-border-img" />
+                  : <div className="cp-border-minimal" />}
+
+                {logoImg && (
+                  <div className="cp-logo-box"><img src={logoImg} alt="" /></div>
+                )}
+                <div className="cp-org-name">{emptyToDefault(state, 'companyName').toUpperCase()}</div>
+
+                <div className="cp-title">CERTIFICATE</div>
+                <div className="cp-subtitle">OF {certType.toUpperCase()}</div>
+
+                <div className="cp-intro">THIS CERTIFICATE IS PROUDLY PRESENTED TO</div>
+                <div ref={registerFit} className="cp-recipient" style={classicNameStyle}>{emptyToDefault(state, 'recipientName')}</div>
+
+                <div className="cp-divider" />
+
+                <div className="cp-citation">{emptyToDefault(state, 'description')}</div>
+                <div ref={registerFit} className="cp-course">{emptyToDefault(state, 'programTitle')}</div>
+                <div className="cp-date-sentence">{emptyToDefault(state, 'dateSentence')}</div>
+
+                <div className="cp-sig-block left">
+                  <div className="cp-sig-name">{emptyToDefault(state, 'issuerName')}</div>
+                  <div className="cp-sig-title">{emptyToDefault(state, 'issuerPosition')}</div>
                 </div>
+                {renderClassicSeal()}
+                {sealStyle === 'As Designed' && (
+                  <>
+                    <div className="cp-seal-diamond left" />
+                    <div className="cp-seal-diamond right" />
+                  </>
+                )}
+                <div className="cp-sig-block right">
+                  <div className="cp-sig-name">{emptyToDefault(state, 'secondIssuerName')}</div>
+                  <div className="cp-sig-title">{emptyToDefault(state, 'secondIssuerPosition')}</div>
+                </div>
+
+                <div className="cp-meta left">CERTIFICATE ID: {emptyToDefault(state, 'certificateId')}</div>
+                <div className="cp-meta right">DATE ISSUED: {emptyToDefault(state, 'issueDate')}</div>
               </div>
             )}
 

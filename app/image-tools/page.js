@@ -14,7 +14,7 @@ const TOOLS = [
   { slug: 'resize-image', title: 'Resize Image', desc: 'Resize images to any dimension', free: true, available: false },
   { slug: 'crop-image', title: 'Crop Image', desc: 'Crop images to the exact size you need', free: true, available: false },
   { slug: 'watermark-image', title: 'Watermark Image', desc: 'Add text or logo watermarks to images', free: true, available: false },
-  { slug: 'scanner-cleanup', title: 'Scanner Cleanup', desc: 'Remove shadows and enhance scanned documents', free: true, available: false },
+  { slug: 'document-enhancer', title: 'Document Enhancer', desc: 'Remove shadows and enhance scanned documents', free: true, available: true },
 ];
 
 export default function ImageToolsPage() {

@@ -445,6 +445,7 @@ export default function CertificateGeneratorWorkspace() {
         .cp-meta { position: absolute; bottom: 11.779%; font-size: clamp(7px, 0.917cqw, 11px); letter-spacing: clamp(0.5px, 0.083cqw, 1px); color: #8A8262; }
         .cp-meta.left { left: 9.167%; }
         .cp-meta.right { right: 9.167%; }
+        .cp-meta.center { left: 50%; transform: translateX(-50%); white-space: nowrap; }
         .cp-seal-wrap { position: absolute; left: 50%; transform: translateX(-50%); color: var(--accent); }
         .cp-seal-as-designed { top: 79.741%; width: 7.667cqw; height: 7.667cqw; border-radius: 50%; border: 1.5px solid #B08D3F; display: flex; align-items: center; justify-content: center; }
         .cp-seal-as-designed-inner { width: 78%; height: 78%; border-radius: 50%; border: 1px solid #B08D3F; display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', serif; font-weight: 700; font-size: 2.833cqw; }
@@ -725,7 +726,7 @@ export default function CertificateGeneratorWorkspace() {
                 )}
 
                 {hasCertId && <div className="cp-meta left">CERTIFICATE ID: {state.certificateId}</div>}
-                <div className="cp-meta right">DATE ISSUED: {emptyToDefault(state, 'issueDate')}</div>
+                <div className="cp-meta center">DATE ISSUED: {emptyToDefault(state, 'issueDate')}</div>
               </div>
             )}
 

@@ -140,6 +140,30 @@ function extractDominantColor(img) {
   }
 }
 
+// Wraps text up to maxLines (merging any overflow into the last line) and
+// returns the pixel height consumed — used anywhere text could otherwise be
+// silently clipped by the canvas (org name, person name).
+function wrapCapped(ctx, text, x, y, maxWidth, lineHeight, maxLines, align = 'left') {
+  ctx.textAlign = align;
+  const words = (text || '').split(' ');
+  const lines = [];
+  let current = '';
+  for (const word of words) {
+    const test = current ? current + ' ' + word : word;
+    if (ctx.measureText(test).width > maxWidth && current) {
+      lines.push(current);
+      current = word;
+      if (lines.length === maxLines - 1) continue;
+    } else {
+      current = test;
+    }
+  }
+  if (current) lines.push(current);
+  const finalLines = lines.length > maxLines ? [...lines.slice(0, maxLines - 1), lines.slice(maxLines - 1).join(' ')] : lines;
+  finalLines.forEach((line, i) => ctx.fillText(line, x, y + i * lineHeight));
+  return finalLines.length * lineHeight;
+}
+
 function wrapText(ctx, text, x, y, maxWidth, lineHeight, align = 'left') {
   ctx.textAlign = align;
   const words = (text || '').split(' ');
@@ -307,21 +331,26 @@ function drawClassic(ctx, d) {
   ctx.fillStyle = colors.accent;
   ctx.fillRect(0, 0, CARD_W, px(6));
 
-  // header: 44px hex logo + wordmark, padding 22/24/14
+  // header: 44px hex logo + wordmark, padding 22/24/14 — org name wraps up to
+  // 2 lines instead of being silently clipped when it's long
   const logoSize = px(44);
   drawLogoOrPlaceholder(ctx, px(24), px(22), logoSize, logoImg, colors, form.orgName);
   const headerTextX = px(24) + logoSize + px(12);
+  const headerMaxW = CARD_W - headerTextX - px(24);
   ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
+  ctx.textBaseline = 'top';
   ctx.fillStyle = ink;
   ctx.font = `800 ${px(22)}px Arial, sans-serif`;
-  ctx.fillText(form.orgName || 'Your Organization', headerTextX, px(22) + px(20));
+  const orgTopY = px(22);
+  const orgLineH = px(22) * 1.15;
+  const orgH = wrapCapped(ctx, form.orgName || 'Your Organization', headerTextX, orgTopY, headerMaxW, orgLineH, 2, 'left');
   ctx.font = `400 ${px(12)}px Arial, sans-serif`;
   ctx.fillStyle = sub;
-  ctx.fillText(form.orgTagline || `${industry.label} ID Card`, headerTextX, px(22) + px(20) + px(16));
+  const tagY = orgTopY + orgH + px(4);
+  ctx.fillText(form.orgTagline || `${industry.label} ID Card`, headerTextX, tagY);
 
   // body: photo 140x170 rounded 12, border 3 gold; text column beside it
-  const bodyTop = px(22) + px(44) + px(14) + px(6);
+  const bodyTop = Math.max(px(22) + px(44) + px(14) + px(6), tagY + px(16) + px(16));
   const photoW = px(140), photoH = px(170);
   const photoX = px(24), photoY = bodyTop + px(6);
   drawPhotoOrPlaceholder(ctx, photoX, photoY, photoW, photoH, photoImg, colors.accent, px(12), ink, null);
@@ -382,17 +411,21 @@ function drawExecutive(ctx, d) {
   const logoSize = px(44);
   drawLogoOrPlaceholder(ctx, px(24), px(24), logoSize, logoImg, colors, form.orgName);
   const headerTextX = px(24) + logoSize + px(12);
+  const headerMaxW = CARD_W - headerTextX - px(24);
   ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
+  ctx.textBaseline = 'top';
   ctx.fillStyle = ink;
   ctx.font = `800 ${px(22)}px Arial, sans-serif`;
-  ctx.fillText(form.orgName || 'Your Organization', headerTextX, px(24) + px(20));
+  const orgTopY = px(24);
+  const orgLineH = px(22) * 1.15;
+  const orgH = wrapCapped(ctx, form.orgName || 'Your Organization', headerTextX, orgTopY, headerMaxW, orgLineH, 2, 'left');
   ctx.font = `400 ${px(12)}px Arial, sans-serif`;
   ctx.fillStyle = sub;
-  ctx.fillText(form.orgTagline || `${industry.label} ID Card`, headerTextX, px(24) + px(20) + px(16));
+  const tagY = orgTopY + orgH + px(4);
+  ctx.fillText(form.orgTagline || `${industry.label} ID Card`, headerTextX, tagY);
 
   // gold gradient divider
-  const dividerY = px(24) + px(44) + px(18);
+  const dividerY = Math.max(px(24) + px(44) + px(18), tagY + px(16) + px(14));
   const divGrad = ctx.createLinearGradient(px(24), 0, CARD_W - px(24), 0);
   divGrad.addColorStop(0, 'rgba(0,0,0,0)');
   divGrad.addColorStop(0.5, colors.accent);
@@ -527,17 +560,21 @@ function drawSplit(ctx, d) {
   const logoSize = px(40);
   drawLogoOrPlaceholder(ctx, padL, px(24), logoSize, logoImg, colors, form.orgName);
   const headerTextX = padL + logoSize + px(12);
+  const headerMaxW = leftW - headerTextX - px(16);
   ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
+  ctx.textBaseline = 'top';
   ctx.fillStyle = colors.ink;
   ctx.font = `800 ${px(20)}px Arial, sans-serif`;
-  ctx.fillText(form.orgName || 'Your Organization', headerTextX, px(24) + px(18));
+  const orgTopY = px(24);
+  const orgLineH = px(20) * 1.15;
+  const orgH = wrapCapped(ctx, form.orgName || 'Your Organization', headerTextX, orgTopY, headerMaxW, orgLineH, 2, 'left');
   ctx.font = `400 ${px(11)}px Arial, sans-serif`;
   ctx.fillStyle = '#5A6472';
   const tagline = form.orgTagline || `${industry.label} ID Card`;
-  ctx.fillText(tagline, headerTextX, px(24) + px(18) + px(15));
+  const tagY = orgTopY + orgH + px(4);
+  ctx.fillText(tagline, headerTextX, tagY);
 
-  let cy = px(24) + px(40) + px(26) + px(28);
+  let cy = Math.max(px(24) + px(40) + px(26) + px(28), tagY + px(15) + px(28));
   ctx.fillStyle = colors.ink;
   ctx.font = `800 ${px(28)}px Arial, sans-serif`;
   ctx.textBaseline = 'top';

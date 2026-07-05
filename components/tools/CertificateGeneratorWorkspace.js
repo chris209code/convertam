@@ -11,7 +11,7 @@ const defaults = {
   description: 'Description text goes here and remains editable.',
   issueDate: 'Date',
   dateSentence: 'Awarded this day',
-  certificateId: 'Certificate ID',
+  certificateId: '',
   verificationUrl: '',
   issuerName: 'Issuer Name',
   issuerPosition: 'Issuer Position',
@@ -39,6 +39,27 @@ function titleCase(value) {
   return String(value || '').toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase());
 }
 
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+function ordinal(n) {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+// Parses an <input type="date"> value (YYYY-MM-DD) into the display formats
+// used across the certificate — avoids timezone-shift bugs from `new Date(str)`.
+function formatDateNice(isoStr) {
+  if (!isoStr) return '';
+  const [y, m, d] = isoStr.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return `${MONTH_NAMES[m - 1]} ${d}, ${y}`;
+}
+function formatDateSentence(isoStr) {
+  if (!isoStr) return '';
+  const [y, m, d] = isoStr.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return `Awarded this ${ordinal(d)} day of ${MONTH_NAMES[m - 1]}, ${y}`;
+}
+
 // Content-aware shrink-to-fit: clamp() alone only responds to viewport width,
 // not to how long a specific person's name actually is. This measures the
 // rendered text and scales font-size down until it fits its container,
@@ -57,7 +78,7 @@ function useAutoFit(deps) {
       if (!el.dataset.baseFontSize) el.dataset.baseFontSize = String(baseSize);
       el.style.fontSize = `${baseSize}px`;
       let size = baseSize;
-      const minSize = baseSize * 0.42;
+      const minSize = baseSize * 0.28;
       let guard = 0;
       while (el.scrollWidth > el.clientWidth + 1 && size > minSize && guard < 40) {
         size -= 0.5;
@@ -81,6 +102,15 @@ export default function CertificateGeneratorWorkspace() {
   const [ornamentLevel, setOrnamentLevel] = useState('Ornate');
   const [sealStyle, setSealStyle] = useState('As Designed');
   const [nameStyle, setNameStyle] = useState('As Designed');
+  const [issueDateRaw, setIssueDateRaw] = useState('');
+  const [hasSecondIssuer, setHasSecondIssuer] = useState(true);
+
+  function handleDatePick(e) {
+    const iso = e.target.value;
+    setIssueDateRaw(iso);
+    if (!iso) return;
+    setState((s) => ({ ...s, issueDate: formatDateNice(iso), dateSentence: formatDateSentence(iso) }));
+  }
 
   const update = (key, val) => setState((s) => ({ ...s, [key]: val }));
 
@@ -110,6 +140,16 @@ export default function CertificateGeneratorWorkspace() {
   }
 
   const [downloading, setDownloading] = useState(false);
+  const [highRes, setHighRes] = useState(false);
+
+  function preloadImage(src) {
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      img.onload = () => resolve();
+      img.onerror = () => resolve(); // don't block the download on a failed preload
+      img.src = src;
+    });
+  }
 
   // Captures ONLY the certificate element (not the whole browser page — that
   // was the bug with window.print()) and saves a real PDF directly, matching
@@ -122,6 +162,20 @@ export default function CertificateGeneratorWorkspace() {
         import('html2canvas'),
         import('jspdf'),
       ]);
+
+      // The editor shows small, fast-loading preview images to keep editing
+      // snappy. For export, preload the real high-res assets first (so the
+      // swap is instant, already cached), then wait for React to paint the
+      // swap before capturing — so the download is always full quality.
+      if (template === 'classic') {
+        await Promise.all([
+          preloadImage('/certificates/border-classic.png'),
+          preloadImage(customSealImg || '/certificates/seal-custom.png'),
+        ]);
+        setHighRes(true);
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      }
+
       const canvas = await html2canvas(certRef.current, {
         scale: 2.5,
         useCORS: true,
@@ -138,14 +192,16 @@ export default function CertificateGeneratorWorkspace() {
       console.error('Certificate PDF export failed:', err);
       window.alert('Something went wrong generating the PDF. Please try again.');
     } finally {
+      setHighRes(false);
       setDownloading(false);
     }
   }
 
   const hasVerification = Boolean(state.verificationUrl);
+  const hasCertId = Boolean(state.certificateId);
   const certType = titleCase(emptyToDefault(state, 'certificateType'));
 
-  const registerFit = useAutoFit([template, state.recipientName, state.programTitle]);
+  const registerFit = useAutoFit([template, state.recipientName, state.programTitle, state.issuerName, state.secondIssuerName]);
   const certRef = useRef(null);
 
   const cssVars = { '--brand': state.brandColor, '--accent': state.accentColor };
@@ -218,7 +274,7 @@ export default function CertificateGeneratorWorkspace() {
     if (sealStyle === 'Rosette Ribbon') return <ClassicRosette letter={logoInitial} />;
     if (sealStyle === 'Engraved Seal') return <ClassicEngraved letter={logoInitial} />;
     if (sealStyle === 'Royal Seal') {
-      return <img className="cp-seal-wrap cp-seal-custom-img" src={customSealImg || '/certificates/seal-custom.png'} alt="Organization seal" />;
+      return <img className="cp-seal-wrap cp-seal-custom-img" src={customSealImg || (highRes ? '/certificates/seal-custom.png' : '/certificates/seal-custom-preview.png')} alt="Organization seal" />;
     }
     return null;
   }
@@ -362,6 +418,7 @@ export default function CertificateGeneratorWorkspace() {
           border: 4px solid #fff; outline: 1px solid rgba(0,0,0,0.2);
         }
         .cert-qr-wrap.is-hidden { visibility: hidden; }
+        .is-hidden { visibility: hidden; }
 
         /* Classic Prestige — exact positions converted proportionally from the spec's 1200×849 canvas */
         .classic-template { background: #FBF6EA; color: #1B2A4A; height: 100%; position: relative; text-align: center; }
@@ -369,11 +426,11 @@ export default function CertificateGeneratorWorkspace() {
         .cp-border-minimal { position: absolute; inset: 4.712%; border: 1px solid #B08D3F; pointer-events: none; }
         .cp-logo-box { position: absolute; top: 7.774%; left: 50%; transform: translateX(-50%); width: 12.5%; height: 6.125%; border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
         .cp-logo-box img { width: 100%; height: 100%; object-fit: contain; }
-        .cp-org-name { position: absolute; top: 15.783%; left: 0; right: 0; font-size: clamp(9px, 1.25cqw, 15px); letter-spacing: clamp(2px, 0.417cqw, 5px); font-weight: 700; }
+        .cp-org-name { position: absolute; top: 15.783%; left: 0; right: 0; font-size: clamp(13px, 1.8cqw, 21px); letter-spacing: clamp(2px, 0.417cqw, 5px); font-weight: 700; }
         .cp-title { position: absolute; top: 20.024%; left: 0; right: 0; font-family: 'Playfair Display', serif; font-weight: 800; font-size: clamp(28px, 5.667cqw, 68px); letter-spacing: clamp(2px, 0.5cqw, 6px); }
         .cp-subtitle { position: absolute; top: 30.624%; left: 0; right: 0; font-family: 'Playfair Display', serif; font-weight: 600; font-size: clamp(13px, 2.25cqw, 27px); color: var(--accent); letter-spacing: clamp(3px, 0.75cqw, 9px); }
         .cp-intro { position: absolute; top: 37.456%; left: 0; right: 0; font-size: clamp(8px, 1.083cqw, 13px); letter-spacing: clamp(1px, 0.25cqw, 3px); color: #8A8262; }
-        .cp-recipient { position: absolute; top: 40.99%; left: 0; right: 0; font-size: clamp(24px, 5.5cqw, 66px); max-width: 76%; margin: 0 auto; overflow-wrap: anywhere; }
+        .cp-recipient { position: absolute; top: 40.99%; left: 0; right: 0; font-size: clamp(24px, 5.5cqw, 66px); max-width: 76%; margin: 0 auto; white-space: nowrap; overflow: hidden; }
         .cp-divider { position: absolute; top: 51.001%; left: 50%; transform: translateX(-50%); width: 23.333%; height: 1px; background: #B08D3F; }
         .cp-citation { position: absolute; top: 53.239%; left: 50%; transform: translateX(-50%); width: 58.333%; font-size: clamp(9px, 1.125cqw, 13.5px); letter-spacing: clamp(1px, 0.125cqw, 1.5px); line-height: 1.8; color: #7D765E; }
         .cp-course { position: absolute; top: 59.835%; left: 0; right: 0; font-family: 'Playfair Display', serif; font-weight: 700; font-size: clamp(13px, 2.25cqw, 27px); overflow-wrap: anywhere; }
@@ -381,8 +438,10 @@ export default function CertificateGeneratorWorkspace() {
         .cp-sig-block { position: absolute; top: 76.325%; width: 19.167%; text-align: center; }
         .cp-sig-block.left { left: 8.333%; }
         .cp-sig-block.right { right: 8.333%; }
-        .cp-sig-name { font-family: 'Dancing Script', cursive; font-size: clamp(14px, 2cqw, 24px); font-weight: 600; }
-        .cp-sig-title { border-top: 1px solid #B0A98C; margin-top: 6px; padding-top: 6px; font-size: clamp(7px, 0.875cqw, 10.5px); letter-spacing: clamp(1px, 0.125cqw, 1.5px); color: #8A8262; text-transform: uppercase; }
+        .cp-sig-block.cp-sig-solo { left: 50%; right: auto; transform: translateX(-50%); }
+        .cp-sig-line { height: 26px; border-bottom: 1px solid #B0A98C; margin-bottom: 6px; }
+        .cp-sig-printed-name { font-family: 'Playfair Display', serif; font-weight: 600; font-size: clamp(10px, 1.3cqw, 15px); white-space: nowrap; overflow: hidden; }
+        .cp-sig-title { margin-top: 4px; padding-top: 4px; font-size: clamp(7px, 0.875cqw, 10.5px); letter-spacing: clamp(1px, 0.125cqw, 1.5px); color: #8A8262; text-transform: uppercase; }
         .cp-meta { position: absolute; bottom: 11.779%; font-size: clamp(7px, 0.917cqw, 11px); letter-spacing: clamp(0.5px, 0.083cqw, 1px); color: #8A8262; }
         .cp-meta.left { left: 9.167%; }
         .cp-meta.right { right: 9.167%; }
@@ -518,13 +577,16 @@ export default function CertificateGeneratorWorkspace() {
             <textarea rows={3} value={state.description} onChange={(e) => update('description', e.target.value)} />
           </label>
           <div className="cert-two-fields">
-            <label>Issue date
-              <input value={state.issueDate} onChange={(e) => update('issueDate', e.target.value)} />
+            <label>Issue date <span style={{ fontWeight: 400, color: '#94A3B8' }}>(pick a date, or type below)</span>
+              <input type="date" value={issueDateRaw} onChange={handleDatePick} />
             </label>
-            <label>Certificate ID
-              <input value={state.certificateId} onChange={(e) => update('certificateId', e.target.value)} />
+            <label>Certificate ID (optional)
+              <input value={state.certificateId} onChange={(e) => update('certificateId', e.target.value)} placeholder="Leave blank if you don't use one" />
             </label>
           </div>
+          <label>Date text shown on certificate
+            <input value={state.issueDate} onChange={(e) => update('issueDate', e.target.value)} />
+          </label>
 
           {template === 'classic' && (
             <>
@@ -575,14 +637,20 @@ export default function CertificateGeneratorWorkspace() {
               <input value={state.issuerPosition} onChange={(e) => update('issuerPosition', e.target.value)} />
             </label>
           </div>
-          <div className="cert-two-fields">
-            <label>Signature 2 — Name
-              <input value={state.secondIssuerName} onChange={(e) => update('secondIssuerName', e.target.value)} />
-            </label>
-            <label>Signature 2 — Position
-              <input value={state.secondIssuerPosition} onChange={(e) => update('secondIssuerPosition', e.target.value)} />
-            </label>
-          </div>
+          <label style={{ flexDirection: 'row', alignItems: 'center', gap: 8, display: 'flex', fontWeight: 600, fontSize: '0.8rem', color: '#334155', margin: '4px 0' }}>
+            <input type="checkbox" checked={hasSecondIssuer} onChange={(e) => setHasSecondIssuer(e.target.checked)} style={{ width: 'auto' }} />
+            Include a second signatory
+          </label>
+          {hasSecondIssuer && (
+            <div className="cert-two-fields">
+              <label>Signature 2 — Name
+                <input value={state.secondIssuerName} onChange={(e) => update('secondIssuerName', e.target.value)} />
+              </label>
+              <label>Signature 2 — Position
+                <input value={state.secondIssuerPosition} onChange={(e) => update('secondIssuerPosition', e.target.value)} />
+              </label>
+            </div>
+          )}
           <div className="cert-two-fields">
             <label>Brand color
               <input className="cert-color-field" type="color" value={state.brandColor} onChange={(e) => update('brandColor', e.target.value)} />
@@ -595,6 +663,9 @@ export default function CertificateGeneratorWorkspace() {
 
         <section className="cert-control-section cert-actions">
           <button type="button" onClick={handleDownload} disabled={downloading}>{downloading ? 'Preparing PDF…' : 'Download PDF'}</button>
+          <p style={{ fontSize: '0.72rem', color: '#64748B', margin: '4px 0 0', lineHeight: 1.5 }}>
+            The signature area leaves a blank line for a real pen signature if you're printing. Sending this digitally instead? Use <strong>Sign PDF</strong> (under PDF Editor) after downloading to add an actual signature without printing.
+          </p>
           <button type="button" onClick={resetSample}>Reset Sample Text</button>
         </section>
       </aside>
@@ -613,7 +684,7 @@ export default function CertificateGeneratorWorkspace() {
             {template === 'classic' && (
               <div className="classic-template">
                 {ornamentLevel === 'Ornate'
-                  ? <img src="/certificates/border-classic.png" alt="" className="cp-border-img" />
+                  ? <img src={highRes ? '/certificates/border-classic.png' : '/certificates/border-classic-preview.png'} alt="" className="cp-border-img" />
                   : <div className="cp-border-minimal" />}
 
                 {logoImg && (
@@ -633,8 +704,9 @@ export default function CertificateGeneratorWorkspace() {
                 <div ref={registerFit} className="cp-course">{emptyToDefault(state, 'programTitle')}</div>
                 <div className="cp-date-sentence">{emptyToDefault(state, 'dateSentence')}</div>
 
-                <div className="cp-sig-block left">
-                  <div className="cp-sig-name">{emptyToDefault(state, 'issuerName')}</div>
+                <div className={`cp-sig-block left ${!hasSecondIssuer ? 'cp-sig-solo' : ''}`}>
+                  <div className="cp-sig-line" />
+                  <div ref={registerFit} className="cp-sig-printed-name">{emptyToDefault(state, 'issuerName')}</div>
                   <div className="cp-sig-title">{emptyToDefault(state, 'issuerPosition')}</div>
                 </div>
                 {renderClassicSeal()}
@@ -644,12 +716,15 @@ export default function CertificateGeneratorWorkspace() {
                     <div className="cp-seal-diamond right" />
                   </>
                 )}
-                <div className="cp-sig-block right">
-                  <div className="cp-sig-name">{emptyToDefault(state, 'secondIssuerName')}</div>
-                  <div className="cp-sig-title">{emptyToDefault(state, 'secondIssuerPosition')}</div>
-                </div>
+                {hasSecondIssuer && (
+                  <div className="cp-sig-block right">
+                    <div className="cp-sig-line" />
+                    <div ref={registerFit} className="cp-sig-printed-name">{emptyToDefault(state, 'secondIssuerName')}</div>
+                    <div className="cp-sig-title">{emptyToDefault(state, 'secondIssuerPosition')}</div>
+                  </div>
+                )}
 
-                <div className="cp-meta left">CERTIFICATE ID: {emptyToDefault(state, 'certificateId')}</div>
+                {hasCertId && <div className="cp-meta left">CERTIFICATE ID: {state.certificateId}</div>}
                 <div className="cp-meta right">DATE ISSUED: {emptyToDefault(state, 'issueDate')}</div>
               </div>
             )}
@@ -678,7 +753,7 @@ export default function CertificateGeneratorWorkspace() {
                   <p className="cert-description">{emptyToDefault(state, 'description')}</p>
                   <footer className="modern-footer">
                     <div><span>Date issued</span><strong>{emptyToDefault(state, 'issueDate')}</strong></div>
-                    <div><span>Certificate ID</span><strong>{emptyToDefault(state, 'certificateId')}</strong></div>
+                    <div className={!hasCertId ? 'is-hidden' : ''}><span>Certificate ID</span><strong>{state.certificateId}</strong></div>
                     <div className={`cert-qr-wrap ${!hasVerification ? 'is-hidden' : ''}`}><span>QR / URL</span><div className="cert-qr-box" /></div>
                     <div className="cert-signature-block right">
                       <div className="cert-signature-line">Signature</div>
@@ -719,9 +794,9 @@ export default function CertificateGeneratorWorkspace() {
                     <span>Date</span>
                     <strong>{emptyToDefault(state, 'issueDate')}</strong>
                   </div>
-                  <div className={`cert-qr-wrap ${!hasVerification ? 'is-hidden' : ''}`}>
-                    <div className="cert-qr-box" />
-                    <span>{emptyToDefault(state, 'certificateId')}</span>
+                  <div className="cert-qr-wrap">
+                    {hasVerification && <div className="cert-qr-box" />}
+                    {hasCertId && <span>{state.certificateId}</span>}
                   </div>
                 </footer>
               </div>
@@ -755,7 +830,7 @@ export default function CertificateGeneratorWorkspace() {
                   </div>
                   <footer className="cert-info-rail">
                     <div><span>Date issued</span><strong>{emptyToDefault(state, 'issueDate')}</strong></div>
-                    <div><span>Certificate ID</span><strong>{emptyToDefault(state, 'certificateId')}</strong></div>
+                    <div className={!hasCertId ? 'is-hidden' : ''}><span>Certificate ID</span><strong>{state.certificateId}</strong></div>
                     <div className={`cert-qr-wrap ${!hasVerification ? 'is-hidden' : ''}`}><div className="cert-qr-box" /><span>QR / URL</span></div>
                   </footer>
                 </section>

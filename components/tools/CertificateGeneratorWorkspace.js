@@ -60,11 +60,11 @@ function formatDateSentence(isoStr) {
   return `Awarded this ${ordinal(d)} day of ${MONTH_NAMES[m - 1]}, ${y}`;
 }
 
-function fitElementToWidth(el, scale = 1) {
+function fitElementToWidth(el, scale = 1, manualPx = null) {
   if (!el) return;
   const naturalBase = parseFloat(el.dataset.baseFontSize || getComputedStyle(el).fontSize);
   if (!el.dataset.baseFontSize) el.dataset.baseFontSize = String(naturalBase);
-  const baseSize = naturalBase * scale;
+  const baseSize = manualPx != null ? manualPx * scale : naturalBase * scale;
   // Reset to normal single-line mode first, in case a previous pass wrapped it
   // and the text has since gotten shorter again.
   el.style.whiteSpace = 'nowrap';
@@ -95,17 +95,20 @@ function fitElementToWidth(el, scale = 1) {
 // PDF capture — html2canvas doesn't reliably wait for custom fonts to finish
 // loading, so text sized against a fallback font can end up wrong-width by
 // the time the actual snapshot happens unless we re-measure after fonts load.
-function useAutoFit(deps, scale = 1) {
+function useAutoFit(deps, scale, manualSizes) {
   const refs = useRef([]);
   refs.current = [];
-  const register = useCallback((el) => {
-    if (el) refs.current.push(el);
+  const register = useCallback((key) => (el) => {
+    if (el) refs.current.push({ el, key });
   }, []);
 
   useEffect(() => {
-    refs.current.forEach((el) => fitElementToWidth(el, scale));
+    refs.current.forEach(({ el, key }) => {
+      const manualPx = manualSizes && manualSizes[key] != null ? manualSizes[key] : null;
+      fitElementToWidth(el, scale, manualPx);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, scale]);
+  }, [...deps, scale, JSON.stringify(manualSizes)]);
 
   return [register, refs];
 }
@@ -126,6 +129,19 @@ export default function CertificateGeneratorWorkspace() {
   const [customQuoteText, setCustomQuoteText] = useState('');
   const [customQuoteAttribution, setCustomQuoteAttribution] = useState('');
   const [textScale, setTextScale] = useState(1);
+  const [manualSizes, setManualSizes] = useState({
+    orgName: 21,
+    recipientName: 50,
+    programTitle: 27,
+    certTitle: 30,
+    sigName1: 14,
+    sigTitle1: 10,
+    sigName2: 14,
+    sigTitle2: 10,
+  });
+  function setFieldSize(key, px) {
+    setManualSizes((m) => ({ ...m, [key]: px }));
+  }
 
   function handleDatePick(e) {
     const iso = e.target.value;
@@ -228,7 +244,10 @@ export default function CertificateGeneratorWorkspace() {
 
       // Final pass, in this exact order, right before capture: shrink any
       // long text to fit, then lock every resulting size to plain pixels.
-      fitRefs.current.forEach((el) => fitElementToWidth(el, textScale));
+      fitRefs.current.forEach(({ el, key }) => {
+        const manualPx = manualSizes && manualSizes[key] != null ? manualSizes[key] : null;
+        fitElementToWidth(el, textScale, manualPx);
+      });
       lockComputedFontSizes(certRef.current);
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
@@ -257,7 +276,7 @@ export default function CertificateGeneratorWorkspace() {
   const hasCertId = Boolean(state.certificateId);
   const certType = titleCase(emptyToDefault(state, 'certificateType'));
 
-  const [registerFit, fitRefs] = useAutoFit([template, state.recipientName, state.programTitle, state.issuerName, state.secondIssuerName, state.issuerPosition, state.secondIssuerPosition, state.companyName], textScale);
+  const [registerFit, fitRefs] = useAutoFit([template, state.recipientName, state.programTitle, state.issuerName, state.secondIssuerName, state.issuerPosition, state.secondIssuerPosition, state.companyName], textScale, manualSizes);
   const certRef = useRef(null);
 
   const cssVars = { '--brand': state.brandColor, '--accent': state.accentColor };
@@ -716,9 +735,31 @@ export default function CertificateGeneratorWorkspace() {
         </section>
 
         <section className="cert-control-section">
-          <h2>Text Size</h2>
+          <h2>Text Size — Per Field</h2>
+          <p style={{ fontSize: '11px', color: '#64748B', margin: '0 0 10px' }}>
+            Drag any slider to set that field's size directly. If a name is still too long to fit at your chosen size, it'll automatically shrink further or wrap to a second line — but your slider value is always the starting point, not a suggestion that gets overridden.
+          </p>
+          {[
+            { key: 'orgName', label: 'Institution name', min: 8, max: 32 },
+            { key: 'recipientName', label: 'Recipient name', min: 16, max: 80 },
+            { key: 'certTitle', label: 'Certificate title (Executive)', min: 14, max: 44 },
+            { key: 'programTitle', label: 'Program / achievement title', min: 12, max: 40 },
+            { key: 'sigName1', label: 'Signature 1 — name', min: 8, max: 26 },
+            { key: 'sigTitle1', label: 'Signature 1 — title', min: 6, max: 18 },
+            { key: 'sigName2', label: 'Signature 2 — name', min: 8, max: 26 },
+            { key: 'sigTitle2', label: 'Signature 2 — title', min: 6, max: 18 },
+          ].map(({ key, label, min, max }) => (
+            <label key={key} style={{ fontSize: '11px', display: 'block', marginBottom: 10 }}>
+              {label} — {manualSizes[key]}px
+              <input type="range" min={min} max={max} step="1" value={manualSizes[key]} onChange={(e) => setFieldSize(key, Number(e.target.value))} style={{ width: '100%', marginTop: 4 }} />
+            </label>
+          ))}
+        </section>
+
+        <section className="cert-control-section">
+          <h2>Overall Text Scale</h2>
           <label style={{ fontSize: '11px' }}>
-            {Math.round(textScale * 100)}% — nudge this if auto-fit shrinks text more (or less) than you'd like
+            {Math.round(textScale * 100)}% — scales every field above together, on top of their individual sizes
             <input type="range" min="0.7" max="1.3" step="0.02" value={textScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: '100%', marginTop: 6 }} />
           </label>
           {textScale !== 1 && (
@@ -913,24 +954,24 @@ export default function CertificateGeneratorWorkspace() {
                 {logoImg && (
                   <div className="cp-logo-box"><img src={logoImg} alt="" /></div>
                 )}
-                <div ref={registerFit} className="cp-org-name">{emptyToDefault(state, 'companyName').toUpperCase()}</div>
+                <div ref={registerFit('orgName')} className="cp-org-name">{emptyToDefault(state, 'companyName').toUpperCase()}</div>
 
                 <div className="cp-title">CERTIFICATE</div>
                 <div className="cp-subtitle">OF {certType.toUpperCase()}</div>
 
                 <div className="cp-intro">THIS CERTIFICATE IS PROUDLY PRESENTED TO</div>
-                <div ref={registerFit} className="cp-recipient" style={classicNameStyle}>{emptyToDefault(state, 'recipientName')}</div>
+                <div ref={registerFit('recipientName')} className="cp-recipient" style={classicNameStyle}>{emptyToDefault(state, 'recipientName')}</div>
 
                 <div className="cp-divider" />
 
                 <div className="cp-citation">{emptyToDefault(state, 'description')}</div>
-                <div ref={registerFit} className="cp-course">{emptyToDefault(state, 'programTitle')}</div>
+                <div ref={registerFit('programTitle')} className="cp-course">{emptyToDefault(state, 'programTitle')}</div>
                 <div className="cp-date-sentence">{emptyToDefault(state, 'dateSentence')}</div>
 
                 <div className={`cp-sig-block left ${!hasSecondIssuer ? 'cp-sig-solo' : ''}`}>
                   <div className="cp-sig-line" />
-                  <div ref={registerFit} className="cp-sig-printed-name">{emptyToDefault(state, 'issuerName')}</div>
-                  <div ref={registerFit} className="cp-sig-title">{emptyToDefault(state, 'issuerPosition')}</div>
+                  <div ref={registerFit('sigName1')} className="cp-sig-printed-name">{emptyToDefault(state, 'issuerName')}</div>
+                  <div ref={registerFit('sigTitle1')} className="cp-sig-title">{emptyToDefault(state, 'issuerPosition')}</div>
                 </div>
                 {renderClassicSeal()}
                 {sealStyle === 'As Designed' && (
@@ -942,8 +983,8 @@ export default function CertificateGeneratorWorkspace() {
                 {hasSecondIssuer && (
                   <div className="cp-sig-block right">
                     <div className="cp-sig-line" />
-                    <div ref={registerFit} className="cp-sig-printed-name">{emptyToDefault(state, 'secondIssuerName')}</div>
-                    <div ref={registerFit} className="cp-sig-title">{emptyToDefault(state, 'secondIssuerPosition')}</div>
+                    <div ref={registerFit('sigName2')} className="cp-sig-printed-name">{emptyToDefault(state, 'secondIssuerName')}</div>
+                    <div ref={registerFit('sigTitle2')} className="cp-sig-title">{emptyToDefault(state, 'secondIssuerPosition')}</div>
                   </div>
                 )}
 
@@ -969,10 +1010,10 @@ export default function CertificateGeneratorWorkspace() {
                 <section className="modern-body">
                   <div className="cert-geo-mark" />
                   <p className="cert-intro">This certificate is proudly presented to</p>
-                  <h3 ref={registerFit}>{emptyToDefault(state, 'recipientName')}</h3>
+                  <h3 ref={registerFit('recipientName')}>{emptyToDefault(state, 'recipientName')}</h3>
                   <div className="cert-accent-line" />
                   <p>For successfully completing</p>
-                  <p ref={registerFit} className="cert-highlight">{emptyToDefault(state, 'programTitle')}</p>
+                  <p ref={registerFit('programTitle')} className="cert-highlight">{emptyToDefault(state, 'programTitle')}</p>
                   <p className="cert-description">{emptyToDefault(state, 'description')}</p>
                   <footer className="modern-footer">
                     <div><span>Date issued</span><strong>{emptyToDefault(state, 'issueDate')}</strong></div>
@@ -1002,14 +1043,14 @@ export default function CertificateGeneratorWorkspace() {
 
                 <div className="ce-header">
                   {logoImg ? <img src={logoImg} alt="" style={{ width: 32, height: 32, objectFit: 'contain' }} /> : <ExecHexLogo letter={logoInitial} />}
-                  <span ref={registerFit} className="ce-orgname">{emptyToDefault(state, 'companyName')}</span>
+                  <span ref={registerFit('orgName')} className="ce-orgname">{emptyToDefault(state, 'companyName')}</span>
                 </div>
                 <div className="ce-distinction">◆&nbsp;&nbsp;PRESENTED WITH DISTINCTION&nbsp;&nbsp;◆</div>
 
-                <div ref={registerFit} className="ce-title">CERTIFICATE OF {certType.toUpperCase()}</div>
+                <div ref={registerFit('certTitle')} className="ce-title">CERTIFICATE OF {certType.toUpperCase()}</div>
 
                 <div className="ce-intro">◆&nbsp;&nbsp;PROUDLY PRESENTED TO&nbsp;&nbsp;◆</div>
-                <div ref={registerFit} className="ce-recipient" style={execNameStyle}>{emptyToDefault(state, 'recipientName')}</div>
+                <div ref={registerFit('recipientName')} className="ce-recipient" style={execNameStyle}>{emptyToDefault(state, 'recipientName')}</div>
 
                 <div className="ce-citation">{emptyToDefault(state, 'description')}</div>
 
@@ -1022,8 +1063,8 @@ export default function CertificateGeneratorWorkspace() {
 
                 <div className="ce-sig-block">
                   <div className="ce-sig-line" />
-                  <div ref={registerFit} className="ce-sig-name">{emptyToDefault(state, 'issuerName')}</div>
-                  <div ref={registerFit} className="ce-sig-title">{emptyToDefault(state, 'issuerPosition')}</div>
+                  <div ref={registerFit('sigName1')} className="ce-sig-name">{emptyToDefault(state, 'issuerName')}</div>
+                  <div ref={registerFit('sigTitle1')} className="ce-sig-title">{emptyToDefault(state, 'issuerPosition')}</div>
                 </div>
 
                 {renderExecSeal()}
@@ -1076,9 +1117,9 @@ export default function CertificateGeneratorWorkspace() {
                 </aside>
                 <section className="cert-split-body">
                   <p className="cert-intro">This certificate is proudly presented to</p>
-                  <h3 ref={registerFit}>{emptyToDefault(state, 'recipientName')}</h3>
+                  <h3 ref={registerFit('recipientName')}>{emptyToDefault(state, 'recipientName')}</h3>
                   <div className="cert-accent-line" />
-                  <p ref={registerFit} className="cert-program">{emptyToDefault(state, 'programTitle')}</p>
+                  <p ref={registerFit('programTitle')} className="cert-program">{emptyToDefault(state, 'programTitle')}</p>
                   <p className="cert-description">{emptyToDefault(state, 'description')}</p>
                   <div className="cert-signature-block right">
                     <div className="cert-signature-line">Signature</div>

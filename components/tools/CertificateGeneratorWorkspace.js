@@ -612,11 +612,11 @@ export default function CertificateGeneratorWorkspace() {
         .ce-concentric { position: absolute; top: 49.94%; left: 50%; border-radius: 50%; transform: translate(-50%,-50%); }
         .ce-concentric.outer { width: 43.333cqw; height: 43.333cqw; border: 1px solid rgba(201,162,39,.16); }
         .ce-concentric.inner { width: 33.333cqw; height: 33.333cqw; border: 1px solid rgba(201,162,39,.12); }
-        .ce-header { position: absolute; top: 8.717%; left: 0; right: 0; display: flex; align-items: center; justify-content: center; gap: 12px; z-index: 2; }
+        .ce-header { position: absolute; top: 10.5%; left: 0; right: 0; display: flex; align-items: center; justify-content: center; gap: 12px; z-index: 2; }
         .ce-hexmark { width: clamp(20px, 2.667cqw, 32px); height: clamp(20px, 2.667cqw, 32px); }
         .ce-orgname { font-family: 'Playfair Display', serif; font-weight: 700; font-size: clamp(16px, 2.083cqw, 25px); color: #E9C874; letter-spacing: 1px; white-space: nowrap; overflow: hidden; max-width: 60cqw; }
-        .ce-tagline { position: absolute; top: 13.663%; left: 10%; right: 10%; text-align: center; font-size: clamp(7px, 0.792cqw, 9.5px); letter-spacing: 3px; color: #8B8464; z-index: 2; }
-        .ce-distinction { position: absolute; top: 17.667%; left: 10%; right: 10%; text-align: center; font-size: clamp(9px, 1cqw, 12px); letter-spacing: 3px; color: #C9BE9A; z-index: 2; }
+        .ce-tagline { position: absolute; top: 15%; left: 12%; right: 12%; text-align: center; font-size: clamp(7px, 0.792cqw, 9.5px); letter-spacing: 3px; color: #8B8464; z-index: 2; }
+        .ce-distinction { position: absolute; top: 19%; left: 12%; right: 12%; text-align: center; font-size: clamp(9px, 1cqw, 12px); letter-spacing: 3px; color: #C9BE9A; z-index: 2; }
         .ce-title { position: absolute; top: 25.442%; left: 7.5%; right: 7.5%; text-align: center; font-family: 'Playfair Display', serif; font-weight: 700; font-size: clamp(18px, 2.75cqw, 33px); color: #E9C874; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; z-index: 2; }
         .ce-rule { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; z-index: 2; }
         .ce-rule-line { height: 1px; background: rgba(201,162,39,.6); }
@@ -626,7 +626,7 @@ export default function CertificateGeneratorWorkspace() {
         .ce-citation { position: absolute; top: 46.407%; left: 50%; transform: translateX(-50%); width: 53.333%; text-align: center; font-size: clamp(9px, 1.25cqw, 15px); line-height: 1.8; color: #D9D3C0; z-index: 2; }
         .ce-quote { position: absolute; top: 55.594%; left: 0; right: 0; text-align: center; font-family: 'Playfair Display', serif; font-style: italic; font-size: clamp(11px, 1.417cqw, 17px); color: #E9C874; z-index: 2; }
         .ce-quote-author { position: absolute; top: 59.6%; left: 0; right: 0; text-align: center; font-size: clamp(8px, 1.042cqw, 12.5px); letter-spacing: 1.5px; color: #C9BE9A; z-index: 2; }
-        .ce-sig-block { position: absolute; top: 82.685%; left: 6%; width: 24%; text-align: center; z-index: 2; }
+        .ce-sig-block { position: absolute; top: 79.5%; left: 10%; width: 24%; text-align: center; z-index: 2; }
         .ce-sig-line { height: 24px; border-bottom: 1px solid rgba(201,162,39,.5); margin-bottom: 6px; }
         .ce-sig-name { font-family: 'Playfair Display', serif; font-weight: 600; font-size: clamp(9px, 1.25cqw, 15px); color: #F3E4B8; white-space: nowrap; overflow: hidden; }
         .ce-sig-title { margin-top: 4px; padding-top: 4px; font-size: clamp(7px, 0.875cqw, 10.5px); letter-spacing: 1.5px; color: #C9BE9A; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
@@ -636,7 +636,7 @@ export default function CertificateGeneratorWorkspace() {
         .ce-seal-rosette { top: 77.267%; width: 8.333cqw; height: 10.833cqw; }
         .ce-seal-engraved { top: 78.092%; width: 9.833cqw; height: 9.833cqw; }
         .ce-seal-custom-img { top: 75.618%; width: 12.667cqw; height: auto; filter: drop-shadow(0 10px 18px rgba(0,0,0,.5)); }
-        .ce-date-verify { position: absolute; top: 78.21%; right: 8.333%; display: flex; align-items: flex-end; gap: 3.667%; z-index: 2; }
+        .ce-date-verify { position: absolute; top: 75%; right: 11%; display: flex; align-items: flex-end; gap: 3.667%; z-index: 2; }
         .ce-date-block { text-align: center; white-space: nowrap; }
         .ce-date-value { font-size: clamp(9px, 1.25cqw, 15px); color: #F3E4B8; font-weight: 600; white-space: nowrap; overflow: hidden; }
         .ce-date-value.ce-date-aligned { margin-top: 20px; }

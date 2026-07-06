@@ -43,13 +43,30 @@ export async function POST(request) {
   }
 
   try {
-    const { text } = await request.json();
-    if (!text || text.length < 50) {
-      return Response.json({ error: 'No usable contract text received.' }, { status: 400 });
-    }
+    const contentType = request.headers.get('content-type') || '';
+    let parts;
 
-    // Guard against extremely large documents blowing past reasonable request size
-    const trimmed = text.length > 100000 ? text.slice(0, 100000) : text;
+    if (contentType.includes('multipart/form-data')) {
+      // Photo of a contract page — send straight to Gemini's vision, no separate OCR step needed
+      const formData = await request.formData();
+      const image = formData.get('image');
+      if (!image) {
+        return Response.json({ error: 'No image received.' }, { status: 400 });
+      }
+      const buf = Buffer.from(await image.arrayBuffer());
+      parts = [
+        { text: PROMPT },
+        { inline_data: { mime_type: image.type || 'image/jpeg', data: buf.toString('base64') } },
+      ];
+    } else {
+      const { text } = await request.json();
+      if (!text || text.length < 50) {
+        return Response.json({ error: 'No usable contract text received.' }, { status: 400 });
+      }
+      // Guard against extremely large documents blowing past reasonable request size
+      const trimmed = text.length > 100000 ? text.slice(0, 100000) : text;
+      parts = [{ text: `${PROMPT}\n\n--- CONTRACT TEXT ---\n${trimmed}` }];
+    }
 
     const res = await fetch(GEMINI_URL, {
       method: 'POST',
@@ -58,10 +75,7 @@ export async function POST(request) {
         'x-goog-api-key': apiKey,
       },
       body: JSON.stringify({
-        contents: [{
-          role: 'user',
-          parts: [{ text: `${PROMPT}\n\n--- CONTRACT TEXT ---\n${trimmed}` }],
-        }],
+        contents: [{ role: 'user', parts }],
         generationConfig: {
           responseMimeType: 'application/json',
           responseSchema,

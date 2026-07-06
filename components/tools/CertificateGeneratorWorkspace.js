@@ -275,6 +275,12 @@ export default function CertificateGeneratorWorkspace() {
     'Hard Work (Tim Notke)': { text: "Hard work beats talent when talent doesn't work hard.", author: 'TIM NOTKE' },
     'Together (Helen Keller)': { text: 'Alone we can do so little; together we can do so much.', author: 'HELEN KELLER' },
     'Create the Future (Drucker)': { text: 'The best way to predict the future is to create it.', author: 'PETER DRUCKER' },
+    'Beauty of Dreams (Eleanor Roosevelt)': { text: 'The future belongs to those who believe in the beauty of their dreams.', author: 'ELEANOR ROOSEVELT' },
+    'Keep Going (Confucius)': { text: 'It does not matter how slowly you go as long as you do not stop.', author: 'CONFUCIUS' },
+    'Within Us (Emerson)': { text: 'What lies behind us and what lies before us are tiny matters compared to what lies within us.', author: 'RALPH WALDO EMERSON' },
+    'No Limit to Tomorrow (FDR)': { text: 'The only limit to our realization of tomorrow will be our doubts of today.', author: 'FRANKLIN D. ROOSEVELT' },
+    'Disappointed by What You Didn\'t Do (Twain)': { text: "Twenty years from now you will be more disappointed by the things you didn't do than by the ones you did do.", author: 'MARK TWAIN' },
+    'Never Let Yourself Be Defeated (Angelou)': { text: 'You will face many defeats in life, but never let yourself be defeated.', author: 'MAYA ANGELOU' },
   };
   const showQuote = quoteStyle !== 'None';
   const activeQuote = quoteStyle === 'Custom'
@@ -795,6 +801,12 @@ export default function CertificateGeneratorWorkspace() {
                   <option>Hard Work (Tim Notke)</option>
                   <option>Together (Helen Keller)</option>
                   <option>Create the Future (Drucker)</option>
+                  <option>Beauty of Dreams (Eleanor Roosevelt)</option>
+                  <option>Keep Going (Confucius)</option>
+                  <option>Within Us (Emerson)</option>
+                  <option>No Limit to Tomorrow (FDR)</option>
+                  <option>Disappointed by What You Didn't Do (Twain)</option>
+                  <option>Never Let Yourself Be Defeated (Angelou)</option>
                   <option>Custom</option>
                 </select>
               </label>
@@ -966,7 +978,6 @@ export default function CertificateGeneratorWorkspace() {
                   {logoImg ? <img src={logoImg} alt="" style={{ width: 32, height: 32, objectFit: 'contain' }} /> : <ExecHexLogo letter={logoInitial} />}
                   <span ref={registerFit} className="ce-orgname">{emptyToDefault(state, 'companyName')}</span>
                 </div>
-                {state.tagline && <div className="ce-tagline">{state.tagline}</div>}
                 <div className="ce-distinction">◆&nbsp;&nbsp;PRESENTED WITH DISTINCTION&nbsp;&nbsp;◆</div>
 
                 <div ref={registerFit} className="ce-title">CERTIFICATE OF {certType.toUpperCase()}</div>

@@ -10,10 +10,9 @@ const TOOLS = [
   { slug: 'png-to-pdf', title: 'PNG to PDF', desc: 'Combine PNG images into a single PDF', free: true, available: true },
   { slug: 'pdf-to-jpg', title: 'PDF to JPG', desc: 'Turn each PDF page into a JPG image', free: true, available: true },
   { slug: 'pdf-to-png', title: 'PDF to PNG', desc: 'Turn each PDF page into a PNG image', free: true, available: true },
-  { slug: 'image-compressor', title: 'Image Compressor', desc: 'Reduce image file size without losing quality', free: true, available: false },
-  { slug: 'resize-image', title: 'Resize Image', desc: 'Resize images to any dimension', free: true, available: false },
-  { slug: 'crop-image', title: 'Crop Image', desc: 'Crop images to the exact size you need', free: true, available: false },
-  { slug: 'watermark-image', title: 'Watermark Image', desc: 'Add text or logo watermarks to images', free: true, available: false },
+  { slug: 'image-compressor', title: 'Image Compressor', desc: 'Reduce image file size without losing quality', free: true, available: true },
+  { slug: 'resize-image', title: 'Image Resizer & Cropper', desc: 'Resize, crop and perfectly fit images for social media, profiles, banners and custom dimensions', free: true, available: true },
+  { slug: 'watermark-image', title: 'Watermark Image', desc: 'Add text or logo watermarks to images', free: true, available: true },
   { slug: 'document-enhancer', title: 'Document Enhancer', desc: 'Remove shadows and enhance scanned documents', free: true, available: true },
 ];
 

@@ -34,7 +34,8 @@ export default function ContractSummarizerWorkspace() {
 
   async function handleSummarize() {
     if (!file) return;
-    if (!window.pdfjsLib) {
+    const isPdf = file.type === 'application/pdf';
+    if (isPdf && !window.pdfjsLib) {
       setError('Still loading — please wait a moment and try again.');
       return;
     }
@@ -43,21 +44,33 @@ export default function ContractSummarizerWorkspace() {
     setResult(null);
 
     try {
-      setStatus('Reading contract…');
-      const text = await extractText(file);
+      let res;
+      if (isPdf) {
+        setStatus('Reading contract…');
+        const text = await extractText(file);
 
-      if (!text || text.length < 50) {
-        setError('Could not extract text from this PDF. It may be a scanned image — try OCR PDF first, then summarize the result.');
-        setBusy(false);
-        return;
+        if (!text || text.length < 50) {
+          setError('Could not extract text from this PDF. It may be a scanned image saved as PDF — try uploading it as a photo instead, or run it through OCR PDF first.');
+          setBusy(false);
+          return;
+        }
+
+        setStatus('Analyzing terms and clauses…');
+        res = await fetch('/api/contract-summarizer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
+      } else {
+        setStatus('Reading photo and analyzing terms and clauses…');
+        const formData = new FormData();
+        formData.append('image', file);
+        res = await fetch('/api/contract-summarizer', {
+          method: 'POST',
+          body: formData,
+        });
       }
 
-      setStatus('Analyzing terms and clauses…');
-      const res = await fetch('/api/contract-summarizer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
       const data = await res.json();
 
       if (!res.ok) {
@@ -110,12 +123,12 @@ export default function ContractSummarizerWorkspace() {
       {!result && (
         <div style={{ border: '2px dashed #CBD5E1', borderRadius: 14, padding: '40px 20px', textAlign: 'center' }}>
           <p style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>
-            Upload a contract or agreement (PDF)
+            Upload a contract or agreement — PDF or a photo of a page
           </p>
           <p style={{ fontSize: '0.82rem', color: '#64748B', marginBottom: 16 }}>
-            Get the key parties, dates, obligations, payment terms, and anything worth double-checking — in plain language.
+            Snap a photo of a printed page, or upload the PDF directly. Get the key parties, dates, obligations, payment terms, and anything worth double-checking — in plain language.
           </p>
-          <input type="file" accept="application/pdf" onChange={handleFile} />
+          <input type="file" accept="application/pdf,image/*" onChange={handleFile} />
 
           {file && (
             <button

@@ -615,18 +615,18 @@ export default function CertificateGeneratorWorkspace() {
         .ce-header { position: absolute; top: 19.3%; left: 0; right: 0; display: flex; align-items: center; justify-content: center; gap: 12px; z-index: 2; }
         .ce-hexmark { width: clamp(20px, 2.667cqw, 32px); height: clamp(20px, 2.667cqw, 32px); }
         .ce-orgname { font-family: 'Playfair Display', serif; font-weight: 700; font-size: clamp(16px, 2.083cqw, 25px); color: #E9C874; letter-spacing: 1px; white-space: nowrap; overflow: hidden; max-width: 60cqw; }
-        .ce-tagline { position: absolute; top: 22.8%; left: 10%; right: 10%; text-align: center; font-size: clamp(7px, 0.792cqw, 9.5px); letter-spacing: 3px; color: #8B8464; z-index: 2; }
-        .ce-distinction { position: absolute; top: 25.8%; left: 10%; right: 10%; text-align: center; font-size: clamp(9px, 1cqw, 12px); letter-spacing: 3px; color: #C9BE9A; z-index: 2; }
-        .ce-title { position: absolute; top: 29.8%; left: 7.5%; right: 7.5%; text-align: center; font-family: 'Playfair Display', serif; font-weight: 700; font-size: clamp(18px, 2.75cqw, 33px); color: #E9C874; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; z-index: 2; }
+        .ce-tagline { position: absolute; top: 23.3%; left: 10%; right: 10%; text-align: center; font-size: clamp(7px, 0.792cqw, 9.5px); letter-spacing: 3px; color: #8B8464; z-index: 2; }
+        .ce-distinction { position: absolute; top: 27.3%; left: 10%; right: 10%; text-align: center; font-size: clamp(9px, 1cqw, 12px); letter-spacing: 3px; color: #C9BE9A; z-index: 2; }
+        .ce-title { position: absolute; top: 34.3%; left: 7.5%; right: 7.5%; text-align: center; font-family: 'Playfair Display', serif; font-weight: 700; font-size: clamp(18px, 2.75cqw, 33px); color: #E9C874; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; z-index: 2; }
         .ce-rule { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; z-index: 2; }
         .ce-rule-line { height: 1px; background: rgba(201,162,39,.6); }
         .ce-underline { position: absolute; left: 50%; transform: translateX(-50%); height: 2px; background: #C9A227; z-index: 2; }
-        .ce-intro { position: absolute; top: 36.8%; left: 10%; right: 10%; text-align: center; font-size: clamp(9px, 1.083cqw, 13px); letter-spacing: 3px; color: #C9BE9A; z-index: 2; }
-        .ce-recipient { position: absolute; top: 40.3%; left: 0; right: 0; text-align: center; font-size: clamp(20px, 4.833cqw, 58px); color: #F3E4B8; white-space: nowrap; overflow: hidden; max-width: 84%; margin: 0 auto; z-index: 2; }
-        .ce-citation { position: absolute; top: 48.9%; left: 50%; transform: translateX(-50%); width: 53.333%; text-align: center; font-size: clamp(9px, 1.25cqw, 15px); line-height: 1.8; color: #D9D3C0; z-index: 2; }
-        .ce-quote { position: absolute; top: 56.3%; left: 0; right: 0; text-align: center; font-family: 'Playfair Display', serif; font-style: italic; font-size: clamp(11px, 1.417cqw, 17px); color: #E9C874; z-index: 2; }
-        .ce-quote-author { position: absolute; top: 59.8%; left: 0; right: 0; text-align: center; font-size: clamp(8px, 1.042cqw, 12.5px); letter-spacing: 1.5px; color: #C9BE9A; z-index: 2; }
-        .ce-sig-block { position: absolute; top: 76.325%; left: 11%; width: 24%; text-align: center; z-index: 2; }
+        .ce-intro { position: absolute; top: 42.3%; left: 10%; right: 10%; text-align: center; font-size: clamp(9px, 1.083cqw, 13px); letter-spacing: 3px; color: #C9BE9A; z-index: 2; }
+        .ce-recipient { position: absolute; top: 46.3%; left: 0; right: 0; text-align: center; font-size: clamp(20px, 4.833cqw, 58px); color: #F3E4B8; white-space: nowrap; overflow: hidden; max-width: 84%; margin: 0 auto; z-index: 2; }
+        .ce-citation { position: absolute; top: 55.3%; left: 50%; transform: translateX(-50%); width: 53.333%; text-align: center; font-size: clamp(9px, 1.25cqw, 15px); line-height: 1.8; color: #D9D3C0; z-index: 2; }
+        .ce-quote { position: absolute; top: 63.3%; left: 0; right: 0; text-align: center; font-family: 'Playfair Display', serif; font-style: italic; font-size: clamp(11px, 1.417cqw, 17px); color: #E9C874; z-index: 2; }
+        .ce-quote-author { position: absolute; top: 67.3%; left: 0; right: 0; text-align: center; font-size: clamp(8px, 1.042cqw, 12.5px); letter-spacing: 1.5px; color: #C9BE9A; z-index: 2; }
+        .ce-sig-block { position: absolute; top: 73%; left: 11%; width: 24%; text-align: center; z-index: 2; }
         .ce-sig-line { height: 24px; border-bottom: 1px solid rgba(201,162,39,.5); margin-bottom: 6px; }
         .ce-sig-name { font-family: 'Playfair Display', serif; font-weight: 600; font-size: clamp(9px, 1.25cqw, 15px); color: #F3E4B8; white-space: nowrap; overflow: hidden; }
         .ce-sig-title { margin-top: 4px; padding-top: 4px; font-size: clamp(7px, 0.875cqw, 10.5px); letter-spacing: 1.5px; color: #C9BE9A; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
@@ -636,7 +636,7 @@ export default function CertificateGeneratorWorkspace() {
         .ce-seal-rosette { top: 77.267%; width: 8.333cqw; height: 10.833cqw; }
         .ce-seal-engraved { top: 78.092%; width: 9.833cqw; height: 9.833cqw; }
         .ce-seal-custom-img { top: 75.618%; width: 12.667cqw; height: auto; filter: drop-shadow(0 10px 18px rgba(0,0,0,.5)); }
-        .ce-date-verify { position: absolute; top: 76.325%; right: 11%; display: flex; align-items: flex-end; gap: 3.667%; z-index: 2; }
+        .ce-date-verify { position: absolute; top: 73%; right: 11%; display: flex; align-items: flex-end; gap: 3.667%; z-index: 2; }
         .ce-date-block { text-align: center; white-space: nowrap; }
         .ce-date-value { font-size: clamp(9px, 1.25cqw, 15px); color: #F3E4B8; font-weight: 600; white-space: nowrap; overflow: hidden; }
         .ce-date-value.ce-date-aligned { margin-top: 20px; }
@@ -970,11 +970,11 @@ export default function CertificateGeneratorWorkspace() {
                 <div className="ce-distinction">◆&nbsp;&nbsp;PRESENTED WITH DISTINCTION&nbsp;&nbsp;◆</div>
 
                 <div ref={registerFit} className="ce-title">CERTIFICATE OF {certType.toUpperCase()}</div>
-                <div className="ce-underline" style={{ top: '35.2%', width: '13%' }} />
+                <div className="ce-underline" style={{ top: '39.7%', width: '13%' }} />
 
                 <div className="ce-intro">◆&nbsp;&nbsp;PROUDLY PRESENTED TO&nbsp;&nbsp;◆</div>
                 <div ref={registerFit} className="ce-recipient" style={execNameStyle}>{emptyToDefault(state, 'recipientName')}</div>
-                <div className="ce-underline" style={{ top: '56.5%', width: '18%' }} />
+                <div className="ce-underline" style={{ top: '52.5%', width: '18%' }} />
 
                 <div className="ce-citation">{emptyToDefault(state, 'description')}</div>
 

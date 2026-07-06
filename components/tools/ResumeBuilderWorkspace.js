@@ -225,10 +225,33 @@ export default function ResumeBuilderWorkspace() {
         page.drawLine({ start: { x: 40, y }, end: { x: width - 40, y }, thickness: 0.5, color: blue });
         y -= 12;
       }
+      // pdf-lib's drawText() silently wraps long text to multiple lines when
+      // maxWidth is passed, but doesn't report how many lines it used — so a
+      // fixed single-line y decrement causes the next section to overlap
+      // whatever just got wrapped. Wrapping manually (measuring real text
+      // width ourselves) and decrementing y per actual line fixes this for good.
       function drawText(text, x, size, f, color, maxW) {
         if (!text) return;
-        page.drawText(text, { x, y, size: size || 10, font: f || font, color: color || dark, maxWidth: maxW || width - 80 });
-        y -= (size || 10) + 4;
+        const useFont = f || font;
+        const useSize = size || 10;
+        const useMaxW = maxW || width - 80;
+        const words = String(text).split(' ');
+        let line = '';
+        const lines = [];
+        words.forEach((word) => {
+          const test = line ? `${line} ${word}` : word;
+          if (useFont.widthOfTextAtSize(test, useSize) > useMaxW && line) {
+            lines.push(line);
+            line = word;
+          } else {
+            line = test;
+          }
+        });
+        if (line) lines.push(line);
+        lines.forEach((l) => {
+          page.drawText(l, { x, y, size: useSize, font: useFont, color: color || dark });
+          y -= useSize + 4;
+        });
       }
 
       if (form.summary) {

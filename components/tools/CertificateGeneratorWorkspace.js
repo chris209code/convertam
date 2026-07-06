@@ -196,6 +196,11 @@ export default function CertificateGeneratorWorkspace() {
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       }
 
+      // Extra settle margin — belt-and-braces on top of the rAF waits above,
+      // since we can't directly verify html2canvas's internal capture timing.
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      fitRefs.current.forEach(fitElementToWidth);
+
       const canvas = await html2canvas(certRef.current, {
         scale: 2.5,
         useCORS: true,
@@ -450,7 +455,7 @@ export default function CertificateGeneratorWorkspace() {
         .cp-title { position: absolute; top: 20.024%; left: 0; right: 0; font-family: 'Playfair Display', serif; font-weight: 800; font-size: clamp(28px, 5.667cqw, 68px); letter-spacing: clamp(2px, 0.5cqw, 6px); }
         .cp-subtitle { position: absolute; top: 30.624%; left: 0; right: 0; font-family: 'Playfair Display', serif; font-weight: 600; font-size: clamp(13px, 2.25cqw, 27px); color: var(--accent); letter-spacing: clamp(3px, 0.75cqw, 9px); }
         .cp-intro { position: absolute; top: 37.456%; left: 0; right: 0; font-size: clamp(8px, 1.083cqw, 13px); letter-spacing: clamp(1px, 0.25cqw, 3px); color: #8A8262; }
-        .cp-recipient { position: absolute; top: 40.99%; left: 0; right: 0; font-size: clamp(24px, 5.5cqw, 66px); max-width: 88%; margin: 0 auto; white-space: nowrap; overflow: hidden; }
+        .cp-recipient { position: absolute; top: 40.99%; left: 0; right: 0; font-size: clamp(24px, 5.5cqw, 66px); max-width: 88%; margin: 0 auto; white-space: nowrap; overflow: visible; }
         .cp-divider { position: absolute; top: 52.6%; left: 50%; transform: translateX(-50%); width: 23.333%; height: 1px; background: #B08D3F; }
         .cp-citation { position: absolute; top: 53.239%; left: 50%; transform: translateX(-50%); width: 58.333%; font-size: clamp(9px, 1.125cqw, 13.5px); letter-spacing: clamp(1px, 0.125cqw, 1.5px); line-height: 1.8; color: #7D765E; }
         .cp-course { position: absolute; top: 59.835%; left: 0; right: 0; font-family: 'Playfair Display', serif; font-weight: 700; font-size: clamp(13px, 2.25cqw, 27px); overflow-wrap: anywhere; }
@@ -460,8 +465,8 @@ export default function CertificateGeneratorWorkspace() {
         .cp-sig-block.right { right: 6%; }
         .cp-sig-block.cp-sig-solo { left: 50%; right: auto; transform: translateX(-50%); }
         .cp-sig-line { height: 26px; border-bottom: 1px solid #B0A98C; margin-bottom: 6px; }
-        .cp-sig-printed-name { font-family: 'Playfair Display', serif; font-weight: 600; font-size: clamp(10px, 1.3cqw, 15px); white-space: nowrap; overflow: hidden; }
-        .cp-sig-title { margin-top: 4px; padding-top: 4px; font-size: clamp(7px, 0.875cqw, 10.5px); letter-spacing: clamp(1px, 0.125cqw, 1.5px); color: #8A8262; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
+        .cp-sig-printed-name { font-family: 'Playfair Display', serif; font-weight: 600; font-size: clamp(10px, 1.3cqw, 15px); white-space: nowrap; overflow: visible; }
+        .cp-sig-title { margin-top: 4px; padding-top: 4px; font-size: clamp(7px, 0.875cqw, 10.5px); letter-spacing: clamp(1px, 0.125cqw, 1.5px); color: #8A8262; text-transform: uppercase; white-space: nowrap; overflow: visible; }
         .cp-meta { position: absolute; bottom: 11.779%; font-size: clamp(7px, 0.917cqw, 11px); letter-spacing: clamp(0.5px, 0.083cqw, 1px); color: #8A8262; }
         .cp-meta.left { left: 9.167%; }
         .cp-meta.right { right: 9.167%; }

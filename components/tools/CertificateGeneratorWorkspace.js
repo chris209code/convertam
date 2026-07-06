@@ -110,6 +110,9 @@ export default function CertificateGeneratorWorkspace() {
   const [nameStyle, setNameStyle] = useState('As Designed');
   const [issueDateRaw, setIssueDateRaw] = useState('');
   const [hasSecondIssuer, setHasSecondIssuer] = useState(true);
+  const [quoteStyle, setQuoteStyle] = useState('Excellence (Aristotle)');
+  const [customQuoteText, setCustomQuoteText] = useState('');
+  const [customQuoteAttribution, setCustomQuoteAttribution] = useState('');
 
   function handleDatePick(e) {
     const iso = e.target.value;
@@ -169,22 +172,29 @@ export default function CertificateGeneratorWorkspace() {
         import('jspdf'),
       ]);
 
-      // html2canvas doesn't reliably wait for custom web fonts (Playfair
-      // Display, Dancing Script, etc.) before snapshotting — if it captures
-      // before they're loaded, text gets measured/rendered with a fallback
-      // font of different width than what was actually shrunk-to-fit on
-      // screen, causing text to cut off only in the download. Wait for the
-      // real fonts, then re-run the fit against their true metrics.
+      // html2canvas re-implements CSS rendering in JS and has known gaps with
+      // modern units like cqw (container queries), which this whole design
+      // is built on — it may not size text the same way a real browser does.
+      // Rather than guess which fields need protecting, lock EVERY element's
+      // font-size to its already-resolved pixel value right before capture
+      // (getComputedStyle always resolves clamp()/cqw down to real px), so
+      // html2canvas never has to interpret those units itself.
+      function lockComputedFontSizes(root) {
+        if (!root) return;
+        root.querySelectorAll('*').forEach((el) => {
+          const resolvedPx = getComputedStyle(el).fontSize;
+          if (resolvedPx) el.style.fontSize = resolvedPx;
+        });
+      }
+
       if (document.fonts && document.fonts.ready) {
         await document.fonts.ready;
       }
-      fitRefs.current.forEach(fitElementToWidth);
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
       // The editor shows small, fast-loading preview images to keep editing
       // snappy. For export, preload the real high-res assets first (so the
-      // swap is instant, already cached), then wait for React to paint the
-      // swap before capturing — so the download is always full quality.
+      // swap is instant, already cached), then wait for the swap to paint
+      // before capturing — so the download is always full quality.
       if (template === 'classic') {
         await Promise.all([
           preloadImage('/certificates/border-classic.png'),
@@ -192,14 +202,22 @@ export default function CertificateGeneratorWorkspace() {
         ]);
         setHighRes(true);
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        fitRefs.current.forEach(fitElementToWidth);
+      }
+      if (template === 'executive') {
+        const sealSrc = sealStyle === 'Royal Seal' ? (customSealImg || '/certificates/seal-custom.png') : '/certificates/seal-executive.png';
+        await Promise.all([
+          preloadImage('/certificates/border-executive.png'),
+          preloadImage(sealSrc),
+        ]);
+        setHighRes(true);
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       }
 
-      // Extra settle margin — belt-and-braces on top of the rAF waits above,
-      // since we can't directly verify html2canvas's internal capture timing.
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      // Final pass, in this exact order, right before capture: shrink any
+      // long text to fit, then lock every resulting size to plain pixels.
       fitRefs.current.forEach(fitElementToWidth);
+      lockComputedFontSizes(certRef.current);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
       const canvas = await html2canvas(certRef.current, {
         scale: 2.5,
@@ -240,6 +258,83 @@ export default function CertificateGeneratorWorkspace() {
     'Bold Modern': { fontFamily: "'Inter', sans-serif", fontWeight: 800, fontStyle: 'normal', letterSpacing: '-1px' },
   };
   const classicNameStyle = nameFonts[nameStyle] || nameFonts['As Designed'];
+
+  // Executive Signature uses the same name-style enum, but its own default
+  // (Playfair Display italic, per the exec spec) when "As Designed" is chosen.
+  const execNameStyle = nameStyle === 'As Designed'
+    ? { fontFamily: "'Playfair Display', serif", fontWeight: 700, fontStyle: 'italic', letterSpacing: '0px' }
+    : classicNameStyle;
+
+  const QUOTE_PRESETS = {
+    'Excellence (Aristotle)': { text: 'Excellence is not an act, but a habit.', author: 'ARISTOTLE' },
+    'Getting Started (Walt Disney)': { text: 'The way to get started is to quit talking and begin doing.', author: 'WALT DISNEY' },
+    'Courage to Continue (Churchill)': { text: 'Success is not final, failure is not fatal: it is the courage to continue that counts.', author: 'WINSTON CHURCHILL' },
+  };
+  const showQuote = quoteStyle !== 'None';
+  const activeQuote = quoteStyle === 'Custom'
+    ? { text: customQuoteText, author: customQuoteAttribution }
+    : (QUOTE_PRESETS[quoteStyle] || QUOTE_PRESETS['Excellence (Aristotle)']);
+
+  function ExecHexLogo({ letter }) {
+    return (
+      <svg className="ce-hexmark" viewBox="0 0 100 100">
+        <polygon points="50,4 93,27 93,73 50,96 7,73 7,27" fill="none" stroke="#C9A227" strokeWidth="4" />
+        <text x="50" y="63" fontFamily="Playfair Display, serif" fontWeight="700" fontSize="42" fill="#E9C874" textAnchor="middle">{letter}</text>
+      </svg>
+    );
+  }
+
+  const execLaurelTransforms = laurelTransforms; // same 24-leaf geometry, recolored
+  function ExecLaurelMedallion({ letter }) {
+    return (
+      <svg viewBox="0 0 100 100" className="ce-seal-svg ce-seal-wrap">
+        <defs><path id="ceLeaf" d="M0,0 C2.4,-4.8 2.4,-11.2 0,-16 C-2.4,-11.2 -2.4,-4.8 0,0 Z" /></defs>
+        <circle cx="50" cy="50" r="16" fill="none" stroke="#E9C874" strokeWidth="1" />
+        <text x="50" y="57" fontFamily="Playfair Display, serif" fontWeight="700" fontStyle="italic" fontSize="20" fill="#E9C874" textAnchor="middle">{letter}</text>
+        <g fill="#E9C874">
+          {execLaurelTransforms.map(([x, y, r], i) => (
+            <use key={i} href="#ceLeaf" transform={`translate(${x},${y}) rotate(${r}) scale(0.6)`} />
+          ))}
+        </g>
+      </svg>
+    );
+  }
+  function ExecRosette({ letter }) {
+    return (
+      <svg viewBox="0 0 100 100" className="ce-seal-rosette ce-seal-wrap">
+        <polygon points="50,8 57.7,23.5 74,18 68.5,34.3 84,42 68.5,49.7 74,66 57.7,60.5 50,76 42.3,60.5 26,66 31.5,49.7 16,42 31.5,34.3 26,18 42.3,23.5" fill="#C9A227" />
+        <circle cx="50" cy="42" r="15" fill="#0B0F1A" stroke="#E9C874" strokeWidth="1.5" />
+        <text x="50" y="48" fontFamily="Playfair Display, serif" fontWeight="700" fontStyle="italic" fontSize="16" fill="#E9C874" textAnchor="middle">{letter}</text>
+        <path d="M40,56 L46,56 L46,90 L43,82 L40,90 Z" fill="#C9A227" />
+        <path d="M54,56 L60,56 L60,90 L57,82 L54,90 Z" fill="#C9A227" />
+      </svg>
+    );
+  }
+  function ExecEngraved({ letter }) {
+    return (
+      <svg viewBox="0 0 100 100" className="ce-seal-engraved ce-seal-wrap">
+        <circle cx="50" cy="50" r="46" fill="none" stroke="#E9C874" strokeWidth="1.5" />
+        <circle cx="50" cy="50" r="41" fill="none" stroke="#C9A227" strokeWidth="4" strokeDasharray="1.6 3.2" />
+        <circle cx="50" cy="50" r="35" fill="none" stroke="#E9C874" strokeWidth="0.75" />
+        <circle cx="50" cy="50" r="24" fill="none" stroke="#E9C874" strokeWidth="1" />
+        <text x="50" y="59" fontFamily="Playfair Display, serif" fontWeight="700" fontStyle="italic" fontSize="26" fill="#E9C874" textAnchor="middle">{letter}</text>
+        <polygon points="50,6 51.8,10.5 56.5,10.8 52.8,13.7 54.1,18.2 50,15.6 45.9,18.2 47.2,13.7 43.5,10.8 48.2,10.5" fill="#E9C874" />
+      </svg>
+    );
+  }
+  function renderExecSeal() {
+    if (sealStyle === 'As Designed') {
+      const size = highRes ? '/certificates/seal-executive.png' : '/certificates/seal-executive-preview.png';
+      return <img className="ce-seal-wrap ce-seal-as-designed" src={size} alt="Seal" />;
+    }
+    if (sealStyle === 'Laurel Medallion') return <ExecLaurelMedallion letter={logoInitial} />;
+    if (sealStyle === 'Rosette Ribbon') return <ExecRosette letter={logoInitial} />;
+    if (sealStyle === 'Engraved Seal') return <ExecEngraved letter={logoInitial} />;
+    if (sealStyle === 'Royal Seal') {
+      return <img className="ce-seal-wrap ce-seal-custom-img" src={customSealImg || '/certificates/seal-custom.png'} alt="Organization seal" />;
+    }
+    return null;
+  }
 
   // Exact Classic Prestige seal variants, reproduced from the design spec's literal
   // coordinates — a distinct set from LaurelSeal (which Executive uses; untouched).
@@ -504,20 +599,44 @@ export default function CertificateGeneratorWorkspace() {
         .modern-footer > div { display: grid; gap: 6px; }
 
         /* Executive Signature */
-        .executive-template { display: grid; grid-template-rows: auto 1fr auto; padding: 4.5% 7%; color: #ffe7b5; background: radial-gradient(circle at 74% 34%, rgba(201,147,45,0.13), transparent 28%), linear-gradient(135deg, #071424, #0b1728 56%, #151414); text-align: center; height: 100%; position: relative; }
-        .cert-gold-frame { position: absolute; inset: 3.2%; border: 2px solid var(--accent); pointer-events: none; }
-        .cert-monogram { position: absolute; top: 22%; right: 14%; color: rgba(255,231,181,0.06); font-size: clamp(150px, 22cqw, 310px); font-weight: 900; }
-        .executive-template header { position: relative; z-index: 1; }
-        .executive-template header p { margin: 0.8% 0 0; font-size: clamp(7px, 0.8cqw, 10px); letter-spacing: 0.18em; text-transform: uppercase; }
-        .executive-template .cert-gold .cert-logo-mark { background: linear-gradient(135deg, var(--accent), #f5df9b); color: #0c1424; }
-        .executive-template section { position: relative; z-index: 1; align-self: center; }
-        .cert-distinction { margin: 0 0 1.2%; color: #e6bc62; font-size: clamp(11px, 1.15cqw, 16px); letter-spacing: 0.16em; text-transform: uppercase; }
-        .executive-template h3 { margin: 0 0 2.3%; font-family: Georgia, "Times New Roman", serif; font-size: clamp(34px, 4.4cqw, 62px); font-weight: 500; text-transform: uppercase; }
-        .executive-template .cert-recipient { margin: 0 auto 2.1%; max-width: 76%; color: #ffd17d; font-family: Georgia, "Times New Roman", serif; font-size: clamp(44px, 6cqw, 82px); line-height: 1.05; white-space: nowrap; display: block; }
-        .executive-template .cert-description { max-width: 70%; margin: 0 auto 2%; color: #fff6e4; font-size: clamp(13px, 1.35cqw, 19px); line-height: 1.45; }
-        .cert-quote { display: inline-block; max-width: 70%; margin: 0; color: #ffdd8a; font-family: Georgia, "Times New Roman", serif; font-size: clamp(15px, 1.7cqw, 25px); font-style: italic; }
-        .executive-template footer { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr auto auto 1fr; align-items: end; gap: 5%; color: #fff6e4; }
-        .executive-template .cert-qr-wrap { display: grid; justify-items: end; gap: 6px; }
+        /* Executive Signature — exact positions converted proportionally from the spec's 1200×849 canvas */
+        .executive-template { background: #0B0F1A; color: #E9C874; height: 100%; position: relative; text-align: center; }
+        .ce-border-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; z-index: 1; }
+        .ce-border-minimal { position: absolute; inset: 4.005%; border: 1px solid rgba(201,162,39,.6); pointer-events: none; }
+        .ce-concentric { position: absolute; top: 49.94%; left: 50%; border-radius: 50%; transform: translate(-50%,-50%); }
+        .ce-concentric.outer { width: 43.333cqw; height: 43.333cqw; border: 1px solid rgba(201,162,39,.16); }
+        .ce-concentric.inner { width: 33.333cqw; height: 33.333cqw; border: 1px solid rgba(201,162,39,.12); }
+        .ce-header { position: absolute; top: 8.717%; left: 0; right: 0; display: flex; align-items: center; justify-content: center; gap: 12px; z-index: 2; }
+        .ce-hexmark { width: clamp(20px, 2.667cqw, 32px); height: clamp(20px, 2.667cqw, 32px); }
+        .ce-orgname { font-family: 'Playfair Display', serif; font-weight: 700; font-size: clamp(16px, 2.083cqw, 25px); color: #E9C874; letter-spacing: 1px; }
+        .ce-tagline { position: absolute; top: 13.663%; left: 10%; right: 10%; text-align: center; font-size: clamp(7px, 0.792cqw, 9.5px); letter-spacing: 3px; color: #8B8464; z-index: 2; }
+        .ce-distinction { position: absolute; top: 17.667%; left: 10%; right: 10%; text-align: center; font-size: clamp(9px, 1cqw, 12px); letter-spacing: 3px; color: #C9BE9A; z-index: 2; }
+        .ce-title { position: absolute; top: 25.442%; left: 7.5%; right: 7.5%; text-align: center; font-family: 'Playfair Display', serif; font-weight: 700; font-size: clamp(18px, 2.75cqw, 33px); color: #E9C874; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; z-index: 2; }
+        .ce-rule { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; z-index: 2; }
+        .ce-rule-line { height: 1px; background: rgba(201,162,39,.6); }
+        .ce-rule-diamond { width: 7px; height: 7px; background: #C9A227; transform: rotate(45deg); flex-shrink: 0; }
+        .ce-intro { position: absolute; top: 32.98%; left: 10%; right: 10%; text-align: center; font-size: clamp(9px, 1.083cqw, 13px); letter-spacing: 3px; color: #C9BE9A; z-index: 2; }
+        .ce-recipient { position: absolute; top: 36.755%; left: 0; right: 0; text-align: center; font-size: clamp(20px, 4.833cqw, 58px); color: #F3E4B8; white-space: nowrap; overflow: hidden; max-width: 84%; margin: 0 auto; z-index: 2; }
+        .ce-citation { position: absolute; top: 46.407%; left: 50%; transform: translateX(-50%); width: 53.333%; text-align: center; font-size: clamp(9px, 1.25cqw, 15px); line-height: 1.8; color: #D9D3C0; z-index: 2; }
+        .ce-quote { position: absolute; top: 55.594%; left: 0; right: 0; text-align: center; font-family: 'Playfair Display', serif; font-style: italic; font-size: clamp(11px, 1.417cqw, 17px); color: #E9C874; z-index: 2; }
+        .ce-quote-author { position: absolute; top: 59.6%; left: 0; right: 0; text-align: center; font-size: clamp(8px, 1.042cqw, 12.5px); letter-spacing: 1.5px; color: #C9BE9A; z-index: 2; }
+        .ce-sig-block { position: absolute; top: 82.685%; left: 8.333%; width: 19.167%; text-align: center; z-index: 2; }
+        .ce-sig-line { height: 24px; border-bottom: 1px solid rgba(201,162,39,.5); margin-bottom: 6px; }
+        .ce-sig-name { font-family: 'Playfair Display', serif; font-weight: 600; font-size: clamp(9px, 1.25cqw, 15px); color: #F3E4B8; white-space: nowrap; overflow: hidden; }
+        .ce-sig-title { margin-top: 4px; padding-top: 4px; font-size: clamp(7px, 0.875cqw, 10.5px); letter-spacing: 1.5px; color: #C9BE9A; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
+        .ce-seal-wrap { position: absolute; left: 50%; transform: translateX(-50%); z-index: 2; }
+        .ce-seal-as-designed { top: 74.912%; width: 10.667cqw; height: auto; }
+        .ce-seal-svg { top: 77.739%; width: 10.667cqw; height: 10.667cqw; }
+        .ce-seal-rosette { top: 77.267%; width: 8.333cqw; height: 10.833cqw; }
+        .ce-seal-engraved { top: 78.092%; width: 9.833cqw; height: 9.833cqw; }
+        .ce-seal-custom-img { top: 75.618%; width: 12.667cqw; height: auto; filter: drop-shadow(0 10px 18px rgba(0,0,0,.5)); }
+        .ce-date-verify { position: absolute; top: 78.21%; right: 8.333%; display: flex; align-items: flex-end; gap: 3.667%; z-index: 2; }
+        .ce-date-block { text-align: center; white-space: nowrap; }
+        .ce-date-value { font-size: clamp(9px, 1.25cqw, 15px); color: #F3E4B8; font-weight: 600; margin-top: 20px; }
+        .ce-date-label { border-top: 1px solid rgba(201,162,39,.5); margin-top: 6px; padding-top: 6px; font-size: clamp(7px, 0.875cqw, 10.5px); letter-spacing: 1.5px; color: #C9BE9A; }
+        .ce-verify-block { text-align: center; white-space: nowrap; }
+        .ce-qr-box { width: clamp(44px, 5.5cqw, 66px); height: clamp(44px, 5.5cqw, 66px); background: #FFFFFF; border-radius: 8px; padding: 6px; box-sizing: border-box; margin: 0 auto; }
+        .ce-verify-label { font-size: clamp(7px, 0.875cqw, 10.5px); letter-spacing: 1.5px; color: #C9BE9A; margin-top: 8px; }
 
         /* Contemporary Split */
         .split-template { display: grid; grid-template-columns: 39% 61%; background: #fff; height: 100%; }
@@ -615,10 +734,13 @@ export default function CertificateGeneratorWorkspace() {
           </label>
 
           {template === 'classic' && (
+            <label>Date line (Classic Prestige only)
+              <input value={state.dateSentence} onChange={(e) => update('dateSentence', e.target.value)} placeholder="e.g. Awarded this 5th day of July, 2026" />
+            </label>
+          )}
+
+          {(template === 'classic' || template === 'executive') && (
             <>
-              <label>Date line (Classic Prestige only)
-                <input value={state.dateSentence} onChange={(e) => update('dateSentence', e.target.value)} placeholder="e.g. Awarded this 5th day of July, 2026" />
-              </label>
               <div className="cert-two-fields">
                 <label>Border style
                   <select value={ornamentLevel} onChange={(e) => setOrnamentLevel(e.target.value)}>
@@ -648,6 +770,30 @@ export default function CertificateGeneratorWorkspace() {
                 <label>Upload your seal image
                   <input type="file" accept="image/*" onChange={handleCustomSealUpload} />
                 </label>
+              )}
+            </>
+          )}
+
+          {template === 'executive' && (
+            <>
+              <label>Quote (Executive Signature only)
+                <select value={quoteStyle} onChange={(e) => setQuoteStyle(e.target.value)}>
+                  <option>Excellence (Aristotle)</option>
+                  <option>Getting Started (Walt Disney)</option>
+                  <option>Courage to Continue (Churchill)</option>
+                  <option>Custom</option>
+                  <option>None</option>
+                </select>
+              </label>
+              {quoteStyle === 'Custom' && (
+                <>
+                  <label>Custom quote
+                    <input value={customQuoteText} onChange={(e) => setCustomQuoteText(e.target.value)} placeholder="Your organization's own quote" />
+                  </label>
+                  <label>Attribution
+                    <input value={customQuoteAttribution} onChange={(e) => setCustomQuoteAttribution(e.target.value)} placeholder="e.g. YOUR FOUNDER'S NAME" />
+                  </label>
+                </>
               )}
             </>
           )}
@@ -793,40 +939,85 @@ export default function CertificateGeneratorWorkspace() {
 
             {template === 'executive' && (
               <div className="executive-template">
-                <div className="cert-gold-frame" />
-                <div className="cert-monogram">C</div>
-                <header>
-                  <div className="cert-logo-row center cert-gold">
-                    <LogoMark />
-                    <span>{emptyToDefault(state, 'companyName')}</span>
+                {ornamentLevel === 'Ornate' ? (
+                  <>
+                    <div className="ce-concentric outer" />
+                    <div className="ce-concentric inner" />
+                    <img src={highRes ? '/certificates/border-executive.png' : '/certificates/border-executive-preview.png'} alt="" className="ce-border-img" />
+                  </>
+                ) : (
+                  <div className="ce-border-minimal" />
+                )}
+
+                <div className="ce-header">
+                  {logoImg ? <img src={logoImg} alt="" style={{ width: 32, height: 32, objectFit: 'contain' }} /> : <ExecHexLogo letter={logoInitial} />}
+                  <span className="ce-orgname">{emptyToDefault(state, 'companyName')}</span>
+                </div>
+                {state.tagline && <div className="ce-tagline">{state.tagline}</div>}
+                <div className="ce-distinction">◆&nbsp;&nbsp;PRESENTED WITH DISTINCTION&nbsp;&nbsp;◆</div>
+
+                <div ref={registerFit} className="ce-title">CERTIFICATE OF {certType.toUpperCase()}</div>
+                <div className="ce-rule" style={{ top: '30.859%' }}>
+                  <div className="ce-rule-line" style={{ width: '5.833%' }} />
+                  <div className="ce-rule-diamond" />
+                  <div className="ce-rule-line" style={{ width: '5.833%' }} />
+                </div>
+
+                <div className="ce-intro">◆&nbsp;&nbsp;PROUDLY PRESENTED TO&nbsp;&nbsp;◆</div>
+                <div ref={registerFit} className="ce-recipient" style={execNameStyle}>{emptyToDefault(state, 'recipientName')}</div>
+                <div className="ce-rule" style={{ top: '45.819%' }}>
+                  <div className="ce-rule-line" style={{ width: '7.5%' }} />
+                  <div className="ce-rule-diamond" />
+                  <div className="ce-rule-line" style={{ width: '7.5%' }} />
+                </div>
+
+                <div className="ce-citation">{emptyToDefault(state, 'description')}</div>
+
+                {showQuote && (
+                  <>
+                    <div className="ce-quote">"{activeQuote.text}"</div>
+                    <div className="ce-quote-author">— {activeQuote.author}</div>
+                  </>
+                )}
+
+                <div className="ce-sig-block">
+                  <div className="ce-sig-line" />
+                  <div ref={registerFit} className="ce-sig-name">{emptyToDefault(state, 'issuerName')}</div>
+                  <div ref={registerFit} className="ce-sig-title">{emptyToDefault(state, 'issuerPosition')}</div>
+                </div>
+
+                {renderExecSeal()}
+
+                <div className="ce-date-verify">
+                  <div className="ce-date-block">
+                    <div className="ce-date-value">{emptyToDefault(state, 'issueDate')}</div>
+                    <div className="ce-date-label">DATE</div>
                   </div>
-                  {state.tagline && <p>{state.tagline}</p>}
-                </header>
-                <section>
-                  <p className="cert-distinction">Presented with distinction</p>
-                  <h3>Certificate of {certType}</h3>
-                  <p ref={registerFit} className="cert-recipient">{emptyToDefault(state, 'recipientName')}</p>
-                  <p className="cert-description">{emptyToDefault(state, 'description')}</p>
-                  <p ref={registerFit} className="cert-quote">{emptyToDefault(state, 'programTitle')}</p>
-                </section>
-                <footer>
-                  <div className="cert-signature-block">
-                    <div className="cert-signature-line">Signature</div>
-                    <strong>{emptyToDefault(state, 'issuerName')}</strong>
-                    <span>{emptyToDefault(state, 'issuerPosition')}</span>
-                  </div>
-                  <div className="cert-seal cert-seal-executive"><LaurelSeal size={70} /></div>
-                  <div className="cert-date-block">
-                    <span>Date</span>
-                    <strong>{emptyToDefault(state, 'issueDate')}</strong>
-                  </div>
-                  <div className="cert-qr-wrap">
-                    {hasVerification && <div className="cert-qr-box" />}
-                    {hasCertId && <span>{state.certificateId}</span>}
-                  </div>
-                </footer>
+                  {hasVerification && (
+                    <div className="ce-verify-block">
+                      <div className="ce-qr-box">
+                        <svg viewBox="0 0 10 10" width="100%" height="100%">
+                          <rect width="10" height="10" fill="#FFFFFF" />
+                          <g fill="#0B0F1A">
+                            <rect x="0" y="0" width="3" height="3" /><rect x="1" y="1" width="1" height="1" fill="#FFFFFF" />
+                            <rect x="7" y="0" width="3" height="3" /><rect x="8" y="1" width="1" height="1" fill="#FFFFFF" />
+                            <rect x="0" y="7" width="3" height="3" /><rect x="1" y="8" width="1" height="1" fill="#FFFFFF" />
+                            <rect x="4" y="0" width="1" height="1" /><rect x="5" y="1" width="1" height="1" />
+                            <rect x="4" y="4" width="1" height="1" /><rect x="5" y="4" width="1" height="1" /><rect x="6" y="4" width="1" height="1" />
+                            <rect x="4" y="5" width="1" height="1" /><rect x="6" y="5" width="1" height="1" />
+                            <rect x="4" y="6" width="1" height="1" /><rect x="5" y="6" width="1" height="1" />
+                            <rect x="8" y="4" width="1" height="1" /><rect x="8" y="6" width="1" height="1" />
+                            <rect x="6" y="8" width="1" height="1" /><rect x="8" y="8" width="1" height="1" /><rect x="4" y="8" width="1" height="1" />
+                          </g>
+                        </svg>
+                      </div>
+                      <div className="ce-verify-label">VERIFY CERTIFICATE</div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
+
 
             {template === 'split' && (
               <div className="split-template">

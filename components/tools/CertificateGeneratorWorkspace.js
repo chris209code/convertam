@@ -60,10 +60,15 @@ function formatDateSentence(isoStr) {
   return `Awarded this ${ordinal(d)} day of ${MONTH_NAMES[m - 1]}, ${y}`;
 }
 
-function fitElementToWidth(el) {
+function fitElementToWidth(el, scale = 1) {
   if (!el) return;
-  const baseSize = parseFloat(el.dataset.baseFontSize || getComputedStyle(el).fontSize);
-  if (!el.dataset.baseFontSize) el.dataset.baseFontSize = String(baseSize);
+  const naturalBase = parseFloat(el.dataset.baseFontSize || getComputedStyle(el).fontSize);
+  if (!el.dataset.baseFontSize) el.dataset.baseFontSize = String(naturalBase);
+  const baseSize = naturalBase * scale;
+  // Reset to normal single-line mode first, in case a previous pass wrapped it
+  // and the text has since gotten shorter again.
+  el.style.whiteSpace = 'nowrap';
+  el.style.overflow = 'hidden';
   el.style.fontSize = `${baseSize}px`;
   let size = baseSize;
   const minSize = baseSize * 0.15;
@@ -72,6 +77,13 @@ function fitElementToWidth(el) {
     size -= 0.5;
     el.style.fontSize = `${size}px`;
     guard++;
+  }
+  // Shrinking alone couldn't make it fit on one line even at the size floor —
+  // wrap to a second line instead of silently clipping the rest of the text.
+  if (el.scrollWidth > el.clientWidth + 1) {
+    el.style.whiteSpace = 'normal';
+    el.style.overflow = 'visible';
+    el.style.wordBreak = 'break-word';
   }
 }
 
@@ -83,7 +95,7 @@ function fitElementToWidth(el) {
 // PDF capture — html2canvas doesn't reliably wait for custom fonts to finish
 // loading, so text sized against a fallback font can end up wrong-width by
 // the time the actual snapshot happens unless we re-measure after fonts load.
-function useAutoFit(deps) {
+function useAutoFit(deps, scale = 1) {
   const refs = useRef([]);
   refs.current = [];
   const register = useCallback((el) => {
@@ -91,9 +103,9 @@ function useAutoFit(deps) {
   }, []);
 
   useEffect(() => {
-    refs.current.forEach(fitElementToWidth);
+    refs.current.forEach((el) => fitElementToWidth(el, scale));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+  }, [...deps, scale]);
 
   return [register, refs];
 }
@@ -113,6 +125,7 @@ export default function CertificateGeneratorWorkspace() {
   const [quoteStyle, setQuoteStyle] = useState('None');
   const [customQuoteText, setCustomQuoteText] = useState('');
   const [customQuoteAttribution, setCustomQuoteAttribution] = useState('');
+  const [textScale, setTextScale] = useState(1);
 
   function handleDatePick(e) {
     const iso = e.target.value;
@@ -215,7 +228,7 @@ export default function CertificateGeneratorWorkspace() {
 
       // Final pass, in this exact order, right before capture: shrink any
       // long text to fit, then lock every resulting size to plain pixels.
-      fitRefs.current.forEach(fitElementToWidth);
+      fitRefs.current.forEach((el) => fitElementToWidth(el, textScale));
       lockComputedFontSizes(certRef.current);
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
@@ -244,7 +257,7 @@ export default function CertificateGeneratorWorkspace() {
   const hasCertId = Boolean(state.certificateId);
   const certType = titleCase(emptyToDefault(state, 'certificateType'));
 
-  const [registerFit, fitRefs] = useAutoFit([template, state.recipientName, state.programTitle, state.issuerName, state.secondIssuerName, state.issuerPosition, state.secondIssuerPosition, state.companyName]);
+  const [registerFit, fitRefs] = useAutoFit([template, state.recipientName, state.programTitle, state.issuerName, state.secondIssuerName, state.issuerPosition, state.secondIssuerPosition, state.companyName], textScale);
   const certRef = useRef(null);
 
   const cssVars = { '--brand': state.brandColor, '--accent': state.accentColor };
@@ -620,7 +633,7 @@ export default function CertificateGeneratorWorkspace() {
         .ce-concentric.inner { width: 33.333cqw; height: 33.333cqw; border: 1px solid rgba(201,162,39,.12); }
         .ce-header { position: absolute; top: 19.3%; left: 0; right: 0; display: flex; align-items: center; justify-content: center; gap: 12px; z-index: 2; }
         .ce-hexmark { width: clamp(20px, 2.667cqw, 32px); height: clamp(20px, 2.667cqw, 32px); }
-        .ce-orgname { font-family: 'Playfair Display', serif; font-weight: 700; font-size: clamp(16px, 2.083cqw, 25px); color: #E9C874; letter-spacing: 1px; white-space: nowrap; overflow: hidden; max-width: 60cqw; line-height: 1.5; padding-bottom: 4px; }
+        .ce-orgname { font-family: 'Playfair Display', serif; font-weight: 700; font-size: clamp(16px, 2.083cqw, 25px); color: #E9C874; letter-spacing: 1px; white-space: nowrap; overflow: hidden; max-width: 52cqw; min-width: 0; line-height: 1.5; padding-bottom: 4px; }
         .ce-tagline { position: absolute; top: 23.3%; left: 10%; right: 10%; text-align: center; font-size: clamp(7px, 0.792cqw, 9.5px); letter-spacing: 3px; color: #8B8464; z-index: 2; }
         .ce-distinction { position: absolute; top: 27.3%; left: 10%; right: 10%; text-align: center; font-size: clamp(9px, 1cqw, 12px); letter-spacing: 3px; color: #C9BE9A; z-index: 2; }
         .ce-title { position: absolute; top: 34.3%; left: 7.5%; right: 7.5%; text-align: center; font-family: 'Playfair Display', serif; font-weight: 700; font-size: clamp(18px, 2.75cqw, 33px); color: #E9C874; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; line-height: 1.5; padding-bottom: 4px; z-index: 2; }
@@ -700,6 +713,19 @@ export default function CertificateGeneratorWorkspace() {
               </button>
             ))}
           </div>
+        </section>
+
+        <section className="cert-control-section">
+          <h2>Text Size</h2>
+          <label style={{ fontSize: '11px' }}>
+            {Math.round(textScale * 100)}% — nudge this if auto-fit shrinks text more (or less) than you'd like
+            <input type="range" min="0.7" max="1.3" step="0.02" value={textScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: '100%', marginTop: 6 }} />
+          </label>
+          {textScale !== 1 && (
+            <button type="button" onClick={() => setTextScale(1)} style={{ background: 'none', border: 'none', color: '#0f766e', fontSize: '11px', fontWeight: 700, cursor: 'pointer', padding: 0, marginTop: 4 }}>
+              Reset to 100%
+            </button>
+          )}
         </section>
 
         <section className="cert-control-section cert-fields">

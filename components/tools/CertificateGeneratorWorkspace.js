@@ -110,7 +110,7 @@ export default function CertificateGeneratorWorkspace() {
   const [nameStyle, setNameStyle] = useState('As Designed');
   const [issueDateRaw, setIssueDateRaw] = useState('');
   const [hasSecondIssuer, setHasSecondIssuer] = useState(true);
-  const [quoteStyle, setQuoteStyle] = useState('Excellence (Aristotle)');
+  const [quoteStyle, setQuoteStyle] = useState('None');
   const [customQuoteText, setCustomQuoteText] = useState('');
   const [customQuoteAttribution, setCustomQuoteAttribution] = useState('');
 
@@ -244,7 +244,7 @@ export default function CertificateGeneratorWorkspace() {
   const hasCertId = Boolean(state.certificateId);
   const certType = titleCase(emptyToDefault(state, 'certificateType'));
 
-  const [registerFit, fitRefs] = useAutoFit([template, state.recipientName, state.programTitle, state.issuerName, state.secondIssuerName, state.issuerPosition, state.secondIssuerPosition]);
+  const [registerFit, fitRefs] = useAutoFit([template, state.recipientName, state.programTitle, state.issuerName, state.secondIssuerName, state.issuerPosition, state.secondIssuerPosition, state.companyName]);
   const certRef = useRef(null);
 
   const cssVars = { '--brand': state.brandColor, '--accent': state.accentColor };
@@ -269,6 +269,12 @@ export default function CertificateGeneratorWorkspace() {
     'Excellence (Aristotle)': { text: 'Excellence is not an act, but a habit.', author: 'ARISTOTLE' },
     'Getting Started (Walt Disney)': { text: 'The way to get started is to quit talking and begin doing.', author: 'WALT DISNEY' },
     'Courage to Continue (Churchill)': { text: 'Success is not final, failure is not fatal: it is the courage to continue that counts.', author: 'WINSTON CHURCHILL' },
+    'Love What You Do (Steve Jobs)': { text: 'The only way to do great work is to love what you do.', author: 'STEVE JOBS' },
+    'Impossible Until Done (Mandela)': { text: "It always seems impossible until it's done.", author: 'NELSON MANDELA' },
+    'Believe (Roosevelt)': { text: "Believe you can and you're halfway there.", author: 'THEODORE ROOSEVELT' },
+    'Hard Work (Tim Notke)': { text: "Hard work beats talent when talent doesn't work hard.", author: 'TIM NOTKE' },
+    'Together (Helen Keller)': { text: 'Alone we can do so little; together we can do so much.', author: 'HELEN KELLER' },
+    'Create the Future (Drucker)': { text: 'The best way to predict the future is to create it.', author: 'PETER DRUCKER' },
   };
   const showQuote = quoteStyle !== 'None';
   const activeQuote = quoteStyle === 'Custom'
@@ -546,7 +552,7 @@ export default function CertificateGeneratorWorkspace() {
         .cp-border-minimal { position: absolute; inset: 4.712%; border: 1px solid #B08D3F; pointer-events: none; }
         .cp-logo-box { position: absolute; top: 7.774%; left: 50%; transform: translateX(-50%); width: 12.5%; height: 6.125%; border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
         .cp-logo-box img { width: 100%; height: 100%; object-fit: contain; }
-        .cp-org-name { position: absolute; top: 15.783%; left: 0; right: 0; font-size: clamp(13px, 1.8cqw, 21px); letter-spacing: clamp(2px, 0.417cqw, 5px); font-weight: 700; }
+        .cp-org-name { position: absolute; top: 15.783%; left: 10%; right: 10%; font-size: clamp(13px, 1.8cqw, 21px); letter-spacing: clamp(2px, 0.417cqw, 5px); font-weight: 700; white-space: nowrap; overflow: hidden; }
         .cp-title { position: absolute; top: 20.024%; left: 0; right: 0; font-family: 'Playfair Display', serif; font-weight: 800; font-size: clamp(28px, 5.667cqw, 68px); letter-spacing: clamp(2px, 0.5cqw, 6px); }
         .cp-subtitle { position: absolute; top: 30.624%; left: 0; right: 0; font-family: 'Playfair Display', serif; font-weight: 600; font-size: clamp(13px, 2.25cqw, 27px); color: var(--accent); letter-spacing: clamp(3px, 0.75cqw, 9px); }
         .cp-intro { position: absolute; top: 37.456%; left: 0; right: 0; font-size: clamp(8px, 1.083cqw, 13px); letter-spacing: clamp(1px, 0.25cqw, 3px); color: #8A8262; }
@@ -608,7 +614,7 @@ export default function CertificateGeneratorWorkspace() {
         .ce-concentric.inner { width: 33.333cqw; height: 33.333cqw; border: 1px solid rgba(201,162,39,.12); }
         .ce-header { position: absolute; top: 8.717%; left: 0; right: 0; display: flex; align-items: center; justify-content: center; gap: 12px; z-index: 2; }
         .ce-hexmark { width: clamp(20px, 2.667cqw, 32px); height: clamp(20px, 2.667cqw, 32px); }
-        .ce-orgname { font-family: 'Playfair Display', serif; font-weight: 700; font-size: clamp(16px, 2.083cqw, 25px); color: #E9C874; letter-spacing: 1px; }
+        .ce-orgname { font-family: 'Playfair Display', serif; font-weight: 700; font-size: clamp(16px, 2.083cqw, 25px); color: #E9C874; letter-spacing: 1px; white-space: nowrap; overflow: hidden; max-width: 60cqw; }
         .ce-tagline { position: absolute; top: 13.663%; left: 10%; right: 10%; text-align: center; font-size: clamp(7px, 0.792cqw, 9.5px); letter-spacing: 3px; color: #8B8464; z-index: 2; }
         .ce-distinction { position: absolute; top: 17.667%; left: 10%; right: 10%; text-align: center; font-size: clamp(9px, 1cqw, 12px); letter-spacing: 3px; color: #C9BE9A; z-index: 2; }
         .ce-title { position: absolute; top: 25.442%; left: 7.5%; right: 7.5%; text-align: center; font-family: 'Playfair Display', serif; font-weight: 700; font-size: clamp(18px, 2.75cqw, 33px); color: #E9C874; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; z-index: 2; }
@@ -620,7 +626,7 @@ export default function CertificateGeneratorWorkspace() {
         .ce-citation { position: absolute; top: 46.407%; left: 50%; transform: translateX(-50%); width: 53.333%; text-align: center; font-size: clamp(9px, 1.25cqw, 15px); line-height: 1.8; color: #D9D3C0; z-index: 2; }
         .ce-quote { position: absolute; top: 55.594%; left: 0; right: 0; text-align: center; font-family: 'Playfair Display', serif; font-style: italic; font-size: clamp(11px, 1.417cqw, 17px); color: #E9C874; z-index: 2; }
         .ce-quote-author { position: absolute; top: 59.6%; left: 0; right: 0; text-align: center; font-size: clamp(8px, 1.042cqw, 12.5px); letter-spacing: 1.5px; color: #C9BE9A; z-index: 2; }
-        .ce-sig-block { position: absolute; top: 82.685%; left: 8.333%; width: 19.167%; text-align: center; z-index: 2; }
+        .ce-sig-block { position: absolute; top: 82.685%; left: 6%; width: 24%; text-align: center; z-index: 2; }
         .ce-sig-line { height: 24px; border-bottom: 1px solid rgba(201,162,39,.5); margin-bottom: 6px; }
         .ce-sig-name { font-family: 'Playfair Display', serif; font-weight: 600; font-size: clamp(9px, 1.25cqw, 15px); color: #F3E4B8; white-space: nowrap; overflow: hidden; }
         .ce-sig-title { margin-top: 4px; padding-top: 4px; font-size: clamp(7px, 0.875cqw, 10.5px); letter-spacing: 1.5px; color: #C9BE9A; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
@@ -632,7 +638,8 @@ export default function CertificateGeneratorWorkspace() {
         .ce-seal-custom-img { top: 75.618%; width: 12.667cqw; height: auto; filter: drop-shadow(0 10px 18px rgba(0,0,0,.5)); }
         .ce-date-verify { position: absolute; top: 78.21%; right: 8.333%; display: flex; align-items: flex-end; gap: 3.667%; z-index: 2; }
         .ce-date-block { text-align: center; white-space: nowrap; }
-        .ce-date-value { font-size: clamp(9px, 1.25cqw, 15px); color: #F3E4B8; font-weight: 600; margin-top: 20px; }
+        .ce-date-value { font-size: clamp(9px, 1.25cqw, 15px); color: #F3E4B8; font-weight: 600; white-space: nowrap; overflow: hidden; }
+        .ce-date-value.ce-date-aligned { margin-top: 20px; }
         .ce-date-label { border-top: 1px solid rgba(201,162,39,.5); margin-top: 6px; padding-top: 6px; font-size: clamp(7px, 0.875cqw, 10.5px); letter-spacing: 1.5px; color: #C9BE9A; }
         .ce-verify-block { text-align: center; white-space: nowrap; }
         .ce-qr-box { width: clamp(44px, 5.5cqw, 66px); height: clamp(44px, 5.5cqw, 66px); background: #FFFFFF; border-radius: 8px; padding: 6px; box-sizing: border-box; margin: 0 auto; }
@@ -776,13 +783,19 @@ export default function CertificateGeneratorWorkspace() {
 
           {template === 'executive' && (
             <>
-              <label>Quote (Executive Signature only)
+              <label>Quote (Executive Signature only, optional)
                 <select value={quoteStyle} onChange={(e) => setQuoteStyle(e.target.value)}>
+                  <option>None</option>
                   <option>Excellence (Aristotle)</option>
                   <option>Getting Started (Walt Disney)</option>
                   <option>Courage to Continue (Churchill)</option>
+                  <option>Love What You Do (Steve Jobs)</option>
+                  <option>Impossible Until Done (Mandela)</option>
+                  <option>Believe (Roosevelt)</option>
+                  <option>Hard Work (Tim Notke)</option>
+                  <option>Together (Helen Keller)</option>
+                  <option>Create the Future (Drucker)</option>
                   <option>Custom</option>
-                  <option>None</option>
                 </select>
               </label>
               {quoteStyle === 'Custom' && (
@@ -862,7 +875,7 @@ export default function CertificateGeneratorWorkspace() {
                 {logoImg && (
                   <div className="cp-logo-box"><img src={logoImg} alt="" /></div>
                 )}
-                <div className="cp-org-name">{emptyToDefault(state, 'companyName').toUpperCase()}</div>
+                <div ref={registerFit} className="cp-org-name">{emptyToDefault(state, 'companyName').toUpperCase()}</div>
 
                 <div className="cp-title">CERTIFICATE</div>
                 <div className="cp-subtitle">OF {certType.toUpperCase()}</div>
@@ -951,7 +964,7 @@ export default function CertificateGeneratorWorkspace() {
 
                 <div className="ce-header">
                   {logoImg ? <img src={logoImg} alt="" style={{ width: 32, height: 32, objectFit: 'contain' }} /> : <ExecHexLogo letter={logoInitial} />}
-                  <span className="ce-orgname">{emptyToDefault(state, 'companyName')}</span>
+                  <span ref={registerFit} className="ce-orgname">{emptyToDefault(state, 'companyName')}</span>
                 </div>
                 {state.tagline && <div className="ce-tagline">{state.tagline}</div>}
                 <div className="ce-distinction">◆&nbsp;&nbsp;PRESENTED WITH DISTINCTION&nbsp;&nbsp;◆</div>
@@ -990,7 +1003,7 @@ export default function CertificateGeneratorWorkspace() {
 
                 <div className="ce-date-verify">
                   <div className="ce-date-block">
-                    <div className="ce-date-value">{emptyToDefault(state, 'issueDate')}</div>
+                    <div className={`ce-date-value ${hasVerification ? 'ce-date-aligned' : ''}`}>{emptyToDefault(state, 'issueDate')}</div>
                     <div className="ce-date-label">DATE</div>
                   </div>
                   {hasVerification && (

@@ -631,11 +631,11 @@ export default function CertificateGeneratorWorkspace() {
         .ce-sig-name { font-family: 'Playfair Display', serif; font-weight: 600; font-size: clamp(9px, 1.25cqw, 15px); color: #F3E4B8; white-space: nowrap; overflow: hidden; }
         .ce-sig-title { margin-top: 4px; padding-top: 4px; font-size: clamp(7px, 0.875cqw, 10.5px); letter-spacing: 1.5px; color: #C9BE9A; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
         .ce-seal-wrap { position: absolute; left: 50%; transform: translateX(-50%); z-index: 2; }
-        .ce-seal-as-designed { top: 74.912%; width: 10.667cqw; height: auto; }
-        .ce-seal-svg { top: 77.739%; width: 10.667cqw; height: 10.667cqw; }
-        .ce-seal-rosette { top: 77.267%; width: 8.333cqw; height: 10.833cqw; }
-        .ce-seal-engraved { top: 78.092%; width: 9.833cqw; height: 9.833cqw; }
-        .ce-seal-custom-img { top: 75.618%; width: 12.667cqw; height: auto; filter: drop-shadow(0 10px 18px rgba(0,0,0,.5)); }
+        .ce-seal-as-designed { top: 74.912%; width: 12.8cqw; height: auto; }
+        .ce-seal-svg { top: 77.739%; width: 12.8cqw; height: 12.8cqw; }
+        .ce-seal-rosette { top: 77.267%; width: 10cqw; height: 13cqw; }
+        .ce-seal-engraved { top: 78.092%; width: 11.8cqw; height: 11.8cqw; }
+        .ce-seal-custom-img { top: 75.618%; width: 15.2cqw; height: auto; filter: drop-shadow(0 10px 18px rgba(0,0,0,.5)); }
         .ce-date-verify { position: absolute; top: 73%; right: 11%; display: flex; align-items: flex-end; gap: 3.667%; z-index: 2; }
         .ce-date-block { text-align: center; white-space: nowrap; }
         .ce-date-value { font-size: clamp(9px, 1.25cqw, 15px); color: #F3E4B8; font-weight: 600; white-space: nowrap; overflow: hidden; }
@@ -970,11 +970,9 @@ export default function CertificateGeneratorWorkspace() {
                 <div className="ce-distinction">◆&nbsp;&nbsp;PRESENTED WITH DISTINCTION&nbsp;&nbsp;◆</div>
 
                 <div ref={registerFit} className="ce-title">CERTIFICATE OF {certType.toUpperCase()}</div>
-                <div className="ce-underline" style={{ top: '39.7%', width: '13%' }} />
 
                 <div className="ce-intro">◆&nbsp;&nbsp;PROUDLY PRESENTED TO&nbsp;&nbsp;◆</div>
                 <div ref={registerFit} className="ce-recipient" style={execNameStyle}>{emptyToDefault(state, 'recipientName')}</div>
-                <div className="ce-underline" style={{ top: '52.5%', width: '18%' }} />
 
                 <div className="ce-citation">{emptyToDefault(state, 'description')}</div>
 

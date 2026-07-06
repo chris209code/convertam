@@ -60,10 +60,29 @@ function formatDateSentence(isoStr) {
   return `Awarded this ${ordinal(d)} day of ${MONTH_NAMES[m - 1]}, ${y}`;
 }
 
+function fitElementToWidth(el) {
+  if (!el) return;
+  const baseSize = parseFloat(el.dataset.baseFontSize || getComputedStyle(el).fontSize);
+  if (!el.dataset.baseFontSize) el.dataset.baseFontSize = String(baseSize);
+  el.style.fontSize = `${baseSize}px`;
+  let size = baseSize;
+  const minSize = baseSize * 0.15;
+  let guard = 0;
+  while (el.scrollWidth > el.clientWidth + 1 && size > minSize && guard < 40) {
+    size -= 0.5;
+    el.style.fontSize = `${size}px`;
+    guard++;
+  }
+}
+
 // Content-aware shrink-to-fit: clamp() alone only responds to viewport width,
 // not to how long a specific person's name actually is. This measures the
 // rendered text and scales font-size down until it fits its container,
 // so "Christopher Okonkwo-Adeyemi III" doesn't overflow or wrap awkwardly.
+// Also exposes the raw refs so the fit can be re-run manually right before a
+// PDF capture — html2canvas doesn't reliably wait for custom fonts to finish
+// loading, so text sized against a fallback font can end up wrong-width by
+// the time the actual snapshot happens unless we re-measure after fonts load.
 function useAutoFit(deps) {
   const refs = useRef([]);
   refs.current = [];
@@ -72,24 +91,11 @@ function useAutoFit(deps) {
   }, []);
 
   useEffect(() => {
-    refs.current.forEach((el) => {
-      if (!el) return;
-      const baseSize = parseFloat(el.dataset.baseFontSize || getComputedStyle(el).fontSize);
-      if (!el.dataset.baseFontSize) el.dataset.baseFontSize = String(baseSize);
-      el.style.fontSize = `${baseSize}px`;
-      let size = baseSize;
-      const minSize = baseSize * 0.15;
-      let guard = 0;
-      while (el.scrollWidth > el.clientWidth + 1 && size > minSize && guard < 40) {
-        size -= 0.5;
-        el.style.fontSize = `${size}px`;
-        guard++;
-      }
-    });
+    refs.current.forEach(fitElementToWidth);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
-  return register;
+  return [register, refs];
 }
 
 const emptyToDefault = (state, key) => state[key] || defaults[key] || '';
@@ -163,6 +169,18 @@ export default function CertificateGeneratorWorkspace() {
         import('jspdf'),
       ]);
 
+      // html2canvas doesn't reliably wait for custom web fonts (Playfair
+      // Display, Dancing Script, etc.) before snapshotting — if it captures
+      // before they're loaded, text gets measured/rendered with a fallback
+      // font of different width than what was actually shrunk-to-fit on
+      // screen, causing text to cut off only in the download. Wait for the
+      // real fonts, then re-run the fit against their true metrics.
+      if (document.fonts && document.fonts.ready) {
+        await document.fonts.ready;
+      }
+      fitRefs.current.forEach(fitElementToWidth);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
       // The editor shows small, fast-loading preview images to keep editing
       // snappy. For export, preload the real high-res assets first (so the
       // swap is instant, already cached), then wait for React to paint the
@@ -173,6 +191,8 @@ export default function CertificateGeneratorWorkspace() {
           preloadImage(customSealImg || '/certificates/seal-custom.png'),
         ]);
         setHighRes(true);
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        fitRefs.current.forEach(fitElementToWidth);
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       }
 
@@ -201,7 +221,7 @@ export default function CertificateGeneratorWorkspace() {
   const hasCertId = Boolean(state.certificateId);
   const certType = titleCase(emptyToDefault(state, 'certificateType'));
 
-  const registerFit = useAutoFit([template, state.recipientName, state.programTitle, state.issuerName, state.secondIssuerName, state.issuerPosition, state.secondIssuerPosition]);
+  const [registerFit, fitRefs] = useAutoFit([template, state.recipientName, state.programTitle, state.issuerName, state.secondIssuerName, state.issuerPosition, state.secondIssuerPosition]);
   const certRef = useRef(null);
 
   const cssVars = { '--brand': state.brandColor, '--accent': state.accentColor };

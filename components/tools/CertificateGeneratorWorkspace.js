@@ -68,7 +68,7 @@ function fitElementToWidth(el) {
   let size = baseSize;
   const minSize = baseSize * 0.15;
   let guard = 0;
-  while (el.scrollWidth > el.clientWidth - 4 && size > minSize && guard < 40) {
+  while (el.scrollWidth > el.clientWidth + 1 && size > minSize && guard < 40) {
     size -= 0.5;
     el.style.fontSize = `${size}px`;
     guard++;

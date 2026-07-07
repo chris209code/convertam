@@ -22,7 +22,8 @@ const EMPTY_EXP = {
   whatYouDid: '', toolsUsed: '', problemsSolved: '', whoYouWorkedWith: '', improvements: '', numbers: '', supervised: '',
   bullets: [], description: '', generating: false,
 };
-const EMPTY_EDU = { institution: '', degree: '', year: '' };
+const EMPTY_EDU = { degree: '', course: '', institution: '', location: '', startYear: '', endYear: '', current: false, grade: '', notes: '' };
+const EMPTY_CERT = { name: '', issuer: '', dateIssued: '', expiryDate: '', doesNotExpire: false, credentialId: '', credentialUrl: '' };
 
 const inputStyle = { width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' };
 const labelStyle = { fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' };
@@ -60,9 +61,33 @@ const Icon = {
 // ---------------------------------------------------------------------------
 // Shared data shape passed into every template — build once, render 3 ways
 // ---------------------------------------------------------------------------
-function useResumeData({ form, targetRole, experience, education, skills }) {
+function useResumeData({ form, targetRole, experience, education, certifications, skills }) {
   const contact = [form.phone, form.email, form.location, form.linkedin].filter(Boolean);
-  return { form, targetRole, experience: experience.filter(e => e.role || e.company), education: education.filter(e => e.institution || e.degree), skills: skills.split(',').map(s => s.trim()).filter(Boolean), contact };
+  return {
+    form, targetRole,
+    experience: experience.filter(e => e.role || e.company),
+    education: education.filter(e => e.institution || e.degree),
+    certifications: certifications.filter(c => c.name),
+    skills: skills.split(',').map(s => s.trim()).filter(Boolean),
+    contact,
+  };
+}
+
+// Combines Qualification + Course + Institution + Location + Dates + Grade into
+// the display lines each template needs, so templates don't each re-derive this.
+function eduDisplayLines(edu) {
+  const titleLine = edu.course ? `${edu.degree} in ${edu.course}` : edu.degree;
+  const subLine = [edu.institution, edu.location].filter(Boolean).join(', ');
+  const dateLine = edu.startYear || edu.endYear
+    ? `${edu.startYear || ''}${edu.current ? ' - Present' : (edu.endYear ? ` - ${edu.endYear}` : '')}`
+    : '';
+  return { titleLine, subLine, dateLine, gradeLine: edu.grade || '' };
+}
+function certDisplayLines(cert) {
+  const dateLine = cert.doesNotExpire
+    ? (cert.dateIssued ? `Issued ${cert.dateIssued} — Does not expire` : 'Does not expire')
+    : [cert.dateIssued && `Issued ${cert.dateIssued}`, cert.expiryDate && `Expires ${cert.expiryDate}`].filter(Boolean).join(' · ');
+  return { titleLine: cert.name, subLine: cert.issuer, dateLine };
 }
 
 function ExpBullets({ exp }) {
@@ -78,22 +103,16 @@ function ExpBullets({ exp }) {
   );
 }
 
-// Small entries should stay together across a page break (no orphaned header
-// with its bullets stranded on the next page). Long entries are deliberately
-// left to break naturally — forcing a huge entry to stay whole can leave a
-// large blank gap at the bottom of the previous page instead.
-function entryLineCount(exp) {
-  return exp.bullets.length || (exp.description ? exp.description.split('\n').filter(Boolean).length : 0);
-}
-function entryBreakStyle(exp) {
-  return entryLineCount(exp) <= 4 ? { breakInside: 'avoid' } : {};
-}
+// Only the small header (title + company + dates) is kept together across a
+// page break — the bullet list itself flows freely, so a long job's content
+// can continue onto the next page without dragging the whole entry with it
+// or leaving a blank gap behind it on the current page.
 
 // ---------------------------------------------------------------------------
 // TEMPLATE 1 — Classic Professional
 // ---------------------------------------------------------------------------
 function ClassicProfessional({ data }) {
-  const { form, experience, education, skills, contact } = data;
+  const { form, experience, education, certifications, skills, contact } = data;
   const S = {
     page: { fontFamily: 'Georgia, "Times New Roman", serif', color: '#1A1A1A', padding: '18mm 16mm' },
     name: { fontSize: 28, fontWeight: 800, textAlign: 'center', letterSpacing: 1, margin: 0 },
@@ -133,12 +152,31 @@ function ClassicProfessional({ data }) {
       {education.length > 0 && (
         <section style={{ marginBottom: 6 }}>
           <p style={S.sectionHead}><Icon.grad /> Education</p>
-          {education.map((edu, i) => (
-            <div key={i} style={{ marginBottom: 10 }}>
-              <p style={S.entryTitle}>{edu.degree}{edu.year && <span style={S.dateRight}>{edu.year}</span>}</p>
-              <p style={S.entrySub}>{edu.institution}</p>
-            </div>
-          ))}
+          {education.map((edu, i) => {
+            const { titleLine, subLine, dateLine, gradeLine } = eduDisplayLines(edu);
+            return (
+              <div key={i} style={{ marginBottom: 10 }}>
+                <p style={S.entryTitle}>{titleLine}{dateLine && <span style={S.dateRight}>{dateLine}</span>}</p>
+                <p style={S.entrySub}>{subLine}{gradeLine ? ` — ${gradeLine}` : ''}</p>
+              </div>
+            );
+          })}
+          <hr style={S.sectionRule} />
+        </section>
+      )}
+
+      {certifications.length > 0 && (
+        <section style={{ marginBottom: 6 }}>
+          <p style={S.sectionHead}><Icon.doc /> Certifications</p>
+          {certifications.map((cert, i) => {
+            const { titleLine, subLine, dateLine } = certDisplayLines(cert);
+            return (
+              <div key={i} style={{ marginBottom: 10 }}>
+                <p style={S.entryTitle}>{titleLine}{dateLine && <span style={S.dateRight}>{dateLine}</span>}</p>
+                {subLine && <p style={S.entrySub}>{subLine}</p>}
+              </div>
+            );
+          })}
           <hr style={S.sectionRule} />
         </section>
       )}
@@ -147,9 +185,11 @@ function ClassicProfessional({ data }) {
         <section style={{ marginBottom: 6 }}>
           <p style={S.sectionHead}><Icon.briefcase /> Professional Experience</p>
           {experience.map((exp, i) => (
-            <div key={i} style={{ marginBottom: 12, ...entryBreakStyle(exp) }}>
-              <p style={S.entryTitle}>{exp.role}{exp.period && <span style={S.dateRight}>{exp.period}</span>}</p>
-              <p style={S.entrySub}>{exp.company}{exp.type !== 'Work Experience' ? ` — ${exp.type}` : ''}</p>
+            <div key={i} style={{ marginBottom: 12 }}>
+              <div style={{ breakInside: 'avoid' }}>
+                <p style={S.entryTitle}>{exp.role}{exp.period && <span style={S.dateRight}>{exp.period}</span>}</p>
+                <p style={S.entrySub}>{exp.company}{exp.type !== 'Work Experience' ? ` — ${exp.type}` : ''}</p>
+              </div>
               <div style={S.body}><ExpBullets exp={exp} /></div>
             </div>
           ))}
@@ -173,10 +213,10 @@ function ClassicProfessional({ data }) {
 // TEMPLATE 2 — Modern Sidebar
 // ---------------------------------------------------------------------------
 function ModernSidebar({ data }) {
-  const { form, experience, education, skills } = data;
+  const { form, experience, education, certifications, skills } = data;
   const initials = (form.fullName || 'U N').split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
   const S = {
-    page: { display: 'flex', fontFamily: "'Segoe UI', Arial, sans-serif", minHeight: '297mm' },
+    page: { display: 'flex', fontFamily: "'Segoe UI', Arial, sans-serif" },
     sidebar: { width: '34%', background: '#16233D', color: 'white', padding: '20mm 8mm', boxSizing: 'border-box' },
     avatar: { width: 70, height: 70, borderRadius: '50%', border: '3px solid #3B82F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700, margin: '0 auto 14px' },
     sideName: { fontSize: 17, fontWeight: 800, textAlign: 'center', margin: '0 0 2px', lineHeight: 1.2, overflowWrap: 'anywhere' },
@@ -226,12 +266,31 @@ function ModernSidebar({ data }) {
           <section style={{ marginBottom: 18 }}>
             <p style={S.sectionHead}>Education</p>
             <hr style={S.sectionRule} />
-            {education.map((edu, i) => (
-              <div key={i} style={{ marginBottom: 10 }}>
-                <p style={S.entryTitle}>{edu.degree}{edu.year && <span style={S.dateRight}>{edu.year}</span>}</p>
-                <p style={S.entrySub}>{edu.institution}</p>
-              </div>
-            ))}
+            {education.map((edu, i) => {
+              const { titleLine, subLine, dateLine, gradeLine } = eduDisplayLines(edu);
+              return (
+                <div key={i} style={{ marginBottom: 10 }}>
+                  <p style={S.entryTitle}>{titleLine}{dateLine && <span style={S.dateRight}>{dateLine}</span>}</p>
+                  <p style={S.entrySub}>{subLine}{gradeLine ? ` — ${gradeLine}` : ''}</p>
+                </div>
+              );
+            })}
+          </section>
+        )}
+
+        {certifications.length > 0 && (
+          <section style={{ marginBottom: 18 }}>
+            <p style={S.sectionHead}>Certifications</p>
+            <hr style={S.sectionRule} />
+            {certifications.map((cert, i) => {
+              const { titleLine, subLine, dateLine } = certDisplayLines(cert);
+              return (
+                <div key={i} style={{ marginBottom: 10 }}>
+                  <p style={S.entryTitle}>{titleLine}{dateLine && <span style={S.dateRight}>{dateLine}</span>}</p>
+                  {subLine && <p style={S.entrySub}>{subLine}</p>}
+                </div>
+              );
+            })}
           </section>
         )}
 
@@ -240,9 +299,11 @@ function ModernSidebar({ data }) {
             <p style={S.sectionHead}>Professional Experience</p>
             <hr style={S.sectionRule} />
             {experience.map((exp, i) => (
-              <div key={i} style={{ marginBottom: 14, ...entryBreakStyle(exp) }}>
-                <p style={S.entryTitle}>{exp.role}{exp.period && <span style={S.dateRight}>{exp.period}</span>}</p>
-                <p style={S.entrySub}>{exp.company}{exp.type !== 'Work Experience' ? ` — ${exp.type}` : ''}</p>
+              <div key={i} style={{ marginBottom: 14 }}>
+                <div style={{ breakInside: 'avoid' }}>
+                  <p style={S.entryTitle}>{exp.role}{exp.period && <span style={S.dateRight}>{exp.period}</span>}</p>
+                  <p style={S.entrySub}>{exp.company}{exp.type !== 'Work Experience' ? ` — ${exp.type}` : ''}</p>
+                </div>
                 <div style={S.body}><ExpBullets exp={exp} /></div>
               </div>
             ))}
@@ -257,7 +318,7 @@ function ModernSidebar({ data }) {
 // TEMPLATE 3 — Executive Minimal
 // ---------------------------------------------------------------------------
 function ExecutiveMinimal({ data }) {
-  const { form, experience, education, skills, contact } = data;
+  const { form, experience, education, certifications, skills, contact } = data;
   const green = '#2F5D4F';
   const S = {
     page: { fontFamily: "'Segoe UI', Arial, sans-serif", color: '#1E293B', padding: '18mm 16mm' },
@@ -302,12 +363,31 @@ function ExecutiveMinimal({ data }) {
       {education.length > 0 && (
         <section style={{ marginBottom: 6 }}>
           <p style={S.sectionHead}><Icon.grad style={{ color: green }} /> Education</p>
-          {education.map((edu, i) => (
-            <div key={i} style={{ marginBottom: 10 }}>
-              <p style={S.entryTitle}>{edu.degree}{edu.year && <span style={S.dateRight}>{edu.year}</span>}</p>
-              <p style={S.entrySub}>{edu.institution}</p>
-            </div>
-          ))}
+          {education.map((edu, i) => {
+            const { titleLine, subLine, dateLine, gradeLine } = eduDisplayLines(edu);
+            return (
+              <div key={i} style={{ marginBottom: 10 }}>
+                <p style={S.entryTitle}>{titleLine}{dateLine && <span style={S.dateRight}>{dateLine}</span>}</p>
+                <p style={S.entrySub}>{subLine}{gradeLine ? ` — ${gradeLine}` : ''}</p>
+              </div>
+            );
+          })}
+          <hr style={S.sectionRule} />
+        </section>
+      )}
+
+      {certifications.length > 0 && (
+        <section style={{ marginBottom: 6 }}>
+          <p style={S.sectionHead}><Icon.doc style={{ color: green }} /> Certifications</p>
+          {certifications.map((cert, i) => {
+            const { titleLine, subLine, dateLine } = certDisplayLines(cert);
+            return (
+              <div key={i} style={{ marginBottom: 10 }}>
+                <p style={S.entryTitle}>{titleLine}{dateLine && <span style={S.dateRight}>{dateLine}</span>}</p>
+                {subLine && <p style={S.entrySub}>{subLine}</p>}
+              </div>
+            );
+          })}
           <hr style={S.sectionRule} />
         </section>
       )}
@@ -316,9 +396,11 @@ function ExecutiveMinimal({ data }) {
         <section style={{ marginBottom: 6 }}>
           <p style={S.sectionHead}><Icon.briefcase style={{ color: green }} /> Professional Experience</p>
           {experience.map((exp, i) => (
-            <div key={i} style={{ marginBottom: 12, ...entryBreakStyle(exp) }}>
-              <p style={S.entryTitle}>{exp.role}{exp.period && <span style={S.dateRight}>{exp.period}</span>}</p>
-              <p style={S.entrySub}>{exp.company}{exp.type !== 'Work Experience' ? ` — ${exp.type}` : ''}</p>
+            <div key={i} style={{ marginBottom: 12 }}>
+              <div style={{ breakInside: 'avoid' }}>
+                <p style={S.entryTitle}>{exp.role}{exp.period && <span style={S.dateRight}>{exp.period}</span>}</p>
+                <p style={S.entrySub}>{exp.company}{exp.type !== 'Work Experience' ? ` — ${exp.type}` : ''}</p>
+              </div>
               <div style={S.body}><ExpBullets exp={exp} /></div>
             </div>
           ))}
@@ -351,12 +433,14 @@ export default function ResumeBuilderWorkspace() {
   const [form, setForm] = useState({ fullName: '', jobTitle: '', email: '', phone: '', location: '', linkedin: '', summary: '' });
   const [experience, setExperience] = useState([{ ...EMPTY_EXP }]);
   const [education, setEducation] = useState([{ ...EMPTY_EDU }]);
+  const [certifications, setCertifications] = useState([]);
   const [skills, setSkills] = useState('');
   const [skillSuggestions, setSkillSuggestions] = useState(null);
   const [suggestingSkills, setSuggestingSkills] = useState(false);
 
   const [generatingSummary, setGeneratingSummary] = useState(false);
   const [refiningSummary, setRefiningSummary] = useState(false);
+  const [previousSummary, setPreviousSummary] = useState(null);
 
   const [polishResult, setPolishResult] = useState(null);
   const [polishing, setPolishing] = useState(false);
@@ -367,12 +451,28 @@ export default function ResumeBuilderWorkspace() {
   const updateForm = (key, val) => setForm(f => ({ ...f, [key]: val }));
   const updateExp = (i, key, val) => setExperience(prev => prev.map((e, idx) => idx === i ? { ...e, [key]: val } : e));
   const updateEdu = (i, key, val) => setEducation(prev => prev.map((e, idx) => idx === i ? { ...e, [key]: val } : e));
+  const updateCert = (i, key, val) => setCertifications(prev => prev.map((c, idx) => idx === i ? { ...c, [key]: val } : c));
+  function moveCert(i, dir) {
+    setCertifications(prev => {
+      const next = [...prev];
+      const j = i + dir;
+      if (j < 0 || j >= next.length) return prev;
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  }
 
   function experienceContextText() {
     return experience.filter(e => e.role || e.company || e.bullets.length).map(e => `${e.type}: ${e.role} at ${e.company}\n${e.bullets.join('\n')}`).join('\n\n');
   }
   function educationContextText() {
-    return education.filter(e => e.institution || e.degree).map(e => `${e.degree}, ${e.institution} (${e.year})`).join('\n');
+    return education.filter(e => e.institution || e.degree).map(e => {
+      const dates = e.startYear || e.endYear ? ` (${e.startYear || ''}${e.current ? ' - Present' : (e.endYear ? ` - ${e.endYear}` : '')})` : '';
+      return `${e.degree}${e.course ? ` in ${e.course}` : ''}, ${e.institution}${e.location ? `, ${e.location}` : ''}${dates}${e.grade ? ` — ${e.grade}` : ''}`;
+    }).join('\n');
+  }
+  function certificationsContextText() {
+    return certifications.filter(c => c.name).map(c => `${c.name}${c.issuer ? ` — ${c.issuer}` : ''}${c.dateIssued ? ` (${c.dateIssued})` : ''}`).join('\n');
   }
 
   async function handleGenerateBullets(i) {
@@ -394,7 +494,7 @@ export default function ResumeBuilderWorkspace() {
     if (!exp.bullets.length) return;
     updateExp(i, 'generating', true);
     try {
-      const { text } = await callAI('refine', { text: exp.bullets.join('\n'), action, context: `${exp.type} — ${exp.role} — targeting ${role || 'general role'}` });
+      const { text } = await callAI('refine', { text: exp.bullets.join('\n'), modifier: action, context: `${exp.type} — ${exp.role} — targeting ${role || 'general role'}` });
       updateExp(i, 'bullets', text.split('\n').map(s => s.replace(/^[-•]\s*/, '').trim()).filter(Boolean));
     } catch (err) { setError(err.message); } finally { updateExp(i, 'generating', false); }
   }
@@ -410,10 +510,17 @@ export default function ResumeBuilderWorkspace() {
   async function handleRefineSummary(action) {
     if (!form.summary) return;
     setRefiningSummary(true);
+    const previous = form.summary;
     try {
-      const { text } = await callAI('refine', { text: form.summary, action, context: `${careerLevel || ''} targeting ${role || 'general role'}` });
+      const { text } = await callAI('refine', { text: form.summary, modifier: action, context: `${careerLevel || ''} targeting ${role || 'general role'}` });
+      setPreviousSummary(previous);
       updateForm('summary', text);
     } catch (err) { setError(err.message); } finally { setRefiningSummary(false); }
+  }
+  function undoSummary() {
+    if (previousSummary == null) return;
+    updateForm('summary', previousSummary);
+    setPreviousSummary(null);
   }
 
   async function handleSuggestSkills() {
@@ -434,7 +541,7 @@ export default function ResumeBuilderWorkspace() {
     return [
       `Name: ${form.fullName}`, `Target role: ${role || 'General'}`, `Headline: ${form.jobTitle}`,
       `Summary: ${form.summary}`, '', 'Experience:', experienceContextText(), '',
-      'Education:', educationContextText(), '', `Skills: ${skills}`,
+      'Education:', educationContextText(), '', 'Certifications:', certificationsContextText(), '', `Skills: ${skills}`,
     ].join('\n');
   }
 
@@ -446,7 +553,7 @@ export default function ResumeBuilderWorkspace() {
     } catch (err) { setError(err.message); } finally { setPolishing(false); }
   }
 
-  const resumeData = useResumeData({ form, targetRole: role, experience, education, skills });
+  const resumeData = useResumeData({ form, targetRole: role, experience, education, certifications, skills });
   const TemplateComponent = TEMPLATES[template];
 
   const STEPS = ['You', 'Personal Info', 'Experience', 'Education', 'Skills', 'Summary', 'Preview & Download'];
@@ -459,6 +566,12 @@ export default function ResumeBuilderWorkspace() {
           body * { visibility: hidden; }
           .resume-print-root, .resume-print-root * { visibility: visible; }
           .resume-print-root { position: absolute; left: 0; top: 0; width: 100%; }
+          .resume-print-root, .resume-print-root * {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            color-adjust: exact;
+          }
+          .resume-page-frame { min-height: 0 !important; box-shadow: none !important; }
           @page { size: A4; margin: 6mm; }
         }
       `}</style>
@@ -565,15 +678,67 @@ export default function ResumeBuilderWorkspace() {
           <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', marginBottom: 12 }}>Education</p>
           {education.map((edu, i) => (
             <div key={i} style={{ background: '#F8FAFC', borderRadius: 12, padding: 16, marginBottom: 12, border: '1px solid #E2E8F0' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: 10 }}>
-                {[['degree','Degree / Certificate'],['institution','Institution'],['year','Year']].map(([key, label]) => (
-                  <div key={key}><label style={labelStyle}>{label}</label><input style={inputStyle} value={edu[key]} onChange={e => updateEdu(i, key, e.target.value)} /></div>
-                ))}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div><label style={labelStyle}>Qualification / Degree</label><input style={inputStyle} value={edu.degree} onChange={e => updateEdu(i, 'degree', e.target.value)} placeholder="e.g. Bachelor of Science (B.Sc.)" /></div>
+                <div><label style={labelStyle}>Course of Study</label><input style={inputStyle} value={edu.course} onChange={e => updateEdu(i, 'course', e.target.value)} placeholder="e.g. Industrial Chemistry" /></div>
               </div>
-              {education.length > 1 && <button onClick={() => setEducation(prev => prev.filter((_, idx) => idx !== i))} style={{ marginTop: 8, fontSize: '0.75rem', color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Remove</button>}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div><label style={labelStyle}>Institution</label><input style={inputStyle} value={edu.institution} onChange={e => updateEdu(i, 'institution', e.target.value)} /></div>
+                <div><label style={labelStyle}>Location</label><input style={inputStyle} value={edu.location} onChange={e => updateEdu(i, 'location', e.target.value)} placeholder="e.g. Abraka, Delta State" /></div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 10, alignItems: 'end' }}>
+                <div><label style={labelStyle}>Start Year</label><input style={inputStyle} value={edu.startYear} onChange={e => updateEdu(i, 'startYear', e.target.value)} /></div>
+                <div>
+                  <label style={labelStyle}>End Year</label>
+                  <input style={inputStyle} value={edu.endYear} disabled={edu.current} onChange={e => updateEdu(i, 'endYear', e.target.value)} />
+                </div>
+                <label style={{ fontSize: '0.75rem', color: '#475569', display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 8 }}>
+                  <input type="checkbox" checked={edu.current} onChange={e => updateEdu(i, 'current', e.target.checked)} /> Currently studying
+                </label>
+              </div>
+              <details>
+                <summary style={{ fontSize: '0.75rem', color: '#94A3B8', cursor: 'pointer', marginBottom: 8 }}>Optional: grade & additional notes</summary>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10, marginTop: 8 }}>
+                  <div><label style={labelStyle}>Grade / Class of Degree</label><input style={inputStyle} value={edu.grade} onChange={e => updateEdu(i, 'grade', e.target.value)} placeholder="e.g. Second Class Upper" /></div>
+                  <div><label style={labelStyle}>Additional Details</label><input style={inputStyle} value={edu.notes} onChange={e => updateEdu(i, 'notes', e.target.value)} /></div>
+                </div>
+              </details>
+              {education.length > 1 && <button onClick={() => setEducation(prev => prev.filter((_, idx) => idx !== i))} style={{ marginTop: 10, fontSize: '0.75rem', color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Remove</button>}
             </div>
           ))}
-          <button onClick={() => setEducation(prev => [...prev, { ...EMPTY_EDU }])} style={{ fontSize: '0.8rem', color: '#2563EB', background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 24 }}>+ Add Education</button>
+          <button onClick={() => setEducation(prev => [...prev, { ...EMPTY_EDU }])} style={{ fontSize: '0.8rem', color: '#2563EB', background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 28 }}>+ Add Education</button>
+
+          <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Certifications <span style={{ fontWeight: 400, color: '#94A3B8' }}>(optional)</span></p>
+          <p style={{ fontSize: '0.78rem', color: '#64748B', marginBottom: 12 }}>Professional certifications, licenses, or courses completed.</p>
+          {certifications.map((cert, i) => (
+            <div key={i} style={{ background: '#F8FAFC', borderRadius: 12, padding: 16, marginBottom: 12, border: '1px solid #E2E8F0' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div><label style={labelStyle}>Certification Name</label><input style={inputStyle} value={cert.name} onChange={e => updateCert(i, 'name', e.target.value)} placeholder="e.g. Lean Six Sigma Green Belt" /></div>
+                <div><label style={labelStyle}>Issuing Organization</label><input style={inputStyle} value={cert.issuer} onChange={e => updateCert(i, 'issuer', e.target.value)} /></div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 10, marginBottom: 10, alignItems: 'end' }}>
+                <div><label style={labelStyle}>Date Issued</label><input style={inputStyle} value={cert.dateIssued} onChange={e => updateCert(i, 'dateIssued', e.target.value)} placeholder="e.g. March 2023" /></div>
+                <div><label style={labelStyle}>Expiry Date</label><input style={inputStyle} disabled={cert.doesNotExpire} value={cert.expiryDate} onChange={e => updateCert(i, 'expiryDate', e.target.value)} /></div>
+                <label style={{ fontSize: '0.75rem', color: '#475569', display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 8, whiteSpace: 'nowrap' }}>
+                  <input type="checkbox" checked={cert.doesNotExpire} onChange={e => updateCert(i, 'doesNotExpire', e.target.checked)} /> Does not expire
+                </label>
+              </div>
+              <details>
+                <summary style={{ fontSize: '0.75rem', color: '#94A3B8', cursor: 'pointer', marginBottom: 8 }}>Optional: credential ID & link</summary>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
+                  <div><label style={labelStyle}>Credential ID</label><input style={inputStyle} value={cert.credentialId} onChange={e => updateCert(i, 'credentialId', e.target.value)} /></div>
+                  <div><label style={labelStyle}>Credential URL</label><input style={inputStyle} value={cert.credentialUrl} onChange={e => updateCert(i, 'credentialUrl', e.target.value)} /></div>
+                </div>
+              </details>
+              <div style={{ display: 'flex', gap: 12, marginTop: 10 }}>
+                <button onClick={() => moveCert(i, -1)} disabled={i === 0} style={{ fontSize: '0.75rem', color: i === 0 ? '#CBD5E1' : '#475569', background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', fontFamily: 'inherit' }}>↑ Move up</button>
+                <button onClick={() => moveCert(i, 1)} disabled={i === certifications.length - 1} style={{ fontSize: '0.75rem', color: i === certifications.length - 1 ? '#CBD5E1' : '#475569', background: 'none', border: 'none', cursor: i === certifications.length - 1 ? 'default' : 'pointer', fontFamily: 'inherit' }}>↓ Move down</button>
+                <button onClick={() => setCertifications(prev => prev.filter((_, idx) => idx !== i))} style={{ fontSize: '0.75rem', color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Remove</button>
+              </div>
+            </div>
+          ))}
+          <button onClick={() => setCertifications(prev => [...prev, { ...EMPTY_CERT }])} style={{ fontSize: '0.8rem', color: '#2563EB', background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 24 }}>+ Add Certification</button>
+
           <div style={{ display: 'flex', gap: 12 }}>
             <button className="btn btn-ghost" onClick={() => setStep(2)}>← Back</button>
             <button className="btn btn-primary" onClick={() => setStep(4)}>Next: Skills →</button>
@@ -616,7 +781,14 @@ export default function ResumeBuilderWorkspace() {
             <button style={aiBtnStyle} disabled={generatingSummary} onClick={handleGenerateSummary}>{generatingSummary ? 'Writing…' : '✨ Generate Summary'}</button>
           </div>
           <textarea style={{ ...inputStyle, minHeight: 90, resize: 'vertical' }} value={form.summary} onChange={e => updateForm('summary', e.target.value)} placeholder="Click 'Generate Summary' above, or write your own." />
-          {form.summary && <RefineBar disabled={refiningSummary} onAction={handleRefineSummary} />}
+          {form.summary && (
+            <>
+              <RefineBar disabled={refiningSummary} onAction={handleRefineSummary} />
+              {previousSummary != null && (
+                <button onClick={undoSummary} style={{ ...refineBtnStyle, marginTop: 8, color: '#DC2626' }}>↩ Undo last change</button>
+              )}
+            </>
+          )}
 
           <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid #E2E8F0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -661,15 +833,21 @@ export default function ResumeBuilderWorkspace() {
                 </button>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <button className="btn btn-ghost" onClick={() => setStep(5)}>← Back</button>
               <button className="btn btn-primary" onClick={() => window.print()}>⬇️ Download PDF</button>
+              <a href="/pdf-to-word" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600, color: '#2563EB', textDecoration: 'none', padding: '10px 14px', borderRadius: 8, border: '1px solid #BFDBFE', background: '#EFF6FF' }}>
+                <Icon.doc /> Convert to MS Word
+              </a>
             </div>
           </div>
+          <p className="no-print" style={{ fontSize: '0.75rem', color: '#94A3B8', textAlign: 'right', marginTop: -8, marginBottom: 16 }}>
+            Need an editable copy? Convert your downloaded PDF to Word.
+          </p>
 
           <div style={{ background: '#E2E8F0', padding: '20px 0', borderRadius: 12, display: 'flex', justifyContent: 'center', overflowX: 'auto' }}>
             <div className="resume-print-root">
-              <div style={{ width: '210mm', minHeight: '297mm', background: 'white', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
+              <div className="resume-page-frame" style={{ width: '210mm', minHeight: '297mm', background: 'white', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
                 <TemplateComponent data={resumeData} />
               </div>
             </div>

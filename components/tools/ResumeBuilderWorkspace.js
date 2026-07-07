@@ -31,11 +31,12 @@ const refineBtnStyle = { fontSize: '0.72rem', color: '#475569', background: 'whi
 
 function RefineBar({ onAction, disabled }) {
   return (
-    <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
       <button style={refineBtnStyle} disabled={disabled} onClick={() => onAction('regenerate')}>↻ Regenerate</button>
       <button style={refineBtnStyle} disabled={disabled} onClick={() => onAction('shorten')}>Shorten</button>
       <button style={refineBtnStyle} disabled={disabled} onClick={() => onAction('strengthen')}>Strengthen</button>
       <button style={refineBtnStyle} disabled={disabled} onClick={() => onAction('formal')}>More Formal</button>
+      {disabled && <span style={{ fontSize: '0.72rem', color: '#7C3AED', fontWeight: 600 }}>Working…</span>}
     </div>
   );
 }
@@ -65,7 +66,10 @@ function useResumeData({ form, targetRole, experience, education, skills }) {
 }
 
 function ExpBullets({ exp }) {
-  const lines = exp.bullets.length ? exp.bullets : (exp.description ? exp.description.split('\n').filter(Boolean) : []);
+  const lines = exp.bullets.length
+    ? exp.bullets
+    : (exp.description ? exp.description.split('\n').filter(Boolean)
+      : (exp.whatYouDid ? exp.whatYouDid.split('\n').filter(Boolean) : []));
   if (!lines.length) return null;
   return (
     <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
@@ -524,7 +528,7 @@ export default function ResumeBuilderWorkspace() {
               <details style={{ marginBottom: 10 }} open={exp.bullets.length === 0}>
                 <summary style={{ fontSize: '0.8rem', fontWeight: 600, color: '#7C3AED', cursor: 'pointer', marginBottom: 8 }}>Answer a few questions so AI can write this for you</summary>
                 <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
-                  <div><label style={labelStyle}>What did you usually do there?</label><textarea style={{ ...inputStyle, minHeight: 50 }} value={exp.whatYouDid} onChange={e => updateExp(i, 'whatYouDid', e.target.value)} /></div>
+                  <div><label style={labelStyle}>Job Description</label><textarea style={{ ...inputStyle, minHeight: 50 }} value={exp.whatYouDid} onChange={e => updateExp(i, 'whatYouDid', e.target.value)} placeholder="What did you do in this role? This will appear on your CV as-is unless you use AI to turn it into polished bullet points below." /></div>
                   <div><label style={labelStyle}>Equipment, software, or tools you used</label><input style={inputStyle} value={exp.toolsUsed} onChange={e => updateExp(i, 'toolsUsed', e.target.value)} /></div>
                   <div><label style={labelStyle}>Any problems you solved?</label><input style={inputStyle} value={exp.problemsSolved} onChange={e => updateExp(i, 'problemsSolved', e.target.value)} /></div>
                   <div><label style={labelStyle}>Who/what did you work with?</label><input style={inputStyle} value={exp.whoYouWorkedWith} onChange={e => updateExp(i, 'whoYouWorkedWith', e.target.value)} /></div>

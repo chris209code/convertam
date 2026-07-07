@@ -53,14 +53,14 @@ ${educationText || ''}
 Return ONLY JSON in this shape: { "technical": ["..."], "tools": ["..."], "professional": ["..."] }. Each array should have 4-8 short items. If a category genuinely doesn't apply, return an empty array for it.`;
 }
 
-function buildRefinePrompt({ text, action, context }) {
+function buildRefinePrompt({ text, modifier, context }) {
   const actionInstructions = {
     regenerate: 'Rewrite this with fresh wording, same meaning and same facts.',
     shorten: 'Make this noticeably shorter and punchier without losing the key facts.',
     strengthen: 'Make this sound more impactful and confident, using stronger action verbs, without inventing any new facts or numbers not already present.',
     formal: 'Rewrite this in a more formal, traditional CV tone.',
   };
-  return `You are editing a piece of CV content. ${actionInstructions[action] || actionInstructions.regenerate}
+  return `You are editing a piece of CV content. ${actionInstructions[modifier] || actionInstructions.regenerate}
 
 ${NO_FABRICATION_RULE}
 

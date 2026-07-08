@@ -30,7 +30,7 @@ const templateNames = {
 
 const templateDefaults = {
   classic: { certificateType: 'Achievement', programTitle: 'Program or Achievement Title', description: 'In recognition of outstanding performance and dedication.', brandColor: '#0b1d49', accentColor: '#c9932d' },
-  modern: { certificateType: 'Completion', programTitle: 'Program or Course Title', description: 'For successfully completing the program.', brandColor: '#0f766e', accentColor: '#10b981' },
+  modern: { certificateType: 'Completion', programTitle: 'Program or Course Title', description: 'This program has equipped the recipient with essential knowledge and practical skills to excel in a professional environment.', brandColor: '#0f766e', accentColor: '#10b981' },
   executive: { certificateType: 'Appreciation', programTitle: 'Award Reason or Recognition Title', description: 'Citation text goes here and remains editable.', brandColor: '#111827', accentColor: '#d4a74f' },
   split: { certificateType: 'Participation', programTitle: 'Program or Event Title', description: 'Description text goes here and remains editable.', brandColor: '#2443d8', accentColor: '#6d28d9' },
 };
@@ -58,6 +58,28 @@ function formatDateSentence(isoStr) {
   const [y, m, d] = isoStr.split('-').map(Number);
   if (!y || !m || !d) return '';
   return `Awarded this ${ordinal(d)} day of ${MONTH_NAMES[m - 1]}, ${y}`;
+}
+
+// Matches the spec's fitOrgName algorithm: allow wrapping up to 2 lines,
+// shrink font-size (maxSize -> minSize) until it fits within 2 lines, and
+// only as an absolute last resort let CSS line-clamp ellipsis-truncate the
+// second line. Used for Modern's institution name, which explicitly needs
+// 2-line wrapping (unlike every other name/title field, which stays single-line).
+function fitTwoLineText(el, maxSize, minSize) {
+  if (!el) return;
+  el.style.display = '-webkit-box';
+  el.style.webkitBoxOrient = 'vertical';
+  el.style.webkitLineClamp = '2';
+  el.style.overflow = 'hidden';
+  el.style.textOverflow = 'ellipsis';
+  let size = maxSize;
+  el.style.fontSize = `${size}px`;
+  let guard = 0;
+  while (el.scrollHeight > el.clientHeight + 2 && size > minSize && guard < 400) {
+    size -= 0.5;
+    el.style.fontSize = `${size}px`;
+    guard++;
+  }
 }
 
 function fitElementToWidth(el, scale = 1, manualPx = null) {
@@ -127,15 +149,12 @@ export default function CertificateGeneratorWorkspace() {
   const [hasSecondIssuer, setHasSecondIssuer] = useState(true);
   const [quoteStyle, setQuoteStyle] = useState('None');
   const [showRibbon, setShowRibbon] = useState(true);
-  const [ribbonSize, setRibbonSize] = useState(86);
-  const [ribbonAlign, setRibbonAlign] = useState('flex-start');
   const [verificationType, setVerificationType] = useState('none');
   const [customQuoteText, setCustomQuoteText] = useState('');
   const [customQuoteAttribution, setCustomQuoteAttribution] = useState('');
   const [textScale, setTextScale] = useState(1);
   const [manualSizes, setManualSizes] = useState({
     orgName: 21,
-    orgNameModern: 26,
     recipientName: 50,
     programTitle: 27,
     certTitle: 30,
@@ -290,20 +309,15 @@ export default function CertificateGeneratorWorkspace() {
 
   const [registerFit, fitRefs] = useAutoFit([template, state.recipientName, state.programTitle, state.issuerName, state.secondIssuerName, state.issuerPosition, state.secondIssuerPosition, state.companyName], textScale, manualSizes);
 
-  // Modern's recipient-name accent line should be a modest fraction of the
-  // actual rendered name width (not a fixed % of the card), per spec: 45-90px,
-  // ~12-18% of the name. Runs after the fit pass above (declared later, so
-  // React fires it after) so it measures the name's real, already-fitted width.
-  const modernAccentLineRef = useRef(null);
+  // Modern's institution name allows wrapping up to 2 lines and shrinks
+  // 26px->14px per the spec's fitOrgName algorithm - fundamentally different
+  // from every other name field (which stays strictly single-line), so it
+  // gets its own dedicated ref/effect rather than going through registerFit.
+  const modernOrgNameRef = useRef(null);
   useEffect(() => {
     if (template !== 'modern') return;
-    const nameEntry = fitRefs.current.find((r) => r.key === 'recipientName' && r.el && r.el.classList.contains('cm-recipient'));
-    const lineEl = modernAccentLineRef.current;
-    if (!nameEntry || !lineEl) return;
-    const w = nameEntry.el.offsetWidth;
-    const target = Math.min(90, Math.max(45, w * 0.15));
-    lineEl.style.width = `${target}px`;
-  }, [template, state.recipientName, manualSizes.recipientName, textScale, fitRefs]);
+    fitTwoLineText(modernOrgNameRef.current, 26, 14);
+  }, [template, state.companyName, textScale]);
   const certRef = useRef(null);
 
   const cssVars = { '--brand': state.brandColor, '--accent': state.accentColor };
@@ -666,43 +680,47 @@ export default function CertificateGeneratorWorkspace() {
            pushes whatever follows it when text wraps, shrinks, or grows — this is
            what makes teal accent lines, spacing, and the ribbon position correctly
            regardless of content length, instead of drifting at a stale fixed Y. */
+        /* Modern Professional — rebuilt exactly to the new design-handoff spec.
+           Every value below is a direct percentage conversion of the spec's
+           literal pixel figures (canvas 1400×990; right-panel left/right/width
+           values convert against its own ~1008px width, everything else against
+           the full 1400×990 card) — nothing here is a personal adjustment. */
         .cm-template { display: flex; height: 100%; background: #FBFAF8; font-family: 'Plus Jakarta Sans', sans-serif; }
-        .cm-rail { position: relative; width: 28%; flex-shrink: 0; overflow: hidden; background: linear-gradient(160deg, #071B2D 0%, #063A46 55%, #005B55 100%); color: #fff; display: flex; flex-direction: column; padding: 8% 7.9% 6%; box-sizing: border-box; }
-        .cm-rail-watermark { position: absolute; inset: 0; opacity: 0.12; }
-        .cm-logo-row { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; margin-bottom: 4%; margin-left: -2%; min-width: 0; }
-        .cm-logo-row span { font-size: clamp(20px, 2.6cqw, 32px); font-weight: 800; color: #fff; line-height: 1.15; white-space: nowrap; overflow: hidden; min-width: 0; }
-        .cm-tagline { position: relative; z-index: 1; font-size: clamp(9px, 1.143cqw, 15px); letter-spacing: 0.3px; color: rgba(255,255,255,.85); line-height: 1.5; font-weight: 500; margin-bottom: 3%; overflow-wrap: anywhere; }
-        .cm-divider-tagline { position: relative; z-index: 1; width: 22%; height: 2px; background: #19C6A3; margin-bottom: 12%; flex-shrink: 0; }
-        .cm-type-block { position: relative; z-index: 1; margin-top: 16%; }
-        .cm-type-label { font-size: clamp(9px, 1.357cqw, 19px); letter-spacing: 1.5px; color: rgba(255,255,255,.75); font-weight: 600; }
-        .cm-type-name { font-size: clamp(26px, 4.6cqw, 64px); font-weight: 800; color: #fff; margin-top: 6px; line-height: 1.05; white-space: nowrap; overflow: hidden; }
-        .cm-divider2 { position: relative; z-index: 1; width: 22%; height: 2px; background: #19C6A3; margin-top: 4%; flex-shrink: 0; }
-        .cm-ribbon-wrap { position: relative; z-index: 1; margin-top: auto; padding-top: 15%; display: flex; justify-content: flex-start; }
-        .cm-ribbon-wrap img { width: var(--ribbon-size, 86%); height: auto; }
+        .cm-rail { position: relative; width: 28%; flex-shrink: 0; overflow: hidden; background: linear-gradient(160deg, #071B2D 0%, #063A46 55%, #005B55 100%); color: #fff; display: flex; flex-direction: column; box-sizing: border-box; padding: 11.01% 2.571% 4.04% 2.214%; }
+        .cm-rail-watermark { position: absolute; top: 0; left: 0; opacity: 0.12; }
+        .cm-logo-row { position: relative; z-index: 1; display: flex; align-items: flex-start; gap: 0.714cqw; min-width: 0; }
+        .cm-logo-icon { flex-shrink: 0; margin-top: 4px; }
+        .cm-org-name { font-size: 26px; font-weight: 800; color: #fff; line-height: 1.2; }
+        .cm-tagline { position: relative; z-index: 1; margin-top: 24px; font-size: 1.143cqw; letter-spacing: 0.036cqw; color: rgba(255,255,255,.8); line-height: 1.35; font-weight: 500; }
+        .cm-divider-tagline { position: relative; z-index: 1; margin-top: 16px; width: 10cqw; height: 2px; background: #19C6A3; flex-shrink: 0; }
+        .cm-type-block { position: relative; z-index: 1; margin-top: 64px; }
+        .cm-type-label { font-size: 1.357cqw; letter-spacing: 0.107cqw; color: rgba(255,255,255,.75); font-weight: 600; }
+        .cm-type-name { font-size: 4.286cqw; font-weight: 800; color: #fff; margin-top: 8px; line-height: 1.1; white-space: nowrap; overflow: hidden; }
+        .cm-divider2 { position: relative; z-index: 1; margin-top: 16px; width: 10cqw; height: 2px; background: #19C6A3; flex-shrink: 0; }
+        .cm-ribbon-spacer { flex: 1; min-height: 3.232%; }
+        .cm-ribbon-img { position: relative; z-index: 1; width: 24.286cqw; min-width: 24.286cqw; height: auto; margin-left: -7.214cqw; align-self: flex-start; flex-shrink: 0; }
 
-        .cm-main { position: relative; flex: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: column; padding: 9.5% 6.94% 5%; box-sizing: border-box; }
+        .cm-main { position: relative; flex: 1; min-width: 0; overflow: hidden; }
         .cm-watermark { position: absolute; top: -6.06%; right: -5.95%; width: 28.57cqw; opacity: 0.1; }
-        .cm-body { position: relative; z-index: 1; }
-        .cm-intro { font-size: clamp(9px, 1.143cqw, 16px); letter-spacing: 1px; color: #0B2A3A; font-weight: 600; margin-bottom: 1.6%; }
-        .cm-recipient-block { margin-bottom: 3%; }
-        .cm-recipient { font-weight: 800; color: #0B2A3A; line-height: 1.1; white-space: nowrap; overflow: hidden; }
-        .cm-accent-line { height: 4px; background: #19C6A3; margin-top: 10px; width: 70px; }
-        .cm-completing { font-size: clamp(11px, 1.714cqw, 24px); color: #3E5058; font-weight: 400; margin-bottom: 2%; }
-        .cm-highlight-wrap { margin-bottom: 20px; max-width: 100%; }
-        .cm-highlight { display: inline-block; background: #D9F4EC; border-radius: 10px; padding: clamp(8px, 1.6cqw, 16px) clamp(12px, 2.4cqw, 24px); font-size: clamp(11px, 1.714cqw, 24px); font-weight: 700; color: #0B2A3A; white-space: nowrap; overflow: hidden; max-width: 100%; box-sizing: border-box; }
-        .cm-description { max-width: 88%; font-size: clamp(10px, 1.5cqw, 21px); line-height: 1.55; color: #3E5058; overflow-wrap: anywhere; }
+        .cm-intro { position: absolute; top: 20%; left: 6.944%; font-size: 1.143cqw; letter-spacing: 1px; color: #0B2A3A; font-weight: 600; }
+        .cm-recipient { position: absolute; top: 24.444%; left: 6.944%; right: 6.944%; font-weight: 800; color: #0B2A3A; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cm-accent-line { position: absolute; top: 32.525%; left: 6.944%; width: 8.333%; height: 4px; background: #19C6A3; }
+        .cm-completing { position: absolute; top: 36.566%; left: 6.944%; font-size: 1.714cqw; color: #3E5058; font-weight: 400; }
+        .cm-highlight-wrap { position: absolute; top: 41.414%; left: 6.944%; max-width: 86%; }
+        .cm-highlight { display: inline-block; background: #D9F4EC; border-radius: 0.714cqw; padding: 1.143cqw 1.714cqw; font-size: 1.714cqw; font-weight: 700; color: #0B2A3A; white-space: nowrap; overflow: hidden; max-width: 100%; box-sizing: border-box; }
+        .cm-description { position: absolute; top: 49.091%; left: 6.944%; max-width: 69.444%; font-size: 1.5cqw; line-height: 1.55; color: #3E5058; overflow-wrap: anywhere; }
 
-        .cm-footer-row { position: relative; z-index: 1; margin-top: auto; padding-top: 24px; display: grid; grid-template-columns: 18% 1px 22% 1px 22% 1px minmax(0,38%); column-gap: 1.5%; align-items: flex-end; }
+        .cm-footer-row { position: absolute; top: 80%; left: 6.944%; right: 5.952%; display: grid; grid-template-columns: 14.881% 1px 18.849% 1px 14.881% 1px minmax(15.873%,1fr); column-gap: 1.786%; align-items: flex-end; }
         .cm-footer-divider { width: 1px; height: 50px; background: #E3E7E5; }
-        .cm-footer-cell { min-width: 0; }
-        .cm-footer-icon { width: clamp(14px, 1.714cqw, 24px); height: clamp(14px, 1.714cqw, 24px); }
-        .cm-footer-value { margin-top: 10px; font-size: clamp(8px, 0.964cqw, 13.5px); font-weight: 600; color: #0B2A3A; white-space: nowrap; overflow: hidden; }
-        .cm-footer-label { margin-top: 2px; font-size: clamp(7px, 0.75cqw, 10.5px); letter-spacing: 1px; color: #8A9895; font-weight: 600; white-space: nowrap; }
-        .cm-qr-box { width: clamp(30px, 3.571cqw, 50px); height: clamp(30px, 3.571cqw, 50px); background: #fff; border: 1px solid #E3E7E5; border-radius: 6px; padding: 5px; box-sizing: border-box; }
-        .cm-barcode-box { width: 100%; max-width: 90px; height: clamp(24px, 2.857cqw, 40px); background: #fff; border: 1px solid #E3E7E5; border-radius: 4px; padding: 4px 5px; box-sizing: border-box; }
+        .cm-footer-cell { min-width: 0; white-space: nowrap; }
+        .cm-footer-icon { width: 1.714cqw; height: 1.714cqw; }
+        .cm-footer-value { margin-top: 10px; font-size: 0.964cqw; font-weight: 600; color: #0B2A3A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cm-footer-label { margin-top: 2px; font-size: 0.75cqw; letter-spacing: 1px; color: #8A9895; font-weight: 600; }
+        .cm-qr-box { width: 3.571cqw; height: 3.571cqw; background: #fff; border: 1px solid #E3E7E5; border-radius: 6px; padding: 5px; box-sizing: border-box; }
+        .cm-barcode-box { width: 100%; max-width: 6.429cqw; height: 2.857cqw; background: #fff; border: 1px solid #E3E7E5; border-radius: 4px; padding: 4px 5px; box-sizing: border-box; }
         .cm-sig-line { height: 22px; border-bottom: 1px solid #D8DEDC; margin-bottom: 6px; }
-        .cm-sig-printed { font-size: clamp(8px, 0.964cqw, 13.5px); font-weight: 700; color: #0B2A3A; white-space: nowrap; overflow: hidden; }
-        .cm-sig-title { font-size: clamp(7px, 0.75cqw, 10.5px); letter-spacing: 1px; color: #8A9895; font-weight: 600; white-space: nowrap; overflow: hidden; }
+        .cm-sig-printed { font-size: 0.857cqw; font-weight: 700; color: #0B2A3A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cm-sig-title { font-size: 0.75cqw; letter-spacing: 1px; color: #8A9895; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         /* Executive Signature */
         /* Executive Signature — exact positions converted proportionally from the spec's 1200×849 canvas */
@@ -802,7 +820,7 @@ export default function CertificateGeneratorWorkspace() {
             Drag any slider to set that field's size directly. If a name is still too long to fit at your chosen size, it'll automatically shrink further or wrap to a second line — but your slider value is always the starting point, not a suggestion that gets overridden.
           </p>
           {[
-            ...(template === 'modern' ? [{ key: 'orgNameModern', label: 'Institution name (Modern)', min: 16, max: 40 }] : [{ key: 'orgName', label: 'Institution name', min: 8, max: 32 }]),
+            ...(template === 'modern' ? [] : [{ key: 'orgName', label: 'Institution name', min: 8, max: 32 }]),
             { key: 'recipientName', label: 'Recipient name', min: 16, max: 80 },
             ...(template === 'executive' ? [{ key: 'certTitle', label: 'Certificate title (Executive)', min: 14, max: 44 }] : []),
             ...(template === 'modern' ? [{ key: 'certTitleModern', label: 'Certificate title (Modern)', min: 14, max: 44 }] : []),
@@ -959,21 +977,6 @@ export default function CertificateGeneratorWorkspace() {
                 <input type="checkbox" checked={showRibbon} onChange={(e) => setShowRibbon(e.target.checked)} style={{ width: 'auto' }} />
                 Award Ribbon — show ribbon graphic
               </label>
-              {showRibbon && (
-                <>
-                  <label style={{ fontSize: '11px', display: 'block', marginBottom: 10 }}>
-                    Ribbon size — {ribbonSize}% of panel width
-                    <input type="range" min="10" max="100" step="1" value={ribbonSize} onChange={(e) => setRibbonSize(Number(e.target.value))} style={{ width: '100%', marginTop: 4 }} />
-                  </label>
-                  <label>Ribbon position
-                    <select value={ribbonAlign} onChange={(e) => setRibbonAlign(e.target.value)}>
-                      <option value="flex-start">Left</option>
-                      <option value="center">Center</option>
-                      <option value="flex-end">Right</option>
-                    </select>
-                  </label>
-                </>
-              )}
               <label>Verification Code (Modern Professional)
                 <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
                   {['none', 'qr', 'barcode'].map((opt) => (
@@ -1102,17 +1105,17 @@ export default function CertificateGeneratorWorkspace() {
             {template === 'modern' && (
               <div className="cm-template">
                 <aside className="cm-rail">
-                  <svg className="cm-rail-watermark" viewBox="0 0 392 990" preserveAspectRatio="none">
+                  <svg className="cm-rail-watermark" width="392" height="990" viewBox="0 0 392 990">
                     <polygon points="60,780 220,860 220,990 60,910" fill="none" stroke="#19C6A3" strokeWidth="1" />
                   </svg>
 
                   <div className="cm-logo-row">
                     {logoImg ? (
-                      <img src={logoImg} alt="" style={{ width: 20, height: 20, objectFit: 'contain', flexShrink: 0 }} />
+                      <img src={logoImg} alt="" className="cm-logo-icon" style={{ width: 28, height: 28, objectFit: 'contain' }} />
                     ) : (
-                      <svg width="20" height="20" viewBox="0 0 30 30" style={{ flexShrink: 0 }}><polygon points="15,1 27,8 27,22 15,29 3,22 3,8" fill="none" stroke="#FFFFFF" strokeWidth="2.5" /><circle cx="15" cy="15" r="5" fill="#FFFFFF" /></svg>
+                      <svg width="28" height="28" viewBox="0 0 30 30" className="cm-logo-icon"><polygon points="15,1 27,8 27,22 15,29 3,22 3,8" fill="none" stroke="#FFFFFF" strokeWidth="2.5" /><circle cx="15" cy="15" r="5" fill="#FFFFFF" /></svg>
                     )}
-                    <span ref={registerFit('orgNameModern')}>{emptyToDefault(state, 'companyName')}</span>
+                    <div ref={modernOrgNameRef} className="cm-org-name">{emptyToDefault(state, 'companyName')}</div>
                   </div>
 
                   {state.tagline && (
@@ -1128,10 +1131,13 @@ export default function CertificateGeneratorWorkspace() {
                   </div>
                   <div className="cm-divider2" />
 
+                  <div className="cm-ribbon-spacer" />
                   {showRibbon && (
-                    <div className="cm-ribbon-wrap" style={{ justifyContent: ribbonAlign, '--ribbon-size': `${ribbonSize}%` }}>
-                      <img src={highRes ? '/certificates/ribbon-modern.png' : '/certificates/ribbon-modern-preview.png'} alt="" />
-                    </div>
+                    <img
+                      src={highRes ? '/certificates/ribbon-modern.png' : '/certificates/ribbon-modern-preview.png'}
+                      alt="Ribbon badge"
+                      className="cm-ribbon-img"
+                    />
                   )}
                 </aside>
 
@@ -1142,18 +1148,14 @@ export default function CertificateGeneratorWorkspace() {
                     <line x1="200" y1="20" x2="200" y2="340" stroke="#19C6A3" strokeWidth="1" />
                   </svg>
 
-                  <div className="cm-body">
-                    <div className="cm-intro">THIS CERTIFICATE IS PROUDLY PRESENTED TO</div>
-                    <div className="cm-recipient-block">
-                      <div ref={registerFit('recipientName')} className="cm-recipient">{emptyToDefault(state, 'recipientName')}</div>
-                      <div ref={modernAccentLineRef} className="cm-accent-line" />
-                    </div>
-                    <div className="cm-completing">For successfully completing the program</div>
-                    <div className="cm-highlight-wrap">
-                      <span ref={registerFit('programTitle')} className="cm-highlight">{emptyToDefault(state, 'programTitle')}</span>
-                    </div>
-                    <div className="cm-description">{emptyToDefault(state, 'description')}</div>
+                  <div className="cm-intro">THIS CERTIFICATE IS PROUDLY PRESENTED TO</div>
+                  <div ref={registerFit('recipientName')} className="cm-recipient">{emptyToDefault(state, 'recipientName')}</div>
+                  <div className="cm-accent-line" />
+                  <div className="cm-completing">For successfully completing the program</div>
+                  <div className="cm-highlight-wrap">
+                    <span ref={registerFit('programTitle')} className="cm-highlight">{emptyToDefault(state, 'programTitle')}</span>
                   </div>
+                  <div className="cm-description">{emptyToDefault(state, 'description')}</div>
 
                   <div className="cm-footer-row">
                     <div className="cm-footer-cell">

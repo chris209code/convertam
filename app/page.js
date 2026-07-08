@@ -487,6 +487,7 @@ export default function HomePage() {
     .tool-list li a .chev { opacity: 0.45; font-size: 12px; flex-shrink: 0; }
 
     .bg-blue { --accent: #2684ff; }
+    .bg-red { --accent: #DC2626; }
     .bg-green { --accent: #18b869; }
     .bg-purple { --accent: #7c4dff; }
     .bg-orange { --accent: #ff8617; }
@@ -501,15 +502,18 @@ export default function HomePage() {
       .laptop { left: 8%; right: auto; }
       .phone { right: 12%; }
       .category-grid { grid-template-columns: repeat(3, 1fr); }
-      .benefits-strip { grid-template-columns: repeat(2, 1fr); row-gap: 14px; }
-      .benefit-item:nth-child(2) { border-right: 0; }
       .nav-links { display: none; }
     }
+
+    .only-desktop { display: block; }
+    .only-mobile { display: none; }
 
     @media (max-width: 820px) {
       .shell { width: min(100% - 32px, 720px); }
       .nav { min-height: 74px; }
       .brand-name { font-size: 20px; }
+      .only-desktop { display: none; }
+      .only-mobile { display: block; }
       .brand-line { font-size: 11px; }
       .nav-actions .primary-button { display: none; }
       .hero { min-height: auto; }
@@ -517,12 +521,13 @@ export default function HomePage() {
       h1 { font-size: clamp(46px, 13vw, 64px); }
       .hero-copy { font-size: 17px; }
       .search-wrap { height: 58px; }
-      .device-stage { min-height: 360px; transform: scale(0.82); transform-origin: top center; width: 122%; margin-left: -11%; }
-      .laptop { left: 50px; width: 500px; }
-      .phone { right: 32px; }
+      .device-stage { display: none; }
       .section { padding: 46px 0; }
       .section-head { display: block; }
       .category-grid { grid-template-columns: repeat(2, 1fr); }
+      .tool-list li:not(.featured) { display: none; }
+      .tool-list li a { padding: 8px 4px; font-size: 12.5px; }
+      .category-card.is-detailed { padding: 16px 14px 14px; }
     }
 
     @media (max-width: 560px) {
@@ -535,11 +540,19 @@ export default function HomePage() {
       .hero-copy { font-size: 16px; }
       .search-wrap { margin-top: 28px; }
       .trending { font-size: 12px; }
-      .device-stage { min-height: 292px; transform: scale(0.64); width: 156%; margin-left: -28%; }
-      .category-grid, .benefits-strip { grid-template-columns: 1fr; }
-      .benefit-item { border-right: 0; border-bottom: 1px solid var(--line); padding-bottom: 14px; }
-      .benefit-item:last-child { border-bottom: 0; }
       .category-card { min-height: 0; }
+      .benefits-strip { padding: 12px 2px; }
+      .benefit-item { padding: 2px 8px; gap: 7px; }
+      .benefit-icon { width: 32px; height: 32px; }
+      .benefit-icon svg { width: 15px; height: 15px; }
+      .benefit-title { font-size: 11.5px; }
+      .benefit-copy { font-size: 9.5px; }
+    }
+
+    /* Only collapse category cards to a single column on genuinely tiny
+       screens — normal mobile widths (360–430px) stay 2-column per spec. */
+    @media (max-width: 340px) {
+      .category-grid { grid-template-columns: 1fr; }
     }
   `}</style>
 <main className="page">
@@ -620,19 +633,37 @@ export default function HomePage() {
         <div className="benefits-strip">
           <div className="benefit-item bg-green">
             <div className="benefit-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-4Z"/></svg></div>
-            <div><p className="benefit-title">100% Free to Use</p><p className="benefit-copy">Most tools are free<br />No hidden charges</p></div>
+            <div>
+              <p className="benefit-title only-desktop">100% Free to Use</p>
+              <p className="benefit-title only-mobile">100% Free</p>
+              <p className="benefit-copy only-desktop">Most tools are free<br />No hidden charges</p>
+              <p className="benefit-copy only-mobile">Most tools are free<br />No hidden charges</p>
+            </div>
           </div>
           <div className="benefit-item bg-blue">
             <div className="benefit-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
-            <div><p className="benefit-title">Secure &amp; Private</p><p className="benefit-copy">Your files are encrypted<br />and never stored</p></div>
+            <div>
+              <p className="benefit-title">Secure &amp; Private</p>
+              <p className="benefit-copy only-desktop">Your files are encrypted<br />and never stored</p>
+              <p className="benefit-copy only-mobile">Files encrypted<br />Never stored</p>
+            </div>
           </div>
           <div className="benefit-item bg-purple">
             <div className="benefit-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg></div>
-            <div><p className="benefit-title">Super Fast</p><p className="benefit-copy">Results in seconds,<br />not minutes</p></div>
+            <div>
+              <p className="benefit-title">Super Fast</p>
+              <p className="benefit-copy only-desktop">Results in seconds,<br />not minutes</p>
+              <p className="benefit-copy only-mobile">Results in seconds<br />Not minutes</p>
+            </div>
           </div>
           <div className="benefit-item bg-pink">
             <div className="benefit-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.8 8.6c0 5.4-8.8 10.4-8.8 10.4S3.2 14 3.2 8.6a4.6 4.6 0 0 1 8.8-1.8 4.6 4.6 0 0 1 8.8 1.8Z"/></svg></div>
-            <div><p className="benefit-title">Works Anywhere</p><p className="benefit-copy">On any device,<br />anytime, anywhere</p></div>
+            <div>
+              <p className="benefit-title only-desktop">Works Anywhere</p>
+              <p className="benefit-title only-mobile">Anywhere</p>
+              <p className="benefit-copy only-desktop">On any device,<br />anytime, anywhere</p>
+              <p className="benefit-copy only-mobile">Any device<br />Anytime</p>
+            </div>
           </div>
         </div>
       </div>
@@ -642,16 +673,23 @@ export default function HomePage() {
       <div className="shell">
         <div className="category-grid">
 
-          <article className="category-card is-detailed bg-blue">
-            <div className="tile-icon" style={{ background: 'var(--accent)' }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2Z"/><path d="M14 2v6h6"/></svg></div>
+          <article className="category-card is-detailed bg-red">
+            <div className="tile-icon" style={{ background: 'var(--accent)' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-label="PDF">
+                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2Z"/>
+                <path d="M14 2v6h6"/>
+                <text x="12" y="17.3" fontSize="6.6" fontWeight="800" fontFamily="Arial, sans-serif" textAnchor="middle" fill="currentColor" stroke="none">PDF</text>
+              </svg>
+            </div>
             <h3>PDF Tools</h3>
-            <p className="card-copy">Convert, edit, merge, split and secure PDFs.</p>
+            <p className="card-copy only-desktop">Convert, edit, merge, split and secure PDFs.</p>
+            <p className="card-copy only-mobile">Convert, merge and secure PDFs.</p>
             <ul className="tool-list">
-              <li><a href="/pdf-to-word">PDF to Word <span className="chev">›</span></a></li>
+              <li className="featured"><a href="/pdf-to-word">PDF to Word <span className="chev">›</span></a></li>
               <li><a href="/word-to-pdf">Word to PDF <span className="chev">›</span></a></li>
-              <li><a href="/merge-pdf">Merge PDF <span className="chev">›</span></a></li>
+              <li className="featured"><a href="/merge-pdf">Merge PDF <span className="chev">›</span></a></li>
               <li><a href="/split-pdf">Split PDF <span className="chev">›</span></a></li>
-              <li><a href="/compress-pdf">Compress PDF <span className="chev">›</span></a></li>
+              <li className="featured"><a href="/compress-pdf">Compress PDF <span className="chev">›</span></a></li>
               <li><a href="/ocr-pdf">OCR PDF <span className="chev">›</span></a></li>
               <li><a href="/fill-pdf">Fill PDF Forms <span className="chev">›</span></a></li>
               <li><a href="/protect-pdf">Protect PDF <span className="chev">›</span></a></li>
@@ -662,12 +700,13 @@ export default function HomePage() {
           <article className="category-card is-detailed bg-green">
             <div className="tile-icon" style={{ background: 'var(--accent)' }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect x="2" y="6" width="20" height="14" rx="2"/></svg></div>
             <h3>Business Tools</h3>
-            <p className="card-copy">Generate invoices, quotes, certificates and more.</p>
+            <p className="card-copy only-desktop">Generate invoices, quotes, certificates and more.</p>
+            <p className="card-copy only-mobile">Invoices, quotes and more.</p>
             <ul className="tool-list">
-              <li><a href="/invoice-generator">Invoice Generator <span className="chev">›</span></a></li>
-              <li><a href="/quotation-generator">Quotation Generator <span className="chev">›</span></a></li>
+              <li className="featured"><a href="/invoice-generator">Invoice Generator <span className="chev">›</span></a></li>
+              <li className="featured"><a href="/quotation-generator">Quotation Generator <span className="chev">›</span></a></li>
               <li><a href="/delivery-note-waybill">Delivery Note &amp; Waybill <span className="chev">›</span></a></li>
-              <li><a href="/certificate-generator">Certificate Generator <span className="chev">›</span></a></li>
+              <li className="featured"><a href="/certificate-generator">Certificate Generator <span className="chev">›</span></a></li>
               <li><a href="/id-card-generator">ID Card Generator <span className="chev">›</span></a></li>
             </ul>
             <a className="card-link" href="/business">View all Business tools →</a>
@@ -676,12 +715,13 @@ export default function HomePage() {
           <article className="category-card is-detailed bg-purple">
             <div className="tile-icon" style={{ background: 'var(--accent)' }}><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/><path d="M19 13l.75 2.25L22 16l-2.25.75L19 19l-.75-2.25L16 16l2.25-.75L19 13z"/></svg></div>
             <h3>AI Tools</h3>
-            <p className="card-copy">Smart AI tools to automate and simplify your work.</p>
+            <p className="card-copy only-desktop">Smart AI tools to automate and simplify your work.</p>
+            <p className="card-copy only-mobile">Smart tools for everyday work.</p>
             <ul className="tool-list">
-              <li><a href="/summarize-pdf">Summarize PDF <span className="chev">›</span></a></li>
-              <li><a href="/smart-converter">Smart AI Converter <span className="chev">›</span></a></li>
+              <li className="featured"><a href="/summarize-pdf">Summarize PDF <span className="chev">›</span></a></li>
+              <li className="featured"><a href="/smart-converter">Smart AI Converter <span className="chev">›</span></a></li>
               <li><a href="/receipt-scanner">Receipt &amp; Invoice Scanner <span className="chev">›</span></a></li>
-              <li><a href="/cv-improver">CV Improver <span className="chev">›</span></a></li>
+              <li className="featured"><a href="/cv-improver">CV Improver <span className="chev">›</span></a></li>
               <li><a href="/resume-builder">Resume Builder <span className="chev">›</span></a></li>
               <li><a href="/cover-letter">Cover Letter Writer <span className="chev">›</span></a></li>
               <li><a href="/contract-summarizer">Contract Summarizer <span className="chev">›</span></a></li>
@@ -693,15 +733,16 @@ export default function HomePage() {
           <article className="category-card is-detailed bg-orange">
             <div className="tile-icon" style={{ background: 'var(--accent)' }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></div>
             <h3>Image Tools</h3>
-            <p className="card-copy">Edit, convert and enhance your images easily.</p>
+            <p className="card-copy only-desktop">Edit, convert and enhance your images easily.</p>
+            <p className="card-copy only-mobile">Edit and enhance images.</p>
             <ul className="tool-list">
               <li><a href="/jpg-to-pdf">JPG to PDF <span className="chev">›</span></a></li>
               <li><a href="/png-to-pdf">PNG to PDF <span className="chev">›</span></a></li>
               <li><a href="/pdf-to-jpg">PDF to JPG <span className="chev">›</span></a></li>
               <li><a href="/pdf-to-png">PDF to PNG <span className="chev">›</span></a></li>
-              <li><a href="/image-compressor">Image Compressor <span className="chev">›</span></a></li>
-              <li><a href="/resize-image">Image Resizer &amp; Cropper <span className="chev">›</span></a></li>
-              <li><a href="/watermark-image">Watermark Image <span className="chev">›</span></a></li>
+              <li className="featured"><a href="/image-compressor">Image Compressor <span className="chev">›</span></a></li>
+              <li className="featured"><a href="/resize-image">Image Resizer &amp; Cropper <span className="chev">›</span></a></li>
+              <li className="featured"><a href="/watermark-image">Watermark Image <span className="chev">›</span></a></li>
               <li><a href="/document-enhancer">Document Enhancer <span className="chev">›</span></a></li>
             </ul>
             <a className="card-link" href="/image-tools">View all Image tools →</a>
@@ -712,9 +753,9 @@ export default function HomePage() {
             <h3>Calculators</h3>
             <p className="card-copy">Calculate anything instantly.</p>
             <ul className="tool-list">
-              <li><a href="/calculator-hub">Salary Calculator <span className="chev">›</span></a></li>
-              <li><a href="/calculator-hub">VAT Calculator <span className="chev">›</span></a></li>
-              <li><a href="/calculator-hub">Loan Calculator <span className="chev">›</span></a></li>
+              <li className="featured"><a href="/calculator-hub">Salary Calculator <span className="chev">›</span></a></li>
+              <li className="featured"><a href="/calculator-hub">VAT Calculator <span className="chev">›</span></a></li>
+              <li className="featured"><a href="/calculator-hub">Loan Calculator <span className="chev">›</span></a></li>
               <li><a href="/calculator-hub">BMI Calculator <span className="chev">›</span></a></li>
               <li><a href="/calculator-hub">Age Calculator <span className="chev">›</span></a></li>
               <li><a href="/calculator-hub">Profit Margin Calculator <span className="chev">›</span></a></li>
@@ -727,9 +768,9 @@ export default function HomePage() {
             <h3>Utilities</h3>
             <p className="card-copy">Everyday tools to boost your productivity.</p>
             <ul className="tool-list">
-              <li><a href="/utilities-hub">QR Code Generator <span className="chev">›</span></a></li>
-              <li><a href="/utilities-hub">Password Generator <span className="chev">›</span></a></li>
-              <li><a href="/utilities-hub">Word Counter <span className="chev">›</span></a></li>
+              <li className="featured"><a href="/utilities-hub">QR Code Generator <span className="chev">›</span></a></li>
+              <li className="featured"><a href="/utilities-hub">Password Generator <span className="chev">›</span></a></li>
+              <li className="featured"><a href="/utilities-hub">Word Counter <span className="chev">›</span></a></li>
               <li><a href="/utilities-hub">Text Case Converter <span className="chev">›</span></a></li>
             </ul>
             <a className="card-link" href="/utilities-hub">View all Utilities →</a>

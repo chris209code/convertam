@@ -126,6 +126,8 @@ export default function CertificateGeneratorWorkspace() {
   const [issueDateRaw, setIssueDateRaw] = useState('');
   const [hasSecondIssuer, setHasSecondIssuer] = useState(true);
   const [quoteStyle, setQuoteStyle] = useState('None');
+  const [showRibbon, setShowRibbon] = useState(true);
+  const [verificationType, setVerificationType] = useState('none');
   const [customQuoteText, setCustomQuoteText] = useState('');
   const [customQuoteAttribution, setCustomQuoteAttribution] = useState('');
   const [textScale, setTextScale] = useState(1);
@@ -134,6 +136,8 @@ export default function CertificateGeneratorWorkspace() {
     recipientName: 50,
     programTitle: 27,
     certTitle: 30,
+    certTitleModern: 30,
+    certIdValue: 13,
     sigName1: 14,
     sigTitle1: 10,
     sigName2: 14,
@@ -282,6 +286,21 @@ export default function CertificateGeneratorWorkspace() {
   const certType = titleCase(emptyToDefault(state, 'certificateType'));
 
   const [registerFit, fitRefs] = useAutoFit([template, state.recipientName, state.programTitle, state.issuerName, state.secondIssuerName, state.issuerPosition, state.secondIssuerPosition, state.companyName], textScale, manualSizes);
+
+  // Modern's recipient-name accent line should be a modest fraction of the
+  // actual rendered name width (not a fixed % of the card), per spec: 45-90px,
+  // ~12-18% of the name. Runs after the fit pass above (declared later, so
+  // React fires it after) so it measures the name's real, already-fitted width.
+  const modernAccentLineRef = useRef(null);
+  useEffect(() => {
+    if (template !== 'modern') return;
+    const nameEntry = fitRefs.current.find((r) => r.key === 'recipientName' && r.el && r.el.classList.contains('cm-recipient'));
+    const lineEl = modernAccentLineRef.current;
+    if (!nameEntry || !lineEl) return;
+    const w = nameEntry.el.offsetWidth;
+    const target = Math.min(90, Math.max(45, w * 0.15));
+    lineEl.style.width = `${target}px`;
+  }, [template, state.recipientName, manualSizes.recipientName, textScale, fitRefs]);
   const certRef = useRef(null);
 
   const cssVars = { '--brand': state.brandColor, '--accent': state.accentColor };
@@ -571,7 +590,7 @@ export default function CertificateGeneratorWorkspace() {
         .cert-preview-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; max-width: 1180px; margin: 0 auto 20px; color: #fff; }
         .cert-preview-toolbar p { color: #aab5cc; }
         .cert-preview-toolbar span { border: 1px solid rgba(255,255,255,0.18); border-radius: 999px; padding: 7px 12px; color: #d7deec; font-size: 12px; }
-        .cert-stage { display: grid; place-items: center; min-height: 560px; }
+        .cert-stage { display: grid; place-items: center; min-height: 240px; padding: 8px 0; }
         .certificate { position: relative; width: min(100%, 1120px); aspect-ratio: var(--certificate-ratio); background: #fff; box-shadow: 0 30px 80px rgba(0,0,0,0.34); overflow: hidden; container-type: inline-size; }
         .cert-logo-row { display: flex; align-items: center; gap: 9px; font-weight: 900; }
         .cert-logo-row.center { justify-content: center; }
@@ -639,36 +658,45 @@ export default function CertificateGeneratorWorkspace() {
         .cert-split-body h3 { margin: 0; max-width: 78%; font-size: clamp(38px, 5cqw, 68px); line-height: 1.05; white-space: nowrap; }
         .cert-accent-line { width: 8%; height: 3px; margin: 2.2% 0 4.5%; background: var(--brand); }
 
+        /* Modern Professional — rebuilt as normal flowing layout (not absolute
+           coordinates). Every element sits in real document flow so it naturally
+           pushes whatever follows it when text wraps, shrinks, or grows — this is
+           what makes teal accent lines, spacing, and the ribbon position correctly
+           regardless of content length, instead of drifting at a stale fixed Y. */
         .cm-template { display: flex; height: 100%; background: #FBFAF8; font-family: 'Plus Jakarta Sans', sans-serif; }
-        .cm-rail { position: relative; width: 28%; flex-shrink: 0; overflow: hidden; background: linear-gradient(160deg, #071B2D 0%, #063A46 55%, #005B55 100%); color: #fff; }
+        .cm-rail { position: relative; width: 28%; flex-shrink: 0; overflow: hidden; background: linear-gradient(160deg, #071B2D 0%, #063A46 55%, #005B55 100%); color: #fff; display: flex; flex-direction: column; padding: 11% 7.9% 6%; box-sizing: border-box; }
         .cm-rail-watermark { position: absolute; inset: 0; opacity: 0.12; }
-        .cm-logo-row { position: absolute; top: 11.01%; left: 7.9%; right: 7.9%; display: flex; align-items: center; gap: 10px; }
-        .cm-logo-row span { font-size: clamp(14px, 1.857cqw, 26px); font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; }
-        .cm-tagline { position: absolute; top: 15.76%; left: 7.9%; right: 10.2%; font-size: clamp(9px, 1.143cqw, 16px); letter-spacing: 0.5px; color: rgba(255,255,255,.8); line-height: 1.35; font-weight: 500; }
-        .cm-divider1 { position: absolute; top: 23.03%; left: 7.9%; width: 35.7%; height: 2px; background: #19C6A3; }
-        .cm-type-block { position: absolute; top: 34.34%; left: 7.9%; right: 9.2%; }
+        .cm-logo-row { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; margin-bottom: 4%; min-width: 0; }
+        .cm-logo-row span { font-size: clamp(14px, 1.857cqw, 26px); font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; min-width: 0; }
+        .cm-tagline { position: relative; z-index: 1; font-size: clamp(9px, 1.143cqw, 16px); letter-spacing: 0.5px; color: rgba(255,255,255,.8); line-height: 1.4; font-weight: 500; margin-bottom: 4%; overflow-wrap: anywhere; }
+        .cm-divider1 { position: relative; z-index: 1; width: 35.7%; height: 2px; background: #19C6A3; margin-bottom: 6%; flex-shrink: 0; }
+        .cm-type-block { position: relative; z-index: 1; }
         .cm-type-label { font-size: clamp(9px, 1.357cqw, 19px); letter-spacing: 1.5px; color: rgba(255,255,255,.75); font-weight: 600; }
-        .cm-type-name { font-size: clamp(24px, 4.286cqw, 60px); font-weight: 800; color: #fff; margin-top: 8px; line-height: 1.1; overflow-wrap: anywhere; }
-        .cm-divider2 { position: absolute; top: 45.66%; left: 7.9%; width: 35.7%; height: 2px; background: #19C6A3; }
-        .cm-ribbon { position: absolute; top: 52.53%; left: -17.9%; width: 86.7%; height: auto; }
+        .cm-type-name { font-size: clamp(24px, 4.286cqw, 60px); font-weight: 800; color: #fff; margin-top: 8px; line-height: 1.15; white-space: nowrap; overflow: hidden; }
+        .cm-divider2 { position: relative; z-index: 1; width: 35.7%; height: 2px; background: #19C6A3; margin-top: 6%; flex-shrink: 0; }
+        .cm-ribbon-wrap { position: relative; z-index: 1; margin-top: auto; padding-top: 8%; display: flex; justify-content: center; }
+        .cm-ribbon-wrap img { width: 62%; height: auto; }
 
-        .cm-main { position: relative; flex: 1; min-width: 0; overflow: hidden; }
+        .cm-main { position: relative; flex: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: column; padding: 9.5% 6.94% 5%; box-sizing: border-box; }
         .cm-watermark { position: absolute; top: -6.06%; right: -5.95%; width: 28.57cqw; opacity: 0.1; }
-        .cm-intro { position: absolute; top: 20%; left: 6.94%; font-size: clamp(9px, 1.143cqw, 16px); letter-spacing: 1px; color: #0B2A3A; font-weight: 600; }
-        .cm-recipient { position: absolute; top: 24.44%; left: 6.94%; right: 6.94%; font-weight: 800; color: #0B2A3A; line-height: 1.1; white-space: nowrap; overflow: hidden; }
-        .cm-accent-line { position: absolute; top: 32.53%; left: 6.94%; width: 8.33%; height: 4px; background: #19C6A3; }
-        .cm-completing { position: absolute; top: 36.57%; left: 6.94%; font-size: clamp(11px, 1.714cqw, 24px); color: #3E5058; font-weight: 400; }
-        .cm-highlight-wrap { position: absolute; top: 41.41%; left: 6.94%; max-width: 86%; }
+        .cm-body { position: relative; z-index: 1; }
+        .cm-intro { font-size: clamp(9px, 1.143cqw, 16px); letter-spacing: 1px; color: #0B2A3A; font-weight: 600; margin-bottom: 1.6%; }
+        .cm-recipient-block { margin-bottom: 3%; }
+        .cm-recipient { font-weight: 800; color: #0B2A3A; line-height: 1.1; white-space: nowrap; overflow: hidden; }
+        .cm-accent-line { height: 4px; background: #19C6A3; margin-top: 10px; width: 70px; }
+        .cm-completing { font-size: clamp(11px, 1.714cqw, 24px); color: #3E5058; font-weight: 400; margin-bottom: 2%; }
+        .cm-highlight-wrap { margin-bottom: 20px; max-width: 100%; }
         .cm-highlight { display: inline-block; background: #D9F4EC; border-radius: 10px; padding: clamp(8px, 1.6cqw, 16px) clamp(12px, 2.4cqw, 24px); font-size: clamp(11px, 1.714cqw, 24px); font-weight: 700; color: #0B2A3A; white-space: nowrap; overflow: hidden; max-width: 100%; box-sizing: border-box; }
-        .cm-description { position: absolute; top: 49.09%; left: 6.94%; max-width: 69.4%; font-size: clamp(10px, 1.5cqw, 21px); line-height: 1.55; color: #3E5058; }
+        .cm-description { max-width: 88%; font-size: clamp(10px, 1.5cqw, 21px); line-height: 1.55; color: #3E5058; overflow-wrap: anywhere; }
 
-        .cm-footer-row { position: absolute; top: 80%; left: 6.94%; right: 5.95%; display: grid; grid-template-columns: 14.88% 1px 18.85% 1px 14.88% 1px minmax(15.87%,1fr); column-gap: 1.786%; align-items: flex-end; }
+        .cm-footer-row { position: relative; z-index: 1; margin-top: auto; padding-top: 24px; display: grid; grid-template-columns: 18% 1px 22% 1px 22% 1px minmax(0,38%); column-gap: 1.5%; align-items: flex-end; }
         .cm-footer-divider { width: 1px; height: 50px; background: #E3E7E5; }
-        .cm-footer-cell { white-space: nowrap; overflow: hidden; min-width: 0; }
+        .cm-footer-cell { min-width: 0; }
         .cm-footer-icon { width: clamp(14px, 1.714cqw, 24px); height: clamp(14px, 1.714cqw, 24px); }
-        .cm-footer-value { margin-top: 10px; font-size: clamp(8px, 0.964cqw, 13.5px); font-weight: 600; color: #0B2A3A; overflow: hidden; text-overflow: ellipsis; }
-        .cm-footer-label { margin-top: 2px; font-size: clamp(7px, 0.75cqw, 10.5px); letter-spacing: 1px; color: #8A9895; font-weight: 600; }
+        .cm-footer-value { margin-top: 10px; font-size: clamp(8px, 0.964cqw, 13.5px); font-weight: 600; color: #0B2A3A; white-space: nowrap; overflow: hidden; }
+        .cm-footer-label { margin-top: 2px; font-size: clamp(7px, 0.75cqw, 10.5px); letter-spacing: 1px; color: #8A9895; font-weight: 600; white-space: nowrap; }
         .cm-qr-box { width: clamp(30px, 3.571cqw, 50px); height: clamp(30px, 3.571cqw, 50px); background: #fff; border: 1px solid #E3E7E5; border-radius: 6px; padding: 5px; box-sizing: border-box; }
+        .cm-barcode-box { width: 100%; max-width: 90px; height: clamp(24px, 2.857cqw, 40px); background: #fff; border: 1px solid #E3E7E5; border-radius: 4px; padding: 4px 5px; box-sizing: border-box; }
         .cm-sig-line { height: 22px; border-bottom: 1px solid #D8DEDC; margin-bottom: 6px; }
         .cm-sig-printed { font-size: clamp(8px, 0.964cqw, 13.5px); font-weight: 700; color: #0B2A3A; white-space: nowrap; overflow: hidden; }
         .cm-sig-title { font-size: clamp(7px, 0.75cqw, 10.5px); letter-spacing: 1px; color: #8A9895; font-weight: 600; white-space: nowrap; overflow: hidden; }
@@ -773,7 +801,8 @@ export default function CertificateGeneratorWorkspace() {
           {[
             { key: 'orgName', label: 'Institution name', min: 8, max: 32 },
             { key: 'recipientName', label: 'Recipient name', min: 16, max: 80 },
-            { key: 'certTitle', label: 'Certificate title (Executive)', min: 14, max: 44 },
+            ...(template === 'executive' ? [{ key: 'certTitle', label: 'Certificate title (Executive)', min: 14, max: 44 }] : []),
+            ...(template === 'modern' ? [{ key: 'certTitleModern', label: 'Certificate title (Modern)', min: 14, max: 44 }] : []),
             { key: 'programTitle', label: 'Program / achievement title', min: 12, max: 40 },
             { key: 'sigName1', label: 'Signature 1 — name', min: 8, max: 26 },
             { key: 'sigTitle1', label: 'Signature 1 — title', min: 6, max: 18 },
@@ -921,6 +950,34 @@ export default function CertificateGeneratorWorkspace() {
             </>
           )}
 
+          {template === 'modern' && (
+            <>
+              <label style={{ flexDirection: 'row', alignItems: 'center', gap: 8, display: 'flex', fontWeight: 600, fontSize: '0.8rem', color: '#334155', margin: '4px 0' }}>
+                <input type="checkbox" checked={showRibbon} onChange={(e) => setShowRibbon(e.target.checked)} style={{ width: 'auto' }} />
+                Award Ribbon — show ribbon graphic
+              </label>
+              <label>Verification Code (Modern Professional)
+                <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                  {['none', 'qr', 'barcode'].map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setVerificationType(opt)}
+                      style={{
+                        flex: 1, padding: '8px', borderRadius: 8, cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, textTransform: 'capitalize',
+                        border: verificationType === opt ? '2px solid #1E3A8A' : '1px solid #E2E8F0',
+                        background: verificationType === opt ? '#EFF6FF' : 'white',
+                        color: verificationType === opt ? '#1E3A8A' : '#475569',
+                      }}
+                    >
+                      {opt === 'qr' ? 'QR Code' : opt}
+                    </button>
+                  ))}
+                </div>
+              </label>
+            </>
+          )}
+
           <label>Verification URL
             <input value={state.verificationUrl} onChange={(e) => update('verificationUrl', e.target.value)} placeholder="Optional verification URL" />
           </label>
@@ -1033,9 +1090,9 @@ export default function CertificateGeneratorWorkspace() {
 
                   <div className="cm-logo-row">
                     {logoImg ? (
-                      <img src={logoImg} alt="" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+                      <img src={logoImg} alt="" style={{ width: 28, height: 28, objectFit: 'contain', flexShrink: 0 }} />
                     ) : (
-                      <svg width="28" height="28" viewBox="0 0 30 30"><polygon points="15,1 27,8 27,22 15,29 3,22 3,8" fill="none" stroke="#FFFFFF" strokeWidth="2.5" /><circle cx="15" cy="15" r="5" fill="#FFFFFF" /></svg>
+                      <svg width="28" height="28" viewBox="0 0 30 30" style={{ flexShrink: 0 }}><polygon points="15,1 27,8 27,22 15,29 3,22 3,8" fill="none" stroke="#FFFFFF" strokeWidth="2.5" /><circle cx="15" cy="15" r="5" fill="#FFFFFF" /></svg>
                     )}
                     <span ref={registerFit('orgName')}>{emptyToDefault(state, 'companyName')}</span>
                   </div>
@@ -1045,11 +1102,15 @@ export default function CertificateGeneratorWorkspace() {
 
                   <div className="cm-type-block">
                     <div className="cm-type-label">CERTIFICATE OF</div>
-                    <div className="cm-type-name">{certType.toUpperCase()}</div>
+                    <div ref={registerFit('certTitleModern')} className="cm-type-name">{certType.toUpperCase()}</div>
                   </div>
                   <div className="cm-divider2" />
 
-                  <img src={highRes ? '/certificates/ribbon-modern.png' : '/certificates/ribbon-modern-preview.png'} alt="" className="cm-ribbon" />
+                  {showRibbon && (
+                    <div className="cm-ribbon-wrap">
+                      <img src={highRes ? '/certificates/ribbon-modern.png' : '/certificates/ribbon-modern-preview.png'} alt="" />
+                    </div>
+                  )}
                 </aside>
 
                 <section className="cm-main">
@@ -1059,14 +1120,18 @@ export default function CertificateGeneratorWorkspace() {
                     <line x1="200" y1="20" x2="200" y2="340" stroke="#19C6A3" strokeWidth="1" />
                   </svg>
 
-                  <div className="cm-intro">THIS CERTIFICATE IS PROUDLY PRESENTED TO</div>
-                  <div ref={registerFit('recipientName')} className="cm-recipient">{emptyToDefault(state, 'recipientName')}</div>
-                  <div className="cm-accent-line" />
-                  <div className="cm-completing">For successfully completing the program</div>
-                  <div className="cm-highlight-wrap">
-                    <span ref={registerFit('programTitle')} className="cm-highlight">{emptyToDefault(state, 'programTitle')}</span>
+                  <div className="cm-body">
+                    <div className="cm-intro">THIS CERTIFICATE IS PROUDLY PRESENTED TO</div>
+                    <div className="cm-recipient-block">
+                      <div ref={registerFit('recipientName')} className="cm-recipient">{emptyToDefault(state, 'recipientName')}</div>
+                      <div ref={modernAccentLineRef} className="cm-accent-line" />
+                    </div>
+                    <div className="cm-completing">For successfully completing the program</div>
+                    <div className="cm-highlight-wrap">
+                      <span ref={registerFit('programTitle')} className="cm-highlight">{emptyToDefault(state, 'programTitle')}</span>
+                    </div>
+                    <div className="cm-description">{emptyToDefault(state, 'description')}</div>
                   </div>
-                  <div className="cm-description">{emptyToDefault(state, 'description')}</div>
 
                   <div className="cm-footer-row">
                     <div className="cm-footer-cell">
@@ -1077,27 +1142,38 @@ export default function CertificateGeneratorWorkspace() {
                     <div className="cm-footer-divider" />
                     <div className={`cm-footer-cell ${!hasCertId ? 'is-hidden' : ''}`}>
                       <svg className="cm-footer-icon" viewBox="0 0 24 24" fill="none" stroke="#19C6A3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="12" r="2" /><line x1="14" y1="10" x2="18" y2="10" /><line x1="14" y1="14" x2="18" y2="14" /></svg>
-                      <div className="cm-footer-value">{state.certificateId}</div>
+                      <div ref={registerFit('certIdValue')} className="cm-footer-value">{state.certificateId}</div>
                       <div className="cm-footer-label">CERTIFICATE ID</div>
                     </div>
                     <div className="cm-footer-divider" />
-                    <div className={`cm-footer-cell ${!hasVerification ? 'is-hidden' : ''}`}>
-                      <div className="cm-qr-box">
-                        <svg viewBox="0 0 10 10" width="100%" height="100%">
-                          <rect width="10" height="10" fill="#FFFFFF" />
-                          <g fill="#0B2A3A">
-                            <rect x="0" y="0" width="3" height="3" /><rect x="1" y="1" width="1" height="1" fill="#FFFFFF" />
-                            <rect x="7" y="0" width="3" height="3" /><rect x="8" y="1" width="1" height="1" fill="#FFFFFF" />
-                            <rect x="0" y="7" width="3" height="3" /><rect x="1" y="8" width="1" height="1" fill="#FFFFFF" />
-                            <rect x="4" y="0" width="1" height="1" /><rect x="5" y="1" width="1" height="1" />
-                            <rect x="4" y="4" width="1" height="1" /><rect x="5" y="4" width="1" height="1" /><rect x="6" y="4" width="1" height="1" />
-                            <rect x="4" y="5" width="1" height="1" /><rect x="6" y="5" width="1" height="1" />
-                            <rect x="4" y="6" width="1" height="1" /><rect x="5" y="6" width="1" height="1" />
-                            <rect x="8" y="4" width="1" height="1" /><rect x="8" y="6" width="1" height="1" />
-                            <rect x="6" y="8" width="1" height="1" /><rect x="8" y="8" width="1" height="1" /><rect x="4" y="8" width="1" height="1" />
-                          </g>
-                        </svg>
-                      </div>
+                    <div className={`cm-footer-cell ${verificationType === 'none' ? 'is-hidden' : ''}`}>
+                      {verificationType === 'barcode' ? (
+                        <div className="cm-barcode-box">
+                          <svg viewBox="0 0 90 30" width="100%" height="100%" preserveAspectRatio="none">
+                            <rect width="90" height="30" fill="#FFFFFF" />
+                            {[2,4,5,8,10,11,14,16,19,21,22,25,27,30,32,35,37,40,43,46,49,52,55,58,61,64,67,70,73,76,79,82,85].map((x, i) => (
+                              <rect key={i} x={x} y="3" width={i % 3 === 0 ? 2 : 1} height="24" fill="#0B2A3A" />
+                            ))}
+                          </svg>
+                        </div>
+                      ) : (
+                        <div className="cm-qr-box">
+                          <svg viewBox="0 0 10 10" width="100%" height="100%">
+                            <rect width="10" height="10" fill="#FFFFFF" />
+                            <g fill="#0B2A3A">
+                              <rect x="0" y="0" width="3" height="3" /><rect x="1" y="1" width="1" height="1" fill="#FFFFFF" />
+                              <rect x="7" y="0" width="3" height="3" /><rect x="8" y="1" width="1" height="1" fill="#FFFFFF" />
+                              <rect x="0" y="7" width="3" height="3" /><rect x="1" y="8" width="1" height="1" fill="#FFFFFF" />
+                              <rect x="4" y="0" width="1" height="1" /><rect x="5" y="1" width="1" height="1" />
+                              <rect x="4" y="4" width="1" height="1" /><rect x="5" y="4" width="1" height="1" /><rect x="6" y="4" width="1" height="1" />
+                              <rect x="4" y="5" width="1" height="1" /><rect x="6" y="5" width="1" height="1" />
+                              <rect x="4" y="6" width="1" height="1" /><rect x="5" y="6" width="1" height="1" />
+                              <rect x="8" y="4" width="1" height="1" /><rect x="8" y="6" width="1" height="1" />
+                              <rect x="6" y="8" width="1" height="1" /><rect x="8" y="8" width="1" height="1" /><rect x="4" y="8" width="1" height="1" />
+                            </g>
+                          </svg>
+                        </div>
+                      )}
                       <div className="cm-footer-label">SCAN TO VERIFY</div>
                     </div>
                     <div className="cm-footer-divider" />

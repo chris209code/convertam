@@ -241,6 +241,11 @@ export default function CertificateGeneratorWorkspace() {
         setHighRes(true);
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       }
+      if (template === 'modern') {
+        await preloadImage('/certificates/ribbon-modern.png');
+        setHighRes(true);
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      }
 
       // Final pass, in this exact order, right before capture: shrink any
       // long text to fit, then lock every resulting size to plain pixels.
@@ -517,7 +522,7 @@ export default function CertificateGeneratorWorkspace() {
   return (
     <div className="cert-app-shell">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;0,800;0,900;1,600&family=Great+Vibes&family=Dancing+Script:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;0,800;0,900;1,600&family=Great+Vibes&family=Dancing+Script:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         .cert-app-shell {
           --ink: #0b1530; --muted: #65708a; --panel: #ffffff; --page: #edf1f7; --line: #d8deea;
           --brand: #0f766e; --accent: #c9932d; --certificate-ratio: 1.4142;
@@ -621,26 +626,52 @@ export default function CertificateGeneratorWorkspace() {
         .cp-seal-engraved { top: 78.563%; width: 9.333cqw; height: 9.333cqw; }
         .cp-seal-custom-img { top: 76.325%; width: 12cqw; height: auto; filter: drop-shadow(0 10px 16px rgba(0,0,0,.3)); }
 
-        /* Modern Professional */
-        .modern-template { display: grid; grid-template-columns: 25% 75%; background: #f8fafc; height: 100%; }
-        .modern-rail { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 8%; padding: 8% 7%; color: #fff; background: linear-gradient(135deg, color-mix(in srgb, var(--brand), #081827 32%), #062a36), var(--brand); overflow: hidden; }
-        .modern-rail::after { content: ""; position: absolute; inset: auto -18% -10% 22%; height: 48%; background: rgba(255,255,255,0.06); transform: skewX(-26deg); }
-        .modern-rail p, .cert-split-brand p { margin: 0; font-size: clamp(7px, 0.8cqw, 11px); line-height: 1.35; text-transform: uppercase; }
+        /* Modern Professional — exact positions converted from the spec's 1400×990 canvas.
+           Right-panel children use percentages of the right panel's own ~1008px width
+           (1400-392 left panel), since that's what CSS % naturally resolves against for
+           their positioned ancestor; font-size (cqw) stays relative to the full card width
+           for consistency with the other templates' shared container. */
+        .cert-split-brand p { margin: 0; font-size: clamp(7px, 0.8cqw, 11px); line-height: 1.35; text-transform: uppercase; }
         .cert-rail-title { display: grid; gap: 8px; margin-top: 8%; }
         .cert-rail-title span { font-size: clamp(10px, 1cqw, 14px); text-transform: uppercase; }
         .cert-rail-title strong { font-size: clamp(22px, 3cqw, 42px); line-height: 1; text-transform: uppercase; }
-        .cert-line-icon { display: grid; place-items: center; width: clamp(52px, 7cqw, 86px); aspect-ratio: 1; margin-top: auto; border: 2px solid #45f0c2; border-radius: 50%; color: #45f0c2; font-size: clamp(8px, 0.9cqw, 12px); text-transform: uppercase; }
-        .modern-body { position: relative; padding: 13% 8% 6%; overflow: hidden; height: 100%; }
-        .cert-geo-mark { position: absolute; top: -12%; right: -4%; width: 36%; aspect-ratio: 1; border: 1px solid rgba(15,118,110,0.18); transform: rotate(45deg); }
-        .cert-geo-mark::before, .cert-geo-mark::after { content: ""; position: absolute; inset: 18%; border: 1px solid rgba(15,118,110,0.15); }
-        .modern-body .cert-intro, .cert-split-body .cert-intro { margin: 0 0 1.6%; font-size: clamp(10px, 1.1cqw, 15px); text-transform: uppercase; }
-        .modern-body h3, .cert-split-body h3 { margin: 0; max-width: 78%; font-size: clamp(38px, 5cqw, 68px); line-height: 1.05; white-space: nowrap; }
+        .cert-split-body .cert-intro { margin: 0 0 1.6%; font-size: clamp(10px, 1.1cqw, 15px); text-transform: uppercase; }
+        .cert-split-body h3 { margin: 0; max-width: 78%; font-size: clamp(38px, 5cqw, 68px); line-height: 1.05; white-space: nowrap; }
         .cert-accent-line { width: 8%; height: 3px; margin: 2.2% 0 4.5%; background: var(--brand); }
-        .modern-body p { margin: 0 0 1.6%; font-size: clamp(11px, 1.2cqw, 17px); }
-        .cert-highlight { display: inline-block; max-width: 68%; padding: 1.3% 3%; border-radius: 7px; background: color-mix(in srgb, var(--brand) 18%, white); font-size: clamp(19px, 2cqw, 30px) !important; font-weight: 850; white-space: nowrap; }
-        .modern-body .cert-description { max-width: 66%; font-size: clamp(10px, 1cqw, 14px); line-height: 1.55; }
-        .modern-footer { position: absolute; left: 8%; right: 7%; bottom: 7%; display: grid; grid-template-columns: 1fr 1.1fr 0.9fr 1.6fr; align-items: end; gap: 3%; }
-        .modern-footer > div { display: grid; gap: 6px; }
+
+        .cm-template { display: flex; height: 100%; background: #FBFAF8; font-family: 'Plus Jakarta Sans', sans-serif; }
+        .cm-rail { position: relative; width: 28%; flex-shrink: 0; overflow: hidden; background: linear-gradient(160deg, #071B2D 0%, #063A46 55%, #005B55 100%); color: #fff; }
+        .cm-rail-watermark { position: absolute; inset: 0; opacity: 0.12; }
+        .cm-logo-row { position: absolute; top: 11.01%; left: 7.9%; right: 7.9%; display: flex; align-items: center; gap: 10px; }
+        .cm-logo-row span { font-size: clamp(14px, 1.857cqw, 26px); font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; }
+        .cm-tagline { position: absolute; top: 15.76%; left: 7.9%; right: 10.2%; font-size: clamp(9px, 1.143cqw, 16px); letter-spacing: 0.5px; color: rgba(255,255,255,.8); line-height: 1.35; font-weight: 500; }
+        .cm-divider1 { position: absolute; top: 23.03%; left: 7.9%; width: 35.7%; height: 2px; background: #19C6A3; }
+        .cm-type-block { position: absolute; top: 34.34%; left: 7.9%; right: 9.2%; }
+        .cm-type-label { font-size: clamp(9px, 1.357cqw, 19px); letter-spacing: 1.5px; color: rgba(255,255,255,.75); font-weight: 600; }
+        .cm-type-name { font-size: clamp(24px, 4.286cqw, 60px); font-weight: 800; color: #fff; margin-top: 8px; line-height: 1.1; overflow-wrap: anywhere; }
+        .cm-divider2 { position: absolute; top: 45.66%; left: 7.9%; width: 35.7%; height: 2px; background: #19C6A3; }
+        .cm-ribbon { position: absolute; top: 52.53%; left: -17.9%; width: 86.7%; height: auto; }
+
+        .cm-main { position: relative; flex: 1; min-width: 0; overflow: hidden; }
+        .cm-watermark { position: absolute; top: -6.06%; right: -5.95%; width: 28.57cqw; opacity: 0.1; }
+        .cm-intro { position: absolute; top: 20%; left: 6.94%; font-size: clamp(9px, 1.143cqw, 16px); letter-spacing: 1px; color: #0B2A3A; font-weight: 600; }
+        .cm-recipient { position: absolute; top: 24.44%; left: 6.94%; right: 6.94%; font-weight: 800; color: #0B2A3A; line-height: 1.1; white-space: nowrap; overflow: hidden; }
+        .cm-accent-line { position: absolute; top: 32.53%; left: 6.94%; width: 8.33%; height: 4px; background: #19C6A3; }
+        .cm-completing { position: absolute; top: 36.57%; left: 6.94%; font-size: clamp(11px, 1.714cqw, 24px); color: #3E5058; font-weight: 400; }
+        .cm-highlight-wrap { position: absolute; top: 41.41%; left: 6.94%; max-width: 86%; }
+        .cm-highlight { display: inline-block; background: #D9F4EC; border-radius: 10px; padding: clamp(8px, 1.6cqw, 16px) clamp(12px, 2.4cqw, 24px); font-size: clamp(11px, 1.714cqw, 24px); font-weight: 700; color: #0B2A3A; white-space: nowrap; overflow: hidden; max-width: 100%; box-sizing: border-box; }
+        .cm-description { position: absolute; top: 49.09%; left: 6.94%; max-width: 69.4%; font-size: clamp(10px, 1.5cqw, 21px); line-height: 1.55; color: #3E5058; }
+
+        .cm-footer-row { position: absolute; top: 80%; left: 6.94%; right: 5.95%; display: grid; grid-template-columns: 14.88% 1px 18.85% 1px 14.88% 1px minmax(15.87%,1fr); column-gap: 1.786%; align-items: flex-end; }
+        .cm-footer-divider { width: 1px; height: 50px; background: #E3E7E5; }
+        .cm-footer-cell { white-space: nowrap; overflow: hidden; min-width: 0; }
+        .cm-footer-icon { width: clamp(14px, 1.714cqw, 24px); height: clamp(14px, 1.714cqw, 24px); }
+        .cm-footer-value { margin-top: 10px; font-size: clamp(8px, 0.964cqw, 13.5px); font-weight: 600; color: #0B2A3A; overflow: hidden; text-overflow: ellipsis; }
+        .cm-footer-label { margin-top: 2px; font-size: clamp(7px, 0.75cqw, 10.5px); letter-spacing: 1px; color: #8A9895; font-weight: 600; }
+        .cm-qr-box { width: clamp(30px, 3.571cqw, 50px); height: clamp(30px, 3.571cqw, 50px); background: #fff; border: 1px solid #E3E7E5; border-radius: 6px; padding: 5px; box-sizing: border-box; }
+        .cm-sig-line { height: 22px; border-bottom: 1px solid #D8DEDC; margin-bottom: 6px; }
+        .cm-sig-printed { font-size: clamp(8px, 0.964cqw, 13.5px); font-weight: 700; color: #0B2A3A; white-space: nowrap; overflow: hidden; }
+        .cm-sig-title { font-size: clamp(7px, 0.75cqw, 10.5px); letter-spacing: 1px; color: #8A9895; font-weight: 600; white-space: nowrap; overflow: hidden; }
 
         /* Executive Signature */
         /* Executive Signature — exact positions converted proportionally from the spec's 1200×849 canvas */
@@ -994,37 +1025,88 @@ export default function CertificateGeneratorWorkspace() {
             )}
 
             {template === 'modern' && (
-              <div className="modern-template">
-                <aside className="modern-rail">
-                  <div className="cert-logo-row">
-                    <LogoMark />
-                    <span>{emptyToDefault(state, 'companyName')}</span>
+              <div className="cm-template">
+                <aside className="cm-rail">
+                  <svg className="cm-rail-watermark" viewBox="0 0 392 990" preserveAspectRatio="none">
+                    <polygon points="60,780 220,860 220,990 60,910" fill="none" stroke="#19C6A3" strokeWidth="1" />
+                  </svg>
+
+                  <div className="cm-logo-row">
+                    {logoImg ? (
+                      <img src={logoImg} alt="" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+                    ) : (
+                      <svg width="28" height="28" viewBox="0 0 30 30"><polygon points="15,1 27,8 27,22 15,29 3,22 3,8" fill="none" stroke="#FFFFFF" strokeWidth="2.5" /><circle cx="15" cy="15" r="5" fill="#FFFFFF" /></svg>
+                    )}
+                    <span ref={registerFit('orgName')}>{emptyToDefault(state, 'companyName')}</span>
                   </div>
-                  {state.tagline && <p>{state.tagline}</p>}
-                  <div className="cert-rail-title">
-                    <span>Certificate of</span>
-                    <strong>{certType}</strong>
+
+                  {state.tagline && <div className="cm-tagline">{state.tagline}</div>}
+                  <div className="cm-divider1" />
+
+                  <div className="cm-type-block">
+                    <div className="cm-type-label">CERTIFICATE OF</div>
+                    <div className="cm-type-name">{certType.toUpperCase()}</div>
                   </div>
-                  <div className="cert-line-icon">Award</div>
+                  <div className="cm-divider2" />
+
+                  <img src={highRes ? '/certificates/ribbon-modern.png' : '/certificates/ribbon-modern-preview.png'} alt="" className="cm-ribbon" />
                 </aside>
-                <section className="modern-body">
-                  <div className="cert-geo-mark" />
-                  <p className="cert-intro">This certificate is proudly presented to</p>
-                  <h3 ref={registerFit('recipientName')}>{emptyToDefault(state, 'recipientName')}</h3>
-                  <div className="cert-accent-line" />
-                  <p>For successfully completing</p>
-                  <p ref={registerFit('programTitle')} className="cert-highlight">{emptyToDefault(state, 'programTitle')}</p>
-                  <p className="cert-description">{emptyToDefault(state, 'description')}</p>
-                  <footer className="modern-footer">
-                    <div><span>Date issued</span><strong>{emptyToDefault(state, 'issueDate')}</strong></div>
-                    <div className={!hasCertId ? 'is-hidden' : ''}><span>Certificate ID</span><strong>{state.certificateId}</strong></div>
-                    <div className={`cert-qr-wrap ${!hasVerification ? 'is-hidden' : ''}`}><span>QR / URL</span><div className="cert-qr-box" /></div>
-                    <div className="cert-signature-block right">
-                      <div className="cert-signature-line">Signature</div>
-                      <strong>{emptyToDefault(state, 'issuerName')}</strong>
-                      <span>{emptyToDefault(state, 'issuerPosition')}</span>
+
+                <section className="cm-main">
+                  <svg className="cm-watermark" viewBox="0 0 400 400">
+                    <polygon points="200,20 340,100 340,260 200,340 60,260 60,100" fill="none" stroke="#19C6A3" strokeWidth="2" />
+                    <polygon points="200,80 290,130 290,230 200,280 110,230 110,130" fill="none" stroke="#19C6A3" strokeWidth="1.5" />
+                    <line x1="200" y1="20" x2="200" y2="340" stroke="#19C6A3" strokeWidth="1" />
+                  </svg>
+
+                  <div className="cm-intro">THIS CERTIFICATE IS PROUDLY PRESENTED TO</div>
+                  <div ref={registerFit('recipientName')} className="cm-recipient">{emptyToDefault(state, 'recipientName')}</div>
+                  <div className="cm-accent-line" />
+                  <div className="cm-completing">For successfully completing the program</div>
+                  <div className="cm-highlight-wrap">
+                    <span ref={registerFit('programTitle')} className="cm-highlight">{emptyToDefault(state, 'programTitle')}</span>
+                  </div>
+                  <div className="cm-description">{emptyToDefault(state, 'description')}</div>
+
+                  <div className="cm-footer-row">
+                    <div className="cm-footer-cell">
+                      <svg className="cm-footer-icon" viewBox="0 0 24 24" fill="none" stroke="#19C6A3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                      <div className="cm-footer-value">{emptyToDefault(state, 'issueDate')}</div>
+                      <div className="cm-footer-label">DATE ISSUED</div>
                     </div>
-                  </footer>
+                    <div className="cm-footer-divider" />
+                    <div className={`cm-footer-cell ${!hasCertId ? 'is-hidden' : ''}`}>
+                      <svg className="cm-footer-icon" viewBox="0 0 24 24" fill="none" stroke="#19C6A3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="9" cy="12" r="2" /><line x1="14" y1="10" x2="18" y2="10" /><line x1="14" y1="14" x2="18" y2="14" /></svg>
+                      <div className="cm-footer-value">{state.certificateId}</div>
+                      <div className="cm-footer-label">CERTIFICATE ID</div>
+                    </div>
+                    <div className="cm-footer-divider" />
+                    <div className={`cm-footer-cell ${!hasVerification ? 'is-hidden' : ''}`}>
+                      <div className="cm-qr-box">
+                        <svg viewBox="0 0 10 10" width="100%" height="100%">
+                          <rect width="10" height="10" fill="#FFFFFF" />
+                          <g fill="#0B2A3A">
+                            <rect x="0" y="0" width="3" height="3" /><rect x="1" y="1" width="1" height="1" fill="#FFFFFF" />
+                            <rect x="7" y="0" width="3" height="3" /><rect x="8" y="1" width="1" height="1" fill="#FFFFFF" />
+                            <rect x="0" y="7" width="3" height="3" /><rect x="1" y="8" width="1" height="1" fill="#FFFFFF" />
+                            <rect x="4" y="0" width="1" height="1" /><rect x="5" y="1" width="1" height="1" />
+                            <rect x="4" y="4" width="1" height="1" /><rect x="5" y="4" width="1" height="1" /><rect x="6" y="4" width="1" height="1" />
+                            <rect x="4" y="5" width="1" height="1" /><rect x="6" y="5" width="1" height="1" />
+                            <rect x="4" y="6" width="1" height="1" /><rect x="5" y="6" width="1" height="1" />
+                            <rect x="8" y="4" width="1" height="1" /><rect x="8" y="6" width="1" height="1" />
+                            <rect x="6" y="8" width="1" height="1" /><rect x="8" y="8" width="1" height="1" /><rect x="4" y="8" width="1" height="1" />
+                          </g>
+                        </svg>
+                      </div>
+                      <div className="cm-footer-label">SCAN TO VERIFY</div>
+                    </div>
+                    <div className="cm-footer-divider" />
+                    <div className="cm-footer-cell" style={{ minWidth: 0 }}>
+                      <div className="cm-sig-line" />
+                      <div ref={registerFit('sigName1')} className="cm-sig-printed">{emptyToDefault(state, 'issuerName')}</div>
+                      <div ref={registerFit('sigTitle1')} className="cm-sig-title">{emptyToDefault(state, 'issuerPosition')}</div>
+                    </div>
+                  </div>
                 </section>
               </div>
             )}

@@ -127,6 +127,8 @@ export default function CertificateGeneratorWorkspace() {
   const [hasSecondIssuer, setHasSecondIssuer] = useState(true);
   const [quoteStyle, setQuoteStyle] = useState('None');
   const [showRibbon, setShowRibbon] = useState(true);
+  const [ribbonSize, setRibbonSize] = useState(86);
+  const [ribbonAlign, setRibbonAlign] = useState('flex-start');
   const [verificationType, setVerificationType] = useState('none');
   const [customQuoteText, setCustomQuoteText] = useState('');
   const [customQuoteAttribution, setCustomQuoteAttribution] = useState('');
@@ -667,16 +669,16 @@ export default function CertificateGeneratorWorkspace() {
         .cm-template { display: flex; height: 100%; background: #FBFAF8; font-family: 'Plus Jakarta Sans', sans-serif; }
         .cm-rail { position: relative; width: 28%; flex-shrink: 0; overflow: hidden; background: linear-gradient(160deg, #071B2D 0%, #063A46 55%, #005B55 100%); color: #fff; display: flex; flex-direction: column; padding: 8% 7.9% 6%; box-sizing: border-box; }
         .cm-rail-watermark { position: absolute; inset: 0; opacity: 0.12; }
-        .cm-logo-row { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; margin-bottom: 4%; min-width: 0; }
-        .cm-logo-row span { font-size: clamp(16px, 2.1cqw, 27px); font-weight: 800; color: #fff; line-height: 1.15; white-space: nowrap; overflow: hidden; min-width: 0; }
+        .cm-logo-row { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; margin-bottom: 4%; margin-left: -2%; min-width: 0; }
+        .cm-logo-row span { font-size: clamp(20px, 2.6cqw, 32px); font-weight: 800; color: #fff; line-height: 1.15; white-space: nowrap; overflow: hidden; min-width: 0; }
         .cm-tagline { position: relative; z-index: 1; font-size: clamp(9px, 1.143cqw, 15px); letter-spacing: 0.3px; color: rgba(255,255,255,.85); line-height: 1.5; font-weight: 500; margin-bottom: 3%; overflow-wrap: anywhere; }
         .cm-divider-tagline { position: relative; z-index: 1; width: 22%; height: 2px; background: #19C6A3; margin-bottom: 12%; flex-shrink: 0; }
-        .cm-type-block { position: relative; z-index: 1; }
+        .cm-type-block { position: relative; z-index: 1; margin-top: 16%; }
         .cm-type-label { font-size: clamp(9px, 1.357cqw, 19px); letter-spacing: 1.5px; color: rgba(255,255,255,.75); font-weight: 600; }
         .cm-type-name { font-size: clamp(26px, 4.6cqw, 64px); font-weight: 800; color: #fff; margin-top: 6px; line-height: 1.05; white-space: nowrap; overflow: hidden; }
         .cm-divider2 { position: relative; z-index: 1; width: 22%; height: 2px; background: #19C6A3; margin-top: 4%; flex-shrink: 0; }
         .cm-ribbon-wrap { position: relative; z-index: 1; margin-top: auto; padding-top: 15%; display: flex; justify-content: flex-start; }
-        .cm-ribbon-wrap img { width: 11cqw; height: auto; }
+        .cm-ribbon-wrap img { width: var(--ribbon-size, 86%); height: auto; }
 
         .cm-main { position: relative; flex: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: column; padding: 9.5% 6.94% 5%; box-sizing: border-box; }
         .cm-watermark { position: absolute; top: -6.06%; right: -5.95%; width: 28.57cqw; opacity: 0.1; }
@@ -957,6 +959,21 @@ export default function CertificateGeneratorWorkspace() {
                 <input type="checkbox" checked={showRibbon} onChange={(e) => setShowRibbon(e.target.checked)} style={{ width: 'auto' }} />
                 Award Ribbon — show ribbon graphic
               </label>
+              {showRibbon && (
+                <>
+                  <label style={{ fontSize: '11px', display: 'block', marginBottom: 10 }}>
+                    Ribbon size — {ribbonSize}% of panel width
+                    <input type="range" min="10" max="100" step="1" value={ribbonSize} onChange={(e) => setRibbonSize(Number(e.target.value))} style={{ width: '100%', marginTop: 4 }} />
+                  </label>
+                  <label>Ribbon position
+                    <select value={ribbonAlign} onChange={(e) => setRibbonAlign(e.target.value)}>
+                      <option value="flex-start">Left</option>
+                      <option value="center">Center</option>
+                      <option value="flex-end">Right</option>
+                    </select>
+                  </label>
+                </>
+              )}
               <label>Verification Code (Modern Professional)
                 <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
                   {['none', 'qr', 'barcode'].map((opt) => (
@@ -1112,7 +1129,7 @@ export default function CertificateGeneratorWorkspace() {
                   <div className="cm-divider2" />
 
                   {showRibbon && (
-                    <div className="cm-ribbon-wrap">
+                    <div className="cm-ribbon-wrap" style={{ justifyContent: ribbonAlign, '--ribbon-size': `${ribbonSize}%` }}>
                       <img src={highRes ? '/certificates/ribbon-modern.png' : '/certificates/ribbon-modern-preview.png'} alt="" />
                     </div>
                   )}

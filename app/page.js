@@ -528,6 +528,17 @@ export default function HomePage() {
       .tool-list li:not(.featured) { display: none; }
       .tool-list li a { padding: 8px 4px; font-size: 12.5px; }
       .category-card.is-detailed { padding: 16px 14px 14px; }
+      .benefits-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .benefit-item {
+        min-width: 0;
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        padding: 10px 12px;
+      }
+      .benefit-item:nth-child(2n) { border-right: 0; }
+      .benefit-item:nth-child(3), .benefit-item:nth-child(4) { border-bottom: 0; }
     }
 
     @media (max-width: 560px) {
@@ -541,12 +552,12 @@ export default function HomePage() {
       .search-wrap { margin-top: 28px; }
       .trending { font-size: 12px; }
       .category-card { min-height: 0; }
-      .benefits-strip { padding: 12px 2px; }
-      .benefit-item { padding: 2px 8px; gap: 7px; }
-      .benefit-icon { width: 32px; height: 32px; }
-      .benefit-icon svg { width: 15px; height: 15px; }
-      .benefit-title { font-size: 11.5px; }
-      .benefit-copy { font-size: 9.5px; }
+      .benefits-strip { padding: 4px; }
+      .benefit-item { padding: 10px 10px; gap: 8px; }
+      .benefit-icon { width: 34px; height: 34px; }
+      .benefit-icon svg { width: 16px; height: 16px; }
+      .benefit-title { font-size: 13px; }
+      .benefit-copy { font-size: 11.5px; }
     }
 
     /* Only collapse category cards to a single column on genuinely tiny
@@ -637,7 +648,7 @@ export default function HomePage() {
               <p className="benefit-title only-desktop">100% Free to Use</p>
               <p className="benefit-title only-mobile">100% Free</p>
               <p className="benefit-copy only-desktop">Most tools are free<br />No hidden charges</p>
-              <p className="benefit-copy only-mobile">Most tools are free<br />No hidden charges</p>
+              <p className="benefit-copy only-mobile">Most tools are free</p>
             </div>
           </div>
           <div className="benefit-item bg-blue">
@@ -645,7 +656,7 @@ export default function HomePage() {
             <div>
               <p className="benefit-title">Secure &amp; Private</p>
               <p className="benefit-copy only-desktop">Your files are encrypted<br />and never stored</p>
-              <p className="benefit-copy only-mobile">Files encrypted<br />Never stored</p>
+              <p className="benefit-copy only-mobile">Files never stored</p>
             </div>
           </div>
           <div className="benefit-item bg-purple">
@@ -653,16 +664,15 @@ export default function HomePage() {
             <div>
               <p className="benefit-title">Super Fast</p>
               <p className="benefit-copy only-desktop">Results in seconds,<br />not minutes</p>
-              <p className="benefit-copy only-mobile">Results in seconds<br />Not minutes</p>
+              <p className="benefit-copy only-mobile">Results in seconds</p>
             </div>
           </div>
           <div className="benefit-item bg-pink">
             <div className="benefit-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.8 8.6c0 5.4-8.8 10.4-8.8 10.4S3.2 14 3.2 8.6a4.6 4.6 0 0 1 8.8-1.8 4.6 4.6 0 0 1 8.8 1.8Z"/></svg></div>
             <div>
-              <p className="benefit-title only-desktop">Works Anywhere</p>
-              <p className="benefit-title only-mobile">Anywhere</p>
+              <p className="benefit-title">Works Anywhere</p>
               <p className="benefit-copy only-desktop">On any device,<br />anytime, anywhere</p>
-              <p className="benefit-copy only-mobile">Any device<br />Anytime</p>
+              <p className="benefit-copy only-mobile">Any device, anytime</p>
             </div>
           </div>
         </div>

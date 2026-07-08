@@ -665,17 +665,18 @@ export default function CertificateGeneratorWorkspace() {
            what makes teal accent lines, spacing, and the ribbon position correctly
            regardless of content length, instead of drifting at a stale fixed Y. */
         .cm-template { display: flex; height: 100%; background: #FBFAF8; font-family: 'Plus Jakarta Sans', sans-serif; }
-        .cm-rail { position: relative; width: 36%; flex-shrink: 0; overflow: hidden; background: linear-gradient(160deg, #071B2D 0%, #063A46 55%, #005B55 100%); color: #fff; display: flex; flex-direction: column; padding: 11% 7.9% 6%; box-sizing: border-box; }
+        .cm-rail { position: relative; width: 28%; flex-shrink: 0; overflow: hidden; background: linear-gradient(160deg, #071B2D 0%, #063A46 55%, #005B55 100%); color: #fff; display: flex; flex-direction: column; padding: 8% 7.9% 6%; box-sizing: border-box; }
         .cm-rail-watermark { position: absolute; inset: 0; opacity: 0.12; }
-        .cm-logo-row { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; margin-bottom: 6%; min-width: 0; }
-        .cm-logo-row span { font-size: clamp(18px, 2.3cqw, 30px); font-weight: 800; color: #fff; line-height: 1.15; white-space: nowrap; overflow: hidden; min-width: 0; }
-        .cm-tagline { position: relative; z-index: 1; font-size: clamp(9px, 1.143cqw, 16px); letter-spacing: 0.5px; color: rgba(255,255,255,.8); line-height: 1.4; font-weight: 500; margin-bottom: 7%; overflow-wrap: anywhere; }
-        .cm-type-block { position: relative; z-index: 1; margin-top: 20%; }
+        .cm-logo-row { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; margin-bottom: 4%; min-width: 0; }
+        .cm-logo-row span { font-size: clamp(16px, 2.1cqw, 27px); font-weight: 800; color: #fff; line-height: 1.15; white-space: nowrap; overflow: hidden; min-width: 0; }
+        .cm-tagline { position: relative; z-index: 1; font-size: clamp(9px, 1.143cqw, 15px); letter-spacing: 0.3px; color: rgba(255,255,255,.85); line-height: 1.5; font-weight: 500; margin-bottom: 3%; overflow-wrap: anywhere; }
+        .cm-divider-tagline { position: relative; z-index: 1; width: 22%; height: 2px; background: #19C6A3; margin-bottom: 12%; flex-shrink: 0; }
+        .cm-type-block { position: relative; z-index: 1; }
         .cm-type-label { font-size: clamp(9px, 1.357cqw, 19px); letter-spacing: 1.5px; color: rgba(255,255,255,.75); font-weight: 600; }
-        .cm-type-name { font-size: clamp(24px, 4.286cqw, 60px); font-weight: 800; color: #fff; margin-top: 10px; line-height: 1.05; white-space: nowrap; overflow: hidden; }
-        .cm-divider2 { position: relative; z-index: 1; width: 35.7%; height: 2px; background: #19C6A3; margin-top: 9%; flex-shrink: 0; }
-        .cm-ribbon-wrap { position: relative; z-index: 1; margin-top: auto; padding-top: 12%; display: flex; justify-content: center; }
-        .cm-ribbon-wrap img { width: 56cqw; height: auto; }
+        .cm-type-name { font-size: clamp(26px, 4.6cqw, 64px); font-weight: 800; color: #fff; margin-top: 6px; line-height: 1.05; white-space: nowrap; overflow: hidden; }
+        .cm-divider2 { position: relative; z-index: 1; width: 22%; height: 2px; background: #19C6A3; margin-top: 4%; flex-shrink: 0; }
+        .cm-ribbon-wrap { position: relative; z-index: 1; margin-top: auto; padding-top: 15%; display: flex; justify-content: flex-start; }
+        .cm-ribbon-wrap img { width: 11cqw; height: auto; }
 
         .cm-main { position: relative; flex: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: column; padding: 9.5% 6.94% 5%; box-sizing: border-box; }
         .cm-watermark { position: absolute; top: -6.06%; right: -5.95%; width: 28.57cqw; opacity: 0.1; }
@@ -1097,7 +1098,12 @@ export default function CertificateGeneratorWorkspace() {
                     <span ref={registerFit('orgNameModern')}>{emptyToDefault(state, 'companyName')}</span>
                   </div>
 
-                  {state.tagline && <div className="cm-tagline">{state.tagline}</div>}
+                  {state.tagline && (
+                    <>
+                      <div className="cm-tagline">{state.tagline}</div>
+                      <div className="cm-divider-tagline" />
+                    </>
+                  )}
 
                   <div className="cm-type-block">
                     <div className="cm-type-label">CERTIFICATE OF</div>

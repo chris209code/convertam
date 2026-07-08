@@ -372,19 +372,6 @@ export default function HomePage() {
       gap: 24px;
       margin-bottom: 28px;
     }
-    .section-head.centered {
-      display: block;
-      text-align: center;
-    }
-    #solutions .section-head.centered h2 {
-      font-size: clamp(24px, 2.1vw, 30px);
-      line-height: 1.15;
-      letter-spacing: -0.02em;
-    }
-    #solutions .section-copy {
-      margin-top: 6px;
-      font-size: 15px;
-    }
     .eyebrow {
       color: var(--blue);
       font-size: 12px;
@@ -401,31 +388,58 @@ export default function HomePage() {
       font-weight: 900;
     }
     .section-copy { margin: 10px 0 0; color: var(--muted); font-size: 16px; line-height: 1.55; }
-    .view-link { color: #1267f1; font-weight: 850; font-size: 14px; white-space: nowrap; }
 
+    /* ------------------------------------------------------------------ */
+    /* Benefits strip — compact, embossed, sits directly beneath the hero */
+    /* ------------------------------------------------------------------ */
+    .benefits-section { padding: 26px 0 8px; background: #fff; }
+    .benefits-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      background: #fdfdfe;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: 0 14px 34px rgba(15,23,42,0.07), inset 0 1px 0 rgba(255,255,255,0.7);
+      padding: 18px 6px;
+    }
+    .benefit-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 4px 22px;
+      border-right: 1px solid var(--line);
+    }
+    .benefit-item:last-child { border-right: 0; }
+    .benefit-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      background: color-mix(in srgb, var(--accent) 12%, #fff);
+      color: var(--accent);
+    }
+    .benefit-title { margin: 0 0 2px; font-size: 14.5px; font-weight: 800; color: #0f172a; letter-spacing: -0.01em; }
+    .benefit-copy { margin: 0; font-size: 12.5px; color: #64748b; line-height: 1.4; }
+
+    /* ------------------------------------------------------------------ */
+    /* Category cards — reuses the existing embossed card treatment below */
+    /* (.category-card / .tile-icon / .count / .card-link already existed */
+    /* for the old simple version; this adds the tool-list + left-aligned */
+    /* modifier needed for the new detailed version only).                */
+    /* ------------------------------------------------------------------ */
     .category-grid {
       display: grid;
       grid-template-columns: repeat(6, 1fr);
       gap: 18px;
     }
-    .category-card,
-    .tool-card,
-    .persona-card,
-    .step-card {
+    .category-card {
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: rgba(255,255,255,0.88);
       box-shadow: var(--shadow-sm);
       transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
-    }
-    .category-card:hover,
-    .tool-card:hover,
-    .persona-card:hover {
-      transform: translateY(-6px);
-      border-color: rgba(38,132,255,0.28);
-      box-shadow: 0 24px 54px rgba(15,23,42,0.13);
-    }
-    .category-card {
       min-height: 222px;
       padding: 22px 18px 20px;
       display: flex;
@@ -433,214 +447,44 @@ export default function HomePage() {
       align-items: center;
       text-align: center;
     }
+    .category-card:hover {
+      transform: translateY(-6px);
+      border-color: rgba(38,132,255,0.28);
+      box-shadow: 0 24px 54px rgba(15,23,42,0.13);
+    }
+    .category-card.is-detailed {
+      align-items: flex-start;
+      text-align: left;
+      padding: 20px 18px 18px;
+    }
     .tile-icon {
-      width: 58px;
-      height: 58px;
+      width: 50px;
+      height: 50px;
       border-radius: 50%;
       display: grid;
       place-items: center;
       color: #fff;
       box-shadow: 0 14px 30px rgba(15,23,42,0.16);
+      flex-shrink: 0;
     }
-    .tile-icon svg { width: 27px; height: 27px; }
-    .category-card h3, .tool-card h3, .persona-card h3, .step-card h3 { margin: 16px 0 0; font-size: 18px; letter-spacing: -0.02em; }
-    .count {
-      display: inline-flex;
-      align-items: center;
-      min-height: 25px;
-      margin-top: 9px;
-      padding: 0 10px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 850;
-      background: color-mix(in srgb, var(--accent) 12%, #fff);
-      color: var(--accent);
-    }
-    .card-copy { color: #2f3a4f; margin: 14px 0 0; font-size: 13px; line-height: 1.55; }
-    .card-link { margin-top: auto; padding-top: 18px; color: var(--accent); font-size: 13px; font-weight: 850; }
+    .tile-icon svg { width: 24px; height: 24px; }
+    .category-card h3 { margin: 14px 0 0; font-size: 16.5px; letter-spacing: -0.02em; }
+    .card-copy { color: #64748b; margin: 6px 0 0; font-size: 12.5px; line-height: 1.5; }
+    .card-link { margin-top: auto; padding-top: 14px; color: var(--accent); font-size: 13px; font-weight: 850; display: inline-block; }
 
-    .persona-grid {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 18px;
-    }
-    .persona-card {
-      position: relative;
-      overflow: hidden;
-      min-height: 166px;
-      padding: 20px 16px 18px;
-      text-align: center;
-    }
-    .persona-top { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-    .persona-icon {
-      width: 54px;
-      height: 54px;
-      border-radius: 50%;
-      display: grid;
-      place-items: center;
-      color: var(--accent);
-      background: color-mix(in srgb, var(--accent) 12%, #fff);
-    }
-    .persona-card h3 { margin-top: 0; font-size: 15px; line-height: 1.25; }
-    .persona-card .card-copy { margin-top: 9px; color: #111827; font-size: 12px; }
-
-    .stats-band {
-      padding: 30px;
-      border-radius: var(--radius);
-      background:
-        radial-gradient(circle at 4% 0%, rgba(38,132,255,0.30), transparent 28%),
-        radial-gradient(circle at 72% 120%, rgba(255,79,146,0.18), transparent 34%),
-        linear-gradient(135deg, #041020, #07172c 56%, #020713);
-      color: #fff;
-      box-shadow: var(--shadow-lg);
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 0;
-      border: 1px solid rgba(255,255,255,0.10);
-    }
-    .stat-card {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      padding: 8px 24px;
-      border-right: 1px solid rgba(255,255,255,0.10);
-    }
-    .stat-card:last-child { border-right: 0; }
-    .stat-icon {
-      width: 58px;
-      height: 58px;
-      border-radius: 50%;
-      display: grid;
-      place-items: center;
-      background: color-mix(in srgb, var(--accent) 34%, #08111f);
-      color: var(--accent);
-      flex: none;
-    }
-    .stat-value { display: block; color: var(--accent); font-size: 29px; line-height: 1; font-weight: 950; letter-spacing: -0.03em; }
-    .stat-label { display: block; margin-top: 6px; color: rgba(255,255,255,0.82); font-size: 13px; line-height: 1.35; font-weight: 700; }
-
-    .steps {
-      display: grid;
-      grid-template-columns: 1fr auto 1fr auto 1fr;
-      gap: 24px;
-      align-items: center;
-      max-width: 1050px;
-      margin: 34px auto 0;
-    }
-    .step-card {
-      position: relative;
-      min-height: 136px;
-      padding: 24px 24px 22px 114px;
-      background: linear-gradient(135deg, #fff, color-mix(in srgb, var(--accent) 8%, #fff));
-    }
-    .step-number {
-      position: absolute;
-      top: 18px;
-      left: 18px;
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      display: grid;
-      place-items: center;
-      color: #fff;
-      background: var(--accent);
-      font-weight: 900;
-      box-shadow: 0 12px 26px color-mix(in srgb, var(--accent) 28%, transparent);
-    }
-    .step-icon {
-      position: absolute;
-      left: 54px;
-      top: 38px;
-      width: 58px;
-      height: 58px;
-      border-radius: 18px;
-      display: grid;
-      place-items: center;
-      color: var(--accent);
-      background: color-mix(in srgb, var(--accent) 12%, #fff);
-    }
-    .arrow { color: #9ab0d5; }
-
-    .tools-grid {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 18px;
-    }
-    .tool-card {
-      position: relative;
-      min-height: 218px;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-    }
-    .tool-icon {
-      width: 44px;
-      height: 44px;
-      border-radius: 8px;
-      display: grid;
-      place-items: center;
-      color: #fff;
-      font-weight: 950;
-      background: var(--accent);
-      box-shadow: 0 12px 26px color-mix(in srgb, var(--accent) 26%, transparent);
-    }
-    .badge {
-      position: absolute;
-      top: 20px;
-      right: 18px;
-      padding: 5px 8px;
-      border-radius: 999px;
-      color: #b85f00;
-      background: #fff1df;
-      font-size: 9px;
-      font-weight: 950;
-      text-transform: uppercase;
-    }
-    .rating { margin-top: 8px; color: #cc7200; font-size: 12px; font-weight: 850; }
-
-    .footer {
-      color: rgba(255,255,255,0.74);
-      background:
-        radial-gradient(circle at 10% 0%, rgba(38,132,255,0.24), transparent 25%),
-        linear-gradient(135deg, #020713, #07172c);
-      padding: 56px 0 28px;
-    }
-    .footer-grid {
-      display: grid;
-      grid-template-columns: 1.6fr repeat(3, 1fr) 1.45fr;
-      gap: 42px;
-    }
-    .footer p { margin: 16px 0 0; max-width: 310px; color: rgba(255,255,255,0.72); line-height: 1.65; font-size: 14px; }
-    .footer h4 { margin: 0 0 17px; color: #fff; font-size: 14px; }
-    .footer ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 11px; font-size: 14px; }
-    .socials { display: flex; gap: 10px; margin-top: 20px; }
-    .socials a {
-      width: 32px;
-      height: 32px;
-      display: grid;
-      place-items: center;
-      border-radius: 50%;
-      border: 1px solid rgba(255,255,255,0.16);
-      color: #fff;
-      font-size: 12px;
-      font-weight: 850;
-    }
-    .subscribe { display: flex; min-height: 46px; margin-top: 14px; border: 1px solid rgba(255,255,255,0.14); border-radius: var(--radius); overflow: hidden; background: rgba(255,255,255,0.05); }
-    .subscribe input { min-width: 0; flex: 1; border: 0; outline: 0; color: #fff; padding: 0 14px; background: transparent; }
-    .subscribe input::placeholder { color: rgba(255,255,255,0.54); }
-    .subscribe button { border: 0; color: #fff; padding: 0 18px; font-weight: 850; background: linear-gradient(135deg, #704dff, #2684ff); }
-    .footer-bottom {
+    .tool-list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 1px; width: 100%; }
+    .tool-list li a {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 20px;
-      margin-top: 44px;
-      padding-top: 24px;
-      border-top: 1px solid rgba(255,255,255,0.10);
-      color: rgba(255,255,255,0.55);
-      font-size: 13px;
+      gap: 6px;
+      padding: 5px 4px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      color: #334155;
     }
-    .legal { display: flex; gap: 28px; }
+    .tool-list li a:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+    .tool-list li a .chev { opacity: 0.45; font-size: 12px; flex-shrink: 0; }
 
     .bg-blue { --accent: #2684ff; }
     .bg-green { --accent: #18b869; }
@@ -656,10 +500,9 @@ export default function HomePage() {
       .device-stage { min-height: 430px; }
       .laptop { left: 8%; right: auto; }
       .phone { right: 12%; }
-      .category-grid, .persona-grid, .tools-grid { grid-template-columns: repeat(3, 1fr); }
-      .stats-band { grid-template-columns: repeat(2, 1fr); row-gap: 22px; }
-      .stat-card:nth-child(2) { border-right: 0; }
-      .footer-grid { grid-template-columns: 1.5fr repeat(2, 1fr); }
+      .category-grid { grid-template-columns: repeat(3, 1fr); }
+      .benefits-strip { grid-template-columns: repeat(2, 1fr); row-gap: 14px; }
+      .benefit-item:nth-child(2) { border-right: 0; }
       .nav-links { display: none; }
     }
 
@@ -679,14 +522,7 @@ export default function HomePage() {
       .phone { right: 32px; }
       .section { padding: 46px 0; }
       .section-head { display: block; }
-      .view-link { display: inline-block; margin-top: 14px; }
-      .category-grid, .persona-grid, .tools-grid { grid-template-columns: repeat(2, 1fr); }
-      .steps { grid-template-columns: 1fr; }
-      .arrow { display: none; }
-      .step-card { padding-left: 106px; }
-      .footer-grid { grid-template-columns: 1fr 1fr; }
-      .footer-grid > div:first-child, .footer-grid > div:last-child { grid-column: 1 / -1; }
-      .footer-bottom { align-items: flex-start; flex-direction: column; }
+      .category-grid { grid-template-columns: repeat(2, 1fr); }
     }
 
     @media (max-width: 560px) {
@@ -700,14 +536,10 @@ export default function HomePage() {
       .search-wrap { margin-top: 28px; }
       .trending { font-size: 12px; }
       .device-stage { min-height: 292px; transform: scale(0.64); width: 156%; margin-left: -28%; }
-      .category-grid, .persona-grid, .tools-grid, .stats-band, .footer-grid { grid-template-columns: 1fr; }
-      .stat-card { border-right: 0; border-bottom: 1px solid rgba(255,255,255,0.10); padding: 10px 0 22px; }
-      .stat-card:last-child { border-bottom: 0; }
-      .category-card { min-height: 198px; }
-      .persona-card { padding: 22px; }
-      .subscribe { flex-direction: column; }
-      .subscribe input, .subscribe button { min-height: 44px; }
-      .legal { flex-wrap: wrap; gap: 16px; }
+      .category-grid, .benefits-strip { grid-template-columns: 1fr; }
+      .benefit-item { border-right: 0; border-bottom: 1px solid var(--line); padding-bottom: 14px; }
+      .benefit-item:last-child { border-bottom: 0; }
+      .category-card { min-height: 0; }
     }
   `}</style>
 <main className="page">
@@ -783,92 +615,126 @@ export default function HomePage() {
       </div>
     </section>
 
-    <section className="section" id="tools">
+    <section className="benefits-section">
       <div className="shell">
-        <div className="section-head">
-          <div>
-            <div className="eyebrow">Tool categories</div>
-            <h2>Everything you need in one workspace.</h2>
-            <p className="section-copy">Six focused categories. Same fast Convertam workflow.</p>
+        <div className="benefits-strip">
+          <div className="benefit-item bg-green">
+            <div className="benefit-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-4Z"/></svg></div>
+            <div><p className="benefit-title">100% Free to Use</p><p className="benefit-copy">Most tools are free<br />No hidden charges</p></div>
+          </div>
+          <div className="benefit-item bg-blue">
+            <div className="benefit-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
+            <div><p className="benefit-title">Secure &amp; Private</p><p className="benefit-copy">Your files are encrypted<br />and never stored</p></div>
+          </div>
+          <div className="benefit-item bg-purple">
+            <div className="benefit-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg></div>
+            <div><p className="benefit-title">Super Fast</p><p className="benefit-copy">Results in seconds,<br />not minutes</p></div>
+          </div>
+          <div className="benefit-item bg-pink">
+            <div className="benefit-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.8 8.6c0 5.4-8.8 10.4-8.8 10.4S3.2 14 3.2 8.6a4.6 4.6 0 0 1 8.8-1.8 4.6 4.6 0 0 1 8.8 1.8Z"/></svg></div>
+            <div><p className="benefit-title">Works Anywhere</p><p className="benefit-copy">On any device,<br />anytime, anywhere</p></div>
           </div>
         </div>
+      </div>
+    </section>
+
+    <section className="section" id="tools" style={{ paddingTop: 22 }}>
+      <div className="shell">
         <div className="category-grid">
-          <article className="category-card bg-blue"><div className="tile-icon" style={{ background: 'var(--accent)' }}><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2Z"/><path d="M14 2v6h6"/><rect x="5.3" y="13.2" width="11.4" height="6.2" rx="1" fill="rgba(0,0,0,0.32)" stroke="none"/><text x="11" y="17.9" fontSize="5.4" fontWeight="800" fontFamily="Arial, sans-serif" textAnchor="middle" fill="currentColor" stroke="none">PDF</text></svg></div><h3>PDF Tools</h3><span className="count">12+ Tools</span><p className="card-copy">Convert, merge, split, compress and secure PDFs.</p><a className="card-link" href="/pdf-tools">Explore all →</a></article>
-          <article className="category-card bg-green"><div className="tile-icon" style={{ background: 'var(--accent)' }}><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect x="2" y="6" width="20" height="14" rx="2"/></svg></div><h3>Business Tools</h3><span className="count">8+ Tools</span><p className="card-copy">Invoices, receipts, quotes, ID cards and more.</p><a className="card-link" href="/business">Explore all →</a></article>
-          <article className="category-card bg-purple"><div className="tile-icon" style={{ background: 'var(--accent)' }}><svg width="27" height="27" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/><path d="M19 13l.75 2.25L22 16l-2.25.75L19 19l-.75-2.25L16 16l2.25-.75L19 13z"/></svg></div><h3>AI Tools</h3><span className="count">10+ Tools</span><p className="card-copy">AI-powered features for smarter everyday work.</p><a className="card-link" href="/ai-tools">Explore all →</a></article>
-          <article className="category-card bg-orange"><div className="tile-icon" style={{ background: 'var(--accent)' }}><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></div><h3>Image Tools</h3><span className="count">9+ Tools</span><p className="card-copy">Convert, edit, resize and optimize images.</p><a className="card-link" href="/image-tools">Explore all →</a></article>
-          <article className="category-card bg-cyan"><div className="tile-icon" style={{ background: 'var(--accent)' }}><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><path d="M16 14v4"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg></div><h3>Calculators</h3><span className="count">25+ Tools</span><p className="card-copy">Finance, health, business and practical calculators.</p><a className="card-link" href="/calculator-hub">Explore all →</a></article>
-          <article className="category-card bg-slate"><div className="tile-icon" style={{ background: 'var(--accent)' }}><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div><h3>Utilities</h3><span className="count">20+ Tools</span><p className="card-copy">Everyday tools to make life easier.</p><a className="card-link" href="/utilities-hub">Explore all →</a></article>
-        </div>
-      </div>
-    </section>
 
-    <section className="section soft" id="solutions">
-      <div className="shell">
-        <div className="section-head centered">
-          <div>
-            <h2>Built for everyone doing the work.</h2>
-            <p className="section-copy">Six kinds of people. Same 63+ tools.</p>
-          </div>
-        </div>
-        <div className="persona-grid">
-          <article className="persona-card bg-purple"><div className="persona-top"><div className="persona-icon"><svg width="27" height="27" viewBox="0 0 24 24" fill="none"><path d="M22 10 12 5 2 10l10 5 10-5Z" stroke="currentColor" strokeWidth="2"/><path d="M6 12.5V17c3.5 2 8.5 2 12 0v-4.5" stroke="currentColor" strokeWidth="2"/></svg></div><h3>For Students</h3></div><p className="card-copy">Convert assignments, summarize PDFs, build resumes.</p></article>
-          <article className="persona-card bg-blue"><div className="persona-top"><div className="persona-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M4 9h16v10H4V9Z" stroke="currentColor" strokeWidth="2"/></svg></div><h3>For Professionals</h3></div><p className="card-copy">Edit PDFs, sign documents, compress files.</p></article>
-          <article className="persona-card bg-green"><div className="persona-top"><div className="persona-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="M4 10h16v10H4V10Z" stroke="currentColor" strokeWidth="2"/><path d="M7 10V6h10v4M8 14h2M14 14h2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div><h3>For Small Businesses</h3></div><p className="card-copy">Create invoices, quotes, receipts.</p></article>
-          <article className="persona-card bg-orange"><div className="persona-top"><div className="persona-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div><h3>For Developers</h3></div><p className="card-copy">JSON formatter, Base64, UUID generator.</p></article>
-          <article className="persona-card bg-pink"><div className="persona-top"><div className="persona-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="M5 8h3l1.5-2h5L16 8h3v11H5V8Z" stroke="currentColor" strokeWidth="2"/><path d="M12 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" strokeWidth="2"/></svg></div><h3>For Creators</h3></div><p className="card-copy">Image tools, watermarking, resizing.</p></article>
-          <article className="persona-card bg-cyan"><div className="persona-top"><div className="persona-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="M8 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM16 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM2 21a6 6 0 0 1 12 0M10 21a6 6 0 0 1 12 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div><h3>For Everyone</h3></div><p className="card-copy">AI summaries, OCR, file conversions.</p></article>
-        </div>
-      </div>
-    </section>
+          <article className="category-card is-detailed bg-blue">
+            <div className="tile-icon" style={{ background: 'var(--accent)' }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2Z"/><path d="M14 2v6h6"/></svg></div>
+            <h3>PDF Tools</h3>
+            <p className="card-copy">Convert, edit, merge, split and secure PDFs.</p>
+            <ul className="tool-list">
+              <li><a href="/pdf-to-word">PDF to Word <span className="chev">›</span></a></li>
+              <li><a href="/word-to-pdf">Word to PDF <span className="chev">›</span></a></li>
+              <li><a href="/merge-pdf">Merge PDF <span className="chev">›</span></a></li>
+              <li><a href="/split-pdf">Split PDF <span className="chev">›</span></a></li>
+              <li><a href="/compress-pdf">Compress PDF <span className="chev">›</span></a></li>
+              <li><a href="/ocr-pdf">OCR PDF <span className="chev">›</span></a></li>
+              <li><a href="/fill-pdf">Fill PDF Forms <span className="chev">›</span></a></li>
+              <li><a href="/protect-pdf">Protect PDF <span className="chev">›</span></a></li>
+            </ul>
+            <a className="card-link" href="/pdf-tools">View all PDF tools →</a>
+          </article>
 
-    <section className="section">
-      <div className="shell">
-        <div className="stats-band">
-          <div className="stat-card bg-blue"><div className="stat-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M7 3h7l4 4v14H7V3Z" stroke="currentColor" strokeWidth="2"/><path d="M14 3v5h5" stroke="currentColor" strokeWidth="2"/></svg></div><div><span className="stat-value">100K+</span><span className="stat-label">Files Processed</span></div></div>
-          <div className="stat-card bg-green"><div className="stat-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M20 12v8H4v-8M2 7h20v5H2V7ZM12 7v13M12 7H8.5A2.5 2.5 0 1 1 11 4.5L12 7Zm0 0h3.5A2.5 2.5 0 1 0 13 4.5L12 7Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/></svg></div><div><span className="stat-value">63+</span><span className="stat-label">Tools</span></div></div>
-          <div className="stat-card bg-purple"><div className="stat-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 6v6l4 2M21 12a9 9 0 1 1-9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div><div><span className="stat-value">99.9%</span><span className="stat-label">Success Rate</span></div></div>
-          <div className="stat-card bg-orange"><div className="stat-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 3 5 6v5c0 5 3.5 8.5 7 10 3.5-1.5 7-5 7-10V6l-7-3Z" stroke="currentColor" strokeWidth="2"/><path d="m9 12 2 2 4-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></div><div><span className="stat-value">24 Hours</span><span className="stat-label">Auto Delete</span></div></div>
-        </div>
-      </div>
-    </section>
+          <article className="category-card is-detailed bg-green">
+            <div className="tile-icon" style={{ background: 'var(--accent)' }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect x="2" y="6" width="20" height="14" rx="2"/></svg></div>
+            <h3>Business Tools</h3>
+            <p className="card-copy">Generate invoices, quotes, certificates and more.</p>
+            <ul className="tool-list">
+              <li><a href="/invoice-generator">Invoice Generator <span className="chev">›</span></a></li>
+              <li><a href="/quotation-generator">Quotation Generator <span className="chev">›</span></a></li>
+              <li><a href="/delivery-note-waybill">Delivery Note &amp; Waybill <span className="chev">›</span></a></li>
+              <li><a href="/certificate-generator">Certificate Generator <span className="chev">›</span></a></li>
+              <li><a href="/id-card-generator">ID Card Generator <span className="chev">›</span></a></li>
+            </ul>
+            <a className="card-link" href="/business">View all Business tools →</a>
+          </article>
 
-    <section className="section soft">
-      <div className="shell">
-        <div className="section-head">
-          <div>
-            <div className="eyebrow">Workflow</div>
-            <h2>How Convertam works</h2>
-            <p className="section-copy">Three simple steps to get your work done.</p>
-          </div>
-        </div>
-        <div className="steps">
-          <article className="step-card bg-blue"><span className="step-number">1</span><span className="step-icon"><svg width="31" height="31" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="21" y1="4" x2="14" y2="4"/><line x1="10" y1="4" x2="3" y2="4"/><line x1="21" y1="12" x2="12" y2="12"/><line x1="8" y1="12" x2="3" y2="12"/><line x1="21" y1="20" x2="16" y2="20"/><line x1="12" y1="20" x2="3" y2="20"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="16" y1="18" x2="16" y2="22"/></svg></span><h3>Choose Tool</h3><p className="card-copy">Select the right tool and customize it if needed.</p></article>
-          <div className="arrow"><svg width="46" height="24" viewBox="0 0 46 24" fill="none"><path d="M2 12h40m0 0-9-9m9 9-9 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div>
-          <article className="step-card bg-green"><span className="step-number">2</span><span className="step-icon"><svg width="31" height="31" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span><h3>Upload</h3><p className="card-copy">Upload your file securely from your device.</p></article>
-          <div className="arrow"><svg width="46" height="24" viewBox="0 0 46 24" fill="none"><path d="M2 12h40m0 0-9-9m9 9-9 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div>
-          <article className="step-card bg-purple"><span className="step-number">3</span><span className="step-icon"><svg width="31" height="31" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span><h3>Download</h3><p className="card-copy">Get your result instantly. Fast, easy, secure.</p></article>
-        </div>
-      </div>
-    </section>
+          <article className="category-card is-detailed bg-purple">
+            <div className="tile-icon" style={{ background: 'var(--accent)' }}><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/><path d="M19 13l.75 2.25L22 16l-2.25.75L19 19l-.75-2.25L16 16l2.25-.75L19 13z"/></svg></div>
+            <h3>AI Tools</h3>
+            <p className="card-copy">Smart AI tools to automate and simplify your work.</p>
+            <ul className="tool-list">
+              <li><a href="/summarize-pdf">Summarize PDF <span className="chev">›</span></a></li>
+              <li><a href="/smart-converter">Smart AI Converter <span className="chev">›</span></a></li>
+              <li><a href="/receipt-scanner">Receipt &amp; Invoice Scanner <span className="chev">›</span></a></li>
+              <li><a href="/cv-improver">CV Improver <span className="chev">›</span></a></li>
+              <li><a href="/resume-builder">Resume Builder <span className="chev">›</span></a></li>
+              <li><a href="/cover-letter">Cover Letter Writer <span className="chev">›</span></a></li>
+              <li><a href="/contract-summarizer">Contract Summarizer <span className="chev">›</span></a></li>
+              <li><a href="/ask-solve-ai">Ask &amp; Solve AI <span className="chev">›</span></a></li>
+            </ul>
+            <a className="card-link" href="/ai-tools">View all AI tools →</a>
+          </article>
 
-    <section className="section" id="resources">
-      <div className="shell">
-        <div className="section-head">
-          <div>
-            <div className="eyebrow">Featured tools</div>
-            <h2>Most loved tools</h2>
-            <p className="section-copy">Hand-picked tools that Convertam users reach for every day.</p>
-          </div>
-          <a className="view-link" href="#">View all tools →</a>
-        </div>
-        <div className="tools-grid">
-          <article className="tool-card bg-green"><span className="badge">Most popular</span><div className="tool-icon">Inv</div><h3>Invoice Generator</h3><div className="rating">4.8 / 5.0</div><p className="card-copy">Create professional invoices instantly.</p><a className="card-link" href="/invoice-generator">Launch Tool →</a></article>
-          <article className="tool-card bg-cyan"><div className="tool-icon">CV</div><h3>Resume Builder</h3><div className="rating">4.9 / 5.0</div><p className="card-copy">Create a professional resume in minutes.</p><a className="card-link" href="/resume-builder">Launch Tool →</a></article>
-          <article className="tool-card bg-purple"><div className="tool-icon">OCR</div><h3>OCR PDF</h3><div className="rating">4.8 / 5.0</div><p className="card-copy">Extract text from scanned PDFs and images.</p><a className="card-link" href="/ocr-pdf">Launch Tool →</a></article>
-          <article className="tool-card bg-orange"><div className="tool-icon">Qt</div><h3>Quotation Generator</h3><div className="rating">4.7 / 5.0</div><p className="card-copy">Send clean quotes for client work.</p><a className="card-link" href="/quotation-generator">Launch Tool →</a></article>
-          <article className="tool-card bg-blue"><div className="tool-icon">PDF</div><h3>Compress PDF</h3><div className="rating">4.7 / 5.0</div><p className="card-copy">Reduce PDF file size without losing quality.</p><a className="card-link" href="/compress-pdf">Launch Tool →</a></article>
-          <article className="tool-card bg-pink"><div className="tool-icon">ID</div><h3>ID Card Generator</h3><div className="rating">4.8 / 5.0</div><p className="card-copy">Design sharp ID cards for teams and groups.</p><a className="card-link" href="/id-card-generator">Launch Tool →</a></article>
+          <article className="category-card is-detailed bg-orange">
+            <div className="tile-icon" style={{ background: 'var(--accent)' }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></div>
+            <h3>Image Tools</h3>
+            <p className="card-copy">Edit, convert and enhance your images easily.</p>
+            <ul className="tool-list">
+              <li><a href="/jpg-to-pdf">JPG to PDF <span className="chev">›</span></a></li>
+              <li><a href="/png-to-pdf">PNG to PDF <span className="chev">›</span></a></li>
+              <li><a href="/pdf-to-jpg">PDF to JPG <span className="chev">›</span></a></li>
+              <li><a href="/pdf-to-png">PDF to PNG <span className="chev">›</span></a></li>
+              <li><a href="/image-compressor">Image Compressor <span className="chev">›</span></a></li>
+              <li><a href="/resize-image">Image Resizer &amp; Cropper <span className="chev">›</span></a></li>
+              <li><a href="/watermark-image">Watermark Image <span className="chev">›</span></a></li>
+              <li><a href="/document-enhancer">Document Enhancer <span className="chev">›</span></a></li>
+            </ul>
+            <a className="card-link" href="/image-tools">View all Image tools →</a>
+          </article>
+
+          <article className="category-card is-detailed bg-cyan">
+            <div className="tile-icon" style={{ background: 'var(--accent)' }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><path d="M16 14v4"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg></div>
+            <h3>Calculators</h3>
+            <p className="card-copy">Calculate anything instantly.</p>
+            <ul className="tool-list">
+              <li><a href="/calculator-hub">Salary Calculator <span className="chev">›</span></a></li>
+              <li><a href="/calculator-hub">VAT Calculator <span className="chev">›</span></a></li>
+              <li><a href="/calculator-hub">Loan Calculator <span className="chev">›</span></a></li>
+              <li><a href="/calculator-hub">BMI Calculator <span className="chev">›</span></a></li>
+              <li><a href="/calculator-hub">Age Calculator <span className="chev">›</span></a></li>
+              <li><a href="/calculator-hub">Profit Margin Calculator <span className="chev">›</span></a></li>
+            </ul>
+            <a className="card-link" href="/calculator-hub">View all Calculators →</a>
+          </article>
+
+          <article className="category-card is-detailed bg-slate">
+            <div className="tile-icon" style={{ background: 'var(--accent)' }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>
+            <h3>Utilities</h3>
+            <p className="card-copy">Everyday tools to boost your productivity.</p>
+            <ul className="tool-list">
+              <li><a href="/utilities-hub">QR Code Generator <span className="chev">›</span></a></li>
+              <li><a href="/utilities-hub">Password Generator <span className="chev">›</span></a></li>
+              <li><a href="/utilities-hub">Word Counter <span className="chev">›</span></a></li>
+              <li><a href="/utilities-hub">Text Case Converter <span className="chev">›</span></a></li>
+            </ul>
+            <a className="card-link" href="/utilities-hub">View all Utilities →</a>
+          </article>
+
         </div>
       </div>
     </section>

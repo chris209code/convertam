@@ -668,15 +668,15 @@ export default function CertificateGeneratorWorkspace() {
         .cm-rail { position: relative; width: 28%; flex-shrink: 0; overflow: hidden; background: linear-gradient(160deg, #071B2D 0%, #063A46 55%, #005B55 100%); color: #fff; display: flex; flex-direction: column; padding: 11% 7.9% 6%; box-sizing: border-box; }
         .cm-rail-watermark { position: absolute; inset: 0; opacity: 0.12; }
         .cm-logo-row { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; margin-bottom: 6%; min-width: 0; }
-        .cm-logo-row span { font-size: clamp(18px, 2.3cqw, 30px); font-weight: 800; color: #fff; line-height: 1.15; overflow-wrap: anywhere; min-width: 0; }
+        .cm-logo-row span { font-size: clamp(18px, 2.3cqw, 30px); font-weight: 800; color: #fff; line-height: 1.15; white-space: nowrap; overflow: hidden; min-width: 0; }
         .cm-tagline { position: relative; z-index: 1; font-size: clamp(9px, 1.143cqw, 16px); letter-spacing: 0.5px; color: rgba(255,255,255,.8); line-height: 1.4; font-weight: 500; margin-bottom: 7%; overflow-wrap: anywhere; }
-        .cm-divider1 { position: relative; z-index: 1; width: 35.7%; height: 2px; background: #19C6A3; margin-bottom: 11%; flex-shrink: 0; }
-        .cm-type-block { position: relative; z-index: 1; }
+        .cm-divider1 { position: relative; z-index: 1; width: 35.7%; height: 2px; background: #19C6A3; margin-bottom: 18%; flex-shrink: 0; }
+        .cm-type-block { position: relative; z-index: 1; margin-top: 6%; }
         .cm-type-label { font-size: clamp(9px, 1.357cqw, 19px); letter-spacing: 1.5px; color: rgba(255,255,255,.75); font-weight: 600; }
         .cm-type-name { font-size: clamp(24px, 4.286cqw, 60px); font-weight: 800; color: #fff; margin-top: 10px; line-height: 1.05; white-space: nowrap; overflow: hidden; }
         .cm-divider2 { position: relative; z-index: 1; width: 35.7%; height: 2px; background: #19C6A3; margin-top: 9%; flex-shrink: 0; }
         .cm-ribbon-wrap { position: relative; z-index: 1; margin-top: auto; padding-top: 12%; display: flex; justify-content: center; }
-        .cm-ribbon-wrap img { width: 85%; height: auto; }
+        .cm-ribbon-wrap img { width: 18cqw; height: auto; }
 
         .cm-main { position: relative; flex: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: column; padding: 9.5% 6.94% 5%; box-sizing: border-box; }
         .cm-watermark { position: absolute; top: -6.06%; right: -5.95%; width: 28.57cqw; opacity: 0.1; }

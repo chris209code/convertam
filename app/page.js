@@ -254,40 +254,58 @@ export default function HomePage() {
   return (
     <section className="cvt-home">
       <style>{`
-        .cvt-home { position: relative; background: linear-gradient(180deg, #FFFFFF 0%, #F4F7FB 55%, #EFF3F8 100%); overflow: hidden; padding: 56px 32px 64px; font-family: 'Inter', Helvetica, Arial, sans-serif; }
-        .cvt-blob-1 { position: absolute; top: 60px; left: 40px; width: 130px; height: 130px; border-radius: 50%; background: radial-gradient(circle, rgba(37,99,235,0.10), rgba(37,99,235,0)); }
-        .cvt-blob-2 { position: absolute; top: 180px; left: 150px; width: 26px; height: 26px; border-radius: 50%; background: rgba(37,99,235,0.18); }
-        .cvt-blob-3 { position: absolute; top: 40px; right: 60px; width: 280px; height: 280px; border-radius: 50%; background: radial-gradient(circle, rgba(16,185,129,0.12), rgba(16,185,129,0)); animation: cvtFloat 9s ease-in-out infinite; }
-        .cvt-blob-4 { position: absolute; bottom: -60px; left: -40px; width: 220px; height: 220px; border-radius: 50%; background: radial-gradient(circle, rgba(37,99,235,0.08), rgba(37,99,235,0)); }
+        .cvt-home { position: relative; background: linear-gradient(180deg, #FFFFFF 0%, #F4F7FB 55%, #EFF3F8 100%); overflow: hidden; padding: 20px 32px 40px; font-family: 'Inter', Helvetica, Arial, sans-serif; }
+        .cvt-blob-1 { position: absolute; top: 30px; left: 40px; width: 90px; height: 90px; border-radius: 50%; background: radial-gradient(circle, rgba(37,99,235,0.10), rgba(37,99,235,0)); }
+        .cvt-blob-2 { position: absolute; top: 120px; left: 150px; width: 20px; height: 20px; border-radius: 50%; background: rgba(37,99,235,0.18); }
+        .cvt-blob-3 { position: absolute; top: 20px; right: 60px; width: 190px; height: 190px; border-radius: 50%; background: radial-gradient(circle, rgba(16,185,129,0.12), rgba(16,185,129,0)); animation: cvtFloat 9s ease-in-out infinite; }
+        .cvt-blob-4 { position: absolute; bottom: -40px; left: -40px; width: 160px; height: 160px; border-radius: 50%; background: radial-gradient(circle, rgba(37,99,235,0.08), rgba(37,99,235,0)); }
         .cvt-dots { position: absolute; inset: 0; background-image: radial-gradient(rgba(100,116,139,0.10) 1px, transparent 1px); background-size: 22px 22px; opacity: 0.5; -webkit-mask-image: radial-gradient(ellipse 60% 40% at 50% 15%, black 0%, transparent 70%); mask-image: radial-gradient(ellipse 60% 40% at 50% 15%, black 0%, transparent 70%); pointer-events: none; }
         @keyframes cvtFloat { 0%,100% { transform: translateY(0px); } 50% { transform: translateY(-14px); } }
 
         .cvt-inner { position: relative; max-width: 1160px; margin: 0 auto; }
 
         .cvt-hero { text-align: center; max-width: 780px; margin: 0 auto; }
-        .cvt-hero h1 { font-size: 52px; line-height: 1.08; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 18px; color: #0F172A; }
+        .cvt-hero h1 { font-size: clamp(1.9rem, 3.2vw, 2.75rem); line-height: 1.02; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 8px; color: #0F172A; }
         .cvt-hero-gradient { background: linear-gradient(90deg, #2563EB 0%, #10B981 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
-        .cvt-hero p { font-size: 18px; line-height: 1.5; color: #475569; max-width: 620px; margin: 0 auto 32px; font-weight: 500; }
-        @media (max-width: 640px) { .cvt-hero h1 { font-size: 36px; } }
+        .cvt-hero p { font-size: 15px; line-height: 1.4; color: #475569; max-width: 580px; margin: 0 auto 18px; font-weight: 500; }
+        @media (max-width: 640px) { .cvt-hero h1 { font-size: 1.9rem; } }
 
-        .cvt-search-wrap { max-width: 760px; margin: 0 auto 20px; position: relative; }
-        .cvt-search-form { display: flex; align-items: center; gap: 8px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; box-shadow: 0 10px 30px rgba(15,23,42,0.07), 0 1px 2px rgba(15,23,42,0.04); padding: 8px 8px 8px 20px; }
-        .cvt-search-form input { flex: 1; border: none; outline: none; font-size: 15px; font-family: inherit; color: #0F172A; background: transparent; padding: 10px 0; }
-        .cvt-search-btn { display: flex; align-items: center; gap: 8px; background: #2563EB; color: #fff; border: none; border-radius: 11px; padding: 12px 24px; font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer; flex-shrink: 0; transition: background 180ms ease; }
+        .cvt-search-wrap { max-width: 760px; margin: 0 auto 14px; position: relative; }
+        .cvt-search-form { display: flex; align-items: center; gap: 8px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; box-shadow: 0 10px 30px rgba(15,23,42,0.07), 0 1px 2px rgba(15,23,42,0.04); padding: 6px 6px 6px 18px; }
+        .cvt-search-form input { flex: 1; border: none; outline: none; font-size: 15px; font-family: inherit; color: #0F172A; background: transparent; padding: 8px 0; }
+        .cvt-search-btn { display: flex; align-items: center; gap: 8px; background: #2563EB; color: #fff; border: none; border-radius: 11px; padding: 10px 22px; font-size: 14.5px; font-weight: 600; font-family: inherit; cursor: pointer; flex-shrink: 0; transition: background 180ms ease; }
         .cvt-search-btn:hover { background: #1D4ED8; }
         .cvt-search-results { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; box-shadow: 0 10px 30px rgba(15,23,42,0.1); overflow: hidden; z-index: 20; }
         .cvt-search-result { display: block; padding: 12px 18px; font-size: 14.5px; color: #334155; text-decoration: none; border-bottom: 1px solid #F1F5F9; }
         .cvt-search-result:last-child { border-bottom: none; }
         .cvt-search-result:hover { background: #F8FAFC; color: #2563EB; }
 
-        .cvt-trending { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; margin-bottom: 40px; }
-        .cvt-trending-label { font-size: 14px; font-weight: 600; color: #334155; margin-right: 2px; }
-        .cvt-chip { font-size: 13.5px; font-weight: 500; color: #334155; background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 999px; padding: 7px 16px; text-decoration: none; transition: all 160ms ease; white-space: nowrap; }
+        .cvt-trending { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+        .cvt-trending-label { font-size: 13px; font-weight: 600; color: #334155; margin-right: 2px; }
+        .cvt-chip { font-size: 13px; font-weight: 500; color: #334155; background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 999px; padding: 5px 13px; text-decoration: none; transition: all 160ms ease; white-space: nowrap; }
         .cvt-chip:hover { background: #E2E8F0; border-color: #CBD5E1; }
 
         .cvt-cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
         @media (max-width: 879px) { .cvt-cat-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 639px) { .cvt-cat-grid { grid-template-columns: 1fr; } }
+
+        /* Shorter desktop/laptop screens (e.g. 1366×768) get extra compaction
+           on top of the base compact layout, so all 6 cards still fit without
+           scrolling even with less vertical room to work with. */
+        @media (min-width: 1024px) and (max-height: 850px) {
+          .cvt-home { padding-top: 12px; padding-bottom: 28px; }
+          .cvt-hero h1 { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin-bottom: 6px; }
+          .cvt-hero p { font-size: 14px; margin-bottom: 14px; }
+          .cvt-search-wrap { margin-bottom: 10px; }
+          .cvt-search-form { padding: 5px 5px 5px 16px; }
+          .cvt-search-form input { padding: 6px 0; }
+          .cvt-search-btn { padding: 8px 18px; }
+          .cvt-trending { margin-bottom: 14px; gap: 6px; }
+          .cvt-chip { padding: 4px 11px; font-size: 12.5px; }
+          .cvt-cat-grid { gap: 16px; }
+          .cvt-cat-header { padding: 14px 20px; }
+          .cvt-cat-body { padding: 16px 20px 14px; }
+        }
 
         .cvt-cat-card { border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 12px 24px rgba(15,23,42,0.06); transition: transform 200ms ease, box-shadow 200ms ease; }
         .cvt-cat-card:hover { transform: translateY(-3px); box-shadow: 0 1px 2px rgba(15,23,42,0.05), 0 20px 34px rgba(15,23,42,0.11); }

@@ -49,7 +49,6 @@ const ALL_TOOLS = [
   { name: 'Receipt & Invoice Scanner', href: '/receipt-scanner' },
   { name: 'CV Improver', href: '/cv-improver' },
   { name: 'Resume Builder', href: '/resume-builder' },
-  { name: 'Ask & Solve AI', href: '/ask-solve-ai' },
   { name: 'Cover Letter Writer', href: '/cover-letter' },
   { name: 'Contract Summarizer', href: '/contract-summarizer' },
   { name: 'Image Compressor', href: '/image-compressor' },
@@ -107,7 +106,7 @@ const CATEGORIES = [
     icon: 'sparkles',
     viewAllHref: '/ai-tools',
     tools: [
-      { name: 'Ask & Solve AI', href: '/ask-solve-ai' },
+      { name: 'CV Improver', href: '/cv-improver' },
       { name: 'Receipt & Invoice Scanner', href: '/receipt-scanner' },
       { name: 'Summarize PDF', href: '/summarize-pdf' },
       { name: 'Resume Builder', href: '/resume-builder' },

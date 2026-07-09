@@ -34,7 +34,6 @@ import ImageResizerCropperWorkspace from '@/components/tools/ImageResizerCropper
 import WatermarkImageWorkspace from '@/components/tools/WatermarkImageWorkspace';
 import ImageFormatConverterWorkspace from '@/components/tools/ImageFormatConverterWorkspace';
 import MemeGeneratorWorkspace from '@/components/tools/MemeGeneratorWorkspace';
-import AskSolveAIWorkspace from '@/components/tools/AskSolveAIWorkspace';
 import ResumeBuilderWorkspace from '@/components/tools/ResumeBuilderWorkspace';
 import IdCardGeneratorWorkspace from '@/components/tools/IdCardGeneratorWorkspace';
 import DocumentEnhancerWorkspace from '@/components/tools/DocumentEnhancerWorkspace';
@@ -50,7 +49,7 @@ const isFree = (mode) =>
    'images-to-pdf', 'extract-pdf-images', 'compare-pdf', 'redact-pdf', 'pdf-overlay', 'convert-image-format', 'meme-generator',
    'remove-pages', 'add-page-numbers', 'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize',
    'fill', 'write-on-pdf', 'quotation', 'calculator-hub', 'utilities-hub', 'cv-improver', 'resume-builder',
-   'cover-letter', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'ask-solve-ai',
+   'cover-letter', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image',
    'id-card-generator', 'document-enhancer', 'delivery-note-waybill'].includes(mode);
 
 function getPriceBadge(mode) {
@@ -138,7 +137,6 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'watermark-image' && <WatermarkImageWorkspace />}
       {tool.mode === 'convert-image-format' && <ImageFormatConverterWorkspace />}
       {tool.mode === 'meme-generator' && <MemeGeneratorWorkspace />}
-      {tool.mode === 'ask-solve-ai' && <AskSolveAIWorkspace />}
       {tool.mode === 'resume-builder' && <ResumeBuilderWorkspace />}
       {tool.mode === 'id-card-generator' && <IdCardGeneratorWorkspace />}
       {tool.mode === 'document-enhancer' && <DocumentEnhancerWorkspace />}

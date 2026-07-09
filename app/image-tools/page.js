@@ -9,10 +9,11 @@ const TOOLS = [
   { slug: 'jpg-to-pdf', title: 'JPG to PDF', desc: 'Combine JPG photos into a single PDF', free: true, available: true },
   { slug: 'png-to-pdf', title: 'PNG to PDF', desc: 'Combine PNG images into a single PDF', free: true, available: true },
   { slug: 'pdf-to-jpg', title: 'PDF to JPG', desc: 'Turn each PDF page into a JPG image', free: true, available: true },
-  { slug: 'pdf-to-png', title: 'PDF to PNG', desc: 'Turn each PDF page into a PNG image', free: true, available: true },
   { slug: 'image-compressor', title: 'Image Compressor', desc: 'Reduce image file size without losing quality', free: true, available: true },
   { slug: 'resize-image', title: 'Image Resizer & Cropper', desc: 'Resize, crop and perfectly fit images for social media, profiles, banners and custom dimensions', free: true, available: true },
   { slug: 'watermark-image', title: 'Watermark Image', desc: 'Add text or logo watermarks to images', free: true, available: true },
+  { slug: 'convert-image-format', title: 'Image Format Converter', desc: 'Convert between JPG, PNG, and WebP', free: true, available: true },
+  { slug: 'meme-generator', title: 'Meme Generator', desc: 'Add classic bold top/bottom captions to any image', free: true, available: true },
   { slug: 'document-enhancer', title: 'Document Enhancer', desc: 'Remove shadows and enhance scanned documents', free: true, available: true },
 ];
 

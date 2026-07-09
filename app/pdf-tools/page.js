@@ -17,6 +17,8 @@ const SECTIONS = [
       { slug: 'pdf-to-powerpoint', title: 'PDF to PowerPoint', desc: 'Turn PDF pages into editable slides', free: false },
       { slug: 'powerpoint-to-pdf', title: 'PowerPoint to PDF', desc: 'Turn a presentation into a PDF', free: false },
       { slug: 'html-to-pdf', title: 'HTML to PDF', desc: 'Convert HTML code into a downloadable PDF', free: true },
+      { slug: 'pdf-to-png', title: 'PDF to Images', desc: 'Turn each page of a PDF into a PNG image', free: true },
+      { slug: 'images-to-pdf', title: 'Images to PDF', desc: 'Combine JPG or PNG images into one PDF', free: true },
     ],
   },
   {
@@ -28,6 +30,8 @@ const SECTIONS = [
       { slug: 'sign-pdf', title: 'Sign PDF', desc: 'Place your signature anywhere on a PDF', free: true },
       { slug: 'watermark-pdf', title: 'Watermark PDF', desc: 'Add custom text watermarks to your PDF', free: true },
       { slug: 'reorder-pdf', title: 'Reorder Pages', desc: 'Drag and drop pages into any order', free: true },
+      { slug: 'redact-pdf', title: 'Redact PDF', desc: 'Permanently black out sensitive text or areas', free: true },
+      { slug: 'pdf-overlay', title: 'PDF Overlay', desc: 'Stamp one PDF (like a letterhead) on top of another', free: true },
     ],
   },
   {
@@ -40,6 +44,8 @@ const SECTIONS = [
       { slug: 'remove-pdf-pages', title: 'Remove Pages', desc: 'Delete specific pages from a PDF', free: true },
       { slug: 'extract-pdf-pages', title: 'Extract Pages', desc: 'Pull specific pages into a new PDF', free: true },
       { slug: 'add-page-numbers', title: 'Add Page Numbers', desc: 'Stamp page numbers onto every page', free: true },
+      { slug: 'extract-pdf-images', title: 'Extract PDF Images', desc: 'Pull the embedded images out of a PDF', free: true },
+      { slug: 'compare-pdf', title: 'Compare PDFs', desc: 'See what changed between two versions of a PDF', free: true },
     ],
   },
   {

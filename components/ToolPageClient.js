@@ -3,6 +3,11 @@
 import PdfLibWorkspace from '@/components/tools/PdfLibWorkspace';
 import OfficeConvertWorkspace from '@/components/tools/OfficeConvertWorkspace';
 import PdfToImageWorkspace from '@/components/tools/PdfToImageWorkspace';
+import ImagesToPdfWorkspace from '@/components/tools/ImagesToPdfWorkspace';
+import ExtractPdfImagesWorkspace from '@/components/tools/ExtractPdfImagesWorkspace';
+import ComparePdfWorkspace from '@/components/tools/ComparePdfWorkspace';
+import RedactPdfWorkspace from '@/components/tools/RedactPdfWorkspace';
+import PdfOverlayWorkspace from '@/components/tools/PdfOverlayWorkspace';
 import SmartConverterWorkspace from '@/components/tools/SmartConverterWorkspace';
 import SummarizePdfWorkspace from '@/components/tools/SummarizePdfWorkspace';
 import ReceiptScanWorkspace from '@/components/tools/ReceiptScanWorkspace';
@@ -27,11 +32,13 @@ import ContractSummarizerWorkspace from '@/components/tools/ContractSummarizerWo
 import ImageCompressorWorkspace from '@/components/tools/ImageCompressorWorkspace';
 import ImageResizerCropperWorkspace from '@/components/tools/ImageResizerCropperWorkspace';
 import WatermarkImageWorkspace from '@/components/tools/WatermarkImageWorkspace';
+import ImageFormatConverterWorkspace from '@/components/tools/ImageFormatConverterWorkspace';
+import MemeGeneratorWorkspace from '@/components/tools/MemeGeneratorWorkspace';
+import AskSolveAIWorkspace from '@/components/tools/AskSolveAIWorkspace';
 import ResumeBuilderWorkspace from '@/components/tools/ResumeBuilderWorkspace';
 import IdCardGeneratorWorkspace from '@/components/tools/IdCardGeneratorWorkspace';
 import DocumentEnhancerWorkspace from '@/components/tools/DocumentEnhancerWorkspace';
 import DeliveryNoteWaybillWorkspace from '@/components/tools/DeliveryNoteWaybillWorkspace';
-import CertificateGeneratorWorkspace from '@/components/tools/CertificateGeneratorWorkspace';
 import PaymentGate from '@/components/PaymentGate';
 import ComingSoon from '@/components/tools/ComingSoon';
 import Link from 'next/link';
@@ -40,10 +47,11 @@ import { toolMeta } from '@/lib/tool-meta';
 
 const isFree = (mode) =>
   ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice',
+   'images-to-pdf', 'extract-pdf-images', 'compare-pdf', 'redact-pdf', 'pdf-overlay', 'convert-image-format', 'meme-generator',
    'remove-pages', 'add-page-numbers', 'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize',
    'fill', 'write-on-pdf', 'quotation', 'calculator-hub', 'utilities-hub', 'cv-improver', 'resume-builder',
-   'cover-letter', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image',
-   'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'certificate-generator'].includes(mode);
+   'cover-letter', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'ask-solve-ai',
+   'id-card-generator', 'document-enhancer', 'delivery-note-waybill'].includes(mode);
 
 function getPriceBadge(mode) {
   if (isFree(mode)) return 'Free';
@@ -99,6 +107,11 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'office' && <OfficeConvertWorkspace accept={tool.accept} toFormat={tool.toFormat} toLabel={tool.toLabel} />}
       {tool.mode === 'pdf-lib' && <PdfLibWorkspace mode={tool.pdfLibMode} accept={tool.accept} />}
       {tool.mode === 'pdf-to-image' && <PdfToImageWorkspace format={tool.imageFormat} />}
+      {tool.mode === 'images-to-pdf' && <ImagesToPdfWorkspace />}
+      {tool.mode === 'extract-pdf-images' && <ExtractPdfImagesWorkspace />}
+      {tool.mode === 'compare-pdf' && <ComparePdfWorkspace />}
+      {tool.mode === 'redact-pdf' && <RedactPdfWorkspace />}
+      {tool.mode === 'pdf-overlay' && <PdfOverlayWorkspace />}
       {tool.mode === 'smart' && <SmartConverterWorkspace />}
       {tool.mode === 'summarize' && <SummarizePdfWorkspace />}
       {tool.mode === 'receipt' && <ReceiptScanWorkspace />}
@@ -123,11 +136,13 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'image-compressor' && <ImageCompressorWorkspace />}
       {tool.mode === 'resize-image' && <ImageResizerCropperWorkspace />}
       {tool.mode === 'watermark-image' && <WatermarkImageWorkspace />}
+      {tool.mode === 'convert-image-format' && <ImageFormatConverterWorkspace />}
+      {tool.mode === 'meme-generator' && <MemeGeneratorWorkspace />}
+      {tool.mode === 'ask-solve-ai' && <AskSolveAIWorkspace />}
       {tool.mode === 'resume-builder' && <ResumeBuilderWorkspace />}
       {tool.mode === 'id-card-generator' && <IdCardGeneratorWorkspace />}
       {tool.mode === 'document-enhancer' && <DocumentEnhancerWorkspace />}
       {tool.mode === 'delivery-note-waybill' && <DeliveryNoteWaybillWorkspace />}
-      {tool.mode === 'certificate-generator' && <CertificateGeneratorWorkspace />}
       {tool.mode === 'soon' && <ComingSoon title={tool.title} note={tool.note} />}
 
       <div className="flex items-center gap-2 mt-4 px-4 py-3 rounded-xl text-sm" style={{ background: '#f0f5ff', border: '1px solid #d0dcf5' }}>

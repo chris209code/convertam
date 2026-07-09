@@ -10,7 +10,6 @@ const TOOLS = [
   { slug: 'quotation-generator', title: 'Quotation Generator', desc: 'Generate professional quotations and proforma invoices', available: true },
   { slug: 'delivery-note-waybill', title: 'Delivery Note & Waybill Generator', desc: 'Confirm delivery or document goods in transit', available: true },
   { slug: 'id-card-generator', title: 'ID Card Generator', desc: 'Design and print professional ID cards', available: true },
-  { slug: 'certificate-generator', title: 'Certificate Generator', desc: 'Create certificates of completion or achievement', available: true },
 ];
 
 export default function BusinessPage() {

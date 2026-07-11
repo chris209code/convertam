@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Icon, TEMPLATES, TEMPLATE_LABELS, useResumeData, RESUME_PRINT_STYLES } from './resumeTemplates';
+import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptToModernProfessionalData, RESUME_PRINT_STYLES } from './resumeTemplates';
 
 const inputStyle = { width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' };
 const labelStyle = { fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' };
@@ -55,7 +55,7 @@ export default function CVImproverWorkspace() {
   const [cvText, setCvText] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [structured, setStructured] = useState(null);
-  const [template, setTemplate] = useState('classic');
+  const [template, setTemplate] = useState('mpSidebar');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -87,6 +87,12 @@ export default function CVImproverWorkspace() {
   const templateInput = structured ? adaptStructuredToTemplateInput(structured) : null;
   const resumeData = templateInput
     ? useResumeData({ form: templateInput.form, targetRole: jobTitle, experience: templateInput.experience, education: templateInput.education, certifications: templateInput.certifications, skills: templateInput.skills })
+    : null;
+  const isModernProfessional = template.startsWith('mp');
+  const templateData = templateInput
+    ? (isModernProfessional
+        ? adaptToModernProfessionalData({ form: templateInput.form, experience: templateInput.experience, education: templateInput.education, certifications: templateInput.certifications, skills: templateInput.skills })
+        : resumeData)
     : null;
   const TemplateComponent = TEMPLATES[template];
 
@@ -122,27 +128,23 @@ export default function CVImproverWorkspace() {
 
       {structured && resumeData && (
         <div>
-          <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {Object.keys(TEMPLATES).map(key => (
-                <button key={key} onClick={() => setTemplate(key)} style={{ padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, border: template === key ? '2px solid #2563EB' : '1px solid #E2E8F0', background: template === key ? '#EFF6FF' : 'white', color: template === key ? '#2563EB' : '#475569' }}>
-                  {TEMPLATE_LABELS[key]}
-                </button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <button className="btn btn-ghost" onClick={() => { setStructured(null); setCvText(''); setStatus(''); }}>Improve Another CV</button>
-              <button className="btn btn-primary" onClick={() => window.print()}>⬇️ Download PDF</button>
-              <a href="/pdf-to-word" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600, color: '#2563EB', textDecoration: 'none', padding: '10px 14px', borderRadius: 8, border: '1px solid #BFDBFE', background: '#EFF6FF' }}>
-                <Icon.doc /> Convert to MS Word
-              </a>
-            </div>
+          <p className="no-print" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', marginBottom: 10 }}>Choose a template</p>
+          <div className="no-print" style={{ marginBottom: 18 }}>
+            <TemplatePicker selected={template} onSelect={setTemplate} />
+          </div>
+
+          <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+            <button className="btn btn-ghost" onClick={() => { setStructured(null); setCvText(''); setStatus(''); }}>Improve Another CV</button>
+            <button className="btn btn-primary" onClick={() => window.print()}>⬇️ Download PDF</button>
+            <a href="/pdf-to-word" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600, color: '#2563EB', textDecoration: 'none', padding: '10px 14px', borderRadius: 8, border: '1px solid #BFDBFE', background: '#EFF6FF' }}>
+              <Icon.doc /> Convert to MS Word
+            </a>
           </div>
 
           <div style={{ background: '#E2E8F0', padding: '20px 0', borderRadius: 12, display: 'flex', justifyContent: 'center', overflowX: 'auto' }}>
             <div className="resume-print-root">
               <div className="resume-page-frame" style={{ width: '210mm', minHeight: '297mm', background: 'white', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
-                <TemplateComponent data={resumeData} />
+                <TemplateComponent data={templateData} />
               </div>
             </div>
           </div>

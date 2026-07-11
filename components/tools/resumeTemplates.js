@@ -166,111 +166,6 @@ export function ClassicProfessional({ data }) {
 }
 
 // ---------------------------------------------------------------------------
-// TEMPLATE 2 — Modern Sidebar
-// ---------------------------------------------------------------------------
-export function ModernSidebar({ data }) {
-  const { form, experience, education, certifications, skills } = data;
-  const initials = (form.fullName || 'U N').split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
-  const S = {
-    page: { display: 'flex', fontFamily: "'Segoe UI', Arial, sans-serif" },
-    sidebar: { width: '34%', background: '#16233D', color: 'white', padding: '20mm 8mm', boxSizing: 'border-box' },
-    avatar: { width: 70, height: 70, borderRadius: '50%', border: '3px solid #3B82F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700, margin: '0 auto 14px' },
-    sideName: { fontSize: 17, fontWeight: 800, textAlign: 'center', margin: '0 0 2px', lineHeight: 1.2, overflowWrap: 'anywhere' },
-    sideTitle: { fontSize: 11, letterSpacing: 2, textAlign: 'center', color: '#93C5FD', textTransform: 'uppercase', marginBottom: 20 },
-    sideHead: { fontSize: 11.5, fontWeight: 800, letterSpacing: 1, color: '#93C5FD', textTransform: 'uppercase', margin: '18px 0 8px' },
-    sideItem: { display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 10.5, color: '#E2E8F0', marginBottom: 6, wordBreak: 'break-word', overflowWrap: 'anywhere', minWidth: 0 },
-    skillItem: { fontSize: 10.5, color: '#E2E8F0', marginBottom: 5 },
-    main: { flex: 1, minWidth: 0, padding: '20mm 12mm', boxSizing: 'border-box', color: '#1E293B' },
-    sectionHead: { fontSize: 13, fontWeight: 800, color: '#1D4ED8', textTransform: 'uppercase', letterSpacing: 0.5, margin: '0 0 6px' },
-    sectionRule: { border: 'none', borderTop: '2px solid #1D4ED8', margin: '0 0 14px', width: 60 },
-    body: { fontSize: 11.5, lineHeight: 1.6, color: '#374151' },
-    entryTitle: { fontSize: 12, fontWeight: 700, margin: 0, overflowWrap: 'anywhere' },
-    entrySub: { fontSize: 11, color: '#4B5563', margin: '1px 0 4px', overflowWrap: 'anywhere' },
-    dateRight: { float: 'right', fontSize: 11, color: '#4B5563' },
-  };
-  return (
-    <div style={S.page}>
-      <aside style={S.sidebar}>
-        <div style={S.avatar}>{initials}</div>
-        <p style={S.sideName}>{form.fullName || 'Your Name'}</p>
-        {form.jobTitle && <p style={S.sideTitle}>{form.jobTitle}</p>}
-
-        <p style={S.sideHead}>Contact</p>
-        {form.phone && <div style={S.sideItem}><Icon.phone />{form.phone}</div>}
-        {form.email && <div style={S.sideItem}><Icon.mail />{form.email}</div>}
-        {form.location && <div style={S.sideItem}><Icon.pin />{form.location}</div>}
-        {form.linkedin && <div style={S.sideItem}><Icon.link />{form.linkedin}</div>}
-
-        {skills.length > 0 && (
-          <>
-            <p style={S.sideHead}>Skills</p>
-            {skills.map((s, i) => <div key={i} style={S.skillItem}>• {s}</div>)}
-          </>
-        )}
-      </aside>
-
-      <main style={S.main}>
-        {form.summary && (
-          <section style={{ marginBottom: 18 }}>
-            <p style={S.sectionHead}>Professional Summary</p>
-            <hr style={S.sectionRule} />
-            <p style={S.body}>{form.summary}</p>
-          </section>
-        )}
-
-        {education.length > 0 && (
-          <section style={{ marginBottom: 18 }}>
-            <p style={S.sectionHead}>Education</p>
-            <hr style={S.sectionRule} />
-            {education.map((edu, i) => {
-              const { titleLine, subLine, dateLine, gradeLine } = eduDisplayLines(edu);
-              return (
-                <div key={i} style={{ marginBottom: 10 }}>
-                  <p style={S.entryTitle}>{titleLine}{dateLine && <span style={S.dateRight}>{dateLine}</span>}</p>
-                  <p style={S.entrySub}>{subLine}{gradeLine ? ` — ${gradeLine}` : ''}</p>
-                </div>
-              );
-            })}
-          </section>
-        )}
-
-        {certifications.length > 0 && (
-          <section style={{ marginBottom: 18 }}>
-            <p style={S.sectionHead}>Certifications</p>
-            <hr style={S.sectionRule} />
-            {certifications.map((cert, i) => {
-              const { titleLine, subLine, dateLine } = certDisplayLines(cert);
-              return (
-                <div key={i} style={{ marginBottom: 10 }}>
-                  <p style={S.entryTitle}>{titleLine}{dateLine && <span style={S.dateRight}>{dateLine}</span>}</p>
-                  {subLine && <p style={S.entrySub}>{subLine}</p>}
-                </div>
-              );
-            })}
-          </section>
-        )}
-
-        {experience.length > 0 && (
-          <section>
-            <p style={S.sectionHead}>Professional Experience</p>
-            <hr style={S.sectionRule} />
-            {experience.map((exp, i) => (
-              <div key={i} style={{ marginBottom: 14 }}>
-                <div style={{ breakInside: 'avoid' }}>
-                  <p style={S.entryTitle}>{exp.role}{exp.period && <span style={S.dateRight}>{exp.period}</span>}</p>
-                  <p style={S.entrySub}>{exp.company}{exp.type && exp.type !== 'Work Experience' ? ` — ${exp.type}` : ''}</p>
-                </div>
-                <div style={S.body}><ExpBullets exp={exp} /></div>
-              </div>
-            ))}
-          </section>
-        )}
-      </main>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // TEMPLATE 3 — Executive Minimal
 // ---------------------------------------------------------------------------
 export function ExecutiveMinimal({ data }) {
@@ -453,12 +348,7 @@ function MPSidebar({ data }) {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.55)', marginBottom: 12 }}><MPIcon.diamond />SKILLS</div>
             {data.skills.map((skill, i) => (
-              <div key={i} style={{ marginBottom: 11 }}>
-                <div style={{ fontSize: 13, marginBottom: 5 }}>{skill.name}</div>
-                <div style={{ height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.18)', overflow: 'hidden' }}>
-                  <div style={{ height: 5, borderRadius: 3, background: '#60a5fa', width: `${Math.max(0, Math.min(5, skill.level || 0)) * 20}%` }} />
-                </div>
-              </div>
+              <div key={i} style={{ fontSize: 13, marginBottom: 8, lineHeight: 1.5 }}>{skill.name}</div>
             ))}
           </div>
         )}
@@ -755,12 +645,7 @@ function MPHeaderBand({ data }) {
               <div style={{ marginBottom: 22 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: accent, paddingBottom: 6, borderBottom: `1px solid ${accent}`, marginBottom: 12 }}><MPIcon.diamond />Skills</div>
                 {data.skills.map((skill, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 9 }}>
-                    <span style={{ fontSize: 13, color: '#374151' }}>{skill.name}</span>
-                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                      {[0, 1, 2, 3, 4].map(n => <span key={n} style={{ width: 7, height: 7, borderRadius: '50%', display: 'inline-block', background: n < (skill.level || 0) ? accent : '#e2e8f0' }} />)}
-                    </div>
-                  </div>
+                  <div key={i} style={{ fontSize: 13, color: '#374151', marginBottom: 8, lineHeight: 1.5 }}>{skill.name}</div>
                 ))}
               </div>
             )}
@@ -792,8 +677,8 @@ function MPHeaderBand({ data }) {
   );
 }
 
-export const TEMPLATES = { classic: ClassicProfessional, sidebar: ModernSidebar, executive: ExecutiveMinimal, mpSidebar: MPSidebar, mpCentered: MPCentered, mpHeaderBand: MPHeaderBand };
-export const TEMPLATE_LABELS = { classic: 'Elegant Minimal', sidebar: 'Classic Sidebar', executive: 'Executive', mpSidebar: 'Modern Professional — Sidebar', mpCentered: 'Modern Professional — Centered', mpHeaderBand: 'Modern Professional — Header Band' };
+export const TEMPLATES = { classic: ClassicProfessional, executive: ExecutiveMinimal, mpSidebar: MPSidebar, mpCentered: MPCentered, mpHeaderBand: MPHeaderBand };
+export const TEMPLATE_LABELS = { classic: 'Elegant Minimal', executive: 'Executive', mpSidebar: 'Modern Professional — Sidebar', mpCentered: 'Modern Professional — Centered', mpHeaderBand: 'Modern Professional — Header Band' };
 
 // Richer metadata for the card-based template picker — badge (⭐ = recommended
 // for that situation), and a "best for" line so people can choose based on
@@ -806,7 +691,6 @@ export const TEMPLATE_META = [
   { key: 'mpHeaderBand', label: 'Modern Professional — Header Band', badge: null, bestFor: 'Modern corporate appearance with premium hierarchy. A dark header band opens onto a two-column body.' },
   { key: 'classic', label: 'Elegant Minimal', badge: null, bestFor: 'Banking, finance, legal, administration' },
   { key: 'executive', label: 'Executive', badge: null, bestFor: 'Managers and senior professionals' },
-  { key: 'sidebar', label: 'Classic Sidebar', badge: null, bestFor: 'An earlier two-column layout, kept available alongside the newer Modern Professional set' },
 ];
 
 // Shared card-based picker — shows people what each template is *for*, not

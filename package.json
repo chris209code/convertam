@@ -18,7 +18,9 @@
     "google-auth-library": "9.14.1",
     "html2canvas": "1.4.1",
     "jspdf": "2.5.1",
-    "pdfjs-dist": "3.11.174"
+    "pdfjs-dist": "3.11.174",
+    "pptxgenjs": "4.0.1",
+    "mammoth": "1.12.0"
   },
   "devDependencies": {
     "tailwindcss": "3.4.7",

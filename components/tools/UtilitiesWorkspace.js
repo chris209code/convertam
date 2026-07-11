@@ -94,12 +94,14 @@ function PasswordGenerator() {
   const [length, setLength] = useState(16);
   const [options, setOptions] = useState({ upper: true, lower: true, numbers: true, symbols: true });
 
-  const [wordCount, setWordCount] = useState(4);
   const [separator, setSeparator] = useState('-');
   const [capitalizeWords, setCapitalizeWords] = useState(true);
-  const [appendNumber, setAppendNumber] = useState(true);
+  const [numberMode, setNumberMode] = useState('random'); // none | random | custom
+  const [customNumber, setCustomNumber] = useState('');
   const [useOwnWords, setUseOwnWords] = useState(false);
   const [ownWordsInput, setOwnWordsInput] = useState('');
+  const [passphraseLength, setPassphraseLength] = useState(20);
+  const [lengthNote, setLengthNote] = useState('');
 
   const [password, setPassword] = useState('');
   const [copied, setCopied] = useState(false);
@@ -120,6 +122,8 @@ function PasswordGenerator() {
     return pwd;
   }
 
+  const SYMBOL_POOL = '!@#$%^&*';
+
   function generatePassphrase() {
     let sourceWords;
     if (useOwnWords) {
@@ -130,12 +134,47 @@ function PasswordGenerator() {
       // still not predictable to anyone else.
       sourceWords = [...sourceWords].sort(() => Math.random() - 0.5);
     } else {
-      sourceWords = Array.from({ length: wordCount }, () => randomWord());
+      // Shuffle first, then only take as many as actually get used below —
+      // this way "how many words fit" is driven by the length target, not
+      // a fixed count, while still starting from a big enough pool.
+      sourceWords = Array.from({ length: 8 }, () => randomWord());
     }
     const words = sourceWords.map(w => capitalizeWords ? capitalize(w) : w.toLowerCase());
-    const sep = separator === 'space' ? ' ' : separator === 'none' ? '' : separator;
-    let phrase = words.join(sep);
-    if (appendNumber) phrase += (sep || '') + Math.floor(10 + Math.random() * 90);
+
+    const sep = separator === 'space' ? ' '
+      : separator === 'none' ? ''
+      : separator === 'symbol' ? SYMBOL_POOL[Math.floor(Math.random() * SYMBOL_POOL.length)]
+      : separator;
+
+    const numberSuffix = numberMode === 'custom' ? customNumber.replace(/[^0-9]/g, '')
+      : numberMode === 'random' ? String(Math.floor(10 + Math.random() * 90))
+      : '';
+    const reserveForNumber = numberSuffix ? sep.length + numberSuffix.length : 0;
+
+    // Build up the phrase one word at a time, using only as many words as
+    // fit within the chosen target length — not necessarily all of them.
+    let phrase = '';
+    for (const word of words) {
+      const candidate = phrase ? phrase + sep + word : word;
+      if (candidate.length + reserveForNumber > passphraseLength && phrase) break;
+      phrase = candidate;
+      if (phrase.length + reserveForNumber >= passphraseLength) break;
+    }
+    if (!phrase) phrase = words[0] || '';
+
+    if (numberSuffix) phrase += sep + numberSuffix;
+
+    if (phrase.length > passphraseLength) {
+      phrase = phrase.slice(0, passphraseLength);
+      setLengthNote('Trimmed to fit your chosen length exactly.');
+    } else if (phrase.length < passphraseLength) {
+      setLengthNote(useOwnWords
+        ? "Used all your words but still shorter than your chosen length — add more words to reach it exactly."
+        : '');
+    } else {
+      setLengthNote('');
+    }
+
     return phrase;
   }
 
@@ -193,7 +232,7 @@ function PasswordGenerator() {
             Use my own words instead of suggested ones
           </label>
 
-          {useOwnWords ? (
+          {useOwnWords && (
             <div style={{ marginBottom: 14 }}>
               <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Your words (separate with commas or spaces)</label>
               <input
@@ -201,14 +240,16 @@ function PasswordGenerator() {
                 placeholder="e.g. mango, lagos, sunrise, 2019"
                 style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }}
               />
-              <p style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: 4 }}>These get shuffled into a different order each time you generate — not just used as typed.</p>
-            </div>
-          ) : (
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Number of words: {wordCount}</label>
-              <input type="range" min={3} max={6} value={wordCount} onChange={e => setWordCount(Number(e.target.value))} style={{ width: '100%', accentColor: '#2563EB' }} />
+              <p style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: 4 }}>These get shuffled into a different order each time you generate — not just used as typed. Not all of them may be needed, depending on the length you choose below.</p>
             </div>
           )}
+
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Password length: {passphraseLength}</label>
+            <input type="range" min={10} max={40} value={passphraseLength} onChange={e => setPassphraseLength(Number(e.target.value))} style={{ width: '100%', accentColor: '#2563EB' }} />
+            <p style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: 4 }}>Only as many words as fit within this length get used.</p>
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
             <div>
               <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Separator</label>
@@ -216,6 +257,7 @@ function PasswordGenerator() {
                 <option value="-">Hyphen (-)</option>
                 <option value="_">Underscore (_)</option>
                 <option value="space">Space</option>
+                <option value="symbol">Random Symbol (!@#$%^&*)</option>
                 <option value="none">None</option>
               </select>
             </div>
@@ -223,10 +265,23 @@ function PasswordGenerator() {
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#475569', cursor: 'pointer' }}>
                 <input type="checkbox" checked={capitalizeWords} onChange={e => setCapitalizeWords(e.target.checked)} /> Capitalize Words
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#475569', cursor: 'pointer' }}>
-                <input type="checkbox" checked={appendNumber} onChange={e => setAppendNumber(e.target.checked)} /> Add a number
-              </label>
             </div>
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Number at the end</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              {[['none', 'None'], ['random', 'Random'], ['custom', 'My own']].map(([val, label]) => (
+                <button key={val} onClick={() => setNumberMode(val)} style={{ flex: 1, padding: '7px', borderRadius: 8, cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600, border: numberMode === val ? '2px solid #2563EB' : '1px solid #E2E8F0', background: numberMode === val ? '#EFF6FF' : 'white', color: numberMode === val ? '#2563EB' : '#475569' }}>{label}</button>
+              ))}
+            </div>
+            {numberMode === 'custom' && (
+              <input
+                type="text" value={customNumber} onChange={e => setCustomNumber(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="e.g. your birth year, a meaningful number"
+                style={{ width: '100%', padding: '9px 11px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' }}
+              />
+            )}
           </div>
         </>
       )}
@@ -248,6 +303,9 @@ function PasswordGenerator() {
             </div>
             <span style={{ fontSize: '0.75rem', fontWeight: 600, color: strengthColor }}>{strengthLabel}</span>
           </div>
+          {mode === 'passphrase' && lengthNote && (
+            <p style={{ fontSize: '0.72rem', color: '#D97706', marginTop: 8 }}>{lengthNote}</p>
+          )}
         </div>
       )}
     </div>

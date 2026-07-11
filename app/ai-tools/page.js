@@ -12,8 +12,12 @@ const TOOLS = [
   { slug: 'ocr-pdf', title: 'OCR PDF', desc: 'Extract text from scanned PDFs and images using AI', available: true },
   { slug: 'cv-improver', title: 'CV Improver', desc: 'Upload your CV and AI rewrites and improves it', available: true },
   { slug: 'resume-builder', title: 'Resume Builder', desc: 'A guided, AI-assisted CV builder for starting from scratch', available: true },
+  { slug: 'ask-solve-ai', title: 'Ask & Solve AI', desc: 'Scan, type or upload a question and get clear answers instantly', available: true },
   { slug: 'cover-letter', title: 'Cover Letter Writer', desc: 'Generate a professional cover letter with AI', available: true },
   { slug: 'contract-summarizer', title: 'Contract Summarizer', desc: 'Upload a contract and AI highlights key points', available: true },
+  { slug: 'presentation-generator', title: 'AI Presentation Generator', desc: 'Turn documents into an editable PowerPoint presentation', available: true },
+  { slug: 'presentation-generator', title: 'AI Presentation Generator', desc: 'Turn documents into an editable PowerPoint presentation', available: true },
+  { slug: 'data-analyst', title: 'AI Data Analyst', desc: 'Upload data and get charts, insights, and an executive report', available: true },
 ];
 
 export default function AIToolsPage() {

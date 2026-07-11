@@ -16,7 +16,6 @@ const TOOLS = [
   { slug: 'cover-letter', title: 'Cover Letter Writer', desc: 'Generate a professional cover letter with AI', available: true },
   { slug: 'contract-summarizer', title: 'Contract Summarizer', desc: 'Upload a contract and AI highlights key points', available: true },
   { slug: 'presentation-generator', title: 'AI Presentation Generator', desc: 'Turn documents into an editable PowerPoint presentation', available: true },
-  { slug: 'presentation-generator', title: 'AI Presentation Generator', desc: 'Turn documents into an editable PowerPoint presentation', available: true },
   { slug: 'data-analyst', title: 'AI Data Analyst', desc: 'Upload data and get charts, insights, and an executive report', available: true },
 ];
 

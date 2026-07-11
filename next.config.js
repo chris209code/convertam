@@ -8,6 +8,11 @@ const nextConfig = {
       http: false,
       path: false,
       stream: false,
+      'node:fs': false,
+      'node:https': false,
+      'node:http': false,
+      'node:path': false,
+      'node:stream': false,
     };
     return config;
   },

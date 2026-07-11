@@ -376,8 +376,472 @@ export function ExecutiveMinimal({ data }) {
   );
 }
 
-export const TEMPLATES = { classic: ClassicProfessional, sidebar: ModernSidebar, executive: ExecutiveMinimal };
-export const TEMPLATE_LABELS = { classic: 'Classic Professional', sidebar: 'Modern Sidebar', executive: 'Executive Minimal' };
+// ---------------------------------------------------------------------------
+// MODERN PROFESSIONAL — a category of its own with 3 layout variants
+// (Sidebar / Centered / Header Band), built to the exact design handoff spec.
+// Per explicit instruction, these NEVER render a photo — no image, no circle,
+// no reserved gap for one — even though the original design spec allowed for
+// an optional one. If photo support is ever wanted, it should be a separate
+// template category, not a change to these three.
+//
+// These accept a richer data shape (adds projects, achievements, languages,
+// and skill levels 1-5) than the original 3 templates use. adaptToModernProfessionalData()
+// below maps the existing simpler resume data into this shape so these new
+// templates work today without requiring wizard changes — skills default to
+// a neutral level since the wizard doesn't collect explicit 1-5 ratings yet,
+// and projects/achievements/languages come through empty until that's added.
+// ---------------------------------------------------------------------------
+
+const MPIcon = {
+  phone: (p) => <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" {...p}><rect x="4" y="1.5" width="7" height="13" rx="1.5" /><line x1="6.5" y1="12" x2="9.5" y2="12" /></svg>,
+  mail: (p) => <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" {...p}><rect x="1.5" y="3.5" width="13" height="9" rx="1" /><polyline points="1.5,4 8,9 14.5,4" /></svg>,
+  pin: (p) => <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" {...p}><circle cx="8" cy="6" r="3.2" /><polygon points="5.2,8.5 10.8,8.5 8,14" fill="currentColor" stroke="none" /></svg>,
+  linkedin: (p) => <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" {...p}><circle cx="5.5" cy="5.5" r="3" /><circle cx="10.5" cy="10.5" r="3" /></svg>,
+  summary: (p) => <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" {...p}><rect x="3" y="1.5" width="10" height="13" rx="1" /><line x1="5" y1="5.5" x2="11" y2="5.5" /><line x1="5" y1="8.5" x2="11" y2="8.5" /><line x1="5" y1="11.5" x2="9" y2="11.5" /></svg>,
+  briefcase: (p) => <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" {...p}><rect x="1.5" y="6" width="13" height="8.5" rx="1" /><rect x="6" y="2.5" width="4" height="3.5" rx="1" /></svg>,
+  cap: (p) => <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" stroke="none" {...p}><polygon points="8,2 15,5.5 8,9 1,5.5" /><rect x="4.5" y="7.5" width="7" height="1.6" /></svg>,
+  folder: (p) => <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" {...p}><rect x="1.5" y="3" width="6" height="2.5" rx="0.8" /><rect x="1.5" y="5" width="13" height="9" rx="1" /></svg>,
+  diamond: (p) => <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" stroke="none" {...p}><polygon points="8,1.5 14.5,8 8,14.5 1.5,8" /></svg>,
+  badge: (p) => <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" {...p}><circle cx="8" cy="6" r="4.2" /><polygon points="6,9.5 8,14.5 10,9.5" fill="currentColor" stroke="none" /></svg>,
+  globe: (p) => <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" {...p}><circle cx="8" cy="8" r="6" /><ellipse cx="8" cy="8" rx="2.4" ry="6" /><line x1="2" y1="8" x2="14" y2="8" /></svg>,
+};
+
+export function adaptToModernProfessionalData({ form, experience, education, certifications, skills }) {
+  return {
+    name: form.fullName || 'Your Name',
+    title: form.jobTitle || '',
+    contact: { phone: form.phone || '', email: form.email || '', location: form.location || '', linkedin: form.linkedin || '' },
+    summary: form.summary || '',
+    experience: (experience || []).filter(e => e.role || e.company).map(e => ({
+      role: e.role, company: e.company, location: '', start: (e.period || '').split(/[-–]/)[0]?.trim() || '', end: (e.period || '').split(/[-–]/)[1]?.trim() || '',
+      bullets: e.bullets?.length ? e.bullets : (e.description ? e.description.split('\n').filter(Boolean) : []),
+    })),
+    education: (education || []).filter(e => e.institution || e.degree).map(e => ({ degree: e.degree, school: e.institution, location: e.location || '', start: e.startYear || '', end: e.current ? 'Present' : (e.endYear || '') })),
+    projects: [],
+    skills: (typeof skills === 'string' ? skills.split(',').map(s => s.trim()).filter(Boolean) : (skills || [])).map(name => ({ name, level: 3 })),
+    certifications: (certifications || []).filter(c => c.name).map(c => ({ name: c.name, issuer: c.issuer || '' })),
+    languages: [],
+    achievements: [],
+  };
+}
+
+function MPSidebar({ data }) {
+  const accent = '#1e40af';
+  const hasSummary = !!data.summary?.trim();
+  const hasLinkedin = !!data.contact?.linkedin;
+  const hasSkills = data.skills?.length > 0;
+  const hasCerts = data.certifications?.length > 0;
+  const hasLanguages = data.languages?.length > 0;
+  const hasExperience = data.experience?.length > 0;
+  const hasEducation = data.education?.length > 0;
+  const hasProjects = data.projects?.length > 0;
+  const hasAchievements = data.achievements?.length > 0;
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'stretch', width: '100%', background: '#fff' }}>
+      <div style={{ flex: '0 0 258px', background: '#0e2a52', color: '#fff', padding: '46px 28px 44px', display: 'flex', flexDirection: 'column', gap: 26, boxSizing: 'border-box' }}>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.55)', marginBottom: 10 }}>CONTACT</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 13.5, lineHeight: 1.5, wordBreak: 'break-word' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><MPIcon.phone style={{ flexShrink: 0 }} /><span>{data.contact.phone}</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><MPIcon.mail style={{ flexShrink: 0 }} /><span>{data.contact.email}</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><MPIcon.pin style={{ flexShrink: 0 }} /><span>{data.contact.location}</span></div>
+            {hasLinkedin && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><MPIcon.linkedin style={{ flexShrink: 0 }} /><span>{data.contact.linkedin}</span></div>}
+          </div>
+        </div>
+        {hasSkills && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.55)', marginBottom: 12 }}><MPIcon.diamond />SKILLS</div>
+            {data.skills.map((skill, i) => (
+              <div key={i} style={{ marginBottom: 11 }}>
+                <div style={{ fontSize: 13, marginBottom: 5 }}>{skill.name}</div>
+                <div style={{ height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.18)', overflow: 'hidden' }}>
+                  <div style={{ height: 5, borderRadius: 3, background: '#60a5fa', width: `${Math.max(0, Math.min(5, skill.level || 0)) * 20}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {hasCerts && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.55)', marginBottom: 10 }}><MPIcon.badge />CERTIFICATIONS</div>
+            {data.certifications.map((cert, i) => (
+              <div key={i} style={{ fontSize: 13, lineHeight: 1.45, marginBottom: 9 }}>
+                <div>{cert.name}</div>
+                {cert.issuer && <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12, marginTop: 1 }}>{cert.issuer}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+        {hasLanguages && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.55)', marginBottom: 10 }}><MPIcon.globe />LANGUAGES</div>
+            {data.languages.map((lang, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                <span>{lang.name}</span><span style={{ color: 'rgba(255,255,255,0.6)' }}>{lang.level}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ flex: '1 1 auto', padding: '52px 46px 60px', minWidth: 0, boxSizing: 'border-box' }}>
+        <div style={{ fontSize: 30, fontWeight: 800, color: '#0f172a', lineHeight: 1.12, letterSpacing: '-0.01em' }}>{data.name}</div>
+        <div style={{ fontSize: 14.5, fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 6 }}>{data.title}</div>
+
+        {hasSummary && (
+          <div style={{ marginTop: 22 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f172a', borderBottom: `2px solid ${accent}`, paddingBottom: 5, marginBottom: 10 }}><MPIcon.summary style={{ color: accent }} />Professional Summary</div>
+            <p style={{ fontSize: 14.5, lineHeight: 1.6, color: '#374151', margin: 0 }}>{data.summary}</p>
+          </div>
+        )}
+
+        {hasExperience && (
+          <div style={{ marginTop: 26 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f172a', borderBottom: `2px solid ${accent}`, paddingBottom: 5, marginBottom: 14 }}><MPIcon.briefcase style={{ color: accent }} />Work Experience</div>
+            {data.experience.map((exp, i) => (
+              <div key={i} style={{ marginBottom: 18, breakInside: 'avoid' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>{exp.role} <span style={{ fontWeight: 500, color: '#64748b' }}>· {exp.company}</span></div>
+                  <div style={{ fontSize: 12.5, color: '#94a3b8', whiteSpace: 'nowrap' }}>{exp.start} – {exp.end}</div>
+                </div>
+                {exp.location && <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 2 }}>{exp.location}</div>}
+                <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+                  {exp.bullets.map((b, bi) => <li key={bi} style={{ fontSize: 14, lineHeight: 1.55, color: '#374151', marginBottom: 4 }}>{b}</li>)}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {hasEducation && (
+          <div style={{ marginTop: 22 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f172a', borderBottom: `2px solid ${accent}`, paddingBottom: 5, marginBottom: 12 }}><MPIcon.cap style={{ color: accent }} />Education</div>
+            {data.education.map((edu, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap', marginBottom: 10, breakInside: 'avoid' }}>
+                <div>
+                  <div style={{ fontSize: 14.5, fontWeight: 700, color: '#0f172a' }}>{edu.degree}</div>
+                  <div style={{ fontSize: 13, color: '#64748b' }}>{edu.school}{edu.location ? ` · ${edu.location}` : ''}</div>
+                </div>
+                <div style={{ fontSize: 12.5, color: '#94a3b8', whiteSpace: 'nowrap' }}>{edu.start} – {edu.end}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {hasProjects && (
+          <div style={{ marginTop: 22 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f172a', borderBottom: `2px solid ${accent}`, paddingBottom: 5, marginBottom: 12 }}><MPIcon.folder style={{ color: accent }} />Projects</div>
+            {data.projects.map((proj, i) => (
+              <div key={i} style={{ marginBottom: 12, breakInside: 'avoid' }}>
+                <div style={{ fontSize: 14.5, fontWeight: 700, color: '#0f172a' }}>{proj.name}</div>
+                <p style={{ fontSize: 14, lineHeight: 1.55, color: '#374151', margin: '3px 0 0' }}>{proj.description}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {hasAchievements && (
+          <div style={{ marginTop: 22 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f172a', borderBottom: `2px solid ${accent}`, paddingBottom: 5, marginBottom: 12 }}><MPIcon.diamond style={{ color: accent }} />Achievements</div>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {data.achievements.map((a, i) => <li key={i} style={{ fontSize: 14, lineHeight: 1.55, color: '#374151', marginBottom: 5 }}>{a}</li>)}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MPCentered({ data }) {
+  const accent = '#047857';
+  const hasSummary = !!data.summary?.trim();
+  const hasLinkedin = !!data.contact?.linkedin;
+  const hasExperience = data.experience?.length > 0;
+  const hasEducation = data.education?.length > 0;
+  const hasProjects = data.projects?.length > 0;
+  const hasAchievements = data.achievements?.length > 0;
+  const hasSkills = data.skills?.length > 0;
+  const hasCerts = data.certifications?.length > 0;
+
+  return (
+    <div style={{ width: '100%', background: '#fff', padding: '56px 64px 64px', boxSizing: 'border-box' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 32, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>{data.name}</div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: accent, textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 8 }}>{data.title}</div>
+        <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center', gap: '8px 16px', marginTop: 16, fontSize: 13.5, color: '#475569' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MPIcon.phone style={{ color: accent }} />{data.contact.phone}</span>
+          <span style={{ color: '#cbd5e1' }}>•</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MPIcon.mail style={{ color: accent }} />{data.contact.email}</span>
+          <span style={{ color: '#cbd5e1' }}>•</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MPIcon.pin style={{ color: accent }} />{data.contact.location}</span>
+          {hasLinkedin && <><span style={{ color: '#cbd5e1' }}>•</span><span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MPIcon.linkedin style={{ color: accent }} />{data.contact.linkedin}</span></>}
+        </div>
+      </div>
+
+      {hasSummary && (
+        <div style={{ marginTop: 36, paddingTop: 28, borderTop: '1px solid #e5e7eb' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: accent, marginBottom: 12 }}><MPIcon.summary />Professional Summary</div>
+          <p style={{ fontSize: 14.5, lineHeight: 1.65, color: '#374151', textAlign: 'center', maxWidth: 620, margin: '0 auto' }}>{data.summary}</p>
+        </div>
+      )}
+
+      {hasExperience && (
+        <div style={{ marginTop: 30, paddingTop: 28, borderTop: '1px solid #e5e7eb' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: accent, marginBottom: 18 }}><MPIcon.briefcase />Experience</div>
+          {data.experience.map((exp, i) => (
+            <div key={i} style={{ marginBottom: 20, breakInside: 'avoid' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 15.5, fontWeight: 700, color: '#0f172a' }}>{exp.role} <span style={{ fontWeight: 500, color: '#64748b' }}>— {exp.company}</span></div>
+                <div style={{ fontSize: 12.5, color: '#94a3b8', whiteSpace: 'nowrap' }}>{exp.start} – {exp.end}</div>
+              </div>
+              {exp.location && <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 2 }}>{exp.location}</div>}
+              <ul style={{ margin: '9px 0 0', paddingLeft: 18 }}>
+                {exp.bullets.map((b, bi) => <li key={bi} style={{ fontSize: 14, lineHeight: 1.6, color: '#374151', marginBottom: 4 }}>{b}</li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {hasEducation && (
+        <div style={{ marginTop: 8, paddingTop: 28, borderTop: '1px solid #e5e7eb' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: accent, marginBottom: 16 }}><MPIcon.cap />Education</div>
+          {data.education.map((edu, i) => (
+            <div key={i} style={{ textAlign: 'center', marginBottom: 12, breakInside: 'avoid' }}>
+              <div style={{ fontSize: 14.5, fontWeight: 700, color: '#0f172a' }}>{edu.degree}</div>
+              <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>{edu.school}{edu.location ? ` · ${edu.location}` : ''} · {edu.start} – {edu.end}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {hasProjects && (
+        <div style={{ marginTop: 8, paddingTop: 28, borderTop: '1px solid #e5e7eb' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: accent, marginBottom: 16 }}><MPIcon.folder />Projects</div>
+          {data.projects.map((proj, i) => (
+            <div key={i} style={{ textAlign: 'center', marginBottom: 14, breakInside: 'avoid' }}>
+              <div style={{ fontSize: 14.5, fontWeight: 700, color: '#0f172a' }}>{proj.name}</div>
+              <p style={{ fontSize: 14, lineHeight: 1.6, color: '#374151', margin: '3px auto 0', maxWidth: 560 }}>{proj.description}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {hasAchievements && (
+        <div style={{ marginTop: 8, paddingTop: 28, borderTop: '1px solid #e5e7eb' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: accent, marginBottom: 14 }}><MPIcon.diamond />Achievements</div>
+          <div style={{ maxWidth: 560, margin: '0 auto' }}>
+            {data.achievements.map((a, i) => <div key={i} style={{ fontSize: 14, lineHeight: 1.6, color: '#374151', textAlign: 'center', marginBottom: 6 }}>{a}</div>)}
+          </div>
+        </div>
+      )}
+
+      {hasSkills && (
+        <div style={{ marginTop: 8, paddingTop: 28, borderTop: '1px solid #e5e7eb' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: accent, marginBottom: 14 }}><MPIcon.diamond />Skills</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8 }}>
+            {data.skills.map((skill, i) => <span key={i} style={{ fontSize: 13, fontWeight: 600, color: '#065f46', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 999, padding: '5px 13px' }}>{skill.name}</span>)}
+          </div>
+        </div>
+      )}
+
+      {hasCerts && (
+        <div style={{ marginTop: 8, paddingTop: 28, borderTop: '1px solid #e5e7eb' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: accent, marginBottom: 14 }}><MPIcon.badge />Certifications</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px 22px' }}>
+            {data.certifications.map((cert, i) => (
+              <div key={i} style={{ fontSize: 13.5, color: '#374151', textAlign: 'center' }}>{cert.name}{cert.issuer && <span style={{ color: '#94a3b8' }}> · {cert.issuer}</span>}</div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MPHeaderBand({ data }) {
+  const accent = '#1c2431';
+  const hasSummary = !!data.summary?.trim();
+  const hasLinkedin = !!data.contact?.linkedin;
+  const hasExperience = data.experience?.length > 0;
+  const hasEducation = data.education?.length > 0;
+  const hasProjects = data.projects?.length > 0;
+  const hasAchievements = data.achievements?.length > 0;
+  const hasSkills = data.skills?.length > 0;
+  const hasCerts = data.certifications?.length > 0;
+  const hasLanguages = data.languages?.length > 0;
+
+  return (
+    <div style={{ width: '100%', background: '#fff' }}>
+      <div style={{ background: accent, color: '#fff', padding: '44px 56px', display: 'flex', alignItems: 'center', gap: 22, boxSizing: 'border-box' }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 29, fontWeight: 800, letterSpacing: '-0.01em' }}>{data.name}</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 6 }}>{data.title}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px 16px', marginTop: 12, fontSize: 13, color: '#cbd5e1' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MPIcon.phone style={{ color: '#cbd5e1' }} />{data.contact.phone}</span>
+            <span style={{ color: '#4b5563' }}>|</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MPIcon.mail style={{ color: '#cbd5e1' }} />{data.contact.email}</span>
+            <span style={{ color: '#4b5563' }}>|</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MPIcon.pin style={{ color: '#cbd5e1' }} />{data.contact.location}</span>
+            {hasLinkedin && <><span style={{ color: '#4b5563' }}>|</span><span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><MPIcon.linkedin style={{ color: '#cbd5e1' }} />{data.contact.linkedin}</span></>}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ padding: '36px 56px 56px', boxSizing: 'border-box' }}>
+        {hasSummary && (
+          <div style={{ marginBottom: 26 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: accent, marginBottom: 10 }}><MPIcon.summary />Professional Summary</div>
+            <p style={{ fontSize: 14.5, lineHeight: 1.6, color: '#374151', margin: 0 }}>{data.summary}</p>
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 40, alignItems: 'start' }}>
+          <div style={{ minWidth: 0 }}>
+            {hasExperience && (
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: accent, paddingBottom: 6, borderBottom: `1px solid ${accent}`, marginBottom: 14 }}><MPIcon.briefcase />Experience</div>
+                {data.experience.map((exp, i) => (
+                  <div key={i} style={{ marginBottom: 18, breakInside: 'avoid' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+                      <div style={{ fontSize: 14.5, fontWeight: 700, color: '#0f172a' }}>{exp.role}</div>
+                      <div style={{ fontSize: 12, color: '#94a3b8', whiteSpace: 'nowrap' }}>{exp.start} – {exp.end}</div>
+                    </div>
+                    <div style={{ fontSize: 13, color: '#64748b', marginTop: 1 }}>{exp.company}{exp.location ? ` · ${exp.location}` : ''}</div>
+                    <ul style={{ margin: '7px 0 0', paddingLeft: 17 }}>
+                      {exp.bullets.map((b, bi) => <li key={bi} style={{ fontSize: 13.5, lineHeight: 1.55, color: '#374151', marginBottom: 4 }}>{b}</li>)}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+            {hasProjects && (
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: accent, paddingBottom: 6, borderBottom: `1px solid ${accent}`, marginBottom: 14 }}><MPIcon.folder />Projects</div>
+                {data.projects.map((proj, i) => (
+                  <div key={i} style={{ marginBottom: 12, breakInside: 'avoid' }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{proj.name}</div>
+                    <p style={{ fontSize: 13.5, lineHeight: 1.55, color: '#374151', margin: '3px 0 0' }}>{proj.description}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {hasAchievements && (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: accent, paddingBottom: 6, borderBottom: `1px solid ${accent}`, marginBottom: 14 }}><MPIcon.diamond />Achievements</div>
+                <ul style={{ margin: 0, paddingLeft: 17 }}>
+                  {data.achievements.map((a, i) => <li key={i} style={{ fontSize: 13.5, lineHeight: 1.55, color: '#374151', marginBottom: 5 }}>{a}</li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <div style={{ minWidth: 0 }}>
+            {hasEducation && (
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: accent, paddingBottom: 6, borderBottom: `1px solid ${accent}`, marginBottom: 12 }}><MPIcon.cap />Education</div>
+                {data.education.map((edu, i) => (
+                  <div key={i} style={{ marginBottom: 10, breakInside: 'avoid' }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0f172a', lineHeight: 1.4 }}>{edu.degree}</div>
+                    <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 2 }}>{edu.school}</div>
+                    <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 1 }}>{edu.start} – {edu.end}{edu.location ? ` · ${edu.location}` : ''}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {hasSkills && (
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: accent, paddingBottom: 6, borderBottom: `1px solid ${accent}`, marginBottom: 12 }}><MPIcon.diamond />Skills</div>
+                {data.skills.map((skill, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 9 }}>
+                    <span style={{ fontSize: 13, color: '#374151' }}>{skill.name}</span>
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      {[0, 1, 2, 3, 4].map(n => <span key={n} style={{ width: 7, height: 7, borderRadius: '50%', display: 'inline-block', background: n < (skill.level || 0) ? accent : '#e2e8f0' }} />)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {hasCerts && (
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: accent, paddingBottom: 6, borderBottom: `1px solid ${accent}`, marginBottom: 12 }}><MPIcon.badge />Certifications</div>
+                {data.certifications.map((cert, i) => (
+                  <div key={i} style={{ fontSize: 13, lineHeight: 1.5, color: '#374151', marginBottom: 8 }}>
+                    <div>{cert.name}</div>
+                    {cert.issuer && <div style={{ color: '#94a3b8', fontSize: 12 }}>{cert.issuer}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+            {hasLanguages && (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: accent, paddingBottom: 6, borderBottom: `1px solid ${accent}`, marginBottom: 12 }}><MPIcon.globe />Languages</div>
+                {data.languages.map((lang, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                    <span style={{ color: '#374151' }}>{lang.name}</span><span style={{ color: '#94a3b8' }}>{lang.level}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export const TEMPLATES = { classic: ClassicProfessional, sidebar: ModernSidebar, executive: ExecutiveMinimal, mpSidebar: MPSidebar, mpCentered: MPCentered, mpHeaderBand: MPHeaderBand };
+export const TEMPLATE_LABELS = { classic: 'Elegant Minimal', sidebar: 'Classic Sidebar', executive: 'Executive', mpSidebar: 'Modern Professional — Sidebar', mpCentered: 'Modern Professional — Centered', mpHeaderBand: 'Modern Professional — Header Band' };
+
+// Richer metadata for the card-based template picker — badge (⭐ = recommended
+// for that situation), and a "best for" line so people can choose based on
+// their actual situation rather than guessing from a name alone. When more
+// templates are added later, just add an entry here — both Resume Builder
+// and CV Improver read from this same list.
+export const TEMPLATE_META = [
+  { key: 'mpSidebar', label: 'Modern Professional — Sidebar', badge: '⭐', bestFor: 'Perfect for most job applications. A coloured sidebar anchors contact, skills and credentials beside a clean main column.' },
+  { key: 'mpCentered', label: 'Modern Professional — Centered', badge: null, bestFor: 'Clean, modern and ATS-friendly. Generous whitespace and thin dividers give it an open, elegant feel.' },
+  { key: 'mpHeaderBand', label: 'Modern Professional — Header Band', badge: null, bestFor: 'Modern corporate appearance with premium hierarchy. A dark header band opens onto a two-column body.' },
+  { key: 'classic', label: 'Elegant Minimal', badge: null, bestFor: 'Banking, finance, legal, administration' },
+  { key: 'executive', label: 'Executive', badge: null, bestFor: 'Managers and senior professionals' },
+  { key: 'sidebar', label: 'Classic Sidebar', badge: null, bestFor: 'An earlier two-column layout, kept available alongside the newer Modern Professional set' },
+];
+
+// Shared card-based picker — shows people what each template is *for*, not
+// just a name, so they can choose based on their own situation. Both tools
+// render this exact same component; adding a template to TEMPLATE_META above
+// automatically gives it a card here in both places, no extra wiring needed.
+export function TemplatePicker({ selected, onSelect }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 4 }}>
+      {TEMPLATE_META.map(({ key, label, badge, bestFor }) => {
+        const isSelected = selected === key;
+        return (
+          <button
+            key={key}
+            onClick={() => onSelect(key)}
+            style={{
+              textAlign: 'left', padding: '14px 16px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
+              border: isSelected ? '2px solid #2563EB' : '1px solid #E2E8F0',
+              background: isSelected ? '#EFF6FF' : 'white',
+              transition: 'all 150ms ease',
+            }}
+          >
+            <div style={{ fontSize: '0.9rem', fontWeight: 700, color: isSelected ? '#1D4ED8' : '#0F172A', marginBottom: 4 }}>
+              {badge && <span style={{ marginRight: 5 }}>{badge}</span>}{label}
+            </div>
+            <div style={{ fontSize: '0.76rem', color: '#64748B', lineHeight: 1.4 }}>{bestFor}</div>
+            {isSelected && (
+              <div style={{ marginTop: 8, fontSize: '0.72rem', fontWeight: 700, color: '#2563EB' }}>✓ Selected</div>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 // Shared print isolation CSS — only the resume itself is visible when printing,
 // regardless of what else is on the page (sidebar controls, other UI, etc.)

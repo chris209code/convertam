@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Script from 'next/script';
 
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
@@ -178,6 +179,11 @@ export default function PresentationGeneratorWorkspace() {
 
   async function handleGenerateOutline() {
     setError('');
+    const hasPdf = files.some((f) => f.type === 'application/pdf');
+    if (hasPdf && !window.pdfjsLib) {
+      setError('Still loading — please wait a moment and try again.');
+      return;
+    }
     const extracted = await extractAll();
     return runOutline(extracted);
   }
@@ -373,6 +379,7 @@ export default function PresentationGeneratorWorkspace() {
     const totalSize = files.reduce((s, f) => s + f.size, 0);
     return (
       <div className="panel">
+        <Script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" />
         <div style={{ border: '2px dashed #CBD5E1', borderRadius: 14, padding: '32px 20px', textAlign: 'center', marginBottom: 20 }}>
           <p style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Upload documents to turn into a presentation</p>
           <p style={{ fontSize: '0.8rem', color: '#64748B', marginBottom: 14 }}>PDF, Word (.docx), TXT, or photos of documents. Up to {MAX_FILES} files, 25 MB each.</p>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Icon, TEMPLATES, TEMPLATE_LABELS, useResumeData, RESUME_PRINT_STYLES } from './resumeTemplates';
+import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptToModernProfessionalData, RESUME_PRINT_STYLES } from './resumeTemplates';
 
 async function callAI(action, payload) {
   const res = await fetch('/api/resume-ai', {
@@ -48,7 +48,7 @@ export default function ResumeBuilderWorkspace() {
   const [careerLevel, setCareerLevel] = useState('');
   const [targetRole, setTargetRole] = useState('');
   const [customRole, setCustomRole] = useState('');
-  const [template, setTemplate] = useState('classic');
+  const [template, setTemplate] = useState('mpSidebar');
 
   const [form, setForm] = useState({ fullName: '', jobTitle: '', email: '', phone: '', location: '', linkedin: '', summary: '' });
   const [experience, setExperience] = useState([{ ...EMPTY_EXP }]);
@@ -174,6 +174,10 @@ export default function ResumeBuilderWorkspace() {
   }
 
   const resumeData = useResumeData({ form, targetRole: role, experience, education, certifications, skills });
+  const isModernProfessional = template.startsWith('mp');
+  const templateData = isModernProfessional
+    ? adaptToModernProfessionalData({ form, experience, education, certifications, skills })
+    : resumeData;
   const TemplateComponent = TEMPLATES[template];
 
   const STEPS = ['You', 'Personal Info', 'Experience', 'Education', 'Skills', 'Summary', 'Preview & Download'];
@@ -431,21 +435,17 @@ export default function ResumeBuilderWorkspace() {
 
       {step === 6 && (
         <div>
-          <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {Object.keys(TEMPLATES).map(key => (
-                <button key={key} onClick={() => setTemplate(key)} style={{ padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, border: template === key ? '2px solid #2563EB' : '1px solid #E2E8F0', background: template === key ? '#EFF6FF' : 'white', color: template === key ? '#2563EB' : '#475569' }}>
-                  {TEMPLATE_LABELS[key]}
-                </button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <button className="btn btn-ghost" onClick={() => setStep(5)}>← Back</button>
-              <button className="btn btn-primary" onClick={() => window.print()}>⬇️ Download PDF</button>
-              <a href="/pdf-to-word" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600, color: '#2563EB', textDecoration: 'none', padding: '10px 14px', borderRadius: 8, border: '1px solid #BFDBFE', background: '#EFF6FF' }}>
-                <Icon.doc /> Convert to MS Word
-              </a>
-            </div>
+          <p className="no-print" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', marginBottom: 10 }}>Choose a template</p>
+          <div className="no-print" style={{ marginBottom: 18 }}>
+            <TemplatePicker selected={template} onSelect={setTemplate} />
+          </div>
+
+          <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+            <button className="btn btn-ghost" onClick={() => setStep(5)}>← Back</button>
+            <button className="btn btn-primary" onClick={() => window.print()}>⬇️ Download PDF</button>
+            <a href="/pdf-to-word" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600, color: '#2563EB', textDecoration: 'none', padding: '10px 14px', borderRadius: 8, border: '1px solid #BFDBFE', background: '#EFF6FF' }}>
+              <Icon.doc /> Convert to MS Word
+            </a>
           </div>
           <p className="no-print" style={{ fontSize: '0.75rem', color: '#94A3B8', textAlign: 'right', marginTop: -8, marginBottom: 16 }}>
             Need an editable copy? Convert your downloaded PDF to Word.
@@ -454,7 +454,7 @@ export default function ResumeBuilderWorkspace() {
           <div style={{ background: '#E2E8F0', padding: '20px 0', borderRadius: 12, display: 'flex', justifyContent: 'center', overflowX: 'auto' }}>
             <div className="resume-print-root">
               <div className="resume-page-frame" style={{ width: '210mm', minHeight: '297mm', background: 'white', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
-                <TemplateComponent data={resumeData} />
+                <TemplateComponent data={templateData} />
               </div>
             </div>
           </div>

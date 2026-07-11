@@ -98,6 +98,8 @@ function PasswordGenerator() {
   const [separator, setSeparator] = useState('-');
   const [capitalizeWords, setCapitalizeWords] = useState(true);
   const [appendNumber, setAppendNumber] = useState(true);
+  const [useOwnWords, setUseOwnWords] = useState(false);
+  const [ownWordsInput, setOwnWordsInput] = useState('');
 
   const [password, setPassword] = useState('');
   const [copied, setCopied] = useState(false);
@@ -119,10 +121,18 @@ function PasswordGenerator() {
   }
 
   function generatePassphrase() {
-    const words = Array.from({ length: wordCount }, () => {
-      const w = randomWord();
-      return capitalizeWords ? capitalize(w) : w;
-    });
+    let sourceWords;
+    if (useOwnWords) {
+      sourceWords = ownWordsInput.split(/[,\s]+/).map(w => w.trim()).filter(Boolean);
+      if (!sourceWords.length) return '';
+      // Shuffle the order so the same set of words doesn't always come out
+      // in the order they were typed — still recognizable to the person,
+      // still not predictable to anyone else.
+      sourceWords = [...sourceWords].sort(() => Math.random() - 0.5);
+    } else {
+      sourceWords = Array.from({ length: wordCount }, () => randomWord());
+    }
+    const words = sourceWords.map(w => capitalizeWords ? capitalize(w) : w.toLowerCase());
     const sep = separator === 'space' ? ' ' : separator === 'none' ? '' : separator;
     let phrase = words.join(sep);
     if (appendNumber) phrase += (sep || '') + Math.floor(10 + Math.random() * 90);
@@ -177,10 +187,28 @@ function PasswordGenerator() {
           <p style={{ fontSize: '0.78rem', color: '#64748B', marginBottom: 14, lineHeight: 1.5 }}>
             Easier to remember and type than random characters, while still being hard to guess — a few unrelated words strung together.
           </p>
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Number of words: {wordCount}</label>
-            <input type="range" min={3} max={6} value={wordCount} onChange={e => setWordCount(Number(e.target.value))} style={{ width: '100%', accentColor: '#2563EB' }} />
-          </div>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', color: '#334155', cursor: 'pointer', marginBottom: 14 }}>
+            <input type="checkbox" checked={useOwnWords} onChange={e => setUseOwnWords(e.target.checked)} />
+            Use my own words instead of suggested ones
+          </label>
+
+          {useOwnWords ? (
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Your words (separate with commas or spaces)</label>
+              <input
+                type="text" value={ownWordsInput} onChange={e => setOwnWordsInput(e.target.value)}
+                placeholder="e.g. mango, lagos, sunrise, 2019"
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.88rem', fontFamily: 'inherit', outline: 'none' }}
+              />
+              <p style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: 4 }}>These get shuffled into a different order each time you generate — not just used as typed.</p>
+            </div>
+          ) : (
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Number of words: {wordCount}</label>
+              <input type="range" min={3} max={6} value={wordCount} onChange={e => setWordCount(Number(e.target.value))} style={{ width: '100%', accentColor: '#2563EB' }} />
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
             <div>
               <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Separator</label>
@@ -203,7 +231,7 @@ function PasswordGenerator() {
         </>
       )}
 
-      <button onClick={generate} style={{ width: '100%', padding: '10px', background: '#2563EB', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, fontSize: '0.88rem', marginBottom: 12 }}>
+      <button onClick={generate} disabled={useOwnWords && mode === 'passphrase' && !ownWordsInput.trim()} style={{ width: '100%', padding: '10px', background: (useOwnWords && mode === 'passphrase' && !ownWordsInput.trim()) ? '#94A3B8' : '#2563EB', color: 'white', border: 'none', borderRadius: 8, cursor: (useOwnWords && mode === 'passphrase' && !ownWordsInput.trim()) ? 'default' : 'pointer', fontFamily: 'inherit', fontWeight: 600, fontSize: '0.88rem', marginBottom: 12 }}>
         Generate {mode === 'characters' ? 'Password' : 'Passphrase'}
       </button>
       {password && (

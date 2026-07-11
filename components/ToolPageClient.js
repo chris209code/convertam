@@ -30,7 +30,6 @@ import CVImproverWorkspace from '@/components/tools/CVImproverWorkspace';
 import CoverLetterWriterWorkspace from '@/components/tools/CoverLetterWriterWorkspace';
 import ContractSummarizerWorkspace from '@/components/tools/ContractSummarizerWorkspace';
 import PresentationGeneratorWorkspace from '@/components/tools/PresentationGeneratorWorkspace';
-import PresentationGeneratorWorkspace from '@/components/tools/PresentationGeneratorWorkspace';
 import DataAnalystWorkspace from '@/components/tools/DataAnalystWorkspace';
 import ImageCompressorWorkspace from '@/components/tools/ImageCompressorWorkspace';
 import ImageResizerCropperWorkspace from '@/components/tools/ImageResizerCropperWorkspace';
@@ -53,7 +52,7 @@ const isFree = (mode) =>
    'remove-pages', 'add-page-numbers', 'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize',
    'fill', 'write-on-pdf', 'quotation', 'calculator-hub', 'utilities-hub', 'cv-improver', 'resume-builder',
    'cover-letter', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'presentation-generator',
-   'presentation-generator', 'data-analyst',
+   'data-analyst',
    'id-card-generator', 'document-enhancer', 'delivery-note-waybill'].includes(mode);
 
 function getPriceBadge(mode) {
@@ -136,7 +135,6 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'cv-improver' && <CVImproverWorkspace />}
       {tool.mode === 'cover-letter' && <CoverLetterWriterWorkspace />}
       {tool.mode === 'contract-summarizer' && <ContractSummarizerWorkspace />}
-      {tool.mode === 'presentation-generator' && <PresentationGeneratorWorkspace />}
       {tool.mode === 'presentation-generator' && <PresentationGeneratorWorkspace />}
       {tool.mode === 'data-analyst' && <DataAnalystWorkspace />}
       {tool.mode === 'image-compressor' && <ImageCompressorWorkspace />}

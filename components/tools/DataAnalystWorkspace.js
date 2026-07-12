@@ -7,8 +7,9 @@ import { discoverKPIs, computeKpiCards, discoverCharts } from '@/lib/dataAnalysi
 
 // Superseded by OBJECTIVE_OPTIONS below — the old multi-select "what would
 // you like to do" chips have been replaced by single-select objective cards
-// per the Milestone 2 spec. OBJECTIVE_TO_INTENTS still maps onto this same
-// shape internally so the existing analyze endpoint needs no changes yet.
+// per the Milestone 2 spec. As of Milestone 4, the objective is sent to the
+// AI directly (via OBJECTIVE_FOCUS-style framing server-side) rather than
+// mapped onto the old intents shape — that mapping is no longer needed.
 
 // Objective cards shown after Dataset Understanding. Availability of some
 // objectives depends on what the dataset actually supports (checked against
@@ -28,17 +29,6 @@ const OBJECTIVE_OPTIONS = [
 // intents shape the current /api/data-analyst "analyze" action already
 // expects — keeps that endpoint's prompt logic completely unchanged for
 // this milestone (deeper objective-aware prompt rework is a later milestone).
-const OBJECTIVE_TO_INTENTS = {
-  'Let AI Decide': ['Analyze my data', 'Generate charts', 'Executive report'],
-  'Executive Management Report': ['Analyze my data', 'Executive report'],
-  'Root Cause Analysis': ['Analyze my data', 'Identify trends'],
-  'Performance Comparison': ['Analyze my data', 'Generate charts'],
-  'Operational Analysis': ['Analyze my data', 'Generate charts'],
-  'Audit / Compliance Report': ['Analyze my data', 'Executive report'],
-  'Trend Analysis': ['Analyze my data', 'Identify trends'],
-  'Dashboard View': ['Generate charts'],
-};
-
 const CHART_COLORS = ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
 
 const inputStyle = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' };
@@ -207,6 +197,38 @@ function computeQualityWarnings(columns, rows, stats) {
 // Chart data preparation — turns a suggested chart spec + the real rows into
 // actual plottable {labels, values} or {points}, computed by us, not the AI.
 // ---------------------------------------------------------------------------
+// Compact, already-computed summary per chart — this is what actually gets
+// sent to the AI (never the raw dataset), satisfying "never send the raw
+// dataset if deterministic statistics already exist."
+function summarizeChartForAI(chart, data) {
+  const base = { type: chart.type, title: chart.title, whatItShows: chart.whatItShows, whyItMatters: chart.whyItMatters };
+  if (!data) return base;
+
+  if (chart.type === 'pareto') {
+    const total = data.values.reduce((a, b) => a + b, 0);
+    const contributorsFor80 = data.cumulativePercents.findIndex((p) => p >= 80) + 1;
+    return { ...base, topContributors: data.labels.slice(0, 3), topValues: data.values.slice(0, 3), totalCategories: data.labels.length, contributorsFor80Percent: contributorsFor80 || data.labels.length, total: Math.round(total * 100) / 100 };
+  }
+  if (chart.type === 'heatmap') {
+    let max = 0, maxX = '', maxY = '';
+    data.grid.forEach((row, yi) => row.forEach((count, xi) => { if (count > max) { max = count; maxX = data.xLabels[xi]; maxY = data.yLabels[yi]; } }));
+    return { ...base, highestCombination: { [chart.xColumn]: maxX, [chart.yColumn]: maxY, count: max } };
+  }
+  if (chart.type === 'scatter') {
+    return { ...base, xColumn: chart.xColumn, yColumn: chart.yColumn, pointCount: data.points.length };
+  }
+  if (chart.type === 'histogram') {
+    const maxBinIdx = data.values.indexOf(Math.max(...data.values));
+    return { ...base, mostCommonRange: data.labels[maxBinIdx], totalCount: data.values.reduce((a, b) => a + b, 0) };
+  }
+  if (chart.type === 'line') {
+    const first = data.values[0], last = data.values[data.values.length - 1];
+    return { ...base, firstValue: first, lastValue: last, direction: last >= first ? 'increased' : 'decreased', min: Math.min(...data.values), max: Math.max(...data.values) };
+  }
+  // bar / pie
+  return { ...base, topCategories: data.labels.slice(0, 5), topValues: data.values.slice(0, 5), totalCategories: data.labels.length };
+}
+
 function prepareChartData(chart, rows, stats) {
   const { type, xColumn, yColumn } = chart;
 
@@ -516,7 +538,6 @@ export default function DataAnalystWorkspace() {
   const [understandBusy, setUnderstandBusy] = useState(false);
   const [clarifyingAnswer, setClarifyingAnswer] = useState('');
 
-  const [industry, setIndustry] = useState('General');
   const [objective, setObjective] = useState('Let AI Decide');
 
   const [analysis, setAnalysis] = useState(null);
@@ -647,34 +668,39 @@ export default function DataAnalystWorkspace() {
     try {
       const stats = computeStats(columns, rows);
       const qualityWarnings = computeQualityWarnings(columns, rows, stats);
-      const derivedIntents = OBJECTIVE_TO_INTENTS[objective] || OBJECTIVE_TO_INTENTS['Let AI Decide'];
-      const effectiveIndustry = understanding?.industry || industry;
-      const res = await fetch('/api/data-analyst', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'analyze', columns, stats, sampleRows: rows, qualityWarnings, intents: derivedIntents, industry: effectiveIndustry, objective, rowCount: rows.length }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not analyze this data.');
-      data.qualityWarnings = qualityWarnings;
-      data.stats = stats;
+      const health = datasetHealth || computeDatasetHealth(columns, rows, stats);
 
-      // Charts and KPIs are decided by the deterministic engine, not the AI —
-      // this replaces the AI's own suggestedCharts entirely, per the
-      // explicit "the application discovers, the AI explains" principle.
+      // Everything the engine can determine is computed here, client-side,
+      // BEFORE the AI is ever called — the AI only ever receives the
+      // finished numbers, never the raw dataset.
       const { kpis } = discoverKPIs(columns, stats, understanding);
       const cards = computeKpiCards(kpis, columns, rows, stats);
       setKpiCards(cards);
 
       const engineCharts = discoverCharts(columns, stats, rows, objective);
-      data.suggestedCharts = engineCharts;
-      setAnalysis(data);
-
       const prepared = {};
       engineCharts.forEach((chart, i) => {
         const cd = prepareChartData(chart, rows, stats);
         if (cd) prepared[i] = cd;
       });
       setChartData(prepared);
+
+      const chartSummaries = engineCharts.map((chart, i) => summarizeChartForAI(chart, prepared[i]));
+
+      const res = await fetch('/api/data-analyst', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'analyze',
+          understanding, objective, health, kpis: cards, chartSummaries,
+          columns, stats, qualityWarnings, rowCount: rows.length,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not analyze this data.');
+      data.qualityWarnings = qualityWarnings;
+      data.stats = stats;
+      data.suggestedCharts = engineCharts;
+      setAnalysis(data);
       setPhase('report');
     } catch (err) {
       setError(err.message);
@@ -805,11 +831,45 @@ export default function DataAnalystWorkspace() {
         }
       }
 
-      if (analysis.keyFindings?.length) { heading('Key Findings'); bulletList(analysis.keyFindings); y -= 8; }
-      if (analysis.insights?.length) { heading('Insights'); bulletList(analysis.insights); y -= 8; }
-      if (analysis.trends?.length) { heading('Trends'); bulletList(analysis.trends); y -= 8; }
-      if (analysis.recommendations?.length) { heading('Recommendations'); bulletList(analysis.recommendations); y -= 8; }
-      if (analysis.risks?.length) { heading('Risks & Caveats'); bulletList(analysis.risks); y -= 8; }
+      if (analysis.confidenceStatement) {
+        heading('Confidence in Findings');
+        wrapText(`${analysis.confidenceStatement.level} — ${analysis.confidenceStatement.reasoning}`, 11, font); y -= 8;
+      }
+      if (analysis.keyFindings?.length) {
+        heading('Key Findings');
+        analysis.keyFindings.forEach((f) => {
+          wrapText(`Finding: ${f.finding}`, 11, bold);
+          wrapText(`Evidence: ${f.evidence}`, 10, font);
+          wrapText(`Business implication: ${f.businessImplication}`, 10, font);
+          y -= 6;
+        });
+        y -= 4;
+      }
+      if (analysis.rootCauseObservations?.length) { heading('Root Cause Observations'); bulletList(analysis.rootCauseObservations); y -= 8; }
+      if (analysis.risks?.length) {
+        heading('Risks');
+        analysis.risks.forEach((r) => { wrapText(`[${r.category}] ${r.description} (Likelihood: ${r.likelihood}, Impact: ${r.impact})`, 10, font); });
+        y -= 8;
+      }
+      if (analysis.opportunities?.length) {
+        heading('Opportunities');
+        analysis.opportunities.forEach((o) => { wrapText(`[${o.priority}] ${o.description} — ${o.whyItMatters}`, 10, font); });
+        y -= 8;
+      }
+      if (analysis.recommendations?.length) {
+        heading('Recommendations');
+        analysis.recommendations.forEach((r) => {
+          wrapText(`Recommendation: ${r.recommendation}`, 11, bold);
+          wrapText(`Evidence: ${r.evidence} | Impact: ${r.impact} | Effort: ${r.effort} | Priority: ${r.priority} | Owner: ${r.owner}`, 10, font);
+          y -= 6;
+        });
+        y -= 4;
+      }
+      if (analysis.actionPlan?.length) {
+        heading('Action Plan');
+        analysis.actionPlan.forEach((a) => { wrapText(`[${a.priority}] ${a.action} — Owner: ${a.owner}, Timeline: ${a.timeline}, Success: ${a.successMeasure}`, 10, font); });
+        y -= 8;
+      }
       if (analysis.qualityWarnings?.length) { heading('Data Quality Notes'); bulletList(analysis.qualityWarnings); y -= 8; }
       heading('Conclusion');
       wrapText(analysis.conclusion, 11, font);
@@ -839,11 +899,46 @@ export default function DataAnalystWorkspace() {
         sections.push(new Paragraph({ text: title, heading: HeadingLevel.HEADING_1 }));
         items.forEach((item) => sections.push(new Paragraph({ text: item, bullet: { level: 0 } })));
       };
-      addBulletSection('Key Findings', analysis.keyFindings);
-      addBulletSection('Insights', analysis.insights);
-      addBulletSection('Trends', analysis.trends);
-      addBulletSection('Recommendations', analysis.recommendations);
-      addBulletSection('Risks & Caveats', analysis.risks);
+
+      if (analysis.confidenceStatement) {
+        sections.push(new Paragraph({ text: 'Confidence in Findings', heading: HeadingLevel.HEADING_1 }));
+        sections.push(new Paragraph({ text: `${analysis.confidenceStatement.level} — ${analysis.confidenceStatement.reasoning}` }));
+      }
+
+      if (analysis.keyFindings?.length) {
+        sections.push(new Paragraph({ text: 'Key Findings', heading: HeadingLevel.HEADING_1 }));
+        analysis.keyFindings.forEach((f) => {
+          sections.push(new Paragraph({ children: [new TextRun({ text: f.finding, bold: true })] }));
+          sections.push(new Paragraph({ text: `Evidence: ${f.evidence}` }));
+          sections.push(new Paragraph({ text: `Business implication: ${f.businessImplication}` }));
+        });
+      }
+
+      addBulletSection('Root Cause Observations', analysis.rootCauseObservations);
+
+      if (analysis.risks?.length) {
+        sections.push(new Paragraph({ text: 'Risks', heading: HeadingLevel.HEADING_1 }));
+        analysis.risks.forEach((r) => sections.push(new Paragraph({ text: `[${r.category}] ${r.description} (Likelihood: ${r.likelihood}, Impact: ${r.impact}) — Evidence: ${r.evidence}` })));
+      }
+
+      if (analysis.opportunities?.length) {
+        sections.push(new Paragraph({ text: 'Opportunities', heading: HeadingLevel.HEADING_1 }));
+        analysis.opportunities.forEach((o) => sections.push(new Paragraph({ text: `[${o.priority}] ${o.description} — ${o.whyItMatters}` })));
+      }
+
+      if (analysis.recommendations?.length) {
+        sections.push(new Paragraph({ text: 'Recommendations', heading: HeadingLevel.HEADING_1 }));
+        analysis.recommendations.forEach((r) => {
+          sections.push(new Paragraph({ children: [new TextRun({ text: r.recommendation, bold: true })] }));
+          sections.push(new Paragraph({ text: `Evidence: ${r.evidence} | Impact: ${r.impact} | Effort: ${r.effort} | Priority: ${r.priority} | Owner: ${r.owner}` }));
+        });
+      }
+
+      if (analysis.actionPlan?.length) {
+        sections.push(new Paragraph({ text: 'Action Plan', heading: HeadingLevel.HEADING_1 }));
+        analysis.actionPlan.forEach((a) => sections.push(new Paragraph({ text: `[${a.priority}] ${a.action} — Owner: ${a.owner}, Timeline: ${a.timeline}, Success: ${a.successMeasure}` })));
+      }
+
       addBulletSection('Data Quality Notes', analysis.qualityWarnings);
       sections.push(new Paragraph({ text: 'Conclusion', heading: HeadingLevel.HEADING_1 }));
       sections.push(new Paragraph({ text: analysis.conclusion }));
@@ -882,11 +977,27 @@ export default function DataAnalystWorkspace() {
             bullets: kpiCards.map((k) => `${k.name}: ${k.unit === '%' ? `${k.value}%` : k.unit ? `${k.unit}${k.value.toLocaleString()}` : k.value.toLocaleString()}`),
           },
           ...chartSlides,
-          analysis.keyFindings?.length && { type: 'content', title: 'Key Findings', bullets: analysis.keyFindings },
-          analysis.insights?.length && { type: 'content', title: 'Insights', bullets: analysis.insights },
-          analysis.trends?.length && { type: 'content', title: 'Trends', bullets: analysis.trends },
-          analysis.recommendations?.length && { type: 'content', title: 'Recommendations', bullets: analysis.recommendations },
-          analysis.risks?.length && { type: 'content', title: 'Risks & Caveats', bullets: analysis.risks },
+          analysis.keyFindings?.length && {
+            type: 'content', title: 'Key Findings',
+            bullets: analysis.keyFindings.map((f) => `${f.finding} (${f.evidence}) → ${f.businessImplication}`),
+          },
+          analysis.rootCauseObservations?.length && { type: 'content', title: 'Root Cause Observations', bullets: analysis.rootCauseObservations },
+          analysis.risks?.length && {
+            type: 'content', title: 'Risks',
+            bullets: analysis.risks.map((r) => `[${r.category}] ${r.description} — Likelihood: ${r.likelihood}, Impact: ${r.impact}`),
+          },
+          analysis.opportunities?.length && {
+            type: 'content', title: 'Opportunities',
+            bullets: analysis.opportunities.map((o) => `[${o.priority}] ${o.description}`),
+          },
+          analysis.recommendations?.length && {
+            type: 'content', title: 'Recommendations',
+            bullets: analysis.recommendations.map((r) => `${r.recommendation} — Impact: ${r.impact}, Effort: ${r.effort}, Priority: ${r.priority}, Owner: ${r.owner}`),
+          },
+          analysis.actionPlan?.length && {
+            type: 'content', title: 'Action Plan',
+            bullets: analysis.actionPlan.map((a) => `[${a.priority}] ${a.action} — ${a.owner}, ${a.timeline}`),
+          },
           { type: 'closing', title: 'Thank You', subtitle: analysis.conclusion },
         ].filter(Boolean),
       };
@@ -1193,21 +1304,93 @@ export default function DataAnalystWorkspace() {
 
           {/* Insights */}
           <div>
-            <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>AI Insights</p>
-            <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 16, maxHeight: 560, overflowY: 'auto' }}>
+            <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Executive Intelligence</p>
+            <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 16, maxHeight: 700, overflowY: 'auto' }}>
               <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Executive Summary</p>
               <p style={{ fontSize: '0.8rem', color: '#374151', marginBottom: 14, lineHeight: 1.6 }}>{analysis.executiveSummary}</p>
 
-              {[['Key Findings', analysis.keyFindings], ['Insights', analysis.insights], ['Trends', analysis.trends], ['Recommendations', analysis.recommendations], ['Risks & Caveats', analysis.risks], ['Data Quality Notes', analysis.qualityWarnings]].map(([title, items]) => items?.length > 0 && (
-                <div key={title} style={{ marginBottom: 14 }}>
-                  <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>{title}</p>
-                  {items.map((item, i) => (
-                    <div key={i} style={{ fontSize: '0.8rem', color: '#374151', marginBottom: 4, display: 'flex', gap: 6, lineHeight: 1.5 }}>
-                      <span style={{ color: '#2563EB', flexShrink: 0 }}>•</span>{item}
+              {analysis.confidenceStatement && (
+                <div style={{ marginBottom: 14, padding: 10, borderRadius: 8, background: analysis.confidenceStatement.level === 'High' ? '#ECFDF5' : analysis.confidenceStatement.level === 'Medium' ? '#FFFBEB' : '#FEF2F2' }}>
+                  <p style={{ fontSize: '0.78rem', fontWeight: 700, color: analysis.confidenceStatement.level === 'High' ? '#059669' : analysis.confidenceStatement.level === 'Medium' ? '#D97706' : '#DC2626', marginBottom: 2 }}>Confidence in Findings: {analysis.confidenceStatement.level}</p>
+                  <p style={{ fontSize: '0.76rem', color: '#475569', margin: 0 }}>{analysis.confidenceStatement.reasoning}</p>
+                </div>
+              )}
+
+              {analysis.keyFindings?.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>Key Findings</p>
+                  {analysis.keyFindings.map((f, i) => (
+                    <div key={i} style={{ marginBottom: 10, paddingLeft: 10, borderLeft: '2px solid #BFDBFE' }}>
+                      <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#0F172A', margin: 0 }}>{f.finding}</p>
+                      <p style={{ fontSize: '0.75rem', color: '#64748B', margin: '2px 0' }}>Evidence: {f.evidence}</p>
+                      <p style={{ fontSize: '0.75rem', color: '#059669', margin: 0 }}>→ {f.businessImplication}</p>
                     </div>
                   ))}
                 </div>
-              ))}
+              )}
+
+              {analysis.rootCauseObservations?.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>Root Cause Observations</p>
+                  {analysis.rootCauseObservations.map((o, i) => <p key={i} style={{ fontSize: '0.8rem', color: '#374151', marginBottom: 4, lineHeight: 1.5 }}>• {o}</p>)}
+                </div>
+              )}
+
+              {analysis.risks?.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>Risks</p>
+                  {analysis.risks.map((r, i) => (
+                    <div key={i} style={{ marginBottom: 8, fontSize: '0.78rem' }}>
+                      <span style={{ fontWeight: 700, color: '#0F172A' }}>[{r.category}] </span>
+                      <span style={{ color: '#374151' }}>{r.description}</span>
+                      <span style={{ color: '#94A3B8' }}> — Likelihood: {r.likelihood}, Impact: {r.impact}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {analysis.opportunities?.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>Opportunities</p>
+                  {analysis.opportunities.map((o, i) => (
+                    <div key={i} style={{ marginBottom: 6, fontSize: '0.78rem', color: '#374151' }}>
+                      <span style={{ fontWeight: 700, color: o.priority === 'High' ? '#059669' : o.priority === 'Medium' ? '#D97706' : '#94A3B8' }}>[{o.priority}] </span>
+                      {o.description} — {o.whyItMatters}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {analysis.recommendations?.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>Recommendations</p>
+                  {analysis.recommendations.map((r, i) => (
+                    <div key={i} style={{ marginBottom: 10, paddingLeft: 10, borderLeft: '2px solid #DDD6FE' }}>
+                      <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#0F172A', margin: 0 }}>{r.recommendation}</p>
+                      <p style={{ fontSize: '0.74rem', color: '#64748B', margin: '2px 0' }}>Evidence: {r.evidence}</p>
+                      <p style={{ fontSize: '0.74rem', color: '#7C3AED', margin: 0 }}>Impact: {r.impact} · Effort: {r.effort} · Priority: {r.priority} · Owner: {r.owner}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {analysis.actionPlan?.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>Action Plan</p>
+                  {analysis.actionPlan.map((a, i) => (
+                    <div key={i} style={{ marginBottom: 6, fontSize: '0.76rem', color: '#374151' }}>
+                      <strong>[{a.priority}]</strong> {a.action} — Owner: {a.owner}, Timeline: {a.timeline}, Success: {a.successMeasure}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {analysis.qualityWarnings?.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>Data Quality Notes</p>
+                  {analysis.qualityWarnings.map((w, i) => <p key={i} style={{ fontSize: '0.78rem', color: '#374151', marginBottom: 4 }}>• {w}</p>)}
+                </div>
+              )}
 
               <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Conclusion</p>
               <p style={{ fontSize: '0.8rem', color: '#374151', lineHeight: 1.6 }}>{analysis.conclusion}</p>

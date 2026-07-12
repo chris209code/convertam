@@ -13,28 +13,85 @@ const analysisSchema = {
   type: 'OBJECT',
   properties: {
     executiveSummary: { type: 'STRING' },
-    keyFindings: { type: 'ARRAY', items: { type: 'STRING' } },
-    insights: { type: 'ARRAY', items: { type: 'STRING' } },
-    trends: { type: 'ARRAY', items: { type: 'STRING' } },
-    recommendations: { type: 'ARRAY', items: { type: 'STRING' } },
-    risks: { type: 'ARRAY', items: { type: 'STRING' } },
-    conclusion: { type: 'STRING' },
-    suggestedCharts: {
+    keyFindings: {
       type: 'ARRAY',
       items: {
         type: 'OBJECT',
         properties: {
-          type: { type: 'STRING' }, // bar | line | pie | scatter | histogram
-          title: { type: 'STRING' },
-          xColumn: { type: 'STRING' },
-          yColumn: { type: 'STRING' },
-          reason: { type: 'STRING' },
+          finding: { type: 'STRING' },
+          evidence: { type: 'STRING' },
+          businessImplication: { type: 'STRING' },
         },
-        required: ['type', 'title', 'xColumn'],
+        required: ['finding', 'evidence', 'businessImplication'],
       },
     },
+    rootCauseObservations: { type: 'ARRAY', items: { type: 'STRING' } },
+    risks: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          category: { type: 'STRING' }, // Operational | Financial | Compliance | Quality | Customer | Safety | Reputational
+          description: { type: 'STRING' },
+          likelihood: { type: 'STRING' }, // High | Medium | Low
+          impact: { type: 'STRING' }, // High | Medium | Low
+          evidence: { type: 'STRING' },
+        },
+        required: ['category', 'description', 'likelihood', 'impact', 'evidence'],
+      },
+    },
+    opportunities: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          description: { type: 'STRING' },
+          priority: { type: 'STRING' }, // High | Medium | Low
+          whyItMatters: { type: 'STRING' },
+        },
+        required: ['description', 'priority', 'whyItMatters'],
+      },
+    },
+    recommendations: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          recommendation: { type: 'STRING' },
+          evidence: { type: 'STRING' },
+          impact: { type: 'STRING' }, // High | Medium | Low
+          effort: { type: 'STRING' }, // High | Medium | Low
+          priority: { type: 'STRING' }, // Immediate | Near-term | Long-term
+          owner: { type: 'STRING' }, // "To be assigned" if not inferable
+        },
+        required: ['recommendation', 'evidence', 'impact', 'effort', 'priority', 'owner'],
+      },
+    },
+    actionPlan: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          priority: { type: 'STRING' },
+          action: { type: 'STRING' },
+          owner: { type: 'STRING' }, // "To be assigned" if not inferable
+          timeline: { type: 'STRING' }, // "To be assigned" if not inferable
+          successMeasure: { type: 'STRING' },
+        },
+        required: ['priority', 'action', 'owner', 'timeline', 'successMeasure'],
+      },
+    },
+    confidenceStatement: {
+      type: 'OBJECT',
+      properties: {
+        level: { type: 'STRING' }, // High | Medium | Low
+        reasoning: { type: 'STRING' },
+      },
+      required: ['level', 'reasoning'],
+    },
+    conclusion: { type: 'STRING' },
   },
-  required: ['executiveSummary', 'keyFindings', 'insights', 'recommendations', 'conclusion'],
+  required: ['executiveSummary', 'keyFindings', 'risks', 'opportunities', 'recommendations', 'actionPlan', 'confidenceStatement', 'conclusion'],
 };
 
 // Rows come back as arrays-of-strings aligned to `columns` by position,
@@ -85,34 +142,55 @@ Provide:
 Return ONLY JSON matching the schema.`;
 }
 
-function buildAnalysisPrompt({ columns, stats, sampleRows, qualityWarnings, intents, industry, rowCount }) {
-  const industryLine = industry && industry !== 'General' ? `This data is from a ${industry} context — use terminology and framing appropriate to that field.` : '';
-  const intentLine = intents?.length ? `The user specifically asked for: ${intents.join(', ')}.` : '';
-  return `You are a business data analyst reviewing a dataset on behalf of a client. Write a clear, professional analysis based ONLY on the real computed statistics and sample rows below — never invent numbers.
+const OBJECTIVE_FOCUS = {
+  'Executive Management Report': 'Focus on KPIs, business impact, and strategic priorities. Management wants the headline story, not a data dump.',
+  'Performance Comparison': 'Focus on rankings, comparisons, and variance between categories.',
+  'Operational Analysis': 'Focus on efficiency, frequency of issues, and exceptions.',
+  'Root Cause Analysis': 'Focus on patterns, likely drivers, and recurring issues. Emphasize the root-cause observations section.',
+  'Audit / Compliance Report': 'Focus on missing records, exceptions, and compliance gaps.',
+  'Trend Analysis': 'Focus on how key measures have changed over time.',
+  'Dashboard View': 'Write concise insights suitable for cards and tooltips — short, scannable, not paragraph-length.',
+  'Let AI Decide': 'Use your judgment on what this dataset most needs — KPIs and business impact if unsure.',
+};
+
+function buildAnalysisPrompt({ understanding, objective, health, kpis, chartSummaries, columns, stats, qualityWarnings, rowCount }) {
+  const focusLine = OBJECTIVE_FOCUS[objective] || OBJECTIVE_FOCUS['Let AI Decide'];
+  const industryLine = understanding?.industry ? `Industry/business context: ${understanding.industry}${understanding.businessProcess ? ` — ${understanding.businessProcess}` : ''}.` : '';
+
+  return `You are an experienced business analyst / management consultant writing an executive intelligence report. Every number below has ALREADY been calculated by the application — your job is interpretation, storytelling, and decision support, not arithmetic.
 
 ${NO_FABRICATION_RULE}
+Never recalculate, re-derive, or second-guess any of the numbers provided below — treat them as ground truth and only interpret them.
+Never claim statistical significance unless it's directly evidenced by the numbers given.
+Never imply causation from correlation — use hedged language ("may indicate", "suggests", "appears consistent with", "could be associated with"), never "caused by" or "definitely due to".
+Never reference a chart that isn't in the chart summaries below.
+Clearly distinguish observed facts from anything estimated or suggested.
+Tone: professional, executive, evidence-based, sector-neutral — never exaggerated or marketing-flavored.
+
 ${industryLine}
-${intentLine}
+Selected objective: ${objective}. ${focusLine}
+Dataset: ${rowCount} rows, columns: ${columns.join(', ')} (types: ${JSON.stringify(Object.fromEntries(columns.map((c) => [c, stats[c]?.type])))})
 
-Dataset: ${rowCount} rows, columns: ${columns.join(', ')}
+Dataset health: ${JSON.stringify(health)}
+${qualityWarnings?.length ? `Known data quality issues: ${qualityWarnings.join('; ')}` : 'No significant data quality issues detected.'}
 
-Pre-computed column statistics (ground truth — use these exact numbers):
-${JSON.stringify(stats, null, 2)}
+KPIs already computed:
+${JSON.stringify(kpis, null, 2)}
 
-Sample rows (for context on what the data looks like):
-${JSON.stringify(sampleRows.slice(0, 15), null, 2)}
+Charts already generated (with their pre-computed key numbers — do not invent chart data beyond this):
+${JSON.stringify(chartSummaries, null, 2)}
 
-${qualityWarnings?.length ? `Data quality issues already detected: ${qualityWarnings.join('; ')}` : ''}
+Write the following, all evidence-based and grounded only in the numbers above:
 
-Write:
-- executiveSummary: 2-3 sentences, high-level, for someone with no time to read the full report.
-- keyFindings: 3-6 short, concrete findings using the real numbers given.
-- insights: 3-6 sentences explaining what the numbers actually mean in plain business language.
-- trends: any directional patterns visible in the sample/stats (e.g. "X increases as Y increases") — empty array if nothing meaningful is visible from the given data.
-- recommendations: 2-4 practical, actionable suggestions grounded in the findings.
-- risks: 1-3 potential concerns or caveats (including anything from the data quality issues above, if relevant) — empty array if none.
-- conclusion: 1-2 sentences wrapping up.
-- suggestedCharts: 2-4 charts that would best illustrate this data. Only use chart types: bar, line, pie, scatter, histogram. xColumn/yColumn must be exact column names from the list above. Only suggest a chart if the columns genuinely support it (e.g. don't suggest a line chart without a sequential/date-like column).
+- executiveSummary: maximum 180 words. Must answer: what happened, why it matters, what management should look at first. Do not just list chart labels or repeat numbers without interpretation.
+- keyFindings: 3-7 items, each with a finding (the observation), evidence (the specific number(s) behind it), and businessImplication (what it means for the business — never leave this generic).
+- rootCauseObservations: probable root-cause observations, ONLY when genuinely supported by the evidence above — use hedged language, never assert causation. Empty array if the objective isn't Root Cause Analysis or if there's nothing evidence-backed to say.
+- risks: identify real risks from categories [Operational, Financial, Compliance, Quality, Customer, Safety, Reputational] that the data actually supports — each with description, likelihood (High/Medium/Low), impact (High/Medium/Low), and the specific evidence behind it. Empty array if none are genuinely supported.
+- opportunities: improvement opportunities, each with a priority (High/Medium/Low) and why it matters. Empty array if none stand out.
+- recommendations: each linked to specific evidence, with impact (High/Medium/Low), effort (High/Medium/Low), priority (Immediate/Near-term/Long-term), and owner — use "To be assigned" for owner if there's genuinely no way to infer one from the data, never fabricate a name or team.
+- actionPlan: a short implementation plan — priority, action, owner ("To be assigned" if not inferable), timeline ("To be assigned" if not inferable), successMeasure.
+- confidenceStatement: level (High/Medium/Low) and reasoning — base this on the dataset health, row count, missing values, and whether the selected objective is actually well-supported by this data. Do not overstate confidence on a small or messy dataset.
+- conclusion: 1-2 sentences.
 
 Return ONLY JSON matching the schema — no extra commentary.`;
 }
@@ -172,11 +250,11 @@ export async function POST(request) {
     }
 
     if (action === 'analyze') {
-      const { columns, stats, sampleRows, qualityWarnings, intents, industry, rowCount } = payload;
-      if (!columns?.length || !sampleRows?.length) {
+      const { understanding, objective, health, kpis, chartSummaries, columns, stats, qualityWarnings, rowCount } = payload;
+      if (!columns?.length || !rowCount) {
         return Response.json({ error: 'No usable data received.' }, { status: 400 });
       }
-      const prompt = buildAnalysisPrompt({ columns, stats, sampleRows, qualityWarnings, intents, industry, rowCount });
+      const prompt = buildAnalysisPrompt({ understanding, objective, health, kpis, chartSummaries, columns, stats, qualityWarnings, rowCount });
       const raw = await callGemini(apiKey, [{ text: prompt }], analysisSchema);
       const clean = raw.replace(/```json|```/g, '').trim();
       const analysis = JSON.parse(clean);

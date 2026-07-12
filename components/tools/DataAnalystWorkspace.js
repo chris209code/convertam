@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Script from 'next/script';
 import { buildPptxFromOutline } from '@/lib/buildPptxFromOutline';
+import { discoverKPIs, computeKpiCards, discoverCharts } from '@/lib/dataAnalysisEngine';
 
 // Superseded by OBJECTIVE_OPTIONS below — the old multi-select "what would
 // you like to do" chips have been replaced by single-select objective cards
@@ -230,20 +231,44 @@ function prepareChartData(chart, rows, stats) {
     return points.length ? { points } : null;
   }
 
-  // bar / line / pie — aggregate yColumn by xColumn category (or count rows if no yColumn / non-numeric yColumn)
-  const groups = {};
-  rows.forEach((r) => {
-    const key = String(r[xColumn] ?? 'Unknown');
-    const yVal = yColumn ? toNumber(r[yColumn]) : 1;
-    if (!groups[key]) groups[key] = 0;
-    groups[key] += (yColumn && !isNaN(yVal)) ? yVal : 1;
-  });
-  let entries = Object.entries(groups);
+  if (type === 'pareto') {
+    // Reuse the engine's already-sorted entries rather than recomputing —
+    // avoids duplicate work between chart selection and chart rendering.
+    const entries = chart._entries || Object.entries(rows.reduce((acc, r) => {
+      const key = String(r[xColumn] ?? 'Unknown');
+      acc[key] = (acc[key] || 0) + (yColumn ? toNumber(r[yColumn]) || 0 : 1);
+      return acc;
+    }, {})).sort((a, b) => b[1] - a[1]);
+    const total = entries.reduce((s, [, v]) => s + v, 0) || 1;
+    let cumulative = 0;
+    const cumulativePercents = entries.map(([, v]) => { cumulative += v; return Math.round((cumulative / total) * 1000) / 10; });
+    return { labels: entries.map((e) => e[0]), values: entries.map((e) => Math.round(e[1] * 100) / 100), cumulativePercents };
+  }
+
+  if (type === 'heatmap') {
+    const xVals = [...new Set(rows.map((r) => String(r[xColumn] ?? 'Unknown')))].slice(0, 10);
+    const yVals = [...new Set(rows.map((r) => String(r[yColumn] ?? 'Unknown')))].slice(0, 10);
+    const grid = yVals.map((yv) => xVals.map((xv) => rows.filter((r) => String(r[xColumn]) === xv && String(r[yColumn]) === yv).length));
+    return { xLabels: xVals, yLabels: yVals, grid };
+  }
+
+  // bar / line / pie — reuse engine-provided entries when available, otherwise aggregate here
+  let entries = chart._entries;
+  if (!entries) {
+    const groups = {};
+    rows.forEach((r) => {
+      const key = String(r[xColumn] ?? 'Unknown');
+      const yVal = yColumn ? toNumber(r[yColumn]) : 1;
+      if (!groups[key]) groups[key] = 0;
+      groups[key] += (yColumn && !isNaN(yVal)) ? yVal : 1;
+    });
+    entries = Object.entries(groups);
+  }
   if (entries.length > 12) {
-    entries.sort((a, b) => b[1] - a[1]);
+    entries = [...entries].sort((a, b) => b[1] - a[1]);
     const top = entries.slice(0, 10);
     const otherSum = entries.slice(10).reduce((s, [, v]) => s + v, 0);
-    entries = [...top, ['Other', otherSum]];
+    entries = [...top, ['Others', otherSum]];
   }
   return { labels: entries.map((e) => e[0]), values: entries.map((e) => Math.round(e[1] * 100) / 100) };
 }
@@ -302,6 +327,91 @@ function ChartCanvas({ chart, data, chartRef }) {
         const px = padding.left + ((p.x - xMin) / (xMax - xMin || 1)) * plotW;
         const py = H - padding.bottom - ((p.y - yMin) / (yMax - yMin || 1)) * plotH;
         ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2); ctx.fillStyle = '#2563EB99'; ctx.fill();
+      });
+      return;
+    }
+
+    if (chart.type === 'pareto') {
+      const n = data.values.length;
+      const maxVal = Math.max(...data.values, 1);
+      const plotW = W - padding.left - padding.right, plotH = H - padding.top - padding.bottom;
+      ctx.strokeStyle = '#E2E8F0';
+      ctx.beginPath(); ctx.moveTo(padding.left, padding.top); ctx.lineTo(padding.left, H - padding.bottom); ctx.lineTo(W - padding.right, H - padding.bottom); ctx.stroke();
+
+      const barWidth = (plotW / n) * 0.65;
+      data.values.forEach((v, i) => {
+        const x = padding.left + (i / n) * plotW + ((plotW / n) - barWidth) / 2;
+        const barH = (v / maxVal) * plotH;
+        ctx.fillStyle = '#2563EB';
+        ctx.fillRect(x, H - padding.bottom - barH, barWidth, barH);
+      });
+
+      // Cumulative percentage line, right-hand scale (0-100%)
+      ctx.beginPath();
+      ctx.strokeStyle = '#DC2626';
+      ctx.lineWidth = 2;
+      data.cumulativePercents.forEach((pct, i) => {
+        const x = padding.left + (i / Math.max(n - 1, 1)) * plotW;
+        const y = H - padding.bottom - (pct / 100) * plotH;
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      // 80% reference line
+      const y80 = H - padding.bottom - 0.8 * plotH;
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = '#94A3B8';
+      ctx.beginPath(); ctx.moveTo(padding.left, y80); ctx.lineTo(W - padding.right, y80); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '9px Inter, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('80%', W - padding.right + 2, y80 + 3);
+
+      ctx.fillStyle = '#475569';
+      ctx.font = '10px Inter, sans-serif';
+      data.labels.forEach((label, i) => {
+        const x = padding.left + (i / n) * plotW + (plotW / n) / 2;
+        const short = String(label).length > 10 ? String(label).slice(0, 9) + '…' : label;
+        ctx.save();
+        ctx.translate(x, H - padding.bottom + 14);
+        ctx.rotate(-Math.PI / 6);
+        ctx.textAlign = 'right';
+        ctx.fillText(short, 0, 0);
+        ctx.restore();
+      });
+      return;
+    }
+
+    if (chart.type === 'heatmap') {
+      const { xLabels, yLabels, grid } = data;
+      const cellW = (W - padding.left - 10) / xLabels.length;
+      const cellH = (H - padding.top - padding.bottom) / yLabels.length;
+      const maxCount = Math.max(...grid.flat(), 1);
+      grid.forEach((row, yi) => {
+        row.forEach((count, xi) => {
+          const intensity = count / maxCount;
+          const x = padding.left + xi * cellW, y = padding.top + yi * cellH;
+          ctx.fillStyle = `rgba(37, 99, 235, ${0.08 + intensity * 0.82})`;
+          ctx.fillRect(x, y, cellW - 2, cellH - 2);
+          if (count > 0) {
+            ctx.fillStyle = intensity > 0.5 ? '#fff' : '#1E293B';
+            ctx.font = '10px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(count, x + cellW / 2, y + cellH / 2 + 3);
+          }
+        });
+      });
+      ctx.fillStyle = '#475569';
+      ctx.font = '9px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      xLabels.forEach((label, xi) => {
+        const short = String(label).length > 8 ? String(label).slice(0, 7) + '…' : label;
+        ctx.fillText(short, padding.left + xi * cellW + cellW / 2, H - padding.bottom + 12);
+      });
+      ctx.textAlign = 'right';
+      yLabels.forEach((label, yi) => {
+        const short = String(label).length > 8 ? String(label).slice(0, 7) + '…' : label;
+        ctx.fillText(short, padding.left - 6, padding.top + yi * cellH + cellH / 2 + 3);
       });
       return;
     }
@@ -367,7 +477,26 @@ function ChartCanvas({ chart, data, chartRef }) {
     <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 12, padding: 14 }}>
       <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>{chart.title}</p>
       <canvas ref={(el) => { canvasRef.current = el; if (chartRef) chartRef.current = el; }} width={380} height={240} style={{ width: '100%', height: 'auto', maxWidth: 380 }} />
-      {chart.reason && <p style={{ fontSize: '0.7rem', color: '#94A3B8', marginTop: 6 }}>{chart.reason}</p>}
+      {(chart.whatItShows || chart.whyItMatters) && (
+        <p style={{ fontSize: '0.72rem', color: '#475569', marginTop: 8, lineHeight: 1.4 }}>{chart.whatItShows} {chart.whyItMatters}</p>
+      )}
+      {chart.whySelected && <p style={{ fontSize: '0.68rem', color: '#94A3B8', marginTop: 4, fontStyle: 'italic' }}>{chart.whySelected}</p>}
+    </div>
+  );
+}
+
+function KpiCard({ kpi }) {
+  const displayValue = kpi.unit === '%' ? `${kpi.value}%` : kpi.unit ? `${kpi.unit}${kpi.value.toLocaleString()}` : kpi.value.toLocaleString();
+  return (
+    <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 12, padding: 16 }}>
+      <p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 6 }}>{kpi.name}</p>
+      <p style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0F172A', marginBottom: 4 }}>{displayValue}</p>
+      <p style={{ fontSize: '0.72rem', color: '#64748B', marginBottom: kpi.comparison ? 6 : 0 }}>{kpi.interpretation}</p>
+      {kpi.comparison && (
+        <p style={{ fontSize: '0.72rem', fontWeight: 700, color: kpi.comparison.goodDirection ? '#059669' : '#DC2626' }}>
+          {kpi.comparison.direction === 'up' ? '▲' : '▼'} {kpi.comparison.pctChange}% vs. earlier period
+        </p>
+      )}
     </div>
   );
 }
@@ -393,6 +522,7 @@ export default function DataAnalystWorkspace() {
   const [analysis, setAnalysis] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [chartData, setChartData] = useState({});
+  const [kpiCards, setKpiCards] = useState([]);
   const chartRefs = useRef({});
 
   const [chatMessages, setChatMessages] = useState([]);
@@ -527,10 +657,20 @@ export default function DataAnalystWorkspace() {
       if (!res.ok) throw new Error(data.error || 'Could not analyze this data.');
       data.qualityWarnings = qualityWarnings;
       data.stats = stats;
+
+      // Charts and KPIs are decided by the deterministic engine, not the AI —
+      // this replaces the AI's own suggestedCharts entirely, per the
+      // explicit "the application discovers, the AI explains" principle.
+      const { kpis } = discoverKPIs(columns, stats, understanding);
+      const cards = computeKpiCards(kpis, columns, rows, stats);
+      setKpiCards(cards);
+
+      const engineCharts = discoverCharts(columns, stats, rows, objective);
+      data.suggestedCharts = engineCharts;
       setAnalysis(data);
 
       const prepared = {};
-      (data.suggestedCharts || []).forEach((chart, i) => {
+      engineCharts.forEach((chart, i) => {
         const cd = prepareChartData(chart, rows, stats);
         if (cd) prepared[i] = cd;
       });
@@ -634,6 +774,37 @@ export default function DataAnalystWorkspace() {
       heading('Executive Summary');
       wrapText(analysis.executiveSummary, 11, font); y -= 8;
 
+      if (kpiCards.length) {
+        heading('KPI Highlights');
+        kpiCards.forEach((kpi) => {
+          const displayValue = kpi.unit === '%' ? `${kpi.value}%` : kpi.unit ? `${kpi.unit}${kpi.value.toLocaleString()}` : kpi.value.toLocaleString();
+          checkY(16);
+          page.drawText(`${kpi.name}: ${displayValue}`, { x: margin, y, size: 11, font: bold, color: rgb(0.06, 0.09, 0.16) }); y -= 16;
+        });
+        y -= 8;
+      }
+
+      // Embed actual chart images — not just paragraphs describing them.
+      const chartEntries = Object.entries(chartRefs.current).filter(([, canvas]) => canvas);
+      if (chartEntries.length) {
+        heading('Charts');
+        for (const [i, canvas] of chartEntries) {
+          const chart = analysis.suggestedCharts?.[i];
+          if (!chart) continue;
+          checkY(200);
+          const pngDataUrl = canvas.toDataURL('image/png');
+          const pngBytes = await (await fetch(pngDataUrl)).arrayBuffer();
+          const embeddedImg = await pdfDoc.embedPng(pngBytes);
+          const imgW = 400, imgH = (imgW / canvas.width) * canvas.height;
+          checkY(imgH + 30);
+          page.drawText(chart.title, { x: margin, y, size: 11, font: bold, color: rgb(0.06, 0.09, 0.16) }); y -= 16;
+          page.drawImage(embeddedImg, { x: margin, y: y - imgH, width: imgW, height: imgH });
+          y -= imgH + 10;
+          if (chart.whatItShows) { wrapText(`${chart.whatItShows} ${chart.whyItMatters || ''}`, 9, font); }
+          y -= 10;
+        }
+      }
+
       if (analysis.keyFindings?.length) { heading('Key Findings'); bulletList(analysis.keyFindings); y -= 8; }
       if (analysis.insights?.length) { heading('Insights'); bulletList(analysis.insights); y -= 8; }
       if (analysis.trends?.length) { heading('Trends'); bulletList(analysis.trends); y -= 8; }
@@ -690,11 +861,27 @@ export default function DataAnalystWorkspace() {
   async function downloadPresentation() {
     setDownloading('pptx');
     try {
+      const chartSlides = Object.entries(chartRefs.current)
+        .filter(([, canvas]) => canvas)
+        .map(([i, canvas]) => {
+          const chart = analysis.suggestedCharts?.[i];
+          if (!chart) return null;
+          return {
+            type: 'chart', title: chart.title, imageDataUrl: canvas.toDataURL('image/png'),
+            caption: `${chart.whatItShows || ''} ${chart.whyItMatters || ''}`.trim(),
+          };
+        }).filter(Boolean);
+
       const outline = {
         title: 'Data Analysis',
         subtitle: analysis.executiveSummary,
         slides: [
           { type: 'title', title: 'Data Analysis', subtitle: analysis.executiveSummary },
+          kpiCards.length && {
+            type: 'content', title: 'KPI Highlights',
+            bullets: kpiCards.map((k) => `${k.name}: ${k.unit === '%' ? `${k.value}%` : k.unit ? `${k.unit}${k.value.toLocaleString()}` : k.value.toLocaleString()}`),
+          },
+          ...chartSlides,
           analysis.keyFindings?.length && { type: 'content', title: 'Key Findings', bullets: analysis.keyFindings },
           analysis.insights?.length && { type: 'content', title: 'Insights', bullets: analysis.insights },
           analysis.trends?.length && { type: 'content', title: 'Trends', bullets: analysis.trends },
@@ -714,7 +901,7 @@ export default function DataAnalystWorkspace() {
     setPhase('upload'); setColumns([]); setRows([]); setAnalysis(null); setChartData({});
     setChatMessages([]); setError(''); setFileName(''); setPasteText('');
     setUnderstanding(null); setDatasetHealth(null); setClarifyingAnswer('');
-    setObjective('Let AI Decide');
+    setObjective('Let AI Decide'); setKpiCards([]);
   }
 
   // ===========================================================================
@@ -983,6 +1170,15 @@ export default function DataAnalystWorkspace() {
           </div>
           <button className="btn btn-ghost" onClick={startOver}>Analyze Different Data</button>
         </div>
+
+        {kpiCards.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>KPI Highlights</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+              {kpiCards.map((kpi) => <KpiCard key={kpi.name} kpi={kpi} />)}
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 20, marginBottom: 24 }}>
           {/* Charts */}

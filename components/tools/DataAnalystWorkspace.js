@@ -493,7 +493,7 @@ function ChartCanvas({ chart, data, chartRef, width = 380, height = 240, hideChr
       ctx.fillText(short, 0, 0);
       ctx.restore();
     });
-  }, [chart, data]);
+  }, [chart, data, width, height]);
 
   return hideChrome ? (
     <canvas ref={(el) => { canvasRef.current = el; if (chartRef) chartRef.current = el; }} width={width} height={height} style={{ width: '100%', height: 'auto', maxWidth: width }} />
@@ -550,6 +550,7 @@ export default function DataAnalystWorkspace() {
 
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
+  const [chatRole, setChatRole] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
   const presentationContainerRef = useRef(null);
   const [downloading, setDownloading] = useState('');
@@ -741,16 +742,23 @@ export default function DataAnalystWorkspace() {
     }
   }
 
-  async function handleChatSend() {
-    if (!chatInput.trim()) return;
-    const question = chatInput.trim();
+  async function handleChatSend(overrideQuestion, transformType) {
+    const question = (overrideQuestion ?? chatInput).trim();
+    if (!question) return;
     setChatMessages((prev) => [...prev, { role: 'user', text: question }]);
     setChatInput('');
     setChatBusy(true);
     try {
       const res = await fetch('/api/data-analyst', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'chat', question, columns, stats: analysis.stats, sampleRows: rows, rowCount: rows.length }),
+        body: JSON.stringify({
+          action: 'chat', question,
+          history: chatMessages.slice(-10),
+          understanding, objective, health: datasetHealth, kpis: kpiCards, analysis,
+          chartSummaries: (analysis.suggestedCharts || []).map((chart, i) => summarizeChartForAI(chart, chartData[i])),
+          role: chatRole || undefined, transformType: transformType || undefined,
+          columns, stats: analysis.stats, sampleRows: rows, rowCount: rows.length,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not answer that.');
@@ -760,6 +768,18 @@ export default function DataAnalystWorkspace() {
     } finally {
       setChatBusy(false);
     }
+  }
+
+  function copyToClipboard(text) {
+    navigator.clipboard?.writeText(text).catch(() => {});
+  }
+
+  function downloadChatAsMarkdown() {
+    const md = chatMessages.map((m) => `**${m.role === 'user' ? 'You' : 'Analyst'}:** ${m.text}`).join('\n\n');
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'analyst-conversation.md'; a.click();
+    URL.revokeObjectURL(url);
   }
 
   // ---------------------------------------------------------------------------
@@ -1397,7 +1417,7 @@ export default function DataAnalystWorkspace() {
     setPhase('upload'); setColumns([]); setRows([]); setAnalysis(null); setChartData({});
     setChatMessages([]); setError(''); setFileName(''); setPasteText('');
     setUnderstanding(null); setDatasetHealth(null); setClarifyingAnswer('');
-    setObjective('Let AI Decide'); setKpiCards([]);
+    setObjective('Let AI Decide'); setKpiCards([]); setChatRole('');
   }
 
   // ===========================================================================
@@ -1791,6 +1811,7 @@ export default function DataAnalystWorkspace() {
                   <button onClick={() => { const c = chartRefs.current[i]; if (c) { const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = `${chart.title.replace(/[^a-z0-9]/gi, '-')}.png`; a.click(); } }} style={{ fontSize: '0.72rem', padding: '5px 10px', borderRadius: 6, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>Export PNG</button>
                   <button onClick={() => setFullscreenChartIdx(i)} style={{ fontSize: '0.72rem', padding: '5px 10px', borderRadius: 6, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>Fullscreen</button>
                   <button onClick={() => downloadChartDataCSV(i)} style={{ fontSize: '0.72rem', padding: '5px 10px', borderRadius: 6, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>Download Data</button>
+                  <button onClick={() => handleChatSend(`Explain this chart: "${chart.title}" — what does it show, why does it matter, and what should management do about it?`)} disabled={chatBusy} style={{ fontSize: '0.72rem', padding: '5px 10px', borderRadius: 6, border: '1px solid #DDD6FE', background: '#F5F3FF', color: '#7C3AED', cursor: 'pointer' }}>Explain this chart</button>
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -1923,30 +1944,73 @@ export default function DataAnalystWorkspace() {
         {/* 12. Ask the Analyst */}
         <div style={sectionStyle} className="no-print-report">
           <p style={sectionLabel}>Ask the Analyst</p>
-          <p style={{ fontSize: '0.85rem', color: '#64748B', marginBottom: 14 }}>Ask questions about this report and dataset.</p>
+          <p style={{ fontSize: '0.85rem', color: '#64748B', marginBottom: 14 }}>Ask questions, request a different framing, or transform this report — I already know everything above.</p>
           <div style={card}>
+
+            {/* Role selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.76rem', fontWeight: 600, color: '#475569' }}>Answer as if speaking to:</span>
+              <select value={chatRole} onChange={(e) => setChatRole(e.target.value)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.78rem', color: '#334155' }}>
+                <option value="">General / no specific audience</option>
+                {['CEO', 'Operations Manager', 'Quality Manager', 'Finance Director', 'HR Manager', 'Sales Manager', 'Board Presentation', 'Frontline Team'].map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+
+            {/* Adaptive suggested questions */}
             {chatMessages.length === 0 && (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-                {['Why is this the top finding?', 'Which area should I improve first?', 'Explain this Pareto.', 'Summarise for executives.', 'What changed over time?'].map((ex) => (
-                  <button key={ex} onClick={() => setChatInput(ex)} style={{ fontSize: '0.76rem', padding: '6px 12px', borderRadius: 999, border: '1px solid #E2E8F0', background: '#F8FAFC', cursor: 'pointer', color: '#475569' }}>{ex}</button>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                {[
+                  analysis.risks?.length && 'Explain the biggest risk',
+                  analysis.recommendations?.length && 'Why is the top recommendation important?',
+                  kpiCards.length && 'Which KPI deserves the most attention?',
+                  'Summarize this for a CEO',
+                  'Highlight quick wins',
+                  'Which issue should we fix first?',
+                ].filter(Boolean).map((ex) => (
+                  <button key={ex} onClick={() => handleChatSend(ex)} disabled={chatBusy} style={{ fontSize: '0.76rem', padding: '6px 12px', borderRadius: 999, border: '1px solid #E2E8F0', background: '#F8FAFC', cursor: 'pointer', color: '#475569' }}>{ex}</button>
                 ))}
               </div>
             )}
+
+            {/* Report transformations */}
+            {chatMessages.length === 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 6 }}>Or transform this report</p>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {['Summarize in 50 words', 'Create speaker notes', 'Rewrite as an email', 'Create a one-minute briefing', 'Create FAQs', 'Generate action checklist'].map((t) => (
+                    <button key={t} onClick={() => handleChatSend(t, t)} disabled={chatBusy} style={{ fontSize: '0.76rem', padding: '6px 12px', borderRadius: 999, border: '1px solid #DDD6FE', background: '#F5F3FF', cursor: 'pointer', color: '#7C3AED' }}>{t}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {chatMessages.length > 0 && (
-              <div style={{ marginBottom: 12, maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ marginBottom: 12, maxHeight: 340, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {chatMessages.map((m, i) => (
-                  <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '80%', background: m.role === 'user' ? '#2563EB' : '#F8FAFC', color: m.role === 'user' ? 'white' : '#1E293B', padding: '9px 13px', borderRadius: 10, fontSize: '0.82rem', border: m.role === 'ai' ? '1px solid #E2E8F0' : 'none' }}>
-                    {m.text}
+                  <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
+                    <div style={{ background: m.role === 'user' ? '#2563EB' : '#F8FAFC', color: m.role === 'user' ? 'white' : '#1E293B', padding: '9px 13px', borderRadius: 10, fontSize: '0.82rem', border: m.role === 'ai' ? '1px solid #E2E8F0' : 'none', whiteSpace: 'pre-wrap' }}>
+                      {m.text}
+                    </div>
+                    {m.role === 'ai' && (
+                      <div style={{ display: 'flex', gap: 10, marginTop: 4, paddingLeft: 4 }}>
+                        <button onClick={() => copyToClipboard(m.text)} style={{ fontSize: '0.68rem', color: '#94A3B8', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Copy</button>
+                        <button onClick={() => setAnalysis((a) => ({ ...a, executiveSummary: m.text }))} style={{ fontSize: '0.68rem', color: '#94A3B8', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Replace Executive Summary</button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             )}
+
             <div style={{ display: 'flex', gap: 8 }}>
               <input aria-label="Ask a question about this report" style={{ ...inputStyle, flex: 1 }} value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleChatSend()} placeholder="Ask a question about this report…" disabled={chatBusy} />
-              <button onClick={handleChatSend} disabled={chatBusy || !chatInput.trim()} aria-label="Send question" style={{ padding: '9px 18px', borderRadius: 8, border: 'none', background: chatBusy ? '#94A3B8' : '#2563EB', color: 'white', fontWeight: 600, fontSize: '0.82rem', cursor: chatBusy ? 'default' : 'pointer' }}>
+              <button onClick={() => handleChatSend()} disabled={chatBusy || !chatInput.trim()} aria-label="Send question" style={{ padding: '9px 18px', borderRadius: 8, border: 'none', background: chatBusy ? '#94A3B8' : '#2563EB', color: 'white', fontWeight: 600, fontSize: '0.82rem', cursor: chatBusy ? 'default' : 'pointer' }}>
                 {chatBusy ? '…' : 'Ask'}
               </button>
             </div>
+            {chatMessages.length > 0 && (
+              <button onClick={downloadChatAsMarkdown} style={{ marginTop: 10, fontSize: '0.72rem', color: '#2563EB', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>⬇ Download this conversation as Markdown</button>
+            )}
           </div>
         </div>
 

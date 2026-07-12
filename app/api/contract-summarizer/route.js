@@ -33,6 +33,61 @@ const responseSchema = {
   required: ['parties', 'obligations', 'summary'],
 };
 
+function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+// Retries transient failures automatically (rate limits, momentary server
+// errors, network blips, or an occasional malformed-JSON response) before
+// ever showing the user an error — same fix applied across every AI route
+// on the site after this exact failure mode surfaced mid-demo.
+async function callGeminiForContract(apiKey, parts) {
+  const body = {
+    contents: [{ role: 'user', parts }],
+    generationConfig: { responseMimeType: 'application/json', responseSchema },
+  };
+  const maxAttempts = 3;
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(GEMINI_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error(`Gemini contract summarizer error (attempt ${attempt}/${maxAttempts}):`, data);
+        const retryable = res.status === 429 || res.status >= 500;
+        if (retryable && attempt < maxAttempts) { await sleep(700 * attempt); continue; }
+        throw new Error('gemini_error');
+      }
+
+      const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!raw) {
+        if (attempt < maxAttempts) { await sleep(700 * attempt); continue; }
+        throw new Error('empty_response');
+      }
+
+      try {
+        const clean = raw.replace(/```json|```/g, '').trim();
+        const parsed = JSON.parse(clean);
+        return parsed;
+      } catch {
+        console.error(`JSON parse error (attempt ${attempt}/${maxAttempts})`);
+        if (attempt < maxAttempts) { await sleep(700 * attempt); continue; }
+        throw new Error('parse_error');
+      }
+    } catch (err) {
+      lastError = err;
+      const isKnownFinalError = ['gemini_error', 'empty_response', 'parse_error'].includes(err.message);
+      if (!isKnownFinalError && attempt < maxAttempts) { await sleep(700 * attempt); continue; } // network-level failure — also worth retrying
+      if (attempt === maxAttempts) throw lastError;
+    }
+  }
+  throw lastError;
+}
+
 export async function POST(request) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -68,44 +123,13 @@ export async function POST(request) {
       parts = [{ text: `${PROMPT}\n\n--- CONTRACT TEXT ---\n${trimmed}` }];
     }
 
-    const res = await fetch(GEMINI_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-      },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema,
-        },
-      }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      console.error('Gemini contract summarizer error:', data);
-      return Response.json({ error: 'Could not analyze this contract. Please try again.' }, { status: 502 });
-    }
-
-    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!raw) {
-      return Response.json({ error: 'No response from AI. Please try again.' }, { status: 422 });
-    }
-
-    let parsed;
-    try {
-      const clean = raw.replace(/```json|```/g, '').trim();
-      parsed = JSON.parse(clean);
-    } catch {
-      return Response.json({ error: 'Could not understand the AI response. Please try again.' }, { status: 502 });
-    }
-
+    const parsed = await callGeminiForContract(apiKey, parts);
     return Response.json(parsed);
   } catch (err) {
     console.error('Contract summarizer error:', err);
-    return Response.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
+    const message = err.message === 'parse_error'
+      ? 'Could not understand the AI response. Please try again.'
+      : 'Something went wrong. Please try again.';
+    return Response.json({ error: message }, { status: 500 });
   }
 }

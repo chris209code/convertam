@@ -6,6 +6,8 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GE
 
 const NO_FABRICATION_RULE = 'You are given pre-computed statistics that are already correct — never recalculate, second-guess, or invent different numbers for totals, averages, counts, min/max, or any other figure. Only use the exact numbers provided. If something can\'t be determined from the given data, say so rather than guessing.';
 
+const WORDING_VARIATION_RULE = 'Vary your phrasing naturally across findings, risks, and recommendations — avoid reusing the same stock phrases (e.g. do not repeat "notably higher than the rest", "disproportionate", or "widest margin" more than once in the same report, and do not lean on any single comparative phrase as a default). Write the way a human analyst would, choosing different words each time even when describing a similar pattern.';
+
 // V1 scope deliberately excludes forecasting, anomaly detection, and
 // period-comparison — these need real statistical modelling, not just an
 // LLM call, and were explicitly deferred to a later version.
@@ -162,6 +164,7 @@ function buildAnalysisPrompt({ understanding, objective, health, kpis, chartSumm
 ${NO_FABRICATION_RULE}
 Never recalculate, re-derive, or second-guess any of the numbers provided below — treat them as ground truth and only interpret them.
 Never claim statistical significance unless it's directly evidenced by the numbers given.
+${WORDING_VARIATION_RULE}
 Never imply causation from correlation — use hedged language ("may indicate", "suggests", "appears consistent with", "could be associated with"), never "caused by" or "definitely due to".
 Never reference a chart that isn't in the chart summaries below.
 Clearly distinguish observed facts from anything estimated or suggested.
@@ -246,6 +249,16 @@ export async function POST(request) {
       const raw = await callGemini(apiKey, [{ text: prompt }], understandingSchema);
       const clean = raw.replace(/```json|```/g, '').trim();
       const understanding = JSON.parse(clean);
+
+      // Deterministic confidence ceiling — a small dataset can't genuinely
+      // support high confidence no matter how clean the column names look,
+      // so this caps the AI's own confidence value rather than trusting its
+      // judgment alone on sample size.
+      if (typeof understanding.confidence === 'number') {
+        if (rowCount < 10) understanding.confidence = Math.min(understanding.confidence, 59);
+        else if (rowCount < 20) understanding.confidence = Math.min(understanding.confidence, 79);
+      }
+
       return Response.json(understanding);
     }
 

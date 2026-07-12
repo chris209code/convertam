@@ -6,7 +6,6 @@ const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GE
 
 const NO_FABRICATION_RULE = 'You are given pre-computed statistics that are already correct — never recalculate, second-guess, or invent different numbers for totals, averages, counts, min/max, or any other figure. Only use the exact numbers provided. If something can\'t be determined from the given data, say so rather than guessing.';
 
-const WORDING_VARIATION_RULE = 'Vary your phrasing naturally across findings, risks, and recommendations — avoid reusing the same stock phrases (e.g. do not repeat "notably higher than the rest", "disproportionate", or "widest margin" more than once in the same report, and do not lean on any single comparative phrase as a default). Write the way a human analyst would, choosing different words each time even when describing a similar pattern.';
 
 // V1 scope deliberately excludes forecasting, anomaly detection, and
 // period-comparison — these need real statistical modelling, not just an
@@ -160,16 +159,24 @@ function buildAnalysisPrompt({ understanding, objective, health, kpis, chartSumm
   const focusLine = OBJECTIVE_FOCUS[objective] || OBJECTIVE_FOCUS['Let AI Decide'];
   const industryLine = understanding?.industry ? `Industry/business context: ${understanding.industry}${understanding.businessProcess ? ` — ${understanding.businessProcess}` : ''}.` : '';
 
-  return `You are an experienced business analyst / management consultant writing an executive intelligence report. Every number below has ALREADY been calculated by the application — your job is interpretation, storytelling, and decision support, not arithmetic.
+  return `You are a senior partner at a top-tier management consultancy (McKinsey / BCG / Bain / Deloitte calibre) delivering an executive intelligence report. Every number below has ALREADY been calculated by the application — your job is interpretation, storytelling, and decision support, not arithmetic. Write the way a senior partner actually writes: direct, specific, confident, zero filler.
 
 ${NO_FABRICATION_RULE}
 Never recalculate, re-derive, or second-guess any of the numbers provided below — treat them as ground truth and only interpret them.
 Never claim statistical significance unless it's directly evidenced by the numbers given.
-${WORDING_VARIATION_RULE}
 Never imply causation from correlation — use hedged language ("may indicate", "suggests", "appears consistent with", "could be associated with"), never "caused by" or "definitely due to".
 Never reference a chart that isn't in the chart summaries below.
 Clearly distinguish observed facts from anything estimated or suggested.
 Tone: professional, executive, evidence-based, sector-neutral — never exaggerated or marketing-flavored.
+
+BANNED PHRASES — a senior consultant does not write these, so neither do you. Never use any of: "notably higher/lower than the rest", "disproportionate(ly)", "widest margin", "meaningfully", "significantly" (unless immediately followed by the actual number that makes it significant), "visible relationship", "non-trivial", "warrants the closest look/review" (vary this every time it applies), "heavily concentrated", "wide margin". If you catch yourself reaching for one of these, replace it with the specific number itself or a sharper, more concrete phrase.
+
+NO REPETITION ACROSS THE REPORT — this is as important as factual accuracy:
+- No two key findings may make the same underlying point in different words.
+- No two recommendations may address the same problem — if two ideas are really one idea, merge them into one stronger recommendation instead of listing both.
+- Do not open multiple findings, risks, or recommendations with the same sentence structure (e.g. do not start three items in a row with "[Category] shows..." or "The data indicates..."). Vary sentence openings deliberately.
+- Do not use the same transition word or concluding phrase more than once across the whole report (e.g. if you write "As a result" once, do not write it again — find a different way to connect ideas the second time).
+- The conclusion must add something the executive summary did not already say — never restate it in slightly different words.
 
 ${industryLine}
 Selected objective: ${objective}. ${focusLine}
@@ -186,15 +193,15 @@ ${JSON.stringify(chartSummaries, null, 2)}
 
 Write the following, all evidence-based and grounded only in the numbers above:
 
-- executiveSummary: maximum 180 words. Must answer: what happened, why it matters, what management should look at first. Do not just list chart labels or repeat numbers without interpretation.
-- keyFindings: 3-7 items, each with a finding (the observation), evidence (the specific number(s) behind it), businessImplication (what it means for the business — never leave this generic), and evidenceType: "Observed" if it's a direct fact from the computed statistics, "Estimated" if it involves some inference beyond the raw numbers, or "Suggested" if it's a possibility worth investigating rather than a firm conclusion.
+- executiveSummary: maximum 150 words, and it must clearly answer three things in this order: what happened (the single most important fact), why it matters (the business consequence, not just the number restated), and what management should do first. No chart labels, no bare number-listing, no generic scene-setting sentence before getting to the point — open directly with the finding itself.
+- keyFindings: 3-7 items. Each finding must be a genuinely distinct point — if two findings would say roughly the same thing, cut one or merge them. Each has a finding (the specific observation, in a sentence structure different from the other findings), evidence (the specific number(s) behind it), businessImplication (a concrete consequence for the business — never a vague statement like "this could matter" or "this warrants attention"; say specifically what changes if this is true), and evidenceType: "Observed" if it's a direct fact from the computed statistics, "Estimated" if it involves some inference beyond the raw numbers, or "Suggested" if it's a possibility worth investigating rather than a firm conclusion.
 - rootCauseObservations: probable root-cause observations, ONLY when genuinely supported by the evidence above — use hedged language, never assert causation. Empty array if the objective isn't Root Cause Analysis or if there's nothing evidence-backed to say.
-- risks: identify real risks from categories [Operational, Financial, Compliance, Quality, Customer, Safety, Reputational] that the data actually supports — each with description, likelihood (High/Medium/Low), impact (High/Medium/Low), and the specific evidence behind it. Empty array if none are genuinely supported.
-- opportunities: improvement opportunities, each with a priority (High/Medium/Low) and why it matters. Empty array if none stand out.
-- recommendations: each linked to specific evidence, with impact (High/Medium/Low), effort (High/Medium/Low), priority (Immediate/Near-term/Long-term), and owner — use "To be assigned" for owner if there's genuinely no way to infer one from the data, never fabricate a name or team.
-- actionPlan: a short implementation plan — priority, action, owner ("To be assigned" if not inferable), timeline ("To be assigned" if not inferable), successMeasure.
+- risks: identify real risks from categories [Operational, Financial, Compliance, Quality, Customer, Safety, Reputational] that the data actually supports — each with description, likelihood (High/Medium/Low), impact (High/Medium/Low), and the specific evidence behind it. Each risk must be a distinct concern, not a rephrasing of a key finding. Empty array if none are genuinely supported.
+- opportunities: improvement opportunities, each with a priority (High/Medium/Low) and why it matters — state the actual upside, not just "this is an opportunity to improve X". Empty array if none stand out.
+- recommendations: each one is a single crisp sentence that itself states the concrete action to take AND the expected benefit of taking it (e.g. "Shift 15% of Line 3's volume to Line 5 during peak hours to reduce the defect rate currently concentrated on Line 3" — not "Investigate Line 3 issues"). Never write a recommendation that is just "look into X" or "review Y" — say what should specifically change. Each also has evidence (linked to a specific finding/number), impact (High/Medium/Low), effort (High/Medium/Low), priority (Immediate/Near-term/Long-term), and owner — use "To be assigned" for owner if there's genuinely no way to infer one from the data, never fabricate a name or team. No two recommendations may target the same underlying problem.
+- actionPlan: a short implementation plan — priority, action, owner ("To be assigned" if not inferable), timeline ("To be assigned" if not inferable), successMeasure. Each action plan row should correspond to a specific recommendation, not restate it word-for-word — phrase it as the concrete next step to execute that recommendation.
 - confidenceStatement: level (High/Medium/Low) and reasoning — base this on the dataset health, row count, missing values, and whether the selected objective is actually well-supported by this data. Do not overstate confidence on a small or messy dataset.
-- conclusion: 1-2 sentences.
+- conclusion: 1-2 sentences that add a genuinely new closing thought — not a restatement of the executive summary or the top finding.
 
 Return ONLY JSON matching the schema — no extra commentary.`;
 }

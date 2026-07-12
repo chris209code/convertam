@@ -31,7 +31,6 @@ import AskSolveAIWorkspace from '@/components/tools/AskSolveAIWorkspace';
 import CoverLetterWriterWorkspace from '@/components/tools/CoverLetterWriterWorkspace';
 import ContractSummarizerWorkspace from '@/components/tools/ContractSummarizerWorkspace';
 import PresentationGeneratorWorkspace from '@/components/tools/PresentationGeneratorWorkspace';
-import PresentationGeneratorWorkspace from '@/components/tools/PresentationGeneratorWorkspace';
 import DataAnalystWorkspace from '@/components/tools/DataAnalystWorkspace';
 import ImageCompressorWorkspace from '@/components/tools/ImageCompressorWorkspace';
 import ImageResizerCropperWorkspace from '@/components/tools/ImageResizerCropperWorkspace';
@@ -53,8 +52,7 @@ const isFree = (mode) =>
    'images-to-pdf', 'extract-pdf-images', 'compare-pdf', 'redact-pdf', 'pdf-overlay', 'convert-image-format', 'meme-generator',
    'remove-pages', 'add-page-numbers', 'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize',
    'fill', 'write-on-pdf', 'quotation', 'calculator-hub', 'utilities-hub', 'cv-improver', 'resume-builder', 'ask-solve-ai',
-   'cover-letter', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'presentation-generator',
-   'presentation-generator', 'data-analyst',
+   'cover-letter', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'presentation-generator', 'data-analyst',
    'id-card-generator', 'document-enhancer', 'delivery-note-waybill'].includes(mode);
 
 function getPriceBadge(mode) {
@@ -138,7 +136,6 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'ask-solve-ai' && <AskSolveAIWorkspace />}
       {tool.mode === 'cover-letter' && <CoverLetterWriterWorkspace />}
       {tool.mode === 'contract-summarizer' && <ContractSummarizerWorkspace />}
-      {tool.mode === 'presentation-generator' && <PresentationGeneratorWorkspace />}
       {tool.mode === 'presentation-generator' && <PresentationGeneratorWorkspace />}
       {tool.mode === 'data-analyst' && <DataAnalystWorkspace />}
       {tool.mode === 'image-compressor' && <ImageCompressorWorkspace />}

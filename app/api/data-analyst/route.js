@@ -50,6 +50,39 @@ const extractionSchema = {
   required: ['columns', 'rows'],
 };
 
+const understandingSchema = {
+  type: 'OBJECT',
+  properties: {
+    datasetType: { type: 'STRING' },
+    industry: { type: 'STRING' },
+    description: { type: 'STRING' },
+    potentialKPIs: { type: 'ARRAY', items: { type: 'STRING' } },
+    confidence: { type: 'NUMBER' },
+    clarifyingQuestion: { type: 'STRING' },
+  },
+  required: ['datasetType', 'industry', 'description', 'potentialKPIs', 'confidence'],
+};
+
+function buildUnderstandingPrompt({ columns, stats, sampleRows, rowCount }) {
+  return `You are looking at a business dataset for the first time. Based ONLY on the column names, their detected types, and the sample rows below, infer what this dataset represents. Never invent details not supportable by what's actually shown.
+
+This must work across ANY industry — do not default to manufacturing-specific assumptions unless the data genuinely points there. Use whatever terminology naturally fits this specific dataset (e.g. sales data uses "region/salesperson/revenue" language, education data uses "student/grade/attendance" language, healthcare uses "patient/department/outcome" language, and so on) — infer the right vocabulary from what's actually in front of you.
+
+Columns and detected types: ${JSON.stringify(Object.fromEntries(columns.map((c) => [c, stats[c]?.type || 'unknown'])))}
+Row count: ${rowCount}
+Sample rows: ${JSON.stringify(sampleRows.slice(0, 10))}
+
+Provide:
+- datasetType: a short name for what this dataset is (e.g. "Packaging Non-Conformance Tracker", "Regional Sales Performance Log")
+- industry: the likely business area/sector this belongs to
+- description: one plain-English sentence describing what this dataset appears to be
+- potentialKPIs: 2-5 column names (exact names from the list above) that would make meaningful KPIs for this dataset — empty array if nothing clear stands out, don't force it
+- confidence: your confidence in this inference, as a number from 0-100, based on how clear and unambiguous the column names and sample data are
+- clarifyingQuestion: if confidence is below 70, one short specific question that would help clarify what this dataset is about — otherwise leave as an empty string
+
+Return ONLY JSON matching the schema.`;
+}
+
 function buildAnalysisPrompt({ columns, stats, sampleRows, qualityWarnings, intents, industry, rowCount }) {
   const industryLine = industry && industry !== 'General' ? `This data is from a ${industry} context — use terminology and framing appropriate to that field.` : '';
   const intentLine = intents?.length ? `The user specifically asked for: ${intents.join(', ')}.` : '';
@@ -123,6 +156,18 @@ export async function POST(request) {
   try {
     const payload = await request.json();
     const { action } = payload;
+
+    if (action === 'understand') {
+      const { columns, stats, sampleRows, rowCount } = payload;
+      if (!columns?.length || !sampleRows?.length) {
+        return Response.json({ error: 'No usable data received.' }, { status: 400 });
+      }
+      const prompt = buildUnderstandingPrompt({ columns, stats, sampleRows, rowCount });
+      const raw = await callGemini(apiKey, [{ text: prompt }], understandingSchema);
+      const clean = raw.replace(/```json|```/g, '').trim();
+      const understanding = JSON.parse(clean);
+      return Response.json(understanding);
+    }
 
     if (action === 'analyze') {
       const { columns, stats, sampleRows, qualityWarnings, intents, industry, rowCount } = payload;

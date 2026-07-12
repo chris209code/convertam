@@ -743,6 +743,7 @@ export default function DataAnalystWorkspace() {
   }
 
   async function handleChatSend(overrideQuestion, transformType) {
+    if (chatBusy) return; // prevents a rapid double-click/double-Enter from firing two concurrent requests
     const question = (overrideQuestion ?? chatInput).trim();
     if (!question) return;
     setChatMessages((prev) => [...prev, { role: 'user', text: question }]);

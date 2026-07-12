@@ -55,12 +55,13 @@ const understandingSchema = {
   properties: {
     datasetType: { type: 'STRING' },
     industry: { type: 'STRING' },
+    businessProcess: { type: 'STRING' },
     description: { type: 'STRING' },
     potentialKPIs: { type: 'ARRAY', items: { type: 'STRING' } },
     confidence: { type: 'NUMBER' },
     clarifyingQuestion: { type: 'STRING' },
   },
-  required: ['datasetType', 'industry', 'description', 'potentialKPIs', 'confidence'],
+  required: ['datasetType', 'industry', 'businessProcess', 'description', 'potentialKPIs', 'confidence'],
 };
 
 function buildUnderstandingPrompt({ columns, stats, sampleRows, rowCount }) {
@@ -75,6 +76,7 @@ Sample rows: ${JSON.stringify(sampleRows.slice(0, 10))}
 Provide:
 - datasetType: a short name for what this dataset is (e.g. "Packaging Non-Conformance Tracker", "Regional Sales Performance Log")
 - industry: the likely business area/sector this belongs to
+- businessProcess: the specific business process this data supports (e.g. "Packaging Quality Management", "Regional Sales Performance Tracking") — more specific than industry
 - description: one plain-English sentence describing what this dataset appears to be
 - potentialKPIs: 2-5 column names (exact names from the list above) that would make meaningful KPIs for this dataset — empty array if nothing clear stands out, don't force it
 - confidence: your confidence in this inference, as a number from 0-100, based on how clear and unambiguous the column names and sample data are

@@ -23,8 +23,9 @@ const analysisSchema = {
           finding: { type: 'STRING' },
           evidence: { type: 'STRING' },
           businessImplication: { type: 'STRING' },
+          evidenceType: { type: 'STRING' }, // Observed | Estimated | Suggested
         },
-        required: ['finding', 'evidence', 'businessImplication'],
+        required: ['finding', 'evidence', 'businessImplication', 'evidenceType'],
       },
     },
     rootCauseObservations: { type: 'ARRAY', items: { type: 'STRING' } },
@@ -186,7 +187,7 @@ ${JSON.stringify(chartSummaries, null, 2)}
 Write the following, all evidence-based and grounded only in the numbers above:
 
 - executiveSummary: maximum 180 words. Must answer: what happened, why it matters, what management should look at first. Do not just list chart labels or repeat numbers without interpretation.
-- keyFindings: 3-7 items, each with a finding (the observation), evidence (the specific number(s) behind it), and businessImplication (what it means for the business — never leave this generic).
+- keyFindings: 3-7 items, each with a finding (the observation), evidence (the specific number(s) behind it), businessImplication (what it means for the business — never leave this generic), and evidenceType: "Observed" if it's a direct fact from the computed statistics, "Estimated" if it involves some inference beyond the raw numbers, or "Suggested" if it's a possibility worth investigating rather than a firm conclusion.
 - rootCauseObservations: probable root-cause observations, ONLY when genuinely supported by the evidence above — use hedged language, never assert causation. Empty array if the objective isn't Root Cause Analysis or if there's nothing evidence-backed to say.
 - risks: identify real risks from categories [Operational, Financial, Compliance, Quality, Customer, Safety, Reputational] that the data actually supports — each with description, likelihood (High/Medium/Low), impact (High/Medium/Low), and the specific evidence behind it. Empty array if none are genuinely supported.
 - opportunities: improvement opportunities, each with a priority (High/Medium/Low) and why it matters. Empty array if none stand out.

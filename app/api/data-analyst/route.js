@@ -266,24 +266,50 @@ Current question: "${question}"
 Answer in plain language, no markdown formatting, 2-5 sentences unless a transformation or list format is specifically requested above. When your answer rests on a specific finding or number, reference it briefly so the answer feels grounded, not generic.`;
 }
 
+function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+// Retries transient failures automatically (rate limits, momentary server
+// errors, network blips) before ever showing the user an error — this is
+// what makes the difference between "it just works after a short pause"
+// and "it fails and the person has to click try again."
 async function callGemini(apiKey, parts, schema) {
   const body = {
     contents: [{ role: 'user', parts }],
     generationConfig: schema ? { responseMimeType: 'application/json', responseSchema: schema } : { maxOutputTokens: 1024 },
   };
-  const res = await fetch(GEMINI_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    console.error('Gemini data-analyst error:', data);
-    throw new Error('gemini_error');
+  const maxAttempts = 3;
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(GEMINI_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error(`Gemini data-analyst error (attempt ${attempt}/${maxAttempts}):`, data);
+        const retryable = res.status === 429 || res.status >= 500;
+        if (retryable && attempt < maxAttempts) { await sleep(700 * attempt); continue; }
+        throw new Error('gemini_error');
+      }
+
+      const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!raw) {
+        if (attempt < maxAttempts) { await sleep(700 * attempt); continue; }
+        throw new Error('empty_response');
+      }
+      return raw;
+    } catch (err) {
+      lastError = err;
+      const isKnownFinalError = err.message === 'gemini_error' || err.message === 'empty_response';
+      if (!isKnownFinalError && attempt < maxAttempts) { await sleep(700 * attempt); continue; } // network-level failure — also worth retrying
+      if (attempt === maxAttempts) throw lastError;
+    }
   }
-  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!raw) throw new Error('empty_response');
-  return raw;
+  throw lastError;
 }
 
 export async function POST(request) {

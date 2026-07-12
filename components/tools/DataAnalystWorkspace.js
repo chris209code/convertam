@@ -546,6 +546,7 @@ export default function DataAnalystWorkspace() {
   const [analyzing, setAnalyzing] = useState(false);
   const [chartData, setChartData] = useState({});
   const [kpiCards, setKpiCards] = useState([]);
+  const [omittedKpis, setOmittedKpis] = useState([]);
   const chartRefs = useRef({});
 
   const [chatMessages, setChatMessages] = useState([]);
@@ -707,8 +708,9 @@ export default function DataAnalystWorkspace() {
       // BEFORE the AI is ever called — the AI only ever receives the
       // finished numbers, never the raw dataset.
       const { kpis } = discoverKPIs(columns, stats, understanding);
-      const cards = computeKpiCards(kpis, columns, rows, stats);
+      const { cards, omitted } = computeKpiCards(kpis, columns, rows, stats);
       setKpiCards(cards);
+      setOmittedKpis(omitted);
 
       const engineCharts = discoverCharts(columns, stats, rows, objective);
       const prepared = {};
@@ -1418,7 +1420,7 @@ export default function DataAnalystWorkspace() {
     setPhase('upload'); setColumns([]); setRows([]); setAnalysis(null); setChartData({});
     setChatMessages([]); setError(''); setFileName(''); setPasteText('');
     setUnderstanding(null); setDatasetHealth(null); setClarifyingAnswer('');
-    setObjective('Let AI Decide'); setKpiCards([]); setChatRole('');
+    setObjective('Let AI Decide'); setKpiCards([]); setChatRole(''); setOmittedKpis([]);
   }
 
   // ===========================================================================
@@ -1736,6 +1738,11 @@ export default function DataAnalystWorkspace() {
             <div style={{ display: 'grid', gridTemplateColumns: presentationMode ? 'repeat(auto-fit, minmax(220px, 1fr))' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
               {kpiCards.map((kpi) => <KpiCard key={kpi.name} kpi={kpi} />)}
             </div>
+            {omittedKpis.length > 0 && (
+              <p style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: 10 }}>
+                {omittedKpis.length} potential KPI{omittedKpis.length > 1 ? 's were' : ' was'} left out because the computed value didn't pass validation, rather than showing a number that couldn't be trusted.
+              </p>
+            )}
           </div>
         )}
 

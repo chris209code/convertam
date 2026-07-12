@@ -206,16 +206,64 @@ Write the following, all evidence-based and grounded only in the numbers above:
 Return ONLY JSON matching the schema — no extra commentary.`;
 }
 
-function buildChatPrompt({ question, columns, stats, sampleRows, rowCount }) {
-  return `You are answering a question about a dataset, using ONLY the information given below. ${NO_FABRICATION_RULE}
+const ROLE_FRAMING = {
+  'CEO': 'Speak to a CEO — strategic, brief, focused on business outcomes and what decision is needed.',
+  'Operations Manager': 'Speak to an Operations Manager — practical, process-focused, concrete on what to change day-to-day.',
+  'Quality Manager': 'Speak to a Quality Manager — precise, focused on root causes, defects, and corrective actions.',
+  'Finance Director': 'Speak to a Finance Director — focused on cost, margin, and financial impact where the data supports it.',
+  'HR Manager': 'Speak to an HR Manager — focused on people, attendance, retention, and workforce implications.',
+  'Sales Manager': 'Speak to a Sales Manager — focused on performance, targets, and what drives results.',
+  'Board Presentation': 'Write as if for a board presentation — formal, high-level, strategic framing, no operational detail.',
+  'Frontline Team': 'Speak to a frontline team — simple, direct, actionable, no executive jargon.',
+};
 
-Dataset: ${rowCount} rows, columns: ${columns.join(', ')}
-Pre-computed statistics: ${JSON.stringify(stats)}
-Sample rows: ${JSON.stringify(sampleRows.slice(0, 20))}
+const TRANSFORM_INSTRUCTIONS = {
+  'Summarize in 50 words': 'Summarize the report in exactly around 50 words. No new analysis — condense what already exists.',
+  'Create speaker notes': 'Write speaker notes a presenter could read aloud while showing this report — natural spoken language, not bullet fragments.',
+  'Generate meeting talking points': 'Produce a short list of talking points for a meeting discussing this report — concise, one idea per point.',
+  'Rewrite as an email': 'Rewrite the key findings and recommendations as a professional email, with a subject line, that could be sent as-is.',
+  'Rewrite as a memo': 'Rewrite as a formal internal memo — header (To/From/Date/Re), then body.',
+  'Create a one-minute briefing': 'Write a briefing that takes about one minute to read aloud — the absolute essentials only.',
+  'Create FAQs': 'Generate a short FAQ (3-5 questions) that a reader of this report would likely ask, answered using only the existing findings.',
+  'Generate action checklist': 'Turn the recommendations and action plan into a simple checklist format, one line per action.',
+};
 
-Question: "${question}"
+function buildChatPrompt({ question, history, understanding, objective, health, kpis, chartSummaries, analysis, role, transformType, columns, stats, sampleRows, rowCount }) {
+  const historyBlock = history?.length
+    ? `Conversation so far (most recent last — use this to resolve references like "it" or "that" to what was actually discussed):\n${history.map((m) => `${m.role === 'user' ? 'User' : 'You'}: ${m.text}`).join('\n')}\n`
+    : '';
 
-If the answer genuinely cannot be determined from the statistics and sample given, say so plainly rather than guessing. Answer in 2-4 sentences, plain language, no markdown formatting.`;
+  const roleLine = role && ROLE_FRAMING[role] ? `${ROLE_FRAMING[role]} The underlying facts must not change — only the framing and language.` : 'Write in clear, professional business language.';
+  const transformLine = transformType && TRANSFORM_INSTRUCTIONS[transformType] ? `\nSPECIAL INSTRUCTION: ${TRANSFORM_INSTRUCTIONS[transformType]} This is a transformation of existing content, not new analysis — do not introduce any finding, number, or claim that isn't already in the report context below.` : '';
+
+  return `You are the analyst who produced this report, continuing the conversation with the person who commissioned it. You already know everything about this dataset and analysis below — never ask them to re-explain the file, industry, objective, or KPIs, and never re-derive numbers that are already given.
+
+${NO_FABRICATION_RULE}
+Never invent facts outside what's in the report context or the dataset sample below. If a question genuinely can't be answered from what you have, say so plainly and suggest what additional data would help answer it — do not guess.
+${roleLine}
+${transformLine}
+
+REPORT CONTEXT (already known — do not ask the user to restate any of this):
+Dataset: ${understanding?.datasetType || 'Uploaded dataset'} — ${understanding?.industry || ''} ${understanding?.businessProcess ? `(${understanding.businessProcess})` : ''}
+Selected objective: ${objective}
+Dataset health: ${JSON.stringify(health)}
+KPIs: ${JSON.stringify(kpis)}
+Executive summary: ${analysis?.executiveSummary || ''}
+Key findings: ${JSON.stringify(analysis?.keyFindings || [])}
+Risks: ${JSON.stringify(analysis?.risks || [])}
+Opportunities: ${JSON.stringify(analysis?.opportunities || [])}
+Recommendations: ${JSON.stringify(analysis?.recommendations || [])}
+Action plan: ${JSON.stringify(analysis?.actionPlan || [])}
+Charts already generated: ${JSON.stringify(chartSummaries || [])}
+
+Full dataset stats: ${JSON.stringify(stats)}
+Sample rows (for row-level follow-up questions, e.g. comparisons not already pre-aggregated above): ${JSON.stringify((sampleRows || []).slice(0, 20))}
+Total rows in dataset: ${rowCount}
+
+${historyBlock}
+Current question: "${question}"
+
+Answer in plain language, no markdown formatting, 2-5 sentences unless a transformation or list format is specifically requested above. When your answer rests on a specific finding or number, reference it briefly so the answer feels grounded, not generic.`;
 }
 
 async function callGemini(apiKey, parts, schema) {
@@ -313,9 +361,9 @@ Return "columns" as the list of column headers, and "rows" as a list of rows —
     }
 
     if (action === 'chat') {
-      const { question, columns, stats, sampleRows, rowCount } = payload;
+      const { question, history, understanding, objective, health, kpis, chartSummaries, analysis, role, transformType, columns, stats, sampleRows, rowCount } = payload;
       if (!question?.trim()) return Response.json({ error: 'No question received.' }, { status: 400 });
-      const prompt = buildChatPrompt({ question, columns, stats, sampleRows, rowCount });
+      const prompt = buildChatPrompt({ question, history, understanding, objective, health, kpis, chartSummaries, analysis, role, transformType, columns, stats, sampleRows, rowCount });
       const answer = await callGemini(apiKey, [{ text: prompt }], false);
       return Response.json({ answer: answer.trim() });
     }

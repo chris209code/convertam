@@ -67,25 +67,53 @@ function toNumber(val) {
   return parseFloat(String(val).replace(/,/g, ''));
 }
 
+// Date detection requires an actual date-like shape (separators, month
+// names) before trusting Date.parse — otherwise plain numbers ("2024",
+// "5", serial-looking IDs) get misread as dates, since Date.parse is
+// permissive by design.
+const DATE_SHAPE_RE = /^\d{1,4}[/\-.]\d{1,2}[/\-.]\d{1,4}$|^\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{2,4}$|^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}$/i;
+
+function isDateLike(val) {
+  if (val === null || val === undefined || String(val).trim() === '') return false;
+  const s = String(val).trim();
+  if (!DATE_SHAPE_RE.test(s)) return false;
+  const parsed = Date.parse(s);
+  return !isNaN(parsed);
+}
+
 function computeStats(columns, rows) {
   const stats = {};
   columns.forEach((col) => {
     const values = rows.map((r) => r[col]);
     const nonEmpty = values.filter((v) => v !== null && v !== undefined && String(v).trim() !== '');
     const missing = values.length - nonEmpty.length;
+    const dateCount = nonEmpty.filter(isDateLike).length;
+    const isDateCol = nonEmpty.length > 0 && dateCount / nonEmpty.length >= 0.7;
+
+    if (isDateCol) {
+      const invalidDates = nonEmpty.filter((v) => !isDateLike(v)).length;
+      stats[col] = { type: 'date', count: nonEmpty.length, missing, invalidDates };
+      return;
+    }
+
     const numericCount = nonEmpty.filter(isNumeric).length;
     const isNumericCol = nonEmpty.length > 0 && numericCount / nonEmpty.length >= 0.7;
 
     if (isNumericCol) {
       const nums = nonEmpty.filter(isNumeric).map(toNumber);
       const sum = nums.reduce((a, b) => a + b, 0);
+      const avg = nums.length ? sum / nums.length : 0;
+      const variance = nums.length ? nums.reduce((s, n) => s + (n - avg) ** 2, 0) / nums.length : 0;
+      const stdDev = Math.sqrt(variance);
+      const outlierCount = stdDev > 0 ? nums.filter((n) => Math.abs(n - avg) > 3 * stdDev).length : 0;
       stats[col] = {
         type: 'numeric', count: nums.length, missing,
         sum: Math.round(sum * 100) / 100,
-        avg: nums.length ? Math.round((sum / nums.length) * 100) / 100 : 0,
+        avg: nums.length ? Math.round(avg * 100) / 100 : 0,
         min: nums.length ? Math.min(...nums) : 0,
         max: nums.length ? Math.max(...nums) : 0,
         negativeCount: nums.filter((n) => n < 0).length,
+        outlierCount,
       };
     } else {
       const counts = {};
@@ -95,6 +123,36 @@ function computeStats(columns, rows) {
     }
   });
   return stats;
+}
+
+// ---------------------------------------------------------------------------
+// Dataset Health Check — fully deterministic, no AI involved, never alters
+// the user's data. This is what the Dataset Understanding step and every
+// downstream confidence statement is grounded in.
+// ---------------------------------------------------------------------------
+function computeDatasetHealth(columns, rows, stats) {
+  const totalRows = rows.length;
+  const totalColumns = columns.length;
+  const totalCells = totalRows * totalColumns;
+
+  const missingValues = columns.reduce((sum, c) => sum + (stats[c]?.missing || 0), 0);
+  const emptyColumns = columns.filter((c) => stats[c] && stats[c].missing === totalRows);
+
+  const seen = new Set();
+  let duplicateRows = 0;
+  rows.forEach((r) => { const key = JSON.stringify(r); if (seen.has(key)) duplicateRows++; else seen.add(key); });
+
+  const invalidDates = columns.reduce((sum, c) => sum + (stats[c]?.type === 'date' ? (stats[c].invalidDates || 0) : 0), 0);
+  const possibleOutliers = columns.reduce((sum, c) => sum + (stats[c]?.type === 'numeric' ? (stats[c].outlierCount || 0) : 0), 0);
+
+  const completeness = totalCells > 0 ? Math.round(((totalCells - missingValues) / totalCells) * 1000) / 10 : 0;
+
+  let health = 'Good';
+  const issueCount = emptyColumns.length + (duplicateRows > 0 ? 1 : 0) + (invalidDates > 0 ? 1 : 0);
+  if (completeness < 70 || issueCount >= 3) health = 'Poor';
+  else if (completeness < 90 || issueCount >= 1) health = 'Needs Attention';
+
+  return { totalRows, totalColumns, missingValues, duplicateRows, emptyColumns: emptyColumns.length, invalidDates, possibleOutliers, completeness, health };
 }
 
 function computeQualityWarnings(columns, rows, stats) {
@@ -299,6 +357,11 @@ export default function DataAnalystWorkspace() {
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState('');
 
+  const [understanding, setUnderstanding] = useState(null);
+  const [datasetHealth, setDatasetHealth] = useState(null);
+  const [understandBusy, setUnderstandBusy] = useState(false);
+  const [clarifyingAnswer, setClarifyingAnswer] = useState('');
+
   const [intents, setIntents] = useState(['Analyze my data', 'Generate charts', 'Executive report']);
   const [industry, setIndustry] = useState('General');
 
@@ -393,6 +456,29 @@ export default function DataAnalystWorkspace() {
   }
   function removeEmptyRows() {
     setRows((prev) => prev.filter((r) => Object.values(r).some((v) => String(v).trim() !== '')));
+  }
+
+  async function handleUnderstand() {
+    setUnderstandBusy(true);
+    setError('');
+    try {
+      const stats = computeStats(columns, rows);
+      const health = computeDatasetHealth(columns, rows, stats);
+      setDatasetHealth(health);
+
+      const res = await fetch('/api/data-analyst', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'understand', columns, stats, sampleRows: rows, rowCount: rows.length }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not understand this dataset.');
+      setUnderstanding(data);
+      setPhase('understanding');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUnderstandBusy(false);
+    }
   }
 
   function toggleIntent(intent) {
@@ -599,6 +685,7 @@ export default function DataAnalystWorkspace() {
   function startOver() {
     setPhase('upload'); setColumns([]); setRows([]); setAnalysis(null); setChartData({});
     setChatMessages([]); setError(''); setFileName(''); setPasteText('');
+    setUnderstanding(null); setDatasetHealth(null); setClarifyingAnswer('');
   }
 
   // ===========================================================================
@@ -674,7 +761,99 @@ export default function DataAnalystWorkspace() {
 
         <div style={{ display: 'flex', gap: 12 }}>
           <button className="btn btn-ghost" onClick={startOver}>Start Over</button>
-          <button className="btn btn-primary" onClick={() => setPhase('intents')}>Confirm & Continue →</button>
+          <button className="btn btn-primary" disabled={understandBusy} onClick={handleUnderstand}>{understandBusy ? 'Reading your dataset…' : 'Confirm & Continue →'}</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === 'understanding' && understanding && datasetHealth) {
+    const columnsByType = { date: [], numeric: [], categorical: [] };
+    columns.forEach((c) => {
+      const t = computeStats(columns, rows)[c]?.type;
+      if (columnsByType[t]) columnsByType[t].push(c);
+    });
+    const healthColor = datasetHealth.health === 'Good' ? '#059669' : datasetHealth.health === 'Needs Attention' ? '#D97706' : '#DC2626';
+    const healthBg = datasetHealth.health === 'Good' ? '#ECFDF5' : datasetHealth.health === 'Needs Attention' ? '#FFFBEB' : '#FEF2F2';
+
+    return (
+      <div className="panel">
+        <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', marginBottom: 16 }}>Dataset Understanding</p>
+
+        <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 18, marginBottom: 16 }}>
+          <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 4 }}>Dataset identified as</p>
+          <p style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', marginBottom: 12 }}>{understanding.datasetType}</p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 12 }}>
+            <div>
+              <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 2 }}>Likely business area</p>
+              <p style={{ fontSize: '0.85rem', color: '#334155' }}>{understanding.industry}</p>
+            </div>
+            <div>
+              <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 2 }}>Confidence</p>
+              <p style={{ fontSize: '0.85rem', fontWeight: 700, color: understanding.confidence >= 70 ? '#059669' : '#D97706' }}>{understanding.confidence}%</p>
+            </div>
+          </div>
+
+          <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 4 }}>Description</p>
+          <input
+            style={{ ...inputStyle, marginBottom: 4 }}
+            value={understanding.description}
+            onChange={(e) => setUnderstanding((u) => ({ ...u, description: e.target.value }))}
+          />
+          <p style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Not quite right? Edit the description above before continuing.</p>
+        </div>
+
+        {understanding.confidence < 70 && understanding.clarifyingQuestion && (
+          <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+            <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400E', marginBottom: 8 }}>{understanding.clarifyingQuestion}</p>
+            <input style={inputStyle} value={clarifyingAnswer} onChange={(e) => setClarifyingAnswer(e.target.value)} placeholder="Your answer helps improve the analysis" />
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+          {[['Date columns', columnsByType.date], ['Numeric measures', columnsByType.numeric], ['Categories', columnsByType.categorical]].map(([label, cols]) => (
+            <div key={label} style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 10, padding: 12 }}>
+              <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 6 }}>{label}</p>
+              {cols.length ? cols.map((c) => <p key={c} style={{ fontSize: '0.78rem', color: '#334155', margin: '2px 0' }}>{c}</p>) : <p style={{ fontSize: '0.78rem', color: '#CBD5E1' }}>None detected</p>}
+            </div>
+          ))}
+        </div>
+
+        {understanding.potentialKPIs?.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 8 }}>Potential KPIs</p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {understanding.potentialKPIs.map((k) => <span key={k} style={{ fontSize: '0.78rem', padding: '5px 12px', borderRadius: 999, background: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE' }}>{k}</span>)}
+            </div>
+          </div>
+        )}
+
+        <div style={{ background: healthBg, border: `1px solid ${healthColor}33`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>Dataset Health</p>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: healthColor, background: 'white', padding: '3px 10px', borderRadius: 999, border: `1px solid ${healthColor}` }}>{datasetHealth.health}</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, fontSize: '0.75rem', color: '#475569' }}>
+            <div><strong>{datasetHealth.totalRows}</strong> rows</div>
+            <div><strong>{datasetHealth.totalColumns}</strong> columns</div>
+            <div><strong>{datasetHealth.completeness}%</strong> complete</div>
+            <div><strong>{datasetHealth.duplicateRows}</strong> duplicates</div>
+            {datasetHealth.missingValues > 0 && <div><strong>{datasetHealth.missingValues}</strong> missing values</div>}
+            {datasetHealth.emptyColumns > 0 && <div><strong>{datasetHealth.emptyColumns}</strong> empty columns</div>}
+            {datasetHealth.invalidDates > 0 && <div><strong>{datasetHealth.invalidDates}</strong> invalid dates</div>}
+            {datasetHealth.possibleOutliers > 0 && <div><strong>{datasetHealth.possibleOutliers}</strong> possible outliers</div>}
+          </div>
+          {datasetHealth.health !== 'Good' && (
+            <p style={{ fontSize: '0.75rem', color: '#475569', marginTop: 10 }}>You can continue, but these issues may affect how confident the final analysis can be.</p>
+          )}
+        </div>
+
+        {error && <div style={{ padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, color: '#DC2626', fontSize: '0.82rem', marginBottom: 16 }}>{error}</div>}
+
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button className="btn btn-ghost" onClick={() => setPhase('review')}>← Back</button>
+          <button className="btn btn-primary" onClick={() => setPhase('intents')}>Continue →</button>
         </div>
       </div>
     );

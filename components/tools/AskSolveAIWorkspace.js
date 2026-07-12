@@ -8,10 +8,17 @@ const MODES = [
   { id: 'translate', label: 'Translate', icon: '🌐', color: '#7C3AED' },
 ];
 
+const DEPTHS = [
+  { id: 'quick', label: 'Quick answer' },
+  { id: 'step-by-step', label: 'Step-by-step' },
+  { id: 'detailed', label: 'Detailed' },
+];
+
 const LANGUAGES = ['English', 'French', 'Spanish', 'Portuguese', 'German', 'Arabic', 'Hausa', 'Yoruba', 'Igbo', 'Swahili', 'Chinese', 'Pidgin English'];
 
 export default function AskSolveAIWorkspace() {
   const [mode, setMode] = useState('general');
+  const [depth, setDepth] = useState('step-by-step');
   const [targetLanguage, setTargetLanguage] = useState('English');
   const [question, setQuestion] = useState('');
   const [image, setImage] = useState(null);
@@ -34,12 +41,31 @@ export default function AskSolveAIWorkspace() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
+  async function callApi({ askedMode, askedQuestion, askedImage, askedDepth, continueFrom }) {
+    if (askedImage) {
+      const formData = new FormData();
+      formData.append('mode', askedMode);
+      formData.append('question', askedQuestion);
+      formData.append('targetLanguage', targetLanguage);
+      formData.append('depth', askedDepth);
+      formData.append('image', askedImage);
+      return fetch('/api/ask-solve-ai', { method: 'POST', body: formData });
+    }
+    return fetch('/api/ask-solve-ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: askedMode, question: askedQuestion, targetLanguage, depth: askedDepth, continueFrom }),
+    });
+  }
+
   async function handleAsk() {
+    if (busy) return; // prevents duplicate concurrent requests from a rapid double-click/double-Enter
     if (!question.trim() && !image) return;
     setError('');
     setBusy(true);
 
-    const userMessage = { role: 'user', text: question, imagePreview, mode };
+    const askedMode = mode, askedDepth = depth;
+    const userMessage = { role: 'user', text: question, imagePreview, mode: askedMode };
     setMessages((m) => [...m, userMessage]);
     const askedQuestion = question;
     const askedImage = image;
@@ -47,28 +73,91 @@ export default function AskSolveAIWorkspace() {
     clearImage();
 
     try {
-      let res;
-      if (askedImage) {
-        const formData = new FormData();
-        formData.append('mode', mode);
-        formData.append('question', askedQuestion);
-        formData.append('targetLanguage', targetLanguage);
-        formData.append('image', askedImage);
-        res = await fetch('/api/ask-solve-ai', { method: 'POST', body: formData });
-      } else {
-        res = await fetch('/api/ask-solve-ai', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode, question: askedQuestion, targetLanguage }),
-        });
-      }
+      const res = await callApi({ askedMode, askedQuestion, askedImage, askedDepth });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || 'Something went wrong. Please try again.');
-        setBusy(false);
         return;
       }
-      setMessages((m) => [...m, { role: 'assistant', text: data.answer, mode }]);
+      // Truncated responses are never silently shown as complete — they're
+      // flagged so Continue/Retry/Shorter can be offered instead.
+      setMessages((m) => [...m, {
+        role: 'assistant', text: data.answer, mode: askedMode, depth: askedDepth,
+        originalQuestion: askedQuestion, truncated: !!data.truncated,
+      }]);
+    } catch (err) {
+      console.error(err);
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Continuation appends to the existing message rather than replacing it —
+  // uses a functional state update so it's never built from a stale closure
+  // value, the same principle that matters for chunk-by-chunk streaming,
+  // just applied to a two-request continue instead.
+  async function handleContinue(index) {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    const msg = messages[index];
+    try {
+      const res = await callApi({ askedMode: msg.mode, askedQuestion: msg.originalQuestion, askedImage: null, askedDepth: msg.depth, continueFrom: msg.text });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Something went wrong. Please try again.');
+        return;
+      }
+      setMessages((prev) => prev.map((m, i) => i === index
+        ? { ...m, text: `${m.text} ${data.answer}`.trim(), truncated: !!data.truncated }
+        : m));
+    } catch (err) {
+      console.error(err);
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRetry(index) {
+    if (busy) return;
+    const msg = messages[index];
+    setBusy(true);
+    setError('');
+    try {
+      const res = await callApi({ askedMode: msg.mode, askedQuestion: msg.originalQuestion, askedImage: null, askedDepth: msg.depth });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Something went wrong. Please try again.');
+        return;
+      }
+      setMessages((prev) => prev.map((m, i) => i === index
+        ? { ...m, text: data.answer, truncated: !!data.truncated }
+        : m));
+    } catch (err) {
+      console.error(err);
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleShorter(index) {
+    if (busy) return;
+    const msg = messages[index];
+    setBusy(true);
+    setError('');
+    try {
+      const res = await callApi({ askedMode: msg.mode, askedQuestion: msg.originalQuestion, askedImage: null, askedDepth: 'quick' });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Something went wrong. Please try again.');
+        return;
+      }
+      setMessages((prev) => prev.map((m, i) => i === index
+        ? { ...m, text: data.answer, truncated: !!data.truncated, depth: 'quick' }
+        : m));
     } catch (err) {
       console.error(err);
       setError('Something went wrong. Please try again.');
@@ -88,7 +177,7 @@ export default function AskSolveAIWorkspace() {
 
   return (
     <div className="panel">
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
         {MODES.map((m) => (
           <button
             key={m.id}
@@ -101,6 +190,24 @@ export default function AskSolveAIWorkspace() {
           >
             <div style={{ fontSize: '1.3rem', marginBottom: 4 }}>{m.icon}</div>
             <div style={{ fontSize: '0.82rem', fontWeight: 700, color: mode === m.id ? m.color : '#475569' }}>{m.label}</div>
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569' }}>Answer depth:</span>
+        {DEPTHS.map((d) => (
+          <button
+            key={d.id}
+            onClick={() => setDepth(d.id)}
+            style={{
+              padding: '5px 12px', borderRadius: 999, cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600,
+              border: depth === d.id ? `1px solid ${activeMode.color}` : '1px solid #E2E8F0',
+              background: depth === d.id ? `${activeMode.color}12` : 'white',
+              color: depth === d.id ? activeMode.color : '#64748B',
+            }}
+          >
+            {d.label}
           </button>
         ))}
       </div>
@@ -124,9 +231,9 @@ export default function AskSolveAIWorkspace() {
           </div>
         )}
         {messages.map((msg, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
+          <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
             <div style={{
-              maxWidth: '80%', padding: '10px 14px', borderRadius: 14,
+              maxWidth: '85%', padding: '10px 14px', borderRadius: 14,
               background: msg.role === 'user' ? '#2563EB' : 'white',
               color: msg.role === 'user' ? 'white' : '#1E293B',
               border: msg.role === 'user' ? 'none' : '1px solid #E2E8F0',
@@ -138,6 +245,16 @@ export default function AskSolveAIWorkspace() {
               )}
               {msg.text}
             </div>
+            {msg.role === 'assistant' && msg.truncated && (
+              <div style={{ marginTop: 6, maxWidth: '85%' }}>
+                <p style={{ fontSize: '0.76rem', color: '#D97706', fontWeight: 600, marginBottom: 6 }}>The answer was interrupted before completion.</p>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button onClick={() => handleContinue(i)} disabled={busy} style={{ fontSize: '0.75rem', padding: '5px 12px', borderRadius: 999, border: '1px solid #FDE68A', background: '#FFFBEB', color: '#92400E', cursor: 'pointer', fontWeight: 600 }}>Continue</button>
+                  <button onClick={() => handleRetry(i)} disabled={busy} style={{ fontSize: '0.75rem', padding: '5px 12px', borderRadius: 999, border: '1px solid #E2E8F0', background: 'white', color: '#475569', cursor: 'pointer' }}>Retry</button>
+                  <button onClick={() => handleShorter(i)} disabled={busy} style={{ fontSize: '0.75rem', padding: '5px 12px', borderRadius: 999, border: '1px solid #E2E8F0', background: 'white', color: '#475569', cursor: 'pointer' }}>Generate shorter answer</button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
         {busy && (

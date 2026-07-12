@@ -37,6 +37,19 @@ const analysisSchema = {
   required: ['executiveSummary', 'keyFindings', 'insights', 'recommendations', 'conclusion'],
 };
 
+// Rows come back as arrays-of-strings aligned to `columns` by position,
+// rather than objects with dynamic keys — Gemini's structured-output schema
+// needs fixed property names, and column names vary per dataset, so this
+// sidesteps that entirely. Zipped into column-keyed objects after parsing.
+const extractionSchema = {
+  type: 'OBJECT',
+  properties: {
+    columns: { type: 'ARRAY', items: { type: 'STRING' } },
+    rows: { type: 'ARRAY', items: { type: 'ARRAY', items: { type: 'STRING' } } },
+  },
+  required: ['columns', 'rows'],
+};
+
 function buildAnalysisPrompt({ columns, stats, sampleRows, qualityWarnings, intents, industry, rowCount }) {
   const industryLine = industry && industry !== 'General' ? `This data is from a ${industry} context — use terminology and framing appropriate to that field.` : '';
   const intentLine = intents?.length ? `The user specifically asked for: ${intents.join(', ')}.` : '';
@@ -81,10 +94,10 @@ Question: "${question}"
 If the answer genuinely cannot be determined from the statistics and sample given, say so plainly rather than guessing. Answer in 2-4 sentences, plain language, no markdown formatting.`;
 }
 
-async function callGemini(apiKey, parts, useSchema) {
+async function callGemini(apiKey, parts, schema) {
   const body = {
     contents: [{ role: 'user', parts }],
-    generationConfig: useSchema ? { responseMimeType: 'application/json', responseSchema: analysisSchema } : { maxOutputTokens: 1024 },
+    generationConfig: schema ? { responseMimeType: 'application/json', responseSchema: schema } : { maxOutputTokens: 1024 },
   };
   const res = await fetch(GEMINI_URL, {
     method: 'POST',
@@ -117,7 +130,7 @@ export async function POST(request) {
         return Response.json({ error: 'No usable data received.' }, { status: 400 });
       }
       const prompt = buildAnalysisPrompt({ columns, stats, sampleRows, qualityWarnings, intents, industry, rowCount });
-      const raw = await callGemini(apiKey, [{ text: prompt }], true);
+      const raw = await callGemini(apiKey, [{ text: prompt }], analysisSchema);
       const clean = raw.replace(/```json|```/g, '').trim();
       const analysis = JSON.parse(clean);
       return Response.json(analysis);
@@ -126,13 +139,14 @@ export async function POST(request) {
     if (action === 'extractFromImage') {
       const { images } = payload;
       if (!images?.length) return Response.json({ error: 'No image received.' }, { status: 400 });
-      const prompt = `Extract the tabular data visible in this image (spreadsheet screenshot, printed report, or table photo) into structured rows and columns. Read every visible value carefully and exactly as shown — never invent or estimate numbers you can't clearly read. If a value is genuinely illegible, use null for that cell rather than guessing.
+      const prompt = `Extract the tabular data visible in this image (spreadsheet screenshot, printed report, or table photo) into structured rows and columns. Read every visible value carefully and exactly as shown — never invent or estimate numbers you can't clearly read. If a value is genuinely illegible, use an empty string for that cell rather than guessing.
 
-Return ONLY JSON in this shape: { "columns": ["...", "..."], "rows": [{"col1": "val1", ...}, ...] }`;
+Return "columns" as the list of column headers, and "rows" as a list of rows — each row is a list of string values in the exact same order as "columns".`;
       const parts = [{ text: prompt }, ...images.map((img) => ({ inline_data: { mime_type: img.mimeType || 'image/jpeg', data: img.data } }))];
-      const raw = await callGemini(apiKey, parts, false);
+      const raw = await callGemini(apiKey, parts, extractionSchema);
       const clean = raw.replace(/```json|```/g, '').trim();
-      const extracted = JSON.parse(clean);
+      const parsed = JSON.parse(clean);
+      const extracted = { columns: parsed.columns, rows: parsed.rows.map((r) => Object.fromEntries(parsed.columns.map((c, i) => [c, r[i] ?? '']))) };
       return Response.json(extracted);
     }
 
@@ -144,10 +158,11 @@ Return ONLY JSON in this shape: { "columns": ["...", "..."], "rows": [{"col1": "
 TEXT:
 ${text.slice(0, 50000)}
 
-Return ONLY JSON in this shape: { "columns": ["...", "..."], "rows": [{"col1": "val1", ...}, ...] }`;
-      const raw = await callGemini(apiKey, [{ text: prompt }], false);
+Return "columns" as the list of column headers, and "rows" as a list of rows — each row is a list of string values in the exact same order as "columns".`;
+      const raw = await callGemini(apiKey, [{ text: prompt }], extractionSchema);
       const clean = raw.replace(/```json|```/g, '').trim();
-      const extracted = JSON.parse(clean);
+      const parsed = JSON.parse(clean);
+      const extracted = { columns: parsed.columns, rows: parsed.rows.map((r) => Object.fromEntries(parsed.columns.map((c, i) => [c, r[i] ?? '']))) };
       return Response.json(extracted);
     }
 

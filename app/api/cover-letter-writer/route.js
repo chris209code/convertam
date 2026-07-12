@@ -28,6 +28,53 @@ Requirements:
 - Return ONLY the plain text of the letter itself, nothing else — no headers, no explanations, no markdown formatting.`;
 }
 
+function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+// Retries transient failures automatically (rate limits, momentary server
+// errors, network blips) before ever showing the user an error — same fix
+// applied across every AI route on the site after this exact failure mode
+// surfaced mid-demo. No JSON parsing here since this route returns plain
+// text, so the retry logic is simpler than the JSON-producing routes.
+async function callGeminiForLetter(apiKey, prompt) {
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { maxOutputTokens: 2048 },
+  };
+  const maxAttempts = 3;
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(GEMINI_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error(`Gemini cover letter error (attempt ${attempt}/${maxAttempts}):`, data);
+        const retryable = res.status === 429 || res.status >= 500;
+        if (retryable && attempt < maxAttempts) { await sleep(700 * attempt); continue; }
+        throw new Error('gemini_error');
+      }
+
+      const letter = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!letter) {
+        if (attempt < maxAttempts) { await sleep(700 * attempt); continue; }
+        throw new Error('empty_response');
+      }
+      return letter;
+    } catch (err) {
+      lastError = err;
+      const isKnownFinalError = err.message === 'gemini_error' || err.message === 'empty_response';
+      if (!isKnownFinalError && attempt < maxAttempts) { await sleep(700 * attempt); continue; } // network-level failure — also worth retrying
+      if (attempt === maxAttempts) throw lastError;
+    }
+  }
+  throw lastError;
+}
+
 export async function POST(request) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -36,40 +83,13 @@ export async function POST(request) {
       { status: 500 }
     );
   }
-
   try {
     const { yourName, jobTitle, companyName, background, jobDescription, tone } = await request.json();
-
     if (!jobTitle || !companyName || !background) {
       return Response.json({ error: 'Job title, company name, and background are required.' }, { status: 400 });
     }
-
     const prompt = buildPrompt({ yourName, jobTitle, companyName, background, jobDescription, tone: tone || 'Professional' });
-
-    const res = await fetch(GEMINI_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-      },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 2048 },
-      }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      console.error('Gemini cover letter error:', data);
-      return Response.json({ error: 'Could not generate the cover letter. Please try again.' }, { status: 502 });
-    }
-
-    const letter = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!letter) {
-      return Response.json({ error: 'No response from AI. Please try again.' }, { status: 422 });
-    }
-
+    const letter = await callGeminiForLetter(apiKey, prompt);
     return Response.json({ letter: letter.trim() });
   } catch (err) {
     console.error('Cover letter writer error:', err);

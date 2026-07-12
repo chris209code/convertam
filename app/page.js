@@ -51,6 +51,8 @@ const ALL_TOOLS = [
   { name: 'Resume Builder', href: '/resume-builder' },
   { name: 'Cover Letter Writer', href: '/cover-letter' },
   { name: 'Contract Summarizer', href: '/contract-summarizer' },
+  { name: 'AI Data Analyst', href: '/data-analyst' },
+  { name: 'AI Presentation Generator', href: '/presentation-generator' },
   { name: 'Image Compressor', href: '/image-compressor' },
   { name: 'Image Resizer & Cropper', href: '/resize-image' },
   { name: 'Watermark Image', href: '/watermark-image' },
@@ -106,12 +108,12 @@ const CATEGORIES = [
     icon: 'sparkles',
     viewAllHref: '/ai-tools',
     tools: [
+      { name: 'AI Data Analyst', href: '/data-analyst' },
+      { name: 'AI Presentation Generator', href: '/presentation-generator' },
       { name: 'CV Improver', href: '/cv-improver' },
-      { name: 'Receipt & Invoice Scanner', href: '/receipt-scanner' },
-      { name: 'Summarize PDF', href: '/summarize-pdf' },
       { name: 'Resume Builder', href: '/resume-builder' },
       { name: 'Cover Letter Writer', href: '/cover-letter' },
-      { name: 'Smart AI Converter', href: '/smart-converter' },
+      { name: 'Summarize PDF', href: '/summarize-pdf' },
     ],
   },
   {
@@ -169,11 +171,11 @@ const CATEGORIES = [
 ];
 
 const TRENDING_TOOLS = [
-  { name: 'PDF to Word', href: '/pdf-to-word' },
-  { name: 'Invoice Generator', href: '/invoice-generator' },
-  { name: 'OCR PDF', href: '/ocr-pdf' },
-  { name: 'ID Card Generator', href: '/id-card-generator' },
+  { name: 'AI Data Analyst', href: '/data-analyst' },
+  { name: 'AI Presentation Generator', href: '/presentation-generator' },
+  { name: 'CV Improver', href: '/cv-improver' },
   { name: 'Resume Builder', href: '/resume-builder' },
+  { name: 'PDF to Word', href: '/pdf-to-word' },
 ];
 
 const ICONS = {

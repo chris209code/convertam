@@ -84,24 +84,48 @@ Current outline (JSON): ${JSON.stringify(outline)}
 Return ONLY JSON matching the same shape as the input.`;
 }
 
+function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+// Retries transient failures automatically (rate limits, momentary server
+// errors, network blips) before ever showing the user an error.
 async function callGemini(apiKey, parts, useSchema) {
   const body = {
     contents: [{ role: 'user', parts }],
     generationConfig: useSchema ? { responseMimeType: 'application/json', responseSchema: outlineSchema } : { maxOutputTokens: 2048 },
   };
-  const res = await fetch(GEMINI_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    console.error('Gemini presentation-generator error:', data);
-    throw new Error('gemini_error');
+  const maxAttempts = 3;
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(GEMINI_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error(`Gemini presentation-generator error (attempt ${attempt}/${maxAttempts}):`, data);
+        const retryable = res.status === 429 || res.status >= 500;
+        if (retryable && attempt < maxAttempts) { await sleep(700 * attempt); continue; }
+        throw new Error('gemini_error');
+      }
+
+      const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!raw) {
+        if (attempt < maxAttempts) { await sleep(700 * attempt); continue; }
+        throw new Error('empty_response');
+      }
+      return raw;
+    } catch (err) {
+      lastError = err;
+      const isKnownFinalError = err.message === 'gemini_error' || err.message === 'empty_response';
+      if (!isKnownFinalError && attempt < maxAttempts) { await sleep(700 * attempt); continue; }
+      if (attempt === maxAttempts) throw lastError;
+    }
   }
-  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!raw) throw new Error('empty_response');
-  return raw;
+  throw lastError;
 }
 
 function parseJsonResponse(raw) {

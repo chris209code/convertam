@@ -4,14 +4,39 @@ import { useState, useRef, useEffect } from 'react';
 import Script from 'next/script';
 import { buildPptxFromOutline } from '@/lib/buildPptxFromOutline';
 
-const INTENT_OPTIONS = [
-  'Analyze my data', 'Generate charts', 'Executive report', 'Identify trends', 'Create PowerPoint presentation',
-];
-// V1 deliberately excludes: Compare periods, Forecast future values, Detect anomalies —
-// these need real statistical modelling, not just an LLM call, and were
-// explicitly deferred per the original scope for this tool.
+// Superseded by OBJECTIVE_OPTIONS below — the old multi-select "what would
+// you like to do" chips have been replaced by single-select objective cards
+// per the Milestone 2 spec. OBJECTIVE_TO_INTENTS still maps onto this same
+// shape internally so the existing analyze endpoint needs no changes yet.
 
-const INDUSTRIES = ['General', 'Business/Finance', 'Sales', 'Manufacturing/Production', 'Quality Assurance', 'Laboratory', 'Inventory', 'Education', 'Healthcare'];
+// Objective cards shown after Dataset Understanding. Availability of some
+// objectives depends on what the dataset actually supports (checked against
+// already-computed stats — no new profiling logic, reusing Milestone 1's).
+const OBJECTIVE_OPTIONS = [
+  { key: 'Let AI Decide', recommended: true, blurb: 'The AI selects the most useful analysis based on your data.' },
+  { key: 'Executive Management Report', blurb: 'Focus on KPIs, risks, major findings and recommendations.' },
+  { key: 'Root Cause Analysis', blurb: 'Focus on recurring problems, contributing factors and likely drivers.' },
+  { key: 'Performance Comparison', blurb: 'Compare teams, categories, branches, products, departments or other groups.' },
+  { key: 'Operational Analysis', blurb: 'Focus on process performance, recurring issues, efficiency and improvement opportunities.' },
+  { key: 'Audit / Compliance Report', blurb: 'Focus on gaps, exceptions, missing records, non-compliance and data quality.' },
+  { key: 'Trend Analysis', blurb: 'Track how key measures change over time.', requiresDates: true },
+  { key: 'Dashboard View', blurb: 'Focus on KPI cards, summary visuals and filterable charts.' },
+];
+
+// Maps the new single-select objective back onto the existing multi-select
+// intents shape the current /api/data-analyst "analyze" action already
+// expects — keeps that endpoint's prompt logic completely unchanged for
+// this milestone (deeper objective-aware prompt rework is a later milestone).
+const OBJECTIVE_TO_INTENTS = {
+  'Let AI Decide': ['Analyze my data', 'Generate charts', 'Executive report'],
+  'Executive Management Report': ['Analyze my data', 'Executive report'],
+  'Root Cause Analysis': ['Analyze my data', 'Identify trends'],
+  'Performance Comparison': ['Analyze my data', 'Generate charts'],
+  'Operational Analysis': ['Analyze my data', 'Generate charts'],
+  'Audit / Compliance Report': ['Analyze my data', 'Executive report'],
+  'Trend Analysis': ['Analyze my data', 'Identify trends'],
+  'Dashboard View': ['Generate charts'],
+};
 
 const CHART_COLORS = ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
 
@@ -362,8 +387,8 @@ export default function DataAnalystWorkspace() {
   const [understandBusy, setUnderstandBusy] = useState(false);
   const [clarifyingAnswer, setClarifyingAnswer] = useState('');
 
-  const [intents, setIntents] = useState(['Analyze my data', 'Generate charts', 'Executive report']);
   const [industry, setIndustry] = useState('General');
+  const [objective, setObjective] = useState('Let AI Decide');
 
   const [analysis, setAnalysis] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -471,18 +496,19 @@ export default function DataAnalystWorkspace() {
         body: JSON.stringify({ action: 'understand', columns, stats, sampleRows: rows, rowCount: rows.length }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not understand this dataset.');
+      if (!res.ok) throw new Error(data.error || 'understanding_failed');
       setUnderstanding(data);
-      setPhase('understanding');
     } catch (err) {
-      setError(err.message);
+      // Fall back to deterministic profiling only — the workflow keeps
+      // going, it just can't offer an inferred business-context guess.
+      setUnderstanding({
+        datasetType: 'Uploaded Dataset', industry: '', businessProcess: '', description: '',
+        potentialKPIs: [], confidence: null, clarifyingQuestion: '', fallback: true,
+      });
     } finally {
+      setPhase('understanding');
       setUnderstandBusy(false);
     }
-  }
-
-  function toggleIntent(intent) {
-    setIntents((prev) => prev.includes(intent) ? prev.filter((i) => i !== intent) : [...prev, intent]);
   }
 
   async function handleAnalyze() {
@@ -491,9 +517,11 @@ export default function DataAnalystWorkspace() {
     try {
       const stats = computeStats(columns, rows);
       const qualityWarnings = computeQualityWarnings(columns, rows, stats);
+      const derivedIntents = OBJECTIVE_TO_INTENTS[objective] || OBJECTIVE_TO_INTENTS['Let AI Decide'];
+      const effectiveIndustry = understanding?.industry || industry;
       const res = await fetch('/api/data-analyst', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'analyze', columns, stats, sampleRows: rows, qualityWarnings, intents, industry, rowCount: rows.length }),
+        body: JSON.stringify({ action: 'analyze', columns, stats, sampleRows: rows, qualityWarnings, intents: derivedIntents, industry: effectiveIndustry, objective, rowCount: rows.length }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not analyze this data.');
@@ -686,6 +714,7 @@ export default function DataAnalystWorkspace() {
     setPhase('upload'); setColumns([]); setRows([]); setAnalysis(null); setChartData({});
     setChatMessages([]); setError(''); setFileName(''); setPasteText('');
     setUnderstanding(null); setDatasetHealth(null); setClarifyingAnswer('');
+    setObjective('Let AI Decide');
   }
 
   // ===========================================================================
@@ -776,46 +805,73 @@ export default function DataAnalystWorkspace() {
     const healthColor = datasetHealth.health === 'Good' ? '#059669' : datasetHealth.health === 'Needs Attention' ? '#D97706' : '#DC2626';
     const healthBg = datasetHealth.health === 'Good' ? '#ECFDF5' : datasetHealth.health === 'Needs Attention' ? '#FFFBEB' : '#FEF2F2';
 
+    const confidenceLabel = understanding.confidence == null ? 'Confidence unavailable'
+      : understanding.confidence >= 80 ? 'High confidence'
+      : understanding.confidence >= 60 ? 'Medium confidence'
+      : 'Low confidence';
+    const confidenceColor = understanding.confidence == null ? '#94A3B8'
+      : understanding.confidence >= 80 ? '#059669'
+      : understanding.confidence >= 60 ? '#D97706'
+      : '#DC2626';
+
     return (
       <div className="panel">
         <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', marginBottom: 16 }}>Dataset Understanding</p>
 
-        <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 18, marginBottom: 16 }}>
-          <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 4 }}>Dataset identified as</p>
-          <p style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', marginBottom: 12 }}>{understanding.datasetType}</p>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 12 }}>
-            <div>
-              <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 2 }}>Likely business area</p>
-              <p style={{ fontSize: '0.85rem', color: '#334155' }}>{understanding.industry}</p>
-            </div>
-            <div>
-              <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 2 }}>Confidence</p>
-              <p style={{ fontSize: '0.85rem', fontWeight: 700, color: understanding.confidence >= 70 ? '#059669' : '#D97706' }}>{understanding.confidence}%</p>
-            </div>
+        {understanding.fallback && (
+          <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: 12, marginBottom: 16 }}>
+            <p style={{ fontSize: '0.8rem', color: '#92400E', margin: 0 }}>We could not fully identify the business context, but you can describe the dataset below.</p>
           </div>
+        )}
 
-          <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 4 }}>Description</p>
+        <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 18, marginBottom: 16 }}>
+          {!understanding.fallback && (
+            <>
+              <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 4 }}>Dataset identified as</p>
+              <p style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F172A', marginBottom: 12 }}>{understanding.datasetType}</p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div>
+                  <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 3 }}>Likely industry</p>
+                  <input style={inputStyle} value={understanding.industry} onChange={(e) => setUnderstanding((u) => ({ ...u, industry: e.target.value }))} />
+                </div>
+                <div>
+                  <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 3 }}>Business process</p>
+                  <input style={inputStyle} value={understanding.businessProcess} onChange={(e) => setUnderstanding((u) => ({ ...u, businessProcess: e.target.value }))} />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 3 }}>Confidence</p>
+                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: confidenceColor }}>{confidenceLabel}{understanding.confidence != null ? ` (${understanding.confidence}%)` : ''}</span>
+              </div>
+            </>
+          )}
+
+          <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 4 }}>Describe this dataset in your own words</p>
           <input
             style={{ ...inputStyle, marginBottom: 4 }}
             value={understanding.description}
             onChange={(e) => setUnderstanding((u) => ({ ...u, description: e.target.value }))}
+            placeholder="e.g. Weekly sales figures by region and product line"
           />
-          <p style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Not quite right? Edit the description above before continuing.</p>
+          <p style={{ fontSize: '0.7rem', color: '#94A3B8' }}>Not quite right? Correct any of the fields above before continuing — nothing needs to be rewritten from scratch.</p>
         </div>
 
-        {understanding.confidence < 70 && understanding.clarifyingQuestion && (
+        {!understanding.fallback && understanding.confidence != null && understanding.confidence < 70 && understanding.clarifyingQuestion && (
           <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 12, padding: 16, marginBottom: 16 }}>
             <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400E', marginBottom: 8 }}>{understanding.clarifyingQuestion}</p>
-            <input style={inputStyle} value={clarifyingAnswer} onChange={(e) => setClarifyingAnswer(e.target.value)} placeholder="Your answer helps improve the analysis" />
+            <input style={inputStyle} value={clarifyingAnswer} onChange={(e) => setClarifyingAnswer(e.target.value)} placeholder="Your answer helps improve the analysis (optional)" />
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 16 }}>
           {[['Date columns', columnsByType.date], ['Numeric measures', columnsByType.numeric], ['Categories', columnsByType.categorical]].map(([label, cols]) => (
             <div key={label} style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 10, padding: 12 }}>
               <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 6 }}>{label}</p>
-              {cols.length ? cols.map((c) => <p key={c} style={{ fontSize: '0.78rem', color: '#334155', margin: '2px 0' }}>{c}</p>) : <p style={{ fontSize: '0.78rem', color: '#CBD5E1' }}>None detected</p>}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {cols.length ? cols.map((c) => <span key={c} style={{ fontSize: '0.72rem', color: '#334155', background: '#F1F5F9', padding: '2px 8px', borderRadius: 999 }}>{c}</span>) : <p style={{ fontSize: '0.78rem', color: '#CBD5E1', margin: 0 }}>None detected</p>}
+              </div>
             </div>
           ))}
         </div>
@@ -834,7 +890,7 @@ export default function DataAnalystWorkspace() {
             <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>Dataset Health</p>
             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: healthColor, background: 'white', padding: '3px 10px', borderRadius: 999, border: `1px solid ${healthColor}` }}>{datasetHealth.health}</span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, fontSize: '0.75rem', color: '#475569' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10, fontSize: '0.75rem', color: '#475569' }}>
             <div><strong>{datasetHealth.totalRows}</strong> rows</div>
             <div><strong>{datasetHealth.totalColumns}</strong> columns</div>
             <div><strong>{datasetHealth.completeness}%</strong> complete</div>
@@ -860,25 +916,57 @@ export default function DataAnalystWorkspace() {
   }
 
   if (phase === 'intents') {
+    const hasDateColumns = columns.some((c) => computeStats(columns, rows)[c]?.type === 'date');
+    const hasCategoricalColumns = columns.some((c) => computeStats(columns, rows)[c]?.type === 'categorical');
+
+    function isDisabled(opt) {
+      return opt.requiresDates && !hasDateColumns;
+    }
+    function helperText(opt) {
+      if (opt.requiresDates && !hasDateColumns) return 'A valid date or sequential field is required.';
+      if (opt.key === 'Root Cause Analysis' && !hasCategoricalColumns) return 'This dataset may not have enough categorical detail for a strong root-cause analysis.';
+      return '';
+    }
+
     return (
       <div className="panel">
-        <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>What would you like to do?</p>
-        <p style={{ fontSize: '0.78rem', color: '#64748B', marginBottom: 12 }}>Select all that apply.</p>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
-          {INTENT_OPTIONS.map((intent) => <button key={intent} style={chipBtn(intents.includes(intent))} onClick={() => toggleIntent(intent)}>{intent}</button>)}
-        </div>
+        <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>What would you like to achieve with this data?</p>
+        <p style={{ fontSize: '0.78rem', color: '#64748B', marginBottom: 16 }}>Pick one — "Let AI Decide" works well if you're not sure.</p>
 
-        <label style={labelStyle}>Industry context (optional — helps tailor the language)</label>
-        <select value={industry} onChange={(e) => setIndustry(e.target.value)} style={{ ...inputStyle, maxWidth: 300, marginBottom: 20 }}>
-          {INDUSTRIES.map((i) => <option key={i}>{i}</option>)}
-        </select>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginBottom: 20 }}>
+          {OBJECTIVE_OPTIONS.map((opt) => {
+            const disabled = isDisabled(opt);
+            const helper = helperText(opt);
+            const selected = objective === opt.key;
+            return (
+              <button
+                key={opt.key}
+                disabled={disabled}
+                onClick={() => setObjective(opt.key)}
+                style={{
+                  textAlign: 'left', padding: '14px 16px', borderRadius: 12, cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                  border: selected ? '2px solid #2563EB' : '1px solid #E2E8F0',
+                  background: disabled ? '#F8FAFC' : selected ? '#EFF6FF' : 'white',
+                  opacity: disabled ? 0.6 : 1,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 700, color: selected ? '#1D4ED8' : '#0F172A' }}>{opt.key}</span>
+                  {opt.recommended && <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#059669', background: '#ECFDF5', padding: '2px 7px', borderRadius: 999 }}>RECOMMENDED</span>}
+                </div>
+                <p style={{ fontSize: '0.75rem', color: '#64748B', margin: 0, lineHeight: 1.4 }}>{opt.blurb}</p>
+                {helper && <p style={{ fontSize: '0.7rem', color: disabled ? '#94A3B8' : '#D97706', margin: '6px 0 0' }}>{helper}</p>}
+              </button>
+            );
+          })}
+        </div>
 
         {error && <div style={{ padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, color: '#DC2626', fontSize: '0.82rem', marginBottom: 16 }}>{error}</div>}
 
         <div style={{ display: 'flex', gap: 12 }}>
-          <button className="btn btn-ghost" onClick={() => setPhase('review')}>← Back</button>
-          <button className="btn btn-primary" disabled={analyzing || !intents.length} onClick={handleAnalyze}>
-            {analyzing ? '✨ Analyzing your data…' : '✨ Analyze'}
+          <button className="btn btn-ghost" onClick={() => setPhase('understanding')}>← Back</button>
+          <button className="btn btn-primary" disabled={analyzing} onClick={handleAnalyze}>
+            {analyzing ? '✨ Analyzing your data…' : 'Continue to Analysis →'}
           </button>
         </div>
       </div>
@@ -959,9 +1047,7 @@ export default function DataAnalystWorkspace() {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button onClick={downloadPDFReport} disabled={!!downloading} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>{downloading === 'pdf' ? 'Building…' : '📄 PDF Report'}</button>
             <button onClick={downloadWordReport} disabled={!!downloading} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>{downloading === 'word' ? 'Building…' : '📝 Word Report'}</button>
-            {intents.includes('Create PowerPoint presentation') && (
-              <button onClick={downloadPresentation} disabled={!!downloading} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>{downloading === 'pptx' ? 'Building…' : '📊 PowerPoint'}</button>
-            )}
+            <button onClick={downloadPresentation} disabled={!!downloading} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>{downloading === 'pptx' ? 'Building…' : '📊 PowerPoint'}</button>
             <button onClick={downloadExcel} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>📈 Excel (data)</button>
             <button onClick={downloadCSV} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>⬇ CSV</button>
             <button onClick={downloadChartsPNG} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>🖼 Charts (PNG)</button>

@@ -300,7 +300,7 @@ function prepareChartData(chart, rows, stats) {
 // charting-library dependency, drawn directly the same way other visual
 // tools on this site already do.
 // ---------------------------------------------------------------------------
-function ChartCanvas({ chart, data, chartRef }) {
+function ChartCanvas({ chart, data, chartRef, width = 380, height = 240, hideChrome = false }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -495,10 +495,12 @@ function ChartCanvas({ chart, data, chartRef }) {
     });
   }, [chart, data]);
 
-  return (
+  return hideChrome ? (
+    <canvas ref={(el) => { canvasRef.current = el; if (chartRef) chartRef.current = el; }} width={width} height={height} style={{ width: '100%', height: 'auto', maxWidth: width }} />
+  ) : (
     <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 12, padding: 14 }}>
       <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>{chart.title}</p>
-      <canvas ref={(el) => { canvasRef.current = el; if (chartRef) chartRef.current = el; }} width={380} height={240} style={{ width: '100%', height: 'auto', maxWidth: 380 }} />
+      <canvas ref={(el) => { canvasRef.current = el; if (chartRef) chartRef.current = el; }} width={width} height={height} style={{ width: '100%', height: 'auto', maxWidth: width }} />
       {(chart.whatItShows || chart.whyItMatters) && (
         <p style={{ fontSize: '0.72rem', color: '#475569', marginTop: 8, lineHeight: 1.4 }}>{chart.whatItShows} {chart.whyItMatters}</p>
       )}
@@ -550,7 +552,17 @@ export default function DataAnalystWorkspace() {
   const [chatInput, setChatInput] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
 
+  useEffect(() => {
+    function onFullscreenChange() {
+      if (!document.fullscreenElement) setPresentationMode(false);
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, []);
+
   const [downloading, setDownloading] = useState('');
+  const [presentationMode, setPresentationMode] = useState(false);
+  const [fullscreenChartIdx, setFullscreenChartIdx] = useState(null);
 
   async function handleFileUpload(e) {
     const file = e.target.files?.[0];
@@ -748,16 +760,6 @@ export default function DataAnalystWorkspace() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Data');
     XLSX.writeFile(wb, `${fileName || 'data'}.xlsx`);
-  }
-
-  function downloadChartsPNG() {
-    Object.entries(chartRefs.current).forEach(([i, canvas], idx) => {
-      if (!canvas) return;
-      setTimeout(() => {
-        const url = canvas.toDataURL('image/png');
-        const a = document.createElement('a'); a.href = url; a.download = `chart-${Number(i) + 1}.png`; a.click();
-      }, idx * 200);
-    });
   }
 
   async function downloadPDFReport() {
@@ -1005,6 +1007,105 @@ export default function DataAnalystWorkspace() {
       await pptx.writeFile({ fileName: 'data-analysis-presentation.pptx' });
     } finally {
       setDownloading('');
+    }
+  }
+
+  // Constructed from existing Milestone 4 output — no new AI call. Exactly
+  // 3 sentences: the top finding, its implication, then the highest-priority
+  // recommendation (or first recommendation if none are marked Immediate).
+  function buildExecutiveBrief() {
+    if (!analysis?.keyFindings?.length) return null;
+    const topFinding = analysis.keyFindings[0];
+    const topRec = analysis.recommendations?.find((r) => r.priority === 'Immediate') || analysis.recommendations?.[0];
+    const sentences = [topFinding.finding, topFinding.businessImplication];
+    if (topRec) sentences.push(topRec.recommendation);
+    return sentences.filter(Boolean).join('. ').replace(/\.\./g, '.').replace(/([^.])$/, '$1.');
+  }
+
+  async function downloadChartsZip() {
+    setDownloading('zip');
+    try {
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+      Object.entries(chartRefs.current).forEach(([i, canvas]) => {
+        if (!canvas) return;
+        const chart = analysis.suggestedCharts?.[i];
+        const dataUrl = canvas.toDataURL('image/png');
+        const base64 = dataUrl.split(',')[1];
+        zip.file(`${(chart?.title || `chart-${i}`).replace(/[^a-z0-9]/gi, '-')}.png`, base64, { base64: true });
+      });
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'charts.zip'; a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloading('');
+    }
+  }
+
+  async function downloadExecutiveSummaryOnly() {
+    setDownloading('summary');
+    try {
+      const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
+      const pdfDoc = await PDFDocument.create();
+      const page = pdfDoc.addPage([595, 842]);
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      let y = 780;
+      page.drawText('Executive Summary', { x: 50, y, size: 20, font: bold, color: rgb(0.06, 0.09, 0.16) }); y -= 34;
+      const words = analysis.executiveSummary.split(' ');
+      let line = '';
+      words.forEach((w) => {
+        const test = line ? `${line} ${w}` : w;
+        if (font.widthOfTextAtSize(test, 12) > 495 && line) {
+          page.drawText(line, { x: 50, y, size: 12, font, color: rgb(0.2, 0.2, 0.2) }); y -= 18;
+          line = w;
+        } else line = test;
+      });
+      if (line) page.drawText(line, { x: 50, y, size: 12, font, color: rgb(0.2, 0.2, 0.2) });
+      const bytes = await pdfDoc.save();
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'executive-summary.pdf'; a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setDownloading('');
+    }
+  }
+
+  function downloadRawJSON() {
+    const payload = { understanding, datasetHealth, kpiCards, analysis };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'raw-findings.json'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadChartDataCSV(i) {
+    const chart = analysis.suggestedCharts?.[i];
+    const data = chartData[i];
+    if (!chart || !data) return;
+    let csv = '';
+    if (data.labels && data.values) {
+      csv = `${chart.xColumn || 'Category'},${chart.yColumn || 'Value'}\n` + data.labels.map((l, idx) => `"${l}",${data.values[idx]}`).join('\n');
+    } else if (data.points) {
+      csv = `${chart.xColumn},${chart.yColumn}\n` + data.points.map((p) => `${p.x},${p.y}`).join('\n');
+    } else if (data.grid) {
+      csv = [chart.xColumn, ...data.xLabels].join(',') + '\n' + data.grid.map((row, yi) => [data.yLabels[yi], ...row].join(',')).join('\n');
+    }
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `${(chart.title || 'chart-data').replace(/[^a-z0-9]/gi, '-')}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function togglePresentationMode() {
+    if (!presentationMode) {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+      setPresentationMode(true);
+    } else {
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+      setPresentationMode(false);
     }
   }
 
@@ -1272,169 +1373,319 @@ export default function DataAnalystWorkspace() {
   }
 
   if (phase === 'report' && analysis) {
-    return (
-      <div className="panel">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
-          <div>
-            <p style={{ fontSize: '1rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>Data Analysis Report</p>
-            <p style={{ fontSize: '0.75rem', color: '#94A3B8', margin: 0 }}>{fileName} · {rows.length} rows</p>
-          </div>
-          <button className="btn btn-ghost" onClick={startOver}>Analyze Different Data</button>
-        </div>
+    const brief = buildExecutiveBrief();
+    const hc = datasetHealth?.health === 'Good' ? '#059669' : datasetHealth?.health === 'Needs Attention' ? '#D97706' : '#DC2626';
+    const hcBg = datasetHealth?.health === 'Good' ? '#ECFDF5' : datasetHealth?.health === 'Needs Attention' ? '#FFFBEB' : '#FEF2F2';
+    const cc = analysis.confidenceStatement?.level === 'High' ? '#059669' : analysis.confidenceStatement?.level === 'Medium' ? '#D97706' : '#DC2626';
+    const evidenceBadge = (t) => ({
+      Observed: { bg: '#ECFDF5', color: '#059669' },
+      Estimated: { bg: '#FFFBEB', color: '#D97706' },
+      Suggested: { bg: '#EFF6FF', color: '#2563EB' },
+    }[t] || { bg: '#F1F5F9', color: '#64748B' });
 
+    const sectionStyle = presentationMode ? { minHeight: '92vh', scrollSnapAlign: 'start', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '40px 0' } : { marginBottom: 32 };
+    const sectionLabel = { fontSize: '0.78rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 };
+    const card = { background: 'white', border: '1px solid #E2E8F0', borderRadius: 14, padding: 20 };
+
+    return (
+      <div className={presentationMode ? '' : 'panel'} style={presentationMode ? { position: 'fixed', inset: 0, background: 'white', zIndex: 9999, overflowY: 'auto', scrollSnapType: 'y mandatory', padding: '0 6%' } : undefined}>
+        <style>{`
+          @media print { .no-print-report { display: none !important; } }
+        `}</style>
+
+        {/* Top bar — hidden entirely in Presentation Mode */}
+        {!presentationMode && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28, flexWrap: 'wrap', gap: 10 }}>
+            <div>
+              <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>Data Analysis Report</p>
+              <p style={{ fontSize: '0.75rem', color: '#94A3B8', margin: 0 }}>{fileName} · {rows.length} rows</p>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={togglePresentationMode} style={{ fontSize: '0.82rem', fontWeight: 700, padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>🎥 Presentation Mode</button>
+              <button className="btn btn-ghost" onClick={startOver}>Analyze Different Data</button>
+            </div>
+          </div>
+        )}
+
+        {presentationMode && (
+          <button onClick={togglePresentationMode} style={{ position: 'fixed', top: 20, right: 20, zIndex: 10000, fontSize: '0.82rem', fontWeight: 700, padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>✕ Exit Presentation</button>
+        )}
+
+        {/* 1. Executive Brief */}
+        {brief && (
+          <div style={sectionStyle}>
+            <div style={{ ...card, background: 'linear-gradient(135deg, #EFF6FF, #F5F3FF)', border: '1px solid #BFDBFE' }}>
+              <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#2563EB', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Executive Brief</p>
+              <p style={{ fontSize: presentationMode ? '1.4rem' : '1rem', fontWeight: 600, color: '#0F172A', lineHeight: 1.6, margin: 0 }}>{brief}</p>
+            </div>
+          </div>
+        )}
+
+        {/* 2. KPI Dashboard */}
         {kpiCards.length > 0 && (
-          <div style={{ marginBottom: 24 }}>
-            <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>KPI Highlights</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+          <div style={sectionStyle}>
+            <p style={sectionLabel}>KPI Dashboard</p>
+            <div style={{ display: 'grid', gridTemplateColumns: presentationMode ? 'repeat(auto-fit, minmax(220px, 1fr))' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
               {kpiCards.map((kpi) => <KpiCard key={kpi.name} kpi={kpi} />)}
             </div>
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 20, marginBottom: 24 }}>
-          {/* Charts */}
-          <div>
-            <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Charts</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
-              {(analysis.suggestedCharts || []).map((chart, i) => chartData[i] && (
-                <ChartCanvas key={i} chart={chart} data={chartData[i]} chartRef={{ current: null, set current(v) { chartRefs.current[i] = v; } }} />
-              ))}
-            </div>
-          </div>
-
-          {/* Insights */}
-          <div>
-            <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Executive Intelligence</p>
-            <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 16, maxHeight: 700, overflowY: 'auto' }}>
-              <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Executive Summary</p>
-              <p style={{ fontSize: '0.8rem', color: '#374151', marginBottom: 14, lineHeight: 1.6 }}>{analysis.executiveSummary}</p>
-
+        {/* 3. Dataset Health & Confidence */}
+        {datasetHealth && (
+          <div style={sectionStyle}>
+            <p style={sectionLabel}>Dataset Health & Confidence</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+              <div style={{ ...card, background: hcBg, borderColor: `${hc}33` }}>
+                <p style={{ fontSize: '0.68rem', fontWeight: 700, color: hc, textTransform: 'uppercase', marginBottom: 4 }}>Health</p>
+                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>{datasetHealth.health}</p>
+              </div>
               {analysis.confidenceStatement && (
-                <div style={{ marginBottom: 14, padding: 10, borderRadius: 8, background: analysis.confidenceStatement.level === 'High' ? '#ECFDF5' : analysis.confidenceStatement.level === 'Medium' ? '#FFFBEB' : '#FEF2F2' }}>
-                  <p style={{ fontSize: '0.78rem', fontWeight: 700, color: analysis.confidenceStatement.level === 'High' ? '#059669' : analysis.confidenceStatement.level === 'Medium' ? '#D97706' : '#DC2626', marginBottom: 2 }}>Confidence in Findings: {analysis.confidenceStatement.level}</p>
-                  <p style={{ fontSize: '0.76rem', color: '#475569', margin: 0 }}>{analysis.confidenceStatement.reasoning}</p>
+                <div style={{ ...card, background: cc === '#059669' ? '#ECFDF5' : cc === '#D97706' ? '#FFFBEB' : '#FEF2F2', borderColor: `${cc}33` }}>
+                  <p style={{ fontSize: '0.68rem', fontWeight: 700, color: cc, textTransform: 'uppercase', marginBottom: 4 }}>Confidence</p>
+                  <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>{analysis.confidenceStatement.level}</p>
                 </div>
               )}
-
-              {analysis.keyFindings?.length > 0 && (
-                <div style={{ marginBottom: 14 }}>
-                  <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>Key Findings</p>
-                  {analysis.keyFindings.map((f, i) => (
-                    <div key={i} style={{ marginBottom: 10, paddingLeft: 10, borderLeft: '2px solid #BFDBFE' }}>
-                      <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#0F172A', margin: 0 }}>{f.finding}</p>
-                      <p style={{ fontSize: '0.75rem', color: '#64748B', margin: '2px 0' }}>Evidence: {f.evidence}</p>
-                      <p style={{ fontSize: '0.75rem', color: '#059669', margin: 0 }}>→ {f.businessImplication}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {analysis.rootCauseObservations?.length > 0 && (
-                <div style={{ marginBottom: 14 }}>
-                  <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>Root Cause Observations</p>
-                  {analysis.rootCauseObservations.map((o, i) => <p key={i} style={{ fontSize: '0.8rem', color: '#374151', marginBottom: 4, lineHeight: 1.5 }}>• {o}</p>)}
-                </div>
-              )}
-
-              {analysis.risks?.length > 0 && (
-                <div style={{ marginBottom: 14 }}>
-                  <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>Risks</p>
-                  {analysis.risks.map((r, i) => (
-                    <div key={i} style={{ marginBottom: 8, fontSize: '0.78rem' }}>
-                      <span style={{ fontWeight: 700, color: '#0F172A' }}>[{r.category}] </span>
-                      <span style={{ color: '#374151' }}>{r.description}</span>
-                      <span style={{ color: '#94A3B8' }}> — Likelihood: {r.likelihood}, Impact: {r.impact}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {analysis.opportunities?.length > 0 && (
-                <div style={{ marginBottom: 14 }}>
-                  <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>Opportunities</p>
-                  {analysis.opportunities.map((o, i) => (
-                    <div key={i} style={{ marginBottom: 6, fontSize: '0.78rem', color: '#374151' }}>
-                      <span style={{ fontWeight: 700, color: o.priority === 'High' ? '#059669' : o.priority === 'Medium' ? '#D97706' : '#94A3B8' }}>[{o.priority}] </span>
-                      {o.description} — {o.whyItMatters}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {analysis.recommendations?.length > 0 && (
-                <div style={{ marginBottom: 14 }}>
-                  <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>Recommendations</p>
-                  {analysis.recommendations.map((r, i) => (
-                    <div key={i} style={{ marginBottom: 10, paddingLeft: 10, borderLeft: '2px solid #DDD6FE' }}>
-                      <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#0F172A', margin: 0 }}>{r.recommendation}</p>
-                      <p style={{ fontSize: '0.74rem', color: '#64748B', margin: '2px 0' }}>Evidence: {r.evidence}</p>
-                      <p style={{ fontSize: '0.74rem', color: '#7C3AED', margin: 0 }}>Impact: {r.impact} · Effort: {r.effort} · Priority: {r.priority} · Owner: {r.owner}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {analysis.actionPlan?.length > 0 && (
-                <div style={{ marginBottom: 14 }}>
-                  <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>Action Plan</p>
-                  {analysis.actionPlan.map((a, i) => (
-                    <div key={i} style={{ marginBottom: 6, fontSize: '0.76rem', color: '#374151' }}>
-                      <strong>[{a.priority}]</strong> {a.action} — Owner: {a.owner}, Timeline: {a.timeline}, Success: {a.successMeasure}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {analysis.qualityWarnings?.length > 0 && (
-                <div style={{ marginBottom: 14 }}>
-                  <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 6 }}>Data Quality Notes</p>
-                  {analysis.qualityWarnings.map((w, i) => <p key={i} style={{ fontSize: '0.78rem', color: '#374151', marginBottom: 4 }}>• {w}</p>)}
-                </div>
-              )}
-
-              <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Conclusion</p>
-              <p style={{ fontSize: '0.8rem', color: '#374151', lineHeight: 1.6 }}>{analysis.conclusion}</p>
+              <div style={card}><p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 4 }}>Rows</p><p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>{datasetHealth.totalRows}</p></div>
+              <div style={card}><p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 4 }}>Columns</p><p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>{datasetHealth.totalColumns}</p></div>
+              <div style={card}><p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 4 }}>Missing Values</p><p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>{datasetHealth.missingValues}</p></div>
+              <div style={card}><p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 4 }}>Duplicates</p><p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>{datasetHealth.duplicateRows}</p></div>
+              <div style={card}><p style={{ fontSize: '0.68rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 4 }}>Completeness</p><p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>{datasetHealth.completeness}%</p></div>
             </div>
+            {analysis.confidenceStatement?.reasoning && <p style={{ fontSize: '0.8rem', color: '#64748B', marginTop: 12, lineHeight: 1.5 }}>{analysis.confidenceStatement.reasoning}</p>}
+          </div>
+        )}
+
+        {/* 4. Executive Summary */}
+        <div style={sectionStyle}>
+          <p style={sectionLabel}>Executive Summary</p>
+          <div style={{ ...card, maxWidth: 780 }}>
+            <p style={{ fontSize: presentationMode ? '1.15rem' : '0.92rem', color: '#374151', lineHeight: 1.75, margin: 0 }}>{analysis.executiveSummary}</p>
           </div>
         </div>
 
-        {/* Chat with data */}
-        <div style={{ marginBottom: 24 }}>
-          <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Ask a question about your data</p>
-          <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 16 }}>
+        {/* 5. Key Findings — cards, not paragraphs */}
+        {analysis.keyFindings?.length > 0 && (
+          <div style={sectionStyle}>
+            <p style={sectionLabel}>Key Findings</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
+              {analysis.keyFindings.map((f, i) => {
+                const badge = evidenceBadge(f.evidenceType);
+                return (
+                  <div key={i} style={card}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <span style={{ fontSize: '1.3rem' }}>💡</span>
+                      {f.evidenceType && <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '2px 9px', borderRadius: 999, background: badge.bg, color: badge.color }}>{f.evidenceType}</span>}
+                    </div>
+                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F172A', marginBottom: 8, lineHeight: 1.4 }}>{f.finding}</p>
+                    <p style={{ fontSize: '0.78rem', color: '#64748B', marginBottom: 6, lineHeight: 1.5 }}>Evidence: {f.evidence}</p>
+                    <p style={{ fontSize: '0.78rem', color: '#059669', margin: 0, lineHeight: 1.5 }}>→ {f.businessImplication}</p>
+                  </div>
+                );
+              })}
+            </div>
+            {analysis.rootCauseObservations?.length > 0 && (
+              <div style={{ ...card, marginTop: 14, background: '#FFFBEB', borderColor: '#FDE68A' }}>
+                <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#92400E', marginBottom: 8 }}>Root Cause Observations</p>
+                {analysis.rootCauseObservations.map((o, i) => <p key={i} style={{ fontSize: '0.8rem', color: '#78350F', marginBottom: 4, lineHeight: 1.5 }}>• {o}</p>)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 6. Interactive Charts — one major chart per section */}
+        {(analysis.suggestedCharts || []).map((chart, i) => chartData[i] && (
+          <div key={i} style={sectionStyle}>
+            <p style={sectionLabel}>Chart {i + 1} of {analysis.suggestedCharts.length}</p>
+            <div style={card}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                <p style={{ fontSize: '1rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>{chart.title}</p>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => { const c = chartRefs.current[i]; if (c) { const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = `${chart.title.replace(/[^a-z0-9]/gi, '-')}.png`; a.click(); } }} style={{ fontSize: '0.72rem', padding: '5px 10px', borderRadius: 6, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>Export PNG</button>
+                  <button onClick={() => setFullscreenChartIdx(i)} style={{ fontSize: '0.72rem', padding: '5px 10px', borderRadius: 6, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>Fullscreen</button>
+                  <button onClick={() => downloadChartDataCSV(i)} style={{ fontSize: '0.72rem', padding: '5px 10px', borderRadius: 6, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>Download Data</button>
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <ChartCanvas
+                  chart={chart} data={chartData[i]} hideChrome
+                  width={presentationMode ? 900 : 640} height={presentationMode ? 460 : 320}
+                  chartRef={{ current: null, set current(v) { chartRefs.current[i] = v; } }}
+                />
+              </div>
+              {(chart.whatItShows || chart.whyItMatters) && <p style={{ fontSize: '0.8rem', color: '#475569', marginTop: 12, lineHeight: 1.5 }}>{chart.whatItShows} {chart.whyItMatters}</p>}
+              {chart.whySelected && <p style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: 4, fontStyle: 'italic' }}>{chart.whySelected}</p>}
+            </div>
+          </div>
+        ))}
+
+        {/* 7. Risks */}
+        {analysis.risks?.length > 0 && (
+          <div style={sectionStyle}>
+            <p style={sectionLabel}>Risks</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+              {analysis.risks.map((r, i) => (
+                <div key={i} style={card}>
+                  <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#DC2626', textTransform: 'uppercase', marginBottom: 6 }}>{r.category}</p>
+                  <p style={{ fontSize: '0.85rem', color: '#0F172A', marginBottom: 8, lineHeight: 1.5 }}>{r.description}</p>
+                  <p style={{ fontSize: '0.75rem', color: '#64748B', margin: 0 }}>Likelihood: {r.likelihood} · Impact: {r.impact}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 8. Opportunities */}
+        {analysis.opportunities?.length > 0 && (
+          <div style={sectionStyle}>
+            <p style={sectionLabel}>Opportunities</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+              {analysis.opportunities.map((o, i) => (
+                <div key={i} style={card}>
+                  <p style={{ fontSize: '0.7rem', fontWeight: 700, color: o.priority === 'High' ? '#059669' : o.priority === 'Medium' ? '#D97706' : '#94A3B8', textTransform: 'uppercase', marginBottom: 6 }}>{o.priority} Priority</p>
+                  <p style={{ fontSize: '0.85rem', color: '#0F172A', marginBottom: 6, lineHeight: 1.5 }}>{o.description}</p>
+                  <p style={{ fontSize: '0.75rem', color: '#64748B', margin: 0 }}>{o.whyItMatters}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 9. Recommendations — executive action cards */}
+        {analysis.recommendations?.length > 0 && (
+          <div style={sectionStyle}>
+            <p style={sectionLabel}>Recommendations</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
+              {analysis.recommendations.map((r, i) => (
+                <div key={i} style={{ ...card, borderLeft: '3px solid #7C3AED' }}>
+                  <p style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0F172A', marginBottom: 10, lineHeight: 1.4 }}>{r.recommendation}</p>
+                  <p style={{ fontSize: '0.76rem', color: '#64748B', marginBottom: 10, lineHeight: 1.5 }}>Evidence: {r.evidence}</p>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: r.priority === 'Immediate' ? '#FEF2F2' : '#F1F5F9', color: r.priority === 'Immediate' ? '#DC2626' : '#475569' }}>{r.priority}</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: '#EFF6FF', color: '#2563EB' }}>Impact: {r.impact}</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: '#F5F3FF', color: '#7C3AED' }}>Effort: {r.effort}</span>
+                  </div>
+                  <p style={{ fontSize: '0.74rem', color: '#94A3B8', marginTop: 10 }}>Owner: {r.owner}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 10. Action Plan — table */}
+        {analysis.actionPlan?.length > 0 && (
+          <div style={sectionStyle}>
+            <p style={sectionLabel}>Action Plan</p>
+            <div style={{ ...card, padding: 0, overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                <thead>
+                  <tr style={{ background: '#F8FAFC' }}>
+                    {['Priority', 'Action', 'Owner', 'Timeline', 'Success Measure'].map((h) => (
+                      <th key={h} style={{ padding: 12, textAlign: 'left', fontWeight: 700, color: '#475569', borderBottom: '1px solid #E2E8F0' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {analysis.actionPlan.map((a, i) => (
+                    <tr key={i} style={{ borderBottom: i < analysis.actionPlan.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
+                      <td style={{ padding: 12 }}><span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '3px 9px', borderRadius: 999, background: a.priority === 'Immediate' ? '#FEF2F2' : '#F1F5F9', color: a.priority === 'Immediate' ? '#DC2626' : '#475569' }}>{a.priority}</span></td>
+                      <td style={{ padding: 12, color: '#0F172A' }}>{a.action}</td>
+                      <td style={{ padding: 12, color: '#64748B' }}>{a.owner}</td>
+                      <td style={{ padding: 12, color: '#64748B' }}>{a.timeline}</td>
+                      <td style={{ padding: 12, color: '#64748B' }}>{a.successMeasure}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {analysis.qualityWarnings?.length > 0 && (
+          <div style={sectionStyle}>
+            <p style={sectionLabel}>Data Quality Notes</p>
+            <div style={card}>
+              {analysis.qualityWarnings.map((w, i) => <p key={i} style={{ fontSize: '0.82rem', color: '#374151', marginBottom: 4 }}>• {w}</p>)}
+            </div>
+          </div>
+        )}
+
+        <div style={sectionStyle}>
+          <p style={sectionLabel}>Conclusion</p>
+          <div style={card}><p style={{ fontSize: '0.9rem', color: '#374151', lineHeight: 1.7, margin: 0 }}>{analysis.conclusion}</p></div>
+        </div>
+
+        {/* 11. Download Centre */}
+        <div style={sectionStyle} className="no-print-report">
+          <p style={sectionLabel}>Downloads</p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={downloadPDFReport} disabled={!!downloading} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>{downloading === 'pdf' ? 'Building…' : '📄 Download PDF'}</button>
+            <button onClick={downloadPresentation} disabled={!!downloading} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>{downloading === 'pptx' ? 'Building…' : '📊 Download PowerPoint'}</button>
+            <button onClick={downloadChartsZip} disabled={!!downloading} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>{downloading === 'zip' ? 'Zipping…' : '🖼 Download Charts (ZIP)'}</button>
+            <button onClick={downloadExecutiveSummaryOnly} disabled={!!downloading} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>{downloading === 'summary' ? 'Building…' : '📋 Download Executive Summary'}</button>
+            <button onClick={downloadRawJSON} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>🗂 Download Raw Findings (JSON)</button>
+            <button onClick={downloadWordReport} disabled={!!downloading} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>{downloading === 'word' ? 'Building…' : '📝 Word Report'}</button>
+            <button onClick={downloadExcel} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>📈 Excel (data)</button>
+            <button onClick={downloadCSV} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>⬇ CSV</button>
+          </div>
+          <p style={{ fontSize: '0.7rem', color: '#94A3B8', marginTop: 8 }}>Note: the Excel download includes your data only — native embedded Excel charts aren't supported yet.</p>
+        </div>
+
+        {/* 12. Ask the Analyst */}
+        <div style={sectionStyle} className="no-print-report">
+          <p style={sectionLabel}>Ask the Analyst</p>
+          <p style={{ fontSize: '0.85rem', color: '#64748B', marginBottom: 14 }}>Ask questions about this report and dataset.</p>
+          <div style={card}>
+            {chatMessages.length === 0 && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+                {['Why is this the top finding?', 'Which area should I improve first?', 'Explain this Pareto.', 'Summarise for executives.', 'What changed over time?'].map((ex) => (
+                  <button key={ex} onClick={() => setChatInput(ex)} style={{ fontSize: '0.76rem', padding: '6px 12px', borderRadius: 999, border: '1px solid #E2E8F0', background: '#F8FAFC', cursor: 'pointer', color: '#475569' }}>{ex}</button>
+                ))}
+              </div>
+            )}
             {chatMessages.length > 0 && (
-              <div style={{ marginBottom: 12, maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ marginBottom: 12, maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {chatMessages.map((m, i) => (
-                  <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '80%', background: m.role === 'user' ? '#2563EB' : 'white', color: m.role === 'user' ? 'white' : '#1E293B', padding: '8px 12px', borderRadius: 10, fontSize: '0.8rem', border: m.role === 'ai' ? '1px solid #E2E8F0' : 'none' }}>
+                  <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '80%', background: m.role === 'user' ? '#2563EB' : '#F8FAFC', color: m.role === 'user' ? 'white' : '#1E293B', padding: '9px 13px', borderRadius: 10, fontSize: '0.82rem', border: m.role === 'ai' ? '1px solid #E2E8F0' : 'none' }}>
                     {m.text}
                   </div>
                 ))}
               </div>
             )}
             <div style={{ display: 'flex', gap: 8 }}>
-              <input style={{ ...inputStyle, flex: 1 }} value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleChatSend()} placeholder="e.g. Which region had the highest revenue?" disabled={chatBusy} />
-              <button onClick={handleChatSend} disabled={chatBusy || !chatInput.trim()} style={{ padding: '9px 18px', borderRadius: 8, border: 'none', background: chatBusy ? '#94A3B8' : '#2563EB', color: 'white', fontWeight: 600, fontSize: '0.82rem', cursor: chatBusy ? 'default' : 'pointer' }}>
+              <input aria-label="Ask a question about this report" style={{ ...inputStyle, flex: 1 }} value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleChatSend()} placeholder="Ask a question about this report…" disabled={chatBusy} />
+              <button onClick={handleChatSend} disabled={chatBusy || !chatInput.trim()} aria-label="Send question" style={{ padding: '9px 18px', borderRadius: 8, border: 'none', background: chatBusy ? '#94A3B8' : '#2563EB', color: 'white', fontWeight: 600, fontSize: '0.82rem', cursor: chatBusy ? 'default' : 'pointer' }}>
                 {chatBusy ? '…' : 'Ask'}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Downloads */}
-        <div>
-          <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>Download</p>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button onClick={downloadPDFReport} disabled={!!downloading} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>{downloading === 'pdf' ? 'Building…' : '📄 PDF Report'}</button>
-            <button onClick={downloadWordReport} disabled={!!downloading} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>{downloading === 'word' ? 'Building…' : '📝 Word Report'}</button>
-            <button onClick={downloadPresentation} disabled={!!downloading} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>{downloading === 'pptx' ? 'Building…' : '📊 PowerPoint'}</button>
-            <button onClick={downloadExcel} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>📈 Excel (data)</button>
-            <button onClick={downloadCSV} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>⬇ CSV</button>
-            <button onClick={downloadChartsPNG} style={{ fontSize: '0.8rem', padding: '9px 16px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>🖼 Charts (PNG)</button>
-          </div>
-          <p style={{ fontSize: '0.7rem', color: '#94A3B8', marginTop: 8 }}>Note: the Excel download includes your data only — native embedded Excel charts aren't supported yet.</p>
-        </div>
+        <p className="privacy-note no-print-report" style={{ marginBottom: presentationMode ? 60 : 0 }}>Your data is sent securely to our AI engine for analysis only, never stored.</p>
 
-        <p className="privacy-note" style={{ marginTop: 20 }}>Your data is sent securely to our AI engine for analysis only, never stored.</p>
+        {/* Chart fullscreen lightbox */}
+        {fullscreenChartIdx !== null && chartData[fullscreenChartIdx] && (
+          <div
+            role="dialog" aria-label="Chart fullscreen view"
+            style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.92)', zIndex: 10001, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 30 }}
+            onClick={() => setFullscreenChartIdx(null)}
+          >
+            <div style={{ background: 'white', borderRadius: 16, padding: 28, maxWidth: '90vw', maxHeight: '90vh' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <p style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>{analysis.suggestedCharts[fullscreenChartIdx].title}</p>
+                <button onClick={() => setFullscreenChartIdx(null)} aria-label="Close fullscreen chart" style={{ border: 'none', background: 'none', fontSize: '1.4rem', cursor: 'pointer', color: '#64748B' }}>✕</button>
+              </div>
+              <canvas
+                ref={(el) => {
+                  if (!el) return;
+                  const src = chartRefs.current[fullscreenChartIdx];
+                  if (src) { el.width = src.width; el.height = src.height; el.getContext('2d').drawImage(src, 0, 0); }
+                }}
+                style={{ maxWidth: '80vw', maxHeight: '70vh', width: 'auto', height: 'auto' }}
+              />
+            </div>
+          </div>
+        )}
       </div>
     );
   }

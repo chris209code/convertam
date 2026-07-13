@@ -656,8 +656,8 @@ export default function DataAnalystWorkspace() {
   function handlePasteSubmit() {
     if (!pasteText.trim()) return;
     setError('');
-    const { columns: cols, rows: dataRows, rawConsistencyRatio, skippedTitleRows } = parsePastedTable(pasteText);
-    const validation = validateParsedTable(cols, dataRows, rawConsistencyRatio);
+    const { columns: cols, rows: dataRows, rawConsistencyRatio, skippedTitleRows, headerCountMismatch } = parsePastedTable(pasteText);
+    const validation = validateParsedTable(cols, dataRows, rawConsistencyRatio, headerCountMismatch);
     setParsingConfidence(validation);
     if (validation.rejected) {
       setError(validation.message);
@@ -1494,6 +1494,12 @@ export default function DataAnalystWorkspace() {
             <span style={{ fontSize: '0.78rem', fontWeight: 700, color: confColor }}>Parsing confidence: {parsingConfidence.level} ({parsingConfidence.confidence}%)</span>
           )}
         </div>
+
+        {parsingConfidence?.headerCountMismatch && (
+          <div style={{ padding: '10px 14px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, color: '#92400E', fontSize: '0.8rem', marginBottom: 16 }}>
+            {parsingConfidence.message}
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
           <button onClick={removeEmptyRows} style={{ fontSize: '0.78rem', padding: '6px 12px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>Remove empty rows</button>

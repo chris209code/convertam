@@ -3,91 +3,10 @@
 import { useState } from 'react';
 
 const TOOLS = [
-  { id: 'qr', label: 'QR Code Generator', icon: '📱' },
   { id: 'password', label: 'Password Generator', icon: '🔐' },
   { id: 'wordcount', label: 'Word Counter', icon: '📝' },
   { id: 'textcase', label: 'Text Case Converter', icon: '🔤' },
 ];
-
-function QRGenerator() {
-  const [text, setText] = useState('');
-  const [qrUrl, setQrUrl] = useState('');
-  const [downloading, setDownloading] = useState(false);
-  const [downloadError, setDownloadError] = useState(false);
-
-  function generate() {
-    if (!text.trim()) return;
-    const encoded = encodeURIComponent(text);
-    setQrUrl(`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encoded}`);
-    setDownloadError(false);
-  }
-
-  // Browsers ignore the `download` attribute on cross-origin URLs (like this
-  // external QR API) for security reasons — it just opens the image instead
-  // of saving it. Fetching it as a blob first and downloading that (same-origin
-  // blob: URL) is what actually makes the download work.
-  async function download() {
-    setDownloading(true);
-    setDownloadError(false);
-    try {
-      const res = await fetch(qrUrl);
-      if (!res.ok) throw new Error('fetch failed');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'qrcode.png';
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      setDownloadError(true);
-      window.open(qrUrl, '_blank');
-    } finally {
-      setDownloading(false);
-    }
-  }
-
-  return (
-    <div>
-      <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>URL or Text</label>
-      <input type="text" value={text} onChange={e => setText(e.target.value)} placeholder="Enter URL or text to convert to QR code"
-        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.88rem', fontFamily: 'inherit', marginBottom: 12, outline: 'none' }} />
-      <button onClick={generate} style={{ padding: '10px 20px', background: '#2563EB', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, fontSize: '0.88rem', marginBottom: 16 }}>Generate QR Code</button>
-      {qrUrl && (
-        <div style={{ textAlign: 'center' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={qrUrl} alt="QR Code" style={{ width: 200, height: 200, border: '1px solid #E2E8F0', borderRadius: 12, marginBottom: 12 }} />
-          <div>
-            <button onClick={download} disabled={downloading} style={{ padding: '8px 20px', background: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE', borderRadius: 8, cursor: downloading ? 'default' : 'pointer', fontFamily: 'inherit', fontWeight: 600, fontSize: '0.82rem' }}>
-              {downloading ? 'Preparing…' : '⬇️ Download PNG'}
-            </button>
-            {downloadError && (
-              <p style={{ fontSize: '0.72rem', color: '#DC2626', marginTop: 8 }}>
-                Couldn't auto-download — opened it in a new tab instead. Right-click the image there and choose "Save image as…".
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// A modest built-in word list keeps this fully client-side (no external
-// dictionary API) — simple, everyday words only, easy to read back and type.
-const PASSPHRASE_WORDS = [
-  'apple','river','stone','cloud','tiger','maple','ocean','spark','brave','coral',
-  'delta','ember','frost','giant','honey','ivory','jolly','koala','lemon','mango',
-  'noble','onion','piano','quiet','robin','solar','table','ultra','velvet','willow',
-  'xenon','yield','zebra','amber','bison','cedar','doubt','eagle','fable','grape',
-  'humor','islet','jelly','karma','lunar','mirth','nudge','opera','pearl','quilt',
-  'ridge','satin','tulip','urban','viper','waltz','amaze','birch','crown','dwell',
-  'echo','flint','glide','haste','inbox','joker','kite','latch','mocha','nifty',
-];
-function randomWord() {
-  return PASSPHRASE_WORDS[Math.floor(Math.random() * PASSPHRASE_WORDS.length)];
-}
-function capitalize(w) { return w.charAt(0).toUpperCase() + w.slice(1); }
 
 function PasswordGenerator() {
   const [mode, setMode] = useState('characters'); // characters | passphrase
@@ -400,10 +319,10 @@ function TextCaseConverter() {
   );
 }
 
-const TOOL_COMPONENTS = { qr: QRGenerator, password: PasswordGenerator, wordcount: WordCounter, textcase: TextCaseConverter };
+const TOOL_COMPONENTS = { password: PasswordGenerator, wordcount: WordCounter, textcase: TextCaseConverter };
 
 export default function UtilitiesWorkspace() {
-  const [active, setActive] = useState('qr');
+  const [active, setActive] = useState('password');
   const ActiveTool = TOOL_COMPONENTS[active];
 
   return (

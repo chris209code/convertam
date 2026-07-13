@@ -1704,7 +1704,6 @@ export default function DataAnalystWorkspace() {
             </div>
           </div>
         ))}
-        </div>
 
         {error && <div style={{ padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, color: '#DC2626', fontSize: '0.82rem', marginBottom: 16 }}>{error}</div>}
 

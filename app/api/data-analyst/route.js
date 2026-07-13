@@ -1,8 +1,6 @@
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 const NO_FABRICATION_RULE = 'You are given pre-computed statistics that are already correct — never recalculate, second-guess, or invent different numbers for totals, averages, counts, min/max, or any other figure. Only use the exact numbers provided. If something can\'t be determined from the given data, say so rather than guessing.';
 
@@ -343,51 +341,7 @@ Current question: "${question}"
 Answer in plain language, no markdown formatting, 2-5 sentences unless a transformation or list format is specifically requested above. When your answer rests on a specific finding or number, reference it briefly so the answer feels grounded, not generic.`;
 }
 
-function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
-
-// Retries transient failures automatically (rate limits, momentary server
-// errors, network blips) before ever showing the user an error — this is
-// what makes the difference between "it just works after a short pause"
-// and "it fails and the person has to click try again."
-async function callGemini(apiKey, parts, schema) {
-  const body = {
-    contents: [{ role: 'user', parts }],
-    generationConfig: schema ? { responseMimeType: 'application/json', responseSchema: schema } : { maxOutputTokens: 1024 },
-  };
-  const maxAttempts = 3;
-  let lastError;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const res = await fetch(GEMINI_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        console.error(`Gemini data-analyst error (attempt ${attempt}/${maxAttempts}):`, data);
-        const retryable = res.status === 429 || res.status >= 500;
-        if (retryable && attempt < maxAttempts) { await sleep(700 * attempt); continue; }
-        throw new Error('gemini_error');
-      }
-
-      const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!raw) {
-        if (attempt < maxAttempts) { await sleep(700 * attempt); continue; }
-        throw new Error('empty_response');
-      }
-      return raw;
-    } catch (err) {
-      lastError = err;
-      const isKnownFinalError = err.message === 'gemini_error' || err.message === 'empty_response';
-      if (!isKnownFinalError && attempt < maxAttempts) { await sleep(700 * attempt); continue; } // network-level failure — also worth retrying
-      if (attempt === maxAttempts) throw lastError;
-    }
-  }
-  throw lastError;
-}
+import { callGemini, AIError, CATEGORY_MESSAGES } from '@/lib/geminiClient';
 
 export async function POST(request) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -405,9 +359,7 @@ export async function POST(request) {
         return Response.json({ error: 'No usable data received.' }, { status: 400 });
       }
       const prompt = buildUnderstandingPrompt({ columns, stats, sampleRows, rowCount });
-      const raw = await callGemini(apiKey, [{ text: prompt }], understandingSchema);
-      const clean = raw.replace(/```json|```/g, '').trim();
-      const understanding = JSON.parse(clean);
+      const { parsed: understanding } = await callGemini({ apiKey, toolName: 'data-analyst:understand', routeName: '/api/data-analyst', parts: [{ text: prompt }], schema: understandingSchema, maxOutputTokens: 2048, inputSizeApprox: prompt.length });
 
       // Deterministic confidence ceiling — a small dataset can't genuinely
       // support high confidence no matter how clean the column names look,
@@ -427,9 +379,12 @@ export async function POST(request) {
         return Response.json({ error: 'No usable data received.' }, { status: 400 });
       }
       const prompt = buildAnalysisPrompt({ understanding, objective, health, kpis, chartSummaries, columns, stats, qualityWarnings, rowCount });
-      const raw = await callGemini(apiKey, [{ text: prompt }], analysisSchema);
-      const clean = raw.replace(/```json|```/g, '').trim();
-      const analysis = JSON.parse(clean);
+      // This is the largest, most complex schema in the app — findings,
+      // risks, opportunities, recommendations, and an action plan, each
+      // with several fields. An unset/default token budget was truncating
+      // this on a large share of calls, which is the actual root cause of
+      // needing many manual retries — this gives it real headroom.
+      const { parsed: analysis } = await callGemini({ apiKey, toolName: 'data-analyst:analyze', routeName: '/api/data-analyst', parts: [{ text: prompt }], schema: analysisSchema, maxOutputTokens: 16384, inputSizeApprox: prompt.length });
       return Response.json(analysis);
     }
 
@@ -440,9 +395,7 @@ export async function POST(request) {
 
 Return "columns" as the list of column headers, and "rows" as a list of rows — each row is a list of string values in the exact same order as "columns".`;
       const parts = [{ text: prompt }, ...images.map((img) => ({ inline_data: { mime_type: img.mimeType || 'image/jpeg', data: img.data } }))];
-      const raw = await callGemini(apiKey, parts, extractionSchema);
-      const clean = raw.replace(/```json|```/g, '').trim();
-      const parsed = JSON.parse(clean);
+      const { parsed } = await callGemini({ apiKey, toolName: 'data-analyst:extractFromImage', routeName: '/api/data-analyst', parts, schema: extractionSchema, maxOutputTokens: 8192, hasImage: true });
       const extracted = { columns: parsed.columns, rows: parsed.rows.map((r) => Object.fromEntries(parsed.columns.map((c, i) => [c, r[i] ?? '']))) };
       return Response.json(extracted);
     }
@@ -456,9 +409,7 @@ TEXT:
 ${text.slice(0, 50000)}
 
 Return "columns" as the list of column headers, and "rows" as a list of rows — each row is a list of string values in the exact same order as "columns".`;
-      const raw = await callGemini(apiKey, [{ text: prompt }], extractionSchema);
-      const clean = raw.replace(/```json|```/g, '').trim();
-      const parsed = JSON.parse(clean);
+      const { parsed } = await callGemini({ apiKey, toolName: 'data-analyst:extractFromPdfText', routeName: '/api/data-analyst', parts: [{ text: prompt }], schema: extractionSchema, maxOutputTokens: 8192, inputSizeApprox: text.length });
       const extracted = { columns: parsed.columns, rows: parsed.rows.map((r) => Object.fromEntries(parsed.columns.map((c, i) => [c, r[i] ?? '']))) };
       return Response.json(extracted);
     }
@@ -467,12 +418,16 @@ Return "columns" as the list of column headers, and "rows" as a list of rows —
       const { question, history, understanding, objective, health, kpis, chartSummaries, analysis, role, transformType, columns, stats, sampleRows, rowCount } = payload;
       if (!question?.trim()) return Response.json({ error: 'No question received.' }, { status: 400 });
       const prompt = buildChatPrompt({ question, history, understanding, objective, health, kpis, chartSummaries, analysis, role, transformType, columns, stats, sampleRows, rowCount });
-      const answer = await callGemini(apiKey, [{ text: prompt }], false);
+      const { raw: answer } = await callGemini({ apiKey, toolName: 'data-analyst:chat', routeName: '/api/data-analyst', parts: [{ text: prompt }], maxOutputTokens: 2048, inputSizeApprox: prompt.length });
       return Response.json({ answer: answer.trim() });
     }
 
     return Response.json({ error: 'Unknown action.' }, { status: 400 });
   } catch (err) {
+    if (err instanceof AIError) {
+      console.error(`Data analyst error [${err.requestId}] category=${err.category}:`, err.message);
+      return Response.json({ error: CATEGORY_MESSAGES[err.category] || CATEGORY_MESSAGES.unexpected, requestId: err.requestId, category: err.category }, { status: 502 });
+    }
     console.error('Data analyst error:', err);
     return Response.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
   }

@@ -144,23 +144,85 @@ Provide:
 Return ONLY JSON matching the schema.`;
 }
 
-const OBJECTIVE_FOCUS = {
-  'Let AI Decide': 'Use your judgment on what this dataset most needs — lead with the highest-value insight if unsure, whether that\'s a KPI, an anomaly, or a business risk.',
-  'Executive Management Report': 'Focus on KPIs, business impact, and strategic priorities. Management wants the headline story, not a data dump.',
-  'Trend Analysis': 'Focus on how key measures have changed over time.',
-  'Dashboard View': 'Write concise insights suitable for cards and tooltips — short, scannable, not paragraph-length.',
-  'Financial Performance': 'Prioritize revenue, margins, profitability, cost, and cash-related metrics above all else.',
-  'Operational Analysis': 'Prioritize efficiency, inventory, downtime, utilization, and quality issues.',
-  'Performance Comparison': 'Focus on rankings, comparisons, and variance between categories.',
-  'Customer Insights': 'Prioritize customer satisfaction, returns, retention, and customer-driven growth.',
-  'Risk Assessment': 'Prioritize anomalies, operational risks, financial risks, and quality issues above routine findings.',
-  'Growth Opportunities': 'Prioritize what could be scaled, expanded, or improved for growth — frame findings around upside, not just problems.',
-  'Root Cause Analysis': 'Focus on patterns, likely drivers, and recurring issues. Emphasize the root-cause observations section.',
-  'Audit / Compliance Report': 'Focus on missing records, exceptions, and compliance gaps.',
+// Each objective is a genuinely different lens on the SAME verified numbers
+// — not just a topic hint, but real behavioral instructions covering what
+// to prioritize, what to deliberately exclude or minimize, and how the
+// report's shape (length, tone, which sections dominate) should differ.
+// This is what makes "Financial Performance" and "Root Cause Analysis"
+// read like two different executives reviewing the same data, rather than
+// the same report with one sentence swapped out.
+const OBJECTIVE_PROFILES = {
+  'Let AI Decide': {
+    priorities: 'Use your judgment on what this dataset most needs — lead with the highest-value insight, whether that\'s a KPI, an anomaly, or a business risk.',
+    exclude: 'Nothing specific to exclude — this is the balanced, default lens.',
+    shape: 'Produce a balanced executive report covering all sections proportionately. No single section should dominate.',
+  },
+  'Financial Performance': {
+    priorities: 'Revenue, margin, EBITDA, cash generation, cost efficiency, marketing ROI, and financial sustainability, in that order of weight.',
+    exclude: 'Customer-facing metrics (satisfaction, retention, churn) should NOT appear unless they materially drive a financial number — e.g. only mention churn if it\'s clearly moving revenue. Do not include customer metrics as standalone findings.',
+    shape: 'Every finding should be framed in financial-impact terms — not "X changed" but "X changed, which affects revenue/margin/cash by roughly this much." Recommendations should be evaluated primarily on financial payback, not operational elegance.',
+  },
+  'Risk Assessment': {
+    priorities: 'Operational disruptions, customer churn spikes, financial risk, service degradation, compliance risks, statistical outliers, and the worst-performing periods in the data.',
+    exclude: 'Do not lead with routine averages or steady-state distributions — those are background, not the story.',
+    shape: 'The executive summary and the first key finding MUST lead with the single highest-risk event or period in the data, not an average or a general trend. Risks section should be the largest section in the report. Opportunities section can be thin or empty if the data is genuinely risk-dominated — do not manufacture upside that isn\'t there.',
+  },
+  'Executive Management Report': {
+    priorities: 'The biggest opportunity, the biggest threat, strategic direction, overall business impact, and the specific decisions leadership needs to make.',
+    exclude: 'Minimize granular operational detail (specific process steps, line-level minutiae) unless it directly supports a strategic point.',
+    shape: 'Write as if for a board or CEO with five minutes: lead with the single most important business fact, balance opportunity and threat rather than skewing all-risk or all-upside, and make every recommendation read as a decision to approve, not a task to schedule.',
+  },
+  'Operational Analysis': {
+    priorities: 'Efficiency, process performance, resource utilization, operational bottlenecks, and productivity.',
+    exclude: 'De-emphasize high-level financial framing (revenue, EBITDA) unless directly tied to an operational cause.',
+    shape: 'Write in the language of someone who runs the operation day to day — specific, process-grounded, concrete about where time/capacity/output is being lost or gained. Recommendations should read as operational changes, not strategic initiatives.',
+  },
+  'Root Cause Analysis': {
+    priorities: 'Why performance changed, the relationships between drivers, contributing factors, and corrective actions.',
+    exclude: 'Avoid a high-level executive-summary tone — this objective is diagnostic, not a headline overview. Do not pad with broad strategic commentary or growth opportunities that don\'t relate to the diagnosis.',
+    shape: 'The rootCauseObservations section should be the most developed part of the report, not an afterthought — go deeper than the other objectives here, tracing specific chains (e.g. "X increased, which appears associated with Y, which likely affected Z"). The executive summary should state the diagnosis directly rather than summarizing the whole dataset.',
+  },
+  'Trend Analysis': {
+    priorities: 'Growth, decline, recovery, structural breaks, and long-term movement in the key measures.',
+    exclude: 'Do not produce a recommendation-heavy report — recommendations should be minimal (1-2 at most, only if genuinely warranted by a trend, not manufactured to fill the section).',
+    shape: 'The bulk of the writing should explain the trend itself — what direction, when it changed, how sharply — rather than pivoting quickly to advice. It is acceptable and expected for this report to read lighter on the action-plan side than other objectives.',
+  },
+  'Dashboard View': {
+    priorities: 'Concise KPI summaries and what the visuals show, nothing more.',
+    exclude: 'No long-form narrative anywhere in this report.',
+    shape: 'Keep every section short: executive summary 2-3 sentences maximum, each finding a single sentence, minimal or no root-cause narrative, recommendations kept to short, card-friendly phrases rather than paragraphs. This should read like tooltip and card copy, not a report.',
+  },
+  'Performance Comparison': {
+    priorities: 'Rankings, relative performance between categories/groups, variance, and who or what is ahead versus behind.',
+    exclude: 'Minimize discussion of overall averages in isolation — the comparison between groups is the point, not the aggregate.',
+    shape: 'Lead with the comparison itself — which category/group leads, which lags, and by how much — before any other narrative.',
+  },
+  'Customer Insights': {
+    priorities: 'Customer satisfaction, retention, churn, and customer-driven growth.',
+    exclude: 'De-emphasize findings that have no clear customer-facing angle, even if numerically notable elsewhere in the data.',
+    shape: 'Frame findings around what they mean for the customer relationship or experience, not just internal operations or finance.',
+  },
+  'Growth Opportunities': {
+    priorities: 'Where the data points to expansion, scalable wins, or under-tapped potential.',
+    exclude: 'Do not let this turn into a risk report — problems should only appear when they directly point to an opportunity (e.g. "underused capacity" framed as upside, not just as a gap).',
+    shape: 'Tone should be opportunity-forward throughout — even when discussing a weakness, frame it as unrealized potential rather than a failure.',
+  },
+  'Audit / Compliance Report': {
+    priorities: 'Missing records, exceptions, non-compliance patterns, and data completeness gaps.',
+    exclude: 'Minimize speculative business storytelling — this objective rewards precision over narrative flair.',
+    shape: 'Write with checklist-like rigor — specific, verifiable statements over broad interpretation. Findings should read like audit observations, not consulting prose.',
+  },
 };
 
+function buildObjectiveInstruction(objective) {
+  const profile = OBJECTIVE_PROFILES[objective] || OBJECTIVE_PROFILES['Let AI Decide'];
+  return `PRIORITIES for this objective: ${profile.priorities}
+WHAT TO EXCLUDE OR MINIMIZE: ${profile.exclude}
+REPORT SHAPE: ${profile.shape}`;
+}
+
 function buildAnalysisPrompt({ understanding, objective, health, kpis, chartSummaries, columns, stats, qualityWarnings, rowCount }) {
-  const focusLine = OBJECTIVE_FOCUS[objective] || OBJECTIVE_FOCUS['Let AI Decide'];
+  const objectiveInstruction = buildObjectiveInstruction(objective);
   const industryLine = understanding?.industry ? `Industry/business context: ${understanding.industry}${understanding.businessProcess ? ` — ${understanding.businessProcess}` : ''}.` : '';
 
   return `You are a senior partner at a top-tier management consultancy (McKinsey / BCG / Bain / Deloitte calibre) delivering an executive intelligence report. Every number below has ALREADY been calculated by the application — your job is interpretation, storytelling, and decision support, not arithmetic. Write the way a senior partner actually writes: direct, specific, confident, zero filler.
@@ -192,7 +254,9 @@ STORYTELLING, NOT COLUMN-BY-COLUMN DESCRIPTION — do not summarize columns indi
 RELATIONSHIP LANGUAGE — real correlation coefficients are not yet computed by this engine, so when discussing how two measures might relate (e.g. from a scatter chart), never use the filler phrase "worth investigating." Instead, explain in plain language why the two measures might plausibly be related given what they represent, whether the relationship looks consistent across the data or only holds in certain periods, and whether any exceptional periods stand out — all without stating a specific correlation number, since none has been calculated.
 
 ${industryLine}
-Selected objective: ${objective}. ${focusLine}
+Selected objective: ${objective}.
+${objectiveInstruction}
+This objective's instructions above should visibly shape which findings lead, how long each section is, and which sections dominate — two different objectives run on the same dataset should read like two different people reviewed it, not the same report with one sentence changed.
 Dataset: ${rowCount} rows, columns: ${columns.join(', ')} (types: ${JSON.stringify(Object.fromEntries(columns.map((c) => [c, stats[c]?.type])))})
 
 Dataset health: ${JSON.stringify(health)}

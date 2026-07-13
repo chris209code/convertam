@@ -14,6 +14,7 @@ const analysisSchema = {
     executiveSummary: { type: 'STRING' },
     keyFindings: {
       type: 'ARRAY',
+      maxItems: 5,
       items: {
         type: 'OBJECT',
         properties: {
@@ -28,6 +29,7 @@ const analysisSchema = {
     rootCauseObservations: { type: 'ARRAY', items: { type: 'STRING' } },
     risks: {
       type: 'ARRAY',
+      maxItems: 4,
       items: {
         type: 'OBJECT',
         properties: {
@@ -42,6 +44,7 @@ const analysisSchema = {
     },
     opportunities: {
       type: 'ARRAY',
+      maxItems: 4,
       items: {
         type: 'OBJECT',
         properties: {
@@ -54,6 +57,7 @@ const analysisSchema = {
     },
     recommendations: {
       type: 'ARRAY',
+      maxItems: 5,
       items: {
         type: 'OBJECT',
         properties: {
@@ -69,6 +73,7 @@ const analysisSchema = {
     },
     actionPlan: {
       type: 'ARRAY',
+      maxItems: 5,
       items: {
         type: 'OBJECT',
         properties: {
@@ -269,12 +274,12 @@ ${JSON.stringify(chartSummaries, null, 2)}
 Write the following, all evidence-based and grounded only in the numbers above:
 
 - executiveSummary: maximum 150 words, and it must clearly answer three things in this order: what happened (the single most important fact), why it matters (the business consequence, not just the number restated), and what management should do first. No chart labels, no bare number-listing, no generic scene-setting sentence before getting to the point — open directly with the finding itself.
-- keyFindings: 3-7 items. Each finding must be a genuinely distinct point — if two findings would say roughly the same thing, cut one or merge them. Each has a finding (the specific observation, in a sentence structure different from the other findings), evidence (the specific number(s) behind it), businessImplication (a concrete consequence for the business — never a vague statement like "this could matter" or "this warrants attention"; say specifically what changes if this is true), and evidenceType: "Observed" if it's a direct fact from the computed statistics, "Estimated" if it involves some inference beyond the raw numbers, or "Suggested" if it's a possibility worth investigating rather than a firm conclusion.
+- keyFindings: 3-5 items (never more). Each finding must be a genuinely distinct point — if two findings would say roughly the same thing, cut one or merge them. Each has a finding (the specific observation, in a sentence structure different from the other findings), evidence (the specific number(s) behind it), businessImplication (a concrete consequence for the business — never a vague statement like "this could matter" or "this warrants attention"; say specifically what changes if this is true), and evidenceType: "Observed" if it's a direct fact from the computed statistics, "Estimated" if it involves some inference beyond the raw numbers, or "Suggested" if it's a possibility worth investigating rather than a firm conclusion.
 - rootCauseObservations: probable root-cause observations, ONLY when genuinely supported by the evidence above — use hedged language, never assert causation. Empty array if the objective isn't Root Cause Analysis or if there's nothing evidence-backed to say.
-- risks: identify real risks from categories [Operational, Financial, Compliance, Quality, Customer, Safety, Reputational] that the data actually supports — each with description, likelihood (High/Medium/Low), impact (High/Medium/Low), and the specific evidence behind it. Each risk must be a distinct concern, not a rephrasing of a key finding. Empty array if none are genuinely supported.
-- opportunities: improvement opportunities, each with a priority (High/Medium/Low) and why it matters — state the actual upside, not just "this is an opportunity to improve X". Empty array if none stand out.
-- recommendations: each one is a single crisp sentence that itself states the concrete action to take AND the expected benefit of taking it (e.g. "Shift 15% of Line 3's volume to Line 5 during peak hours to reduce the defect rate currently concentrated on Line 3" — not "Investigate Line 3 issues"). Never write a recommendation that is just "look into X" or "review Y" — say what should specifically change. Each also has evidence (linked to a specific finding/number), impact (High/Medium/Low), effort (High/Medium/Low), priority (Immediate/Near-term/Long-term), and owner — use "To be assigned" for owner if there's genuinely no way to infer one from the data, never fabricate a name or team. No two recommendations may target the same underlying problem.
-- actionPlan: a short implementation plan — priority, action, owner ("To be assigned" if not inferable), timeline ("To be assigned" if not inferable), successMeasure. Each action plan row should correspond to a specific recommendation, not restate it word-for-word — phrase it as the concrete next step to execute that recommendation.
+- risks: up to 4 (never more), identified from categories [Operational, Financial, Compliance, Quality, Customer, Safety, Reputational] that the data actually supports — each with description, likelihood (High/Medium/Low), impact (High/Medium/Low), and the specific evidence behind it. Each risk must be a distinct concern, not a rephrasing of a key finding. Empty array if none are genuinely supported.
+- opportunities: up to 4 (never more) improvement opportunities, each with a priority (High/Medium/Low) and why it matters — state the actual upside, not just "this is an opportunity to improve X". Empty array if none stand out.
+- recommendations: up to 5 (never more). Each one is a single crisp sentence that itself states the concrete action to take AND the expected benefit of taking it (e.g. "Shift 15% of Line 3's volume to Line 5 during peak hours to reduce the defect rate currently concentrated on Line 3" — not "Investigate Line 3 issues"). Never write a recommendation that is just "look into X" or "review Y" — say what should specifically change. Each also has evidence (linked to a specific finding/number), impact (High/Medium/Low), effort (High/Medium/Low), priority (Immediate/Near-term/Long-term), and owner — use "To be assigned" for owner if there's genuinely no way to infer one from the data, never fabricate a name or team. No two recommendations may target the same underlying problem.
+- actionPlan: up to 5 rows (never more) — priority, action, owner ("To be assigned" if not inferable), timeline ("To be assigned" if not inferable), successMeasure. Each action plan row should correspond to a specific recommendation, not restate it word-for-word — phrase it as the concrete next step to execute that recommendation.
 - confidenceStatement: level (High/Medium/Low) and reasoning — base this on the dataset health, row count, missing values, and whether the selected objective is actually well-supported by this data. Do not overstate confidence on a small or messy dataset.
 - conclusion: 1-2 sentences that add a genuinely new closing thought — not a restatement of the executive summary or the top finding.
 

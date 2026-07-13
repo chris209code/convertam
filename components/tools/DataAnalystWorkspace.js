@@ -16,14 +16,21 @@ import { parsePastedTable, validateParsedTable } from '@/lib/tableParser';
 // objectives depends on what the dataset actually supports (checked against
 // already-computed stats — no new profiling logic, reusing Milestone 1's).
 const OBJECTIVE_OPTIONS = [
-  { key: 'Let AI Decide', recommended: true, blurb: 'The AI selects the most useful analysis based on your data.' },
-  { key: 'Executive Management Report', blurb: 'Focus on KPIs, risks, major findings and recommendations.' },
-  { key: 'Root Cause Analysis', blurb: 'Focus on recurring problems, contributing factors and likely drivers.' },
-  { key: 'Performance Comparison', blurb: 'Compare teams, categories, branches, products, departments or other groups.' },
-  { key: 'Operational Analysis', blurb: 'Focus on process performance, recurring issues, efficiency and improvement opportunities.' },
-  { key: 'Audit / Compliance Report', blurb: 'Focus on gaps, exceptions, missing records, non-compliance and data quality.' },
-  { key: 'Trend Analysis', blurb: 'Track how key measures change over time.', requiresDates: true },
-  { key: 'Dashboard View', blurb: 'Focus on KPI cards, summary visuals and filterable charts.' },
+  // General
+  { key: 'Let AI Decide', group: 'General', recommended: true, blurb: 'The AI selects the most useful analysis based on your data.' },
+  { key: 'Executive Management Report', group: 'General', blurb: 'Focus on KPIs, risks, major findings and recommendations.' },
+  { key: 'Trend Analysis', group: 'General', blurb: 'Track how key measures change over time.', requiresDates: true },
+  { key: 'Dashboard View', group: 'General', blurb: 'Focus on KPI cards, summary visuals and filterable charts.' },
+  // Business Focus
+  { key: 'Financial Performance', group: 'Business Focus', blurb: 'Focus on revenue, margins, profitability, cost and cash-related metrics.' },
+  { key: 'Operational Analysis', group: 'Business Focus', blurb: 'Focus on process performance, recurring issues, efficiency and improvement opportunities.' },
+  { key: 'Performance Comparison', group: 'Business Focus', blurb: 'Compare teams, categories, branches, products, departments or other groups.' },
+  { key: 'Customer Insights', group: 'Business Focus', blurb: 'Focus on customer satisfaction, returns, retention and growth.' },
+  { key: 'Risk Assessment', group: 'Business Focus', blurb: 'Focus on anomalies, operational risks, financial risks and quality issues.' },
+  { key: 'Growth Opportunities', group: 'Business Focus', blurb: 'Focus on where the data points to expansion, upside, or untapped potential.' },
+  // Deep Analysis
+  { key: 'Root Cause Analysis', group: 'Deep Analysis', blurb: 'Focus on recurring problems, contributing factors and likely drivers.' },
+  { key: 'Audit / Compliance Report', group: 'Deep Analysis', blurb: 'Focus on gaps, exceptions, missing records, non-compliance and data quality.' },
 ];
 
 // Maps the new single-select objective back onto the existing multi-select
@@ -1665,32 +1672,38 @@ export default function DataAnalystWorkspace() {
         <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>What would you like to achieve with this data?</p>
         <p style={{ fontSize: '0.78rem', color: '#64748B', marginBottom: 16 }}>Pick one — "Let AI Decide" works well if you're not sure.</p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, marginBottom: 20 }}>
-          {OBJECTIVE_OPTIONS.map((opt) => {
-            const disabled = isDisabled(opt);
-            const helper = helperText(opt);
-            const selected = objective === opt.key;
-            return (
-              <button
-                key={opt.key}
-                disabled={disabled}
-                onClick={() => setObjective(opt.key)}
-                style={{
-                  textAlign: 'left', padding: '14px 16px', borderRadius: 12, cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
-                  border: selected ? '2px solid #2563EB' : '1px solid #E2E8F0',
-                  background: disabled ? '#F8FAFC' : selected ? '#EFF6FF' : 'white',
-                  opacity: disabled ? 0.6 : 1,
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                  <span style={{ fontSize: '0.88rem', fontWeight: 700, color: selected ? '#1D4ED8' : '#0F172A' }}>{opt.key}</span>
-                  {opt.recommended && <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#059669', background: '#ECFDF5', padding: '2px 7px', borderRadius: 999 }}>RECOMMENDED</span>}
-                </div>
-                <p style={{ fontSize: '0.75rem', color: '#64748B', margin: 0, lineHeight: 1.4 }}>{opt.blurb}</p>
-                {helper && <p style={{ fontSize: '0.7rem', color: disabled ? '#94A3B8' : '#D97706', margin: '6px 0 0' }}>{helper}</p>}
-              </button>
-            );
-          })}
+        {['General', 'Business Focus', 'Deep Analysis'].map((groupName) => (
+          <div key={groupName} style={{ marginBottom: 18 }}>
+            <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>{groupName}</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+              {OBJECTIVE_OPTIONS.filter((opt) => opt.group === groupName).map((opt) => {
+                const disabled = isDisabled(opt);
+                const helper = helperText(opt);
+                const selected = objective === opt.key;
+                return (
+                  <button
+                    key={opt.key}
+                    disabled={disabled}
+                    onClick={() => setObjective(opt.key)}
+                    style={{
+                      textAlign: 'left', padding: '14px 16px', borderRadius: 12, cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+                      border: selected ? '2px solid #2563EB' : '1px solid #E2E8F0',
+                      background: disabled ? '#F8FAFC' : selected ? '#EFF6FF' : 'white',
+                      opacity: disabled ? 0.6 : 1,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <span style={{ fontSize: '0.88rem', fontWeight: 700, color: selected ? '#1D4ED8' : '#0F172A' }}>{opt.key}</span>
+                      {opt.recommended && <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#059669', background: '#ECFDF5', padding: '2px 7px', borderRadius: 999 }}>RECOMMENDED</span>}
+                    </div>
+                    <p style={{ fontSize: '0.75rem', color: '#64748B', margin: 0, lineHeight: 1.4 }}>{opt.blurb}</p>
+                    {helper && <p style={{ fontSize: '0.7rem', color: disabled ? '#94A3B8' : '#D97706', margin: '6px 0 0' }}>{helper}</p>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
         </div>
 
         {error && <div style={{ padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, color: '#DC2626', fontSize: '0.82rem', marginBottom: 16 }}>{error}</div>}

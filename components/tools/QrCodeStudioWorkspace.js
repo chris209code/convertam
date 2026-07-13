@@ -494,7 +494,7 @@ export default function QrCodeStudioWorkspace() {
   // match, per the "export consistency" requirement.
   async function renderExportCanvas(size) {
     const { default: QRCodeStyling } = await import('qr-code-styling');
-    const qrSize = Math.round(size * (280 / 400)); // proportional to the on-screen 400 stage / 280 QR ratio
+    const qrSize = Math.round(size * (280 / 480)); // proportional to the on-screen 400 stage / 280 QR ratio
     const options = buildQrOptions(qrSize);
     const exportQr = new QRCodeStyling(options);
     const qrBlob = await exportQr.getRawData('png');
@@ -508,10 +508,10 @@ export default function QrCodeStudioWorkspace() {
 
     drawBackgroundOnCanvas(ctx, previewStyle, size);
 
-    const cardPad = size * (40 / 400);
+    const cardPad = size * (40 / 480);
     const cardSize = qrSize + cardPad * 2;
     const cardX = (size - cardSize) / 2, cardY = (size - cardSize) / 2;
-    const cardRadius = size * (24 / 400);
+    const cardRadius = size * (24 / 480);
 
     ctx.save();
     ctx.shadowColor = 'rgba(20,21,26,0.28)';
@@ -523,7 +523,7 @@ export default function QrCodeStudioWorkspace() {
     ctx.restore();
 
     if (showCornerBrackets) {
-      const inset = size * (14 / 400), bLen = size * (26 / 400), thick = Math.max(2, size * (4 / 400)), rad = size * (8 / 400);
+      const inset = size * (14 / 480), bLen = size * (26 / 480), thick = Math.max(2, size * (4 / 480)), rad = size * (8 / 480);
       const brackets = [
         { x: cardX + inset, y: cardY + inset, corner: 'tl', color: T.blue },
         { x: cardX + cardSize - inset - bLen, y: cardY + inset, corner: 'tr', color: '#EF4444' },
@@ -553,18 +553,24 @@ export default function QrCodeStudioWorkspace() {
   // tradeoff rather than a silent simplification.
   async function renderExportSVG(size) {
     const { default: QRCodeStyling } = await import('qr-code-styling');
-    const qrSize = Math.round(size * (280 / 400));
-    const options = buildQrOptions(qrSize);
+    const qrSize = Math.round(size * (280 / 480));
+    // Deliberately request the QR pattern WITHOUT asking the library to
+    // embed the logo — qr-code-styling's SVG output doesn't reliably embed
+    // a raster logo image the way its canvas/PNG output does. Instead, the
+    // logo badge is composited manually as its own SVG layer below, which
+    // guarantees it's actually present rather than depending on library
+    // behavior that turned out not to hold.
+    const options = { ...buildQrOptions(qrSize), image: undefined };
     const exportQr = new QRCodeStyling(options);
     const svgBlob = await exportQr.getRawData('svg');
     const svgText = await svgBlob.text();
     const innerMatch = svgText.match(/<svg[^>]*>([\s\S]*)<\/svg>/);
     const innerSvg = innerMatch ? innerMatch[1] : '';
 
-    const cardPad = size * (40 / 400);
+    const cardPad = size * (40 / 480);
     const cardSize = qrSize + cardPad * 2;
     const cardX = (size - cardSize) / 2, cardY = (size - cardSize) / 2;
-    const cardRadius = size * (24 / 400);
+    const cardRadius = size * (24 / 480);
 
     let backgroundLayer = '';
     if (previewStyle !== 'transparent') {
@@ -576,7 +582,7 @@ export default function QrCodeStudioWorkspace() {
 
     let bracketsLayer = '';
     if (showCornerBrackets) {
-      const inset = size * (14 / 400), bLen = size * (26 / 400), thick = Math.max(2, size * (4 / 400)), rad = size * (8 / 400);
+      const inset = size * (14 / 480), bLen = size * (26 / 480), thick = Math.max(2, size * (4 / 480)), rad = size * (8 / 480);
       const mk = (x, y, d, color) => `<path d="${d}" stroke="${color}" stroke-width="${thick}" fill="none" />`;
       bracketsLayer = [
         mk(0, 0, `M ${cardX + inset} ${cardY + inset + bLen} L ${cardX + inset} ${cardY + inset + rad} A ${rad} ${rad} 0 0 1 ${cardX + inset + rad} ${cardY + inset} L ${cardX + inset + bLen} ${cardY + inset}`, T.blue),
@@ -586,11 +592,18 @@ export default function QrCodeStudioWorkspace() {
       ].join('');
     }
 
+    let logoLayer = '';
+    if (compositedLogoUrl) {
+      const logoSize = qrSize * logoSizeRatio;
+      const logoOffset = (qrSize - logoSize) / 2;
+      logoLayer = `<image href="${compositedLogoUrl}" x="${logoOffset}" y="${logoOffset}" width="${logoSize}" height="${logoSize}" />`;
+    }
+
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
       ${backgroundLayer}
       <rect x="${cardX}" y="${cardY}" width="${cardSize}" height="${cardSize}" rx="${cardRadius}" fill="#FFFFFF" />
       ${bracketsLayer}
-      <g transform="translate(${cardX + cardPad}, ${cardY + cardPad})">${innerSvg}</g>
+      <g transform="translate(${cardX + cardPad}, ${cardY + cardPad})">${innerSvg}${logoLayer}</g>
     </svg>`;
   }
 

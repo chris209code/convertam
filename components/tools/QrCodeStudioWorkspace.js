@@ -494,7 +494,7 @@ export default function QrCodeStudioWorkspace() {
   // match, per the "export consistency" requirement.
   async function renderExportCanvas(size) {
     const { default: QRCodeStyling } = await import('qr-code-styling');
-    const qrSize = Math.round(size * (280 / 480)); // proportional to the on-screen 400 stage / 280 QR ratio
+    const qrSize = Math.round(size * (280 / 480));
     const options = buildQrOptions(qrSize);
     const exportQr = new QRCodeStyling(options);
     const qrBlob = await exportQr.getRawData('png');
@@ -502,8 +502,13 @@ export default function QrCodeStudioWorkspace() {
     const qrImg = new Image();
     await new Promise((resolve, reject) => { qrImg.onload = resolve; qrImg.onerror = reject; qrImg.src = qrDataUrl; });
 
+    // The Scan Me pill / caption renders below the square stage in the live
+    // preview, not inside it — the export canvas needs real extra height
+    // for it, or it simply has nowhere to go. Previously this was drawn in
+    // the preview only and never reached any export at all.
+    const frameHeight = frame === 'none' ? 0 : Math.round(size * 0.17);
     const canvas = document.createElement('canvas');
-    canvas.width = size; canvas.height = size;
+    canvas.width = size; canvas.height = size + frameHeight;
     const ctx = canvas.getContext('2d');
 
     drawBackgroundOnCanvas(ctx, previewStyle, size);
@@ -542,6 +547,29 @@ export default function QrCodeStudioWorkspace() {
     }
 
     ctx.drawImage(qrImg, cardX + cardPad, cardY + cardPad, qrSize, qrSize);
+
+    if (frame === 'scanme') {
+      const label = captionText || 'Scan Me';
+      const fontSize = Math.round(size * 0.032);
+      ctx.font = `700 ${fontSize}px ${T.font}`;
+      const textWidth = ctx.measureText(label).width;
+      const padX = size * 0.045, pillH = size * 0.09;
+      const pillW = textWidth + padX * 2;
+      const pillX = (size - pillW) / 2, pillY = size + (frameHeight - pillH) / 2;
+      ctx.fillStyle = T.blue;
+      roundRectPath(ctx, pillX, pillY, pillW, pillH, pillH / 2);
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, size / 2, pillY + pillH / 2 + fontSize * 0.05);
+    } else if (frame === 'caption') {
+      const fontSize = Math.round(size * 0.028);
+      ctx.font = `600 ${fontSize}px ${T.font}`;
+      ctx.fillStyle = T.inkSecondary;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(captionText, size / 2, size + frameHeight / 2);
+    }
+
     return canvas;
   }
 
@@ -599,11 +627,29 @@ export default function QrCodeStudioWorkspace() {
       logoLayer = `<image href="${compositedLogoUrl}" x="${logoOffset}" y="${logoOffset}" width="${logoSize}" height="${logoSize}" />`;
     }
 
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    let frameLayer = '';
+    const frameHeight = frame === 'none' ? 0 : Math.round(size * 0.17);
+    if (frame === 'scanme') {
+      const label = captionText || 'Scan Me';
+      const fontSize = Math.round(size * 0.032);
+      const approxCharWidth = fontSize * 0.58; // rough estimate since SVG text can't be measured without a live DOM
+      const textWidth = label.length * approxCharWidth;
+      const padX = size * 0.045, pillH = size * 0.09;
+      const pillW = textWidth + padX * 2;
+      const pillX = (size - pillW) / 2, pillY = size + (frameHeight - pillH) / 2;
+      frameLayer = `<rect x="${pillX}" y="${pillY}" width="${pillW}" height="${pillH}" rx="${pillH / 2}" fill="${T.blue}" />
+        <text x="${size / 2}" y="${pillY + pillH / 2}" font-family="${T.font}" font-weight="700" font-size="${fontSize}" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle">${label}</text>`;
+    } else if (frame === 'caption') {
+      const fontSize = Math.round(size * 0.028);
+      frameLayer = `<text x="${size / 2}" y="${size + frameHeight / 2}" font-family="${T.font}" font-weight="600" font-size="${fontSize}" fill="${T.inkSecondary}" text-anchor="middle" dominant-baseline="middle">${captionText}</text>`;
+    }
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size + frameHeight}" viewBox="0 0 ${size} ${size + frameHeight}">
       ${backgroundLayer}
       <rect x="${cardX}" y="${cardY}" width="${cardSize}" height="${cardSize}" rx="${cardRadius}" fill="#FFFFFF" />
       ${bracketsLayer}
       <g transform="translate(${cardX + cardPad}, ${cardY + cardPad})">${innerSvg}${logoLayer}</g>
+      ${frameLayer}
     </svg>`;
   }
 
@@ -622,8 +668,11 @@ export default function QrCodeStudioWorkspace() {
         if (extension === 'pdf') {
           const dataUrl = canvas.toDataURL('image/png');
           const { jsPDF } = await import('jspdf');
-          const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: [previewSize * 0.75 + 80, previewSize * 0.75 + 80] });
-          pdf.addImage(dataUrl, 'PNG', 40, 40, previewSize * 0.75, previewSize * 0.75);
+          // Use the canvas's actual dimensions rather than assuming square —
+          // it's genuinely taller than wide whenever a frame/CTA is active.
+          const imgW = canvas.width * 0.75, imgH = canvas.height * 0.75;
+          const pdf = new jsPDF({ orientation: imgH >= imgW ? 'portrait' : 'landscape', unit: 'pt', format: [imgW + 80, imgH + 80] });
+          pdf.addImage(dataUrl, 'PNG', 40, 40, imgW, imgH);
           pdf.save('qr-code.pdf');
         } else {
           const url = canvas.toDataURL('image/png');

@@ -61,6 +61,7 @@ const ALL_TOOLS = [
   { name: 'Document Enhancer', href: '/document-enhancer' },
   { name: 'Calculator Hub', href: '/calculator-hub' },
   { name: 'Utilities Hub', href: '/utilities-hub' },
+  { name: 'QR Code Generator', href: '/qr-code-generator' },
 ];
 
 const CATEGORIES = [
@@ -162,7 +163,7 @@ const CATEGORIES = [
     icon: 'grid',
     viewAllHref: '/utilities-hub',
     tools: [
-      { name: 'QR Code Generator', href: '/utilities-hub' },
+      { name: 'QR Code Generator', href: '/qr-code-generator' },
       { name: 'Password Generator', href: '/utilities-hub' },
       { name: 'Word Counter', href: '/utilities-hub' },
       { name: 'Text Case Converter', href: '/utilities-hub' },

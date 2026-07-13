@@ -529,6 +529,13 @@ export default function DataAnalystWorkspace() {
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState('');
   const [parsingConfidence, setParsingConfidence] = useState(null);
+  const [cooldown, setCooldown] = useState(null); // { seconds, action } - disables the relevant button and counts down
+  const [aiNarrativeUnavailable, setAiNarrativeUnavailable] = useState(false);
+  const analysisCacheRef = useRef({}); // key -> analysis result, avoids re-calling Gemini for unchanged dataset+objective+context
+  const lastAnalysisInputsRef = useRef(null); // stores deterministic engine outputs so a narrative-only retry never re-runs parsing/stats/chart-selection
+  const understandingCacheRef = useRef({ key: null, result: null });
+  const [chatQuestionCount, setChatQuestionCount] = useState(0);
+  const CHAT_QUESTION_LIMIT = 20;
 
   const [understanding, setUnderstanding] = useState(null);
   const [datasetHealth, setDatasetHealth] = useState(null);
@@ -560,6 +567,20 @@ export default function DataAnalystWorkspace() {
     document.addEventListener('fullscreenchange', onFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
   }, []);
+
+  // Counts down a rate-limit cooldown once per second, clearing it (and
+  // re-enabling whatever button it was blocking) when it reaches zero.
+  useEffect(() => {
+    if (!cooldown || cooldown.seconds <= 0) return;
+    const id = setTimeout(() => {
+      setCooldown((c) => (c && c.seconds > 1 ? { ...c, seconds: c.seconds - 1 } : null));
+    }, 1000);
+    return () => clearTimeout(id);
+  }, [cooldown]);
+
+  function startCooldown(action, seconds) {
+    setCooldown({ action, seconds: Math.max(1, Math.round(seconds || 30)) });
+  }
 
   useEffect(() => {
     if (!presentationMode) return;
@@ -692,12 +713,23 @@ export default function DataAnalystWorkspace() {
       const health = computeDatasetHealth(columns, rows, stats);
       setDatasetHealth(health);
 
+      // Reuse a previous result for the exact same dataset content — going
+      // back to review and forward again without changing anything should
+      // never re-call Gemini.
+      const cacheKey = JSON.stringify({ columns, rowCount: rows.length, sample: rows.slice(0, 3) });
+      if (understandingCacheRef.current.key === cacheKey && understandingCacheRef.current.result) {
+        setUnderstanding(understandingCacheRef.current.result);
+        setPhase('understanding');
+        return;
+      }
+
       const res = await fetch('/api/data-analyst', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'understand', columns, stats, sampleRows: rows, rowCount: rows.length }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'understanding_failed');
+      understandingCacheRef.current = { key: cacheKey, result: data };
       setUnderstanding(data);
     } catch (err) {
       // Fall back to deterministic profiling only — the workflow keeps
@@ -712,9 +744,23 @@ export default function DataAnalystWorkspace() {
     }
   }
 
+  function buildAnalysisCacheKey() {
+    return JSON.stringify({ cols: columns, objective, desc: understanding?.description, industry: understanding?.industry, rowCount: rows.length });
+  }
+
+  function buildFallbackAnalysis(qualityWarnings, stats, engineCharts) {
+    return {
+      executiveSummary: '', keyFindings: [], rootCauseObservations: [], risks: [], opportunities: [],
+      recommendations: [], actionPlan: [], confidenceStatement: null, conclusion: '',
+      qualityWarnings, stats, suggestedCharts: engineCharts,
+    };
+  }
+
   async function handleAnalyze() {
+    if (cooldown?.action === 'analyze') return; // button should already be disabled, but never send during an active cooldown regardless
     setAnalyzing(true);
     setError('');
+    setAiNarrativeUnavailable(false);
     try {
       const stats = computeStats(columns, rows);
       const qualityWarnings = computeQualityWarnings(columns, rows, stats);
@@ -737,6 +783,17 @@ export default function DataAnalystWorkspace() {
       setChartData(prepared);
 
       const chartSummaries = engineCharts.map((chart, i) => summarizeChartForAI(chart, prepared[i]));
+      lastAnalysisInputsRef.current = { stats, qualityWarnings, health, cards, chartSummaries, engineCharts };
+
+      // Reuse a previous successful result for the exact same dataset +
+      // objective + context — never re-call Gemini just because the user
+      // navigated back and forward or clicked through again.
+      const cacheKey = buildAnalysisCacheKey();
+      if (analysisCacheRef.current[cacheKey]) {
+        setAnalysis(analysisCacheRef.current[cacheKey]);
+        setPhase('report');
+        return;
+      }
 
       const res = await fetch('/api/data-analyst', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -747,10 +804,25 @@ export default function DataAnalystWorkspace() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not analyze this data.');
+      if (!res.ok) {
+        if (data.category === 'rate_limit' || data.category === 'quota_exhausted') {
+          // The report is never made fully unusable just because the AI
+          // narrative call is rate-limited — everything the deterministic
+          // engine already computed (KPIs, charts, stats) still renders.
+          startCooldown('analyze', data.retryAfterSeconds);
+          setAiNarrativeUnavailable(true);
+          data.qualityWarnings = qualityWarnings;
+          data.stats = stats;
+          setAnalysis(buildFallbackAnalysis(qualityWarnings, stats, engineCharts));
+          setPhase('report');
+          return;
+        }
+        throw new Error(data.error || 'Could not analyze this data.');
+      }
       data.qualityWarnings = qualityWarnings;
       data.stats = stats;
       data.suggestedCharts = engineCharts;
+      analysisCacheRef.current[cacheKey] = data;
       setAnalysis(data);
       setPhase('report');
     } catch (err) {
@@ -760,13 +832,54 @@ export default function DataAnalystWorkspace() {
     }
   }
 
+  // Retries ONLY the AI narrative call, reusing everything the deterministic
+  // engine already computed — never re-runs parsing, stats, KPI discovery,
+  // or chart selection just to get a second try at the narrative.
+  async function generateAiNarrativeOnly() {
+    if (cooldown?.action === 'analyze' || !lastAnalysisInputsRef.current) return;
+    setAnalyzing(true);
+    setError('');
+    try {
+      const { stats, qualityWarnings, health, cards, chartSummaries, engineCharts } = lastAnalysisInputsRef.current;
+      const cacheKey = buildAnalysisCacheKey();
+      const res = await fetch('/api/data-analyst', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'analyze', understanding, objective, health, kpis: cards, chartSummaries, columns, stats, qualityWarnings, rowCount: rows.length }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.category === 'rate_limit' || data.category === 'quota_exhausted') {
+          startCooldown('analyze', data.retryAfterSeconds);
+          return;
+        }
+        throw new Error(data.error || 'Could not generate the AI narrative.');
+      }
+      data.qualityWarnings = qualityWarnings;
+      data.stats = stats;
+      data.suggestedCharts = engineCharts;
+      analysisCacheRef.current[cacheKey] = data;
+      setAnalysis(data);
+      setAiNarrativeUnavailable(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
   async function handleChatSend(overrideQuestion, transformType) {
     if (chatBusy) return; // prevents a rapid double-click/double-Enter from firing two concurrent requests
+    if (cooldown?.action === 'chat') return; // never send during an active rate-limit cooldown
     const question = (overrideQuestion ?? chatInput).trim();
     if (!question) return;
+    if (chatQuestionCount >= CHAT_QUESTION_LIMIT) {
+      setChatMessages((prev) => [...prev, { role: 'ai', text: `You've reached this session's limit of ${CHAT_QUESTION_LIMIT} questions. Start a new analysis to continue asking questions.` }]);
+      return;
+    }
     setChatMessages((prev) => [...prev, { role: 'user', text: question }]);
     setChatInput('');
     setChatBusy(true);
+    setChatQuestionCount((n) => n + 1);
     try {
       const res = await fetch('/api/data-analyst', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -780,7 +893,14 @@ export default function DataAnalystWorkspace() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not answer that.');
+      if (!res.ok) {
+        if (data.category === 'rate_limit' || data.category === 'quota_exhausted') {
+          startCooldown('chat', data.retryAfterSeconds);
+          setChatMessages((prev) => [...prev, { role: 'ai', text: data.error }]); // conversation is preserved, not cleared, even when rate-limited
+          return;
+        }
+        throw new Error(data.error || 'Could not answer that.');
+      }
       setChatMessages((prev) => [...prev, { role: 'ai', text: data.answer }]);
     } catch (err) {
       setChatMessages((prev) => [...prev, { role: 'ai', text: `Sorry — ${err.message}` }]);
@@ -1437,6 +1557,8 @@ export default function DataAnalystWorkspace() {
     setChatMessages([]); setError(''); setFileName(''); setPasteText('');
     setUnderstanding(null); setDatasetHealth(null); setClarifyingAnswer('');
     setObjective('Let AI Decide'); setKpiCards([]); setChatRole(''); setOmittedKpis([]); setParsingConfidence(null);
+    setCooldown(null); setAiNarrativeUnavailable(false); setChatQuestionCount(0);
+    analysisCacheRef.current = {}; lastAnalysisInputsRef.current = null; understandingCacheRef.current = { key: null, result: null };
   }
 
   // ===========================================================================
@@ -1713,10 +1835,16 @@ export default function DataAnalystWorkspace() {
 
         {error && <div style={{ padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, color: '#DC2626', fontSize: '0.82rem', marginBottom: 16 }}>{error}</div>}
 
+        {cooldown?.action === 'analyze' && (
+          <div style={{ padding: '10px 14px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, color: '#92400E', fontSize: '0.82rem', marginBottom: 16 }}>
+            The AI service is temporarily rate-limited. You can retry in {cooldown.seconds} second{cooldown.seconds !== 1 ? 's' : ''}.
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 12 }}>
           <button className="btn btn-ghost" onClick={() => setPhase('understanding')}>← Back</button>
-          <button className="btn btn-primary" disabled={analyzing} onClick={handleAnalyze}>
-            {analyzing ? '✨ Analyzing your data…' : 'Continue to Analysis →'}
+          <button className="btn btn-primary" disabled={analyzing || cooldown?.action === 'analyze'} onClick={handleAnalyze}>
+            {analyzing ? '✨ Analyzing your data…' : cooldown?.action === 'analyze' ? `Retry in ${cooldown.seconds}s` : 'Continue to Analysis →'}
           </button>
         </div>
       </div>
@@ -1763,6 +1891,20 @@ export default function DataAnalystWorkspace() {
         )}
         {presentationMode && (
           <p style={{ position: 'fixed', bottom: 16, right: 20, zIndex: 10000, fontSize: '0.72rem', color: '#94A3B8', background: 'white', padding: '6px 12px', borderRadius: 999, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>↑↓ or space to navigate · Esc to exit</p>
+        )}
+
+        {aiNarrativeUnavailable && !presentationMode && (
+          <div style={{ ...card, background: '#FFFBEB', border: '1px solid #FDE68A', marginBottom: 24 }}>
+            <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#92400E', marginBottom: 6 }}>AI-written interpretation is temporarily unavailable because the service usage limit was reached.</p>
+            <p style={{ fontSize: '0.8rem', color: '#78350F', marginBottom: 12 }}>Everything below — KPIs, charts, and computed statistics — is unaffected and fully available now. Only the written narrative (executive summary, findings, recommendations) is missing.</p>
+            {cooldown?.action === 'analyze' ? (
+              <button disabled style={{ padding: '9px 16px', borderRadius: 8, border: 'none', background: '#D9A441', color: 'white', fontWeight: 700, fontSize: '0.82rem', cursor: 'default' }}>Retry in {cooldown.seconds}s</button>
+            ) : (
+              <button onClick={generateAiNarrativeOnly} disabled={analyzing} style={{ padding: '9px 16px', borderRadius: 8, border: 'none', background: '#D97706', color: 'white', fontWeight: 700, fontSize: '0.82rem', cursor: analyzing ? 'default' : 'pointer' }}>
+                {analyzing ? 'Generating…' : '✨ Generate AI narrative'}
+              </button>
+            )}
+          </div>
         )}
 
         {/* 1. Executive Brief */}

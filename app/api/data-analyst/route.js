@@ -348,28 +348,23 @@ Answer in plain language, no markdown formatting, 2-5 sentences unless a transfo
 
 import { callGemini, AIError, CATEGORY_MESSAGES } from '@/lib/geminiClient';
 
-import { encodeSignedCookie, decodeSignedCookie, parseCookies, buildCookieHeader, currentWATDateString, msUntilNextWATMidnight } from '@/lib/usageCookie';
+import { encodeSignedCookie, buildCookieHeader, msUntilNextWATMidnight, computeDataAnalystUsageState } from '@/lib/usageCookie';
 
-const USAGE_COOKIE_NAME = 'convertam_usage';
+const USAGE_COOKIE_NAME = 'convertam_data_analyst_daily_usage'; // deliberately specific — this limit belongs only to AI Data Analyst's main report generation, never a platform-wide AI limit
 const OWNER_COOKIE_NAME = 'convertam_owner';
 const DAILY_REPORT_LIMIT = 2;
 const ENABLE_ANALYST_CHAT = process.env.ENABLE_ANALYST_CHAT === 'true'; // default/production value is false unless explicitly set
 
 function readUsageState(request) {
-  const cookies = parseCookies(request.headers.get('cookie'));
   const usageSecret = process.env.CONVERTAM_OWNER_COOKIE_SECRET; // reusing the owner cookie secret for signing is intentional — one server-only secret, not two to manage
-  const ownerToken = cookies[OWNER_COOKIE_NAME];
-  const ownerPayload = ownerToken && usageSecret ? decodeSignedCookie(ownerToken, usageSecret) : null;
-  const isOwner = !!ownerPayload?.owner;
-
-  const today = currentWATDateString();
-  const usageToken = cookies[USAGE_COOKIE_NAME];
-  const usagePayload = usageToken && usageSecret ? decodeSignedCookie(usageToken, usageSecret) : null;
-  // Reset whenever the stored date doesn't match today's WAT calendar day —
-  // computed server-side, never trusting the visitor's device clock.
-  const count = usagePayload?.date === today ? (usagePayload.count || 0) : 0;
-
-  return { isOwner, today, count, remaining: Math.max(0, DAILY_REPORT_LIMIT - count), usageSecret };
+  const state = computeDataAnalystUsageState({
+    cookieHeader: request.headers.get('cookie'),
+    ownerCookieName: OWNER_COOKIE_NAME,
+    usageCookieName: USAGE_COOKIE_NAME,
+    cookieSecret: usageSecret,
+    dailyLimit: DAILY_REPORT_LIMIT,
+  });
+  return { ...state, usageSecret };
 }
 
 function withUsageCookie(responseBody, status, usageState, newCount) {

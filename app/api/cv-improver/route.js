@@ -1,14 +1,9 @@
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const GEMINI_MODEL = 'gemini-2.5-flash';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+import { callGemini, AIError, CATEGORY_MESSAGES } from '@/lib/geminiClient';
 
-// Enforces the exact shape the prompt asks for — previously this route
-// relied entirely on prompt instructions ("Return ONLY valid JSON") with no
-// schema behind it, which is the same class of bug found and fixed in
-// AI Data Analyst's extraction actions: unenforced JSON occasionally comes
-// back malformed or truncated, especially on longer input like a full CV.
+// Enforces the exact shape the prompt asks for.
 const cvSchema = {
   type: 'OBJECT',
   properties: {
@@ -50,67 +45,6 @@ const cvSchema = {
   required: ['name', 'summary', 'experience', 'skills'],
 };
 
-function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
-
-// Retries transient failures automatically (rate limits, momentary server
-// errors, network blips, or an occasional malformed-JSON response) before
-// ever showing the user an error.
-async function callGeminiForCV(apiKey, prompt) {
-  const body = {
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: {
-      temperature: 0.3,
-      maxOutputTokens: 65536,
-      responseMimeType: 'application/json',
-      responseSchema: cvSchema,
-    },
-  };
-  const maxAttempts = 3;
-  let lastError;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const res = await fetch(GEMINI_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        console.error(`Gemini CV-improver error (attempt ${attempt}/${maxAttempts}):`, JSON.stringify(data));
-        const retryable = res.status === 429 || res.status >= 500;
-        if (retryable && attempt < maxAttempts) { await sleep(700 * attempt); continue; }
-        throw new Error('gemini_error');
-      }
-
-      const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      if (!raw) {
-        if (attempt < maxAttempts) { await sleep(700 * attempt); continue; }
-        throw new Error('empty_response');
-      }
-
-      // Parsing is inside the retry loop too — an occasional malformed
-      // response is worth a fresh attempt rather than an immediate failure.
-      try {
-        const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-        const parsed = JSON.parse(cleaned);
-        return { raw, parsed };
-      } catch (parseErr) {
-        console.error(`JSON parse error (attempt ${attempt}/${maxAttempts}):`, parseErr.message);
-        if (attempt < maxAttempts) { await sleep(700 * attempt); continue; }
-        throw new Error('parse_error');
-      }
-    } catch (err) {
-      lastError = err;
-      const isKnownFinalError = ['gemini_error', 'empty_response', 'parse_error'].includes(err.message);
-      if (!isKnownFinalError && attempt < maxAttempts) { await sleep(700 * attempt); continue; } // network-level failure — also worth retrying
-      if (attempt === maxAttempts) throw lastError;
-    }
-  }
-  throw lastError;
-}
-
 export async function POST(request) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -136,13 +70,14 @@ ${jobTitle ? `- Optimize for the role: ${jobTitle}` : ''}
 CV TO IMPROVE:
 ${cvText}`;
 
-    const { raw, parsed } = await callGeminiForCV(apiKey, prompt);
+    const { raw, parsed } = await callGemini({ apiKey, toolName: 'cv-improver', routeName: '/api/cv-improver', parts: [{ text: prompt }], schema: cvSchema, maxOutputTokens: 65536, inputSizeApprox: prompt.length });
     return Response.json({ improved: raw, structured: parsed });
   } catch (err) {
+    if (err instanceof AIError) {
+      console.error(`CV improver error [${err.requestId}] category=${err.category}:`, err.message);
+      return Response.json({ error: CATEGORY_MESSAGES[err.category] || CATEGORY_MESSAGES.unexpected, requestId: err.requestId, category: err.category, retryAfterSeconds: err.retryAfterSeconds }, { status: 502 });
+    }
     console.error('CV improver error:', err);
-    const message = err.message === 'parse_error'
-      ? 'AI returned an unexpected format. Please try again.'
-      : 'Something went wrong. Please try again.';
-    return Response.json({ error: message }, { status: 500 });
+    return Response.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
   }
 }

@@ -145,14 +145,18 @@ Return ONLY JSON matching the schema.`;
 }
 
 const OBJECTIVE_FOCUS = {
+  'Let AI Decide': 'Use your judgment on what this dataset most needs — lead with the highest-value insight if unsure, whether that\'s a KPI, an anomaly, or a business risk.',
   'Executive Management Report': 'Focus on KPIs, business impact, and strategic priorities. Management wants the headline story, not a data dump.',
-  'Performance Comparison': 'Focus on rankings, comparisons, and variance between categories.',
-  'Operational Analysis': 'Focus on efficiency, frequency of issues, and exceptions.',
-  'Root Cause Analysis': 'Focus on patterns, likely drivers, and recurring issues. Emphasize the root-cause observations section.',
-  'Audit / Compliance Report': 'Focus on missing records, exceptions, and compliance gaps.',
   'Trend Analysis': 'Focus on how key measures have changed over time.',
   'Dashboard View': 'Write concise insights suitable for cards and tooltips — short, scannable, not paragraph-length.',
-  'Let AI Decide': 'Use your judgment on what this dataset most needs — KPIs and business impact if unsure.',
+  'Financial Performance': 'Prioritize revenue, margins, profitability, cost, and cash-related metrics above all else.',
+  'Operational Analysis': 'Prioritize efficiency, inventory, downtime, utilization, and quality issues.',
+  'Performance Comparison': 'Focus on rankings, comparisons, and variance between categories.',
+  'Customer Insights': 'Prioritize customer satisfaction, returns, retention, and customer-driven growth.',
+  'Risk Assessment': 'Prioritize anomalies, operational risks, financial risks, and quality issues above routine findings.',
+  'Growth Opportunities': 'Prioritize what could be scaled, expanded, or improved for growth — frame findings around upside, not just problems.',
+  'Root Cause Analysis': 'Focus on patterns, likely drivers, and recurring issues. Emphasize the root-cause observations section.',
+  'Audit / Compliance Report': 'Focus on missing records, exceptions, and compliance gaps.',
 };
 
 function buildAnalysisPrompt({ understanding, objective, health, kpis, chartSummaries, columns, stats, qualityWarnings, rowCount }) {
@@ -177,6 +181,15 @@ NO REPETITION ACROSS THE REPORT — this is as important as factual accuracy:
 - Do not open multiple findings, risks, or recommendations with the same sentence structure (e.g. do not start three items in a row with "[Category] shows..." or "The data indicates..."). Vary sentence openings deliberately.
 - Do not use the same transition word or concluding phrase more than once across the whole report (e.g. if you write "As a result" once, do not write it again — find a different way to connect ideas the second time).
 - The conclusion must add something the executive summary did not already say — never restate it in slightly different words.
+
+INSIGHT PRIORITIZATION — this determines what leads the report:
+Rank what matters in this order: (1) significant disruptions or anomalies, (2) financial impact, (3) operational failures, (4) customer impact, (5) recovery or improvement after a disruption, (6) growth opportunities, (7) routine efficiency observations, (8) long-term averages. A major disruption or anomaly — if the data shows one — is ALWAYS the primary story, never a footnote after routine averages. Never let a plain average lead the report when a more significant event exists in the data.
+
+EXECUTIVE SUMMARY MUST LEAD WITH THE HIGHEST-VALUE INSIGHT — never open with a generic statement like "The average reject rate is X" if a more important story exists (a disruption, a sharp change, a major risk). Open with whatever matters most per the ranking above.
+
+STORYTELLING, NOT COLUMN-BY-COLUMN DESCRIPTION — do not summarize columns individually. Where the data supports it, tell the actual business story as a narrative arc (e.g. steady performance, then a disruption, then recovery, then a new normal) rather than a list of disconnected facts. This should read like a consulting presentation, not a spreadsheet walkthrough.
+
+RELATIONSHIP LANGUAGE — real correlation coefficients are not yet computed by this engine, so when discussing how two measures might relate (e.g. from a scatter chart), never use the filler phrase "worth investigating." Instead, explain in plain language why the two measures might plausibly be related given what they represent, whether the relationship looks consistent across the data or only holds in certain periods, and whether any exceptional periods stand out — all without stating a specific correlation number, since none has been calculated.
 
 ${industryLine}
 Selected objective: ${objective}. ${focusLine}

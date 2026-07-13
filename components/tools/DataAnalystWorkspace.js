@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import Script from 'next/script';
 import { buildPptxFromOutline } from '@/lib/buildPptxFromOutline';
 import { discoverKPIs, computeKpiCards, discoverCharts } from '@/lib/dataAnalysisEngine';
+import { parsePastedTable, validateParsedTable } from '@/lib/tableParser';
 
 // Superseded by OBJECTIVE_OPTIONS below — the old multi-select "what would
 // you like to do" chips have been replaced by single-select objective cards
@@ -54,20 +55,6 @@ async function extractPdfText(file) {
     text += content.items.map((item) => item.str).join(' ') + '\n';
   }
   return text.trim();
-}
-
-function parseDelimitedText(text) {
-  const lines = text.trim().split('\n').filter((l) => l.trim());
-  if (!lines.length) return { columns: [], rows: [] };
-  const delimiter = lines[0].includes('\t') ? '\t' : ',';
-  const columns = lines[0].split(delimiter).map((c) => c.trim());
-  const rows = lines.slice(1).map((line) => {
-    const cells = line.split(delimiter);
-    const row = {};
-    columns.forEach((col, i) => { row[col] = (cells[i] || '').trim(); });
-    return row;
-  });
-  return { columns, rows };
 }
 
 // ---------------------------------------------------------------------------
@@ -534,6 +521,7 @@ export default function DataAnalystWorkspace() {
   const [rows, setRows] = useState([]);
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState('');
+  const [parsingConfidence, setParsingConfidence] = useState(null);
 
   const [understanding, setUnderstanding] = useState(null);
   const [datasetHealth, setDatasetHealth] = useState(null);
@@ -594,6 +582,8 @@ export default function DataAnalystWorkspace() {
     setFileName(file.name);
     try {
       const ext = file.name.toLowerCase().split('.').pop();
+      let cols, dataRows, rawConsistencyRatio = 1; // Excel/Gemini-extracted sources don't have a raw pre-normalization signal, so they default to full trust on that dimension — their underlying parser is already reliable
+
       if (ext === 'xlsx' || ext === 'xls' || ext === 'csv' || ext === 'tsv') {
         const XLSX = await import('xlsx');
         const buf = await file.arrayBuffer();
@@ -601,14 +591,14 @@ export default function DataAnalystWorkspace() {
         const sheet = wb.Sheets[wb.SheetNames[0]];
         const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
         if (!aoa.length) throw new Error('Empty file');
-        const cols = aoa[0].map((c) => String(c || '').trim() || 'Column');
-        const dataRows = aoa.slice(1).map((r) => {
+        cols = aoa[0].map((c) => String(c || '').trim() || 'Column');
+        const rawLengths = aoa.slice(1).map((r) => r.length);
+        rawConsistencyRatio = rawLengths.length ? rawLengths.filter((l) => l === cols.length).length / rawLengths.length : 1;
+        dataRows = aoa.slice(1).map((r) => {
           const obj = {};
           cols.forEach((c, i) => { obj[c] = r[i] !== undefined ? String(r[i]) : ''; });
           return obj;
         }).filter((r) => Object.values(r).some((v) => v !== ''));
-        setColumns(cols);
-        setRows(dataRows);
       } else if (file.type.startsWith('image/')) {
         if (!window.pdfjsLib && ext === 'pdf') throw new Error('pdf-lib-not-ready');
         const dataUrl = await fileToDataUrl(file);
@@ -618,8 +608,8 @@ export default function DataAnalystWorkspace() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Could not read this image.');
-        setColumns(data.columns || []);
-        setRows((data.rows || []).map((r) => { const o = {}; (data.columns || []).forEach((c) => { o[c] = String(r[c] ?? ''); }); return o; }));
+        cols = data.columns || [];
+        dataRows = (data.rows || []).map((r) => { const o = {}; cols.forEach((c) => { o[c] = String(r[c] ?? ''); }); return o; });
       } else if (ext === 'pdf') {
         if (!window.pdfjsLib) throw new Error('Still loading — please wait a moment and try again.');
         const text = await extractPdfText(file);
@@ -629,11 +619,24 @@ export default function DataAnalystWorkspace() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Could not read this PDF.');
-        setColumns(data.columns || []);
-        setRows((data.rows || []).map((r) => { const o = {}; (data.columns || []).forEach((c) => { o[c] = String(r[c] ?? ''); }); return o; }));
+        cols = data.columns || [];
+        dataRows = (data.rows || []).map((r) => { const o = {}; cols.forEach((c) => { o[c] = String(r[c] ?? ''); }); return o; });
       } else {
         throw new Error('Unsupported file type.');
       }
+
+      // Same validation standard applied regardless of source — a
+      // low-confidence parse stops here rather than silently feeding a
+      // wrong schema into analysis.
+      const validation = validateParsedTable(cols, dataRows, rawConsistencyRatio);
+      setParsingConfidence(validation);
+      if (validation.rejected) {
+        setError(validation.message);
+        return;
+      }
+
+      setColumns(cols);
+      setRows(dataRows);
       setPhase('review');
     } catch (err) {
       console.error(err);
@@ -645,11 +648,17 @@ export default function DataAnalystWorkspace() {
 
   function handlePasteSubmit() {
     if (!pasteText.trim()) return;
-    const { columns: cols, rows: dataRows } = parseDelimitedText(pasteText);
-    if (!cols.length) { setError('Could not parse this as a table. Make sure it has a header row.'); return; }
+    setError('');
+    const { columns: cols, rows: dataRows, rawConsistencyRatio, skippedTitleRows } = parsePastedTable(pasteText);
+    const validation = validateParsedTable(cols, dataRows, rawConsistencyRatio);
+    setParsingConfidence(validation);
+    if (validation.rejected) {
+      setError(validation.message);
+      return; // do not proceed into analysis on a low-confidence parse
+    }
     setColumns(cols);
     setRows(dataRows);
-    setFileName('Pasted data');
+    setFileName(skippedTitleRows > 0 ? 'Pasted data (title row detected and skipped)' : 'Pasted data');
     setPhase('review');
   }
 
@@ -1420,7 +1429,7 @@ export default function DataAnalystWorkspace() {
     setPhase('upload'); setColumns([]); setRows([]); setAnalysis(null); setChartData({});
     setChatMessages([]); setError(''); setFileName(''); setPasteText('');
     setUnderstanding(null); setDatasetHealth(null); setClarifyingAnswer('');
-    setObjective('Let AI Decide'); setKpiCards([]); setChatRole(''); setOmittedKpis([]);
+    setObjective('Let AI Decide'); setKpiCards([]); setChatRole(''); setOmittedKpis([]); setParsingConfidence(null);
   }
 
   // ===========================================================================
@@ -1457,10 +1466,27 @@ export default function DataAnalystWorkspace() {
 
   if (phase === 'review') {
     const previewCols = columns;
+    const previewStats = computeStats(columns, rows);
+    const numericCount = columns.filter((c) => previewStats[c]?.type === 'numeric').length;
+    const categoricalCount = columns.filter((c) => previewStats[c]?.type === 'categorical').length;
+    const dateCount = columns.filter((c) => previewStats[c]?.type === 'date').length;
+    const confColor = parsingConfidence?.level === 'high' ? '#059669' : parsingConfidence?.level === 'medium' ? '#D97706' : '#DC2626';
+
     return (
       <div className="panel">
         <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Review your data</p>
         <p style={{ fontSize: '0.78rem', color: '#64748B', marginBottom: 14 }}>{rows.length} rows extracted from {fileName}. Edit anything that looks wrong before continuing.</p>
+
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16, padding: 12, background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 10 }}>
+          <span style={{ fontSize: '0.78rem', color: '#475569' }}><strong>{rows.length}</strong> rows</span>
+          <span style={{ fontSize: '0.78rem', color: '#475569' }}><strong>{columns.length}</strong> columns</span>
+          <span style={{ fontSize: '0.78rem', color: '#475569' }}><strong>{numericCount}</strong> numeric</span>
+          <span style={{ fontSize: '0.78rem', color: '#475569' }}><strong>{categoricalCount}</strong> categorical</span>
+          <span style={{ fontSize: '0.78rem', color: '#475569' }}><strong>{dateCount}</strong> date/time</span>
+          {parsingConfidence && (
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: confColor }}>Parsing confidence: {parsingConfidence.level} ({parsingConfidence.confidence}%)</span>
+          )}
+        </div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
           <button onClick={removeEmptyRows} style={{ fontSize: '0.78rem', padding: '6px 12px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>Remove empty rows</button>

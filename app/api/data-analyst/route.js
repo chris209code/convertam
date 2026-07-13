@@ -348,6 +348,39 @@ Answer in plain language, no markdown formatting, 2-5 sentences unless a transfo
 
 import { callGemini, AIError, CATEGORY_MESSAGES } from '@/lib/geminiClient';
 
+import { encodeSignedCookie, decodeSignedCookie, parseCookies, buildCookieHeader, currentWATDateString, msUntilNextWATMidnight } from '@/lib/usageCookie';
+
+const USAGE_COOKIE_NAME = 'convertam_usage';
+const OWNER_COOKIE_NAME = 'convertam_owner';
+const DAILY_REPORT_LIMIT = 2;
+const ENABLE_ANALYST_CHAT = process.env.ENABLE_ANALYST_CHAT === 'true'; // default/production value is false unless explicitly set
+
+function readUsageState(request) {
+  const cookies = parseCookies(request.headers.get('cookie'));
+  const usageSecret = process.env.CONVERTAM_OWNER_COOKIE_SECRET; // reusing the owner cookie secret for signing is intentional — one server-only secret, not two to manage
+  const ownerToken = cookies[OWNER_COOKIE_NAME];
+  const ownerPayload = ownerToken && usageSecret ? decodeSignedCookie(ownerToken, usageSecret) : null;
+  const isOwner = !!ownerPayload?.owner;
+
+  const today = currentWATDateString();
+  const usageToken = cookies[USAGE_COOKIE_NAME];
+  const usagePayload = usageToken && usageSecret ? decodeSignedCookie(usageToken, usageSecret) : null;
+  // Reset whenever the stored date doesn't match today's WAT calendar day —
+  // computed server-side, never trusting the visitor's device clock.
+  const count = usagePayload?.date === today ? (usagePayload.count || 0) : 0;
+
+  return { isOwner, today, count, remaining: Math.max(0, DAILY_REPORT_LIMIT - count), usageSecret };
+}
+
+function withUsageCookie(responseBody, status, usageState, newCount) {
+  const headers = new Headers({ 'Content-Type': 'application/json' });
+  if (usageState.usageSecret && !usageState.isOwner) {
+    const token = encodeSignedCookie({ date: usageState.today, count: newCount }, usageState.usageSecret);
+    headers.append('Set-Cookie', buildCookieHeader(USAGE_COOKIE_NAME, token, { maxAgeSeconds: 60 * 60 * 30, httpOnly: true, sameSite: 'Lax' }));
+  }
+  return new Response(JSON.stringify(responseBody), { status, headers });
+}
+
 export async function POST(request) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -357,6 +390,17 @@ export async function POST(request) {
   try {
     const payload = await request.json();
     const { action } = payload;
+
+    if (action === 'usageStatus') {
+      const usageState = readUsageState(request);
+      return Response.json({
+        isOwner: usageState.isOwner,
+        remaining: usageState.isOwner ? null : usageState.remaining,
+        limit: DAILY_REPORT_LIMIT,
+        resetInMs: msUntilNextWATMidnight(),
+        chatEnabled: ENABLE_ANALYST_CHAT,
+      });
+    }
 
     if (action === 'understand') {
       const { columns, stats, sampleRows, rowCount } = payload;
@@ -375,6 +419,7 @@ export async function POST(request) {
         else if (rowCount < 20) understanding.confidence = Math.min(understanding.confidence, 79);
       }
 
+      // Dataset Understanding never consumes a report credit.
       return Response.json(understanding);
     }
 
@@ -383,6 +428,18 @@ export async function POST(request) {
       if (!columns?.length || !rowCount) {
         return Response.json({ error: 'No usable data received.' }, { status: 400 });
       }
+
+      // Reservation check — before Gemini is ever called, not after. A
+      // credit is only ever consumed on a confirmed successful analysis,
+      // never for a failed request, a rate limit, or a fallback report.
+      const usageState = readUsageState(request);
+      if (!usageState.isOwner && usageState.remaining <= 0) {
+        return withUsageCookie(
+          { error: 'No AI reports remaining today.', category: 'usage_limit_reached', remaining: 0, resetInMs: msUntilNextWATMidnight() },
+          403, usageState, usageState.count
+        );
+      }
+
       const prompt = buildAnalysisPrompt({ understanding, objective, health, kpis, chartSummaries, columns, stats, qualityWarnings, rowCount });
       // This is the largest, most complex schema in the app — findings,
       // risks, opportunities, recommendations, and an action plan, each
@@ -390,7 +447,11 @@ export async function POST(request) {
       // this on a large share of calls, which is the actual root cause of
       // needing many manual retries — this gives it real headroom.
       const { parsed: analysis } = await callGemini({ apiKey, toolName: 'data-analyst:analyze', routeName: '/api/data-analyst', parts: [{ text: prompt }], schema: analysisSchema, maxOutputTokens: 16384, inputSizeApprox: prompt.length });
-      return Response.json(analysis);
+
+      // Confirmation — the credit is only decremented here, after Gemini
+      // has actually returned a successful, parsed result.
+      const newCount = usageState.isOwner ? usageState.count : usageState.count + 1;
+      return withUsageCookie({ ...analysis, usageRemaining: usageState.isOwner ? null : Math.max(0, DAILY_REPORT_LIMIT - newCount) }, 200, usageState, newCount);
     }
 
     if (action === 'extractFromImage') {
@@ -420,6 +481,9 @@ Return "columns" as the list of column headers, and "rows" as a list of rows —
     }
 
     if (action === 'chat') {
+      if (!ENABLE_ANALYST_CHAT) {
+        return Response.json({ error: 'Analyst Chat is not available in this version.', category: 'feature_disabled' }, { status: 404 });
+      }
       const { question, history, understanding, objective, health, kpis, chartSummaries, analysis, role, transformType, columns, stats, sampleRows, rowCount } = payload;
       if (!question?.trim()) return Response.json({ error: 'No question received.' }, { status: 400 });
       const prompt = buildChatPrompt({ question, history, understanding, objective, health, kpis, chartSummaries, analysis, role, transformType, columns, stats, sampleRows, rowCount });

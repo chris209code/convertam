@@ -175,13 +175,21 @@ function PreviewBackground({ style }) {
   }
   if (style === 'confetti') {
     const colors = ['#2563EB', '#10B981', '#06B6D4', '#FBBF24', '#F97316', '#EC4899', '#8B5CF6', '#EF4444'];
+    const cardHalf = 180; // half-width of the card within the actual 400px on-screen stage
     const shapes = Array.from({ length: 16 }, (_, i) => {
       const size = 10 + (i % 4) * 6;
       const isCircle = i % 2 === 0;
       const angle = (i / 16) * 360;
-      const radius = 200 + (i % 3) * 20;
-      const x = 240 + radius * Math.cos((angle * Math.PI) / 180) - size / 2;
-      const y = 240 + radius * Math.sin((angle * Math.PI) / 180) - size / 2;
+      const rad = (angle * Math.PI) / 180;
+      // True distance from center to a SQUARE's edge in a given direction
+      // (not a circle's) — this correctly clears the card at every angle:
+      // enough margin at the diagonals (where corners/brackets reach
+      // furthest) without over-pushing cardinal-direction pieces off the
+      // visible stage, which a single flat "safe" radius can't do at once.
+      const minClearRadius = cardHalf / Math.max(Math.abs(Math.cos(rad)), Math.abs(Math.sin(rad)));
+      const radius = minClearRadius + 20 + (i % 3) * 15;
+      const x = 240 + radius * Math.cos(rad) - size / 2;
+      const y = 240 + radius * Math.sin(rad) - size / 2;
       const blurred = i % 5 === 0;
       return (
         <div key={i} style={{
@@ -208,9 +216,11 @@ function PreviewBackground({ style }) {
   }
   if (style === 'floating') {
     const items = [
-      { size: 52, shape: 'circle', x: 40, y: 50 }, { size: 44, shape: 'square', x: 380, y: 60, rot: 20 },
-      { size: 56, shape: 'diamond', x: 60, y: 370 }, { size: 46, shape: 'circle', x: 390, y: 380 },
-      { size: 40, shape: 'square', x: 220, y: 30, rot: -15 },
+      { size: 58, shape: 'circle', x: 30, y: 192 },
+      { size: 50, shape: 'square', x: 396, y: 108, rot: 20 },
+      { size: 60, shape: 'diamond', x: 84, y: 372 },
+      { size: 53, shape: 'circle', x: 360, y: 348 },
+      { size: 43, shape: 'square', x: 216, y: 26, rot: -15 },
     ];
     return (
       <div style={{ position: 'absolute', inset: 0, background: '#F8F9FC', overflow: 'hidden' }}>
@@ -418,11 +428,15 @@ export default function QrCodeStudioWorkspace() {
     if (style === 'confetti') {
       ctx.fillStyle = '#F8F9FC'; ctx.fillRect(0, 0, size, size);
       const colors = ['#2563EB', '#10B981', '#06B6D4', '#FBBF24', '#F97316', '#EC4899', '#8B5CF6', '#EF4444'];
+      const cardHalf = (size / 480) * 180;
       for (let i = 0; i < 16; i++) {
         const s = (size / 480) * (10 + (i % 4) * 6);
-        const angle = (i / 16) * 360, radius = (size / 480) * (200 + (i % 3) * 20);
-        const x = size / 2 + radius * Math.cos((angle * Math.PI) / 180);
-        const y = size / 2 + radius * Math.sin((angle * Math.PI) / 180);
+        const angle = (i / 16) * 360;
+        const rad = (angle * Math.PI) / 180;
+        const minClearRadius = cardHalf / Math.max(Math.abs(Math.cos(rad)), Math.abs(Math.sin(rad)));
+        const radius = minClearRadius + (size / 480) * (20 + (i % 3) * 15);
+        const x = size / 2 + radius * Math.cos(rad);
+        const y = size / 2 + radius * Math.sin(rad);
         ctx.globalAlpha = i % 5 === 0 ? 0.3 : 0.85;
         ctx.fillStyle = colors[i % colors.length];
         if (i % 2 === 0) { ctx.beginPath(); ctx.arc(x, y, s / 2, 0, Math.PI * 2); ctx.fill(); }
@@ -443,11 +457,11 @@ export default function QrCodeStudioWorkspace() {
     if (style === 'floating') {
       ctx.fillStyle = '#F8F9FC'; ctx.fillRect(0, 0, size, size);
       const items = [
-        { x: 0.09, y: 0.11, s: 0.11, shape: 'circle', color: '#2563EB' },
-        { x: 0.82, y: 0.13, s: 0.1, shape: 'square', color: '#10B981' },
-        { x: 0.13, y: 0.8, s: 0.12, shape: 'diamond', color: '#F59E0B' },
-        { x: 0.85, y: 0.82, s: 0.1, shape: 'circle', color: '#EC4899' },
-        { x: 0.46, y: 0.06, s: 0.09, shape: 'square', color: '#8B5CF6' },
+        { x: 0.0625, y: 0.4, s: 0.12, shape: 'circle', color: '#2563EB' },
+        { x: 0.825, y: 0.225, s: 0.105, shape: 'square', color: '#10B981' },
+        { x: 0.175, y: 0.775, s: 0.125, shape: 'diamond', color: '#F59E0B' },
+        { x: 0.75, y: 0.725, s: 0.11, shape: 'circle', color: '#EC4899' },
+        { x: 0.45, y: 0.055, s: 0.09, shape: 'square', color: '#8B5CF6' },
       ];
       ctx.globalAlpha = 0.88;
       items.forEach((it) => {
@@ -738,7 +752,7 @@ export default function QrCodeStudioWorkspace() {
             ))}
           </div>
 
-          <div style={{ position: 'relative', width: 400, height: 400, maxWidth: '100%', aspectRatio: '1/1', borderRadius: 28, overflow: 'hidden' }}>
+          <div style={{ position: 'relative', width: 480, height: 480, maxWidth: '100%', aspectRatio: '1/1', borderRadius: 28, overflow: 'hidden' }}>
             <PreviewBackground style={previewStyle} />
             <div style={{
               position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',

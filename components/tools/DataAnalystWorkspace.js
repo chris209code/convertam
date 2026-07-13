@@ -528,6 +528,8 @@ export default function DataAnalystWorkspace() {
   const [rows, setRows] = useState([]);
   const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState('');
+  const [chatEnabled, setChatEnabled] = useState(false); // authoritative value always comes from the server
+  const [usageInfo, setUsageInfo] = useState(null); // { isOwner, remaining, limit, resetInMs }
   const [parsingConfidence, setParsingConfidence] = useState(null);
   const [cooldown, setCooldown] = useState(null); // { seconds, action } - disables the relevant button and counts down
   const [aiNarrativeUnavailable, setAiNarrativeUnavailable] = useState(false);
@@ -566,6 +568,16 @@ export default function DataAnalystWorkspace() {
     }
     document.addEventListener('fullscreenchange', onFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/data-analyst', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'usageStatus' }),
+    }).then((r) => r.json()).then((d) => {
+      setChatEnabled(!!d.chatEnabled);
+      setUsageInfo(d);
+    }).catch(() => {});
   }, []);
 
   // Counts down a rate-limit cooldown once per second, clearing it (and
@@ -805,6 +817,10 @@ export default function DataAnalystWorkspace() {
       });
       const data = await res.json();
       if (!res.ok) {
+        if (data.category === 'usage_limit_reached') {
+          setUsageInfo((u) => ({ ...(u || {}), remaining: 0, resetInMs: data.resetInMs }));
+          throw new Error(data.error || 'No AI reports remaining today.');
+        }
         if (data.category === 'rate_limit' || data.category === 'quota_exhausted') {
           // The report is never made fully unusable just because the AI
           // narrative call is rate-limited — everything the deterministic
@@ -819,6 +835,7 @@ export default function DataAnalystWorkspace() {
         }
         throw new Error(data.error || 'Could not analyze this data.');
       }
+      if (typeof data.usageRemaining === 'number') setUsageInfo((u) => ({ ...(u || {}), remaining: data.usageRemaining }));
       data.qualityWarnings = qualityWarnings;
       data.stats = stats;
       data.suggestedCharts = engineCharts;
@@ -848,12 +865,17 @@ export default function DataAnalystWorkspace() {
       });
       const data = await res.json();
       if (!res.ok) {
+        if (data.category === 'usage_limit_reached') {
+          setUsageInfo((u) => ({ ...(u || {}), remaining: 0, resetInMs: data.resetInMs }));
+          throw new Error(data.error || 'No AI reports remaining today.');
+        }
         if (data.category === 'rate_limit' || data.category === 'quota_exhausted') {
           startCooldown('analyze', data.retryAfterSeconds);
           return;
         }
         throw new Error(data.error || 'Could not generate the AI narrative.');
       }
+      if (typeof data.usageRemaining === 'number') setUsageInfo((u) => ({ ...(u || {}), remaining: data.usageRemaining }));
       data.qualityWarnings = qualityWarnings;
       data.stats = stats;
       data.suggestedCharts = engineCharts;
@@ -1841,10 +1863,16 @@ export default function DataAnalystWorkspace() {
           </div>
         )}
 
+        {usageInfo && (
+          <p style={{ fontSize: '0.76rem', color: usageInfo.isOwner ? '#059669' : usageInfo.remaining === 0 ? '#DC2626' : '#64748B', fontWeight: usageInfo.isOwner ? 700 : 400, marginBottom: 12 }}>
+            {usageInfo.isOwner ? 'Owner Testing Mode — Convertam limit disabled' : `AI reports remaining today: ${usageInfo.remaining} of ${usageInfo.limit}`}
+          </p>
+        )}
+
         <div style={{ display: 'flex', gap: 12 }}>
           <button className="btn btn-ghost" onClick={() => setPhase('understanding')}>← Back</button>
-          <button className="btn btn-primary" disabled={analyzing || cooldown?.action === 'analyze'} onClick={handleAnalyze}>
-            {analyzing ? '✨ Analyzing your data…' : cooldown?.action === 'analyze' ? `Retry in ${cooldown.seconds}s` : 'Continue to Analysis →'}
+          <button className="btn btn-primary" disabled={analyzing || cooldown?.action === 'analyze' || (usageInfo && !usageInfo.isOwner && usageInfo.remaining === 0)} onClick={handleAnalyze}>
+            {analyzing ? '✨ Analyzing your data…' : cooldown?.action === 'analyze' ? `Retry in ${cooldown.seconds}s` : (usageInfo && !usageInfo.isOwner && usageInfo.remaining === 0) ? 'No reports remaining today' : 'Continue to Analysis →'}
           </button>
         </div>
       </div>
@@ -2005,7 +2033,7 @@ export default function DataAnalystWorkspace() {
                   <button onClick={() => { const c = chartRefs.current[i]; if (c) { const a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = `${chart.title.replace(/[^a-z0-9]/gi, '-')}.png`; a.click(); } }} style={{ fontSize: '0.72rem', padding: '5px 10px', borderRadius: 6, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>Export PNG</button>
                   <button onClick={() => setFullscreenChartIdx(i)} style={{ fontSize: '0.72rem', padding: '5px 10px', borderRadius: 6, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>Fullscreen</button>
                   <button onClick={() => downloadChartDataCSV(i)} style={{ fontSize: '0.72rem', padding: '5px 10px', borderRadius: 6, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>Download Data</button>
-                  <button onClick={() => handleChatSend(`Explain this chart: "${chart.title}" — what does it show, why does it matter, and what should management do about it?`)} disabled={chatBusy} style={{ fontSize: '0.72rem', padding: '5px 10px', borderRadius: 6, border: '1px solid #DDD6FE', background: '#F5F3FF', color: '#7C3AED', cursor: 'pointer' }}>Explain this chart</button>
+                  {chatEnabled && <button onClick={() => handleChatSend(`Explain this chart: "${chart.title}" — what does it show, why does it matter, and what should management do about it?`)} disabled={chatBusy} style={{ fontSize: '0.72rem', padding: '5px 10px', borderRadius: 6, border: '1px solid #DDD6FE', background: '#F5F3FF', color: '#7C3AED', cursor: 'pointer' }}>Explain this chart</button>}
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -2135,7 +2163,8 @@ export default function DataAnalystWorkspace() {
           <p style={{ fontSize: '0.7rem', color: '#94A3B8', marginTop: 8 }}>Note: the Excel download includes your data only — native embedded Excel charts aren't supported yet. Charts export as PNG only — SVG export isn't available since charts are rendered on canvas, not as vector graphics.</p>
         </div>
 
-        {/* 12. Ask the Analyst */}
+        {/* 12. Ask the Analyst — behind ENABLE_ANALYST_CHAT, default/production off in V1 */}
+        {chatEnabled && (
         <div style={sectionStyle} className="no-print-report">
           <p style={sectionLabel}>Ask the Analyst</p>
           <p style={{ fontSize: '0.85rem', color: '#64748B', marginBottom: 14 }}>Ask questions, request a different framing, or transform this report — I already know everything above.</p>
@@ -2207,6 +2236,7 @@ export default function DataAnalystWorkspace() {
             )}
           </div>
         </div>
+        )}
 
         <p className="privacy-note no-print-report" style={{ marginBottom: presentationMode ? 60 : 0 }}>Your data is sent securely to our AI engine for analysis only, never stored.</p>
 

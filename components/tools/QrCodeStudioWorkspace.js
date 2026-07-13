@@ -534,7 +534,7 @@ export default function QrCodeStudioWorkspace() {
         ctx.strokeStyle = color; ctx.lineWidth = thick; ctx.lineCap = 'butt';
         ctx.beginPath();
         if (corner === 'tl') { ctx.moveTo(x, y + bLen); ctx.lineTo(x, y + rad); ctx.arcTo(x, y, x + rad, y, rad); ctx.lineTo(x + bLen, y); }
-        if (corner === 'tr') { ctx.moveTo(x, y + bLen); ctx.lineTo(x, y + rad); ctx.arcTo(x + bLen, y, x + bLen, y + rad, rad); ctx.lineTo(x + bLen - rad, y); ctx.lineTo(x, y); }
+        if (corner === 'tr') { ctx.moveTo(x, y); ctx.lineTo(x + bLen - rad, y); ctx.arcTo(x + bLen, y, x + bLen, y + rad, rad); ctx.lineTo(x + bLen, y + bLen); }
         if (corner === 'bl') { ctx.moveTo(x, y); ctx.lineTo(x, y + bLen - rad); ctx.arcTo(x, y + bLen, x + rad, y + bLen, rad); ctx.lineTo(x + bLen, y + bLen); }
         if (corner === 'br') { ctx.moveTo(x + bLen, y); ctx.lineTo(x + bLen, y + bLen - rad); ctx.arcTo(x + bLen, y + bLen, x + bLen - rad, y + bLen, rad); ctx.lineTo(x, y + bLen); }
         ctx.stroke();

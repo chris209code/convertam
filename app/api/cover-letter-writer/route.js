@@ -1,8 +1,7 @@
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+import { callGemini, AIError, CATEGORY_MESSAGES } from '@/lib/geminiClient';
 
 function buildPrompt({ yourName, jobTitle, companyName, background, jobDescription, tone }) {
   return `You are an expert career writer. Write a complete, ready-to-send cover letter for the following applicant.
@@ -28,53 +27,6 @@ Requirements:
 - Return ONLY the plain text of the letter itself, nothing else — no headers, no explanations, no markdown formatting.`;
 }
 
-function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
-
-// Retries transient failures automatically (rate limits, momentary server
-// errors, network blips) before ever showing the user an error — same fix
-// applied across every AI route on the site after this exact failure mode
-// surfaced mid-demo. No JSON parsing here since this route returns plain
-// text, so the retry logic is simpler than the JSON-producing routes.
-async function callGeminiForLetter(apiKey, prompt) {
-  const body = {
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 2048 },
-  };
-  const maxAttempts = 3;
-  let lastError;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const res = await fetch(GEMINI_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        console.error(`Gemini cover letter error (attempt ${attempt}/${maxAttempts}):`, data);
-        const retryable = res.status === 429 || res.status >= 500;
-        if (retryable && attempt < maxAttempts) { await sleep(700 * attempt); continue; }
-        throw new Error('gemini_error');
-      }
-
-      const letter = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!letter) {
-        if (attempt < maxAttempts) { await sleep(700 * attempt); continue; }
-        throw new Error('empty_response');
-      }
-      return letter;
-    } catch (err) {
-      lastError = err;
-      const isKnownFinalError = err.message === 'gemini_error' || err.message === 'empty_response';
-      if (!isKnownFinalError && attempt < maxAttempts) { await sleep(700 * attempt); continue; } // network-level failure — also worth retrying
-      if (attempt === maxAttempts) throw lastError;
-    }
-  }
-  throw lastError;
-}
-
 export async function POST(request) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -89,9 +41,13 @@ export async function POST(request) {
       return Response.json({ error: 'Job title, company name, and background are required.' }, { status: 400 });
     }
     const prompt = buildPrompt({ yourName, jobTitle, companyName, background, jobDescription, tone: tone || 'Professional' });
-    const letter = await callGeminiForLetter(apiKey, prompt);
+    const { raw: letter } = await callGemini({ apiKey, toolName: 'cover-letter-writer', routeName: '/api/cover-letter-writer', parts: [{ text: prompt }], maxOutputTokens: 2048, inputSizeApprox: prompt.length });
     return Response.json({ letter: letter.trim() });
   } catch (err) {
+    if (err instanceof AIError) {
+      console.error(`Cover letter writer error [${err.requestId}] category=${err.category}:`, err.message);
+      return Response.json({ error: CATEGORY_MESSAGES[err.category] || CATEGORY_MESSAGES.unexpected, requestId: err.requestId, category: err.category, retryAfterSeconds: err.retryAfterSeconds }, { status: 502 });
+    }
     console.error('Cover letter writer error:', err);
     return Response.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
   }

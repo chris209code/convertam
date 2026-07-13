@@ -426,7 +426,7 @@ Return "columns" as the list of column headers, and "rows" as a list of rows —
   } catch (err) {
     if (err instanceof AIError) {
       console.error(`Data analyst error [${err.requestId}] category=${err.category}:`, err.message);
-      return Response.json({ error: CATEGORY_MESSAGES[err.category] || CATEGORY_MESSAGES.unexpected, requestId: err.requestId, category: err.category }, { status: 502 });
+      return Response.json({ error: CATEGORY_MESSAGES[err.category] || CATEGORY_MESSAGES.unexpected, requestId: err.requestId, category: err.category, retryAfterSeconds: err.retryAfterSeconds }, { status: 502 });
     }
     console.error('Data analyst error:', err);
     return Response.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });

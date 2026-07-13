@@ -161,7 +161,7 @@ export async function POST(request) {
   } catch (err) {
     if (err instanceof AIError) {
       console.error(`Resume AI error [${err.requestId}] category=${err.category}:`, err.message);
-      return Response.json({ error: CATEGORY_MESSAGES[err.category] || CATEGORY_MESSAGES.unexpected, requestId: err.requestId, category: err.category }, { status: 502 });
+      return Response.json({ error: CATEGORY_MESSAGES[err.category] || CATEGORY_MESSAGES.unexpected, requestId: err.requestId, category: err.category, retryAfterSeconds: err.retryAfterSeconds }, { status: 502 });
     }
     console.error('Resume AI error:', err);
     return Response.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });

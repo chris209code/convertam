@@ -84,10 +84,21 @@ export function normalizeBulletLines(exp) {
 export function ExpBullets({ exp, className, style, liStyle }) {
   const lines = normalizeBulletLines(exp);
   if (!lines.length) return null;
+  // Deliberately NOT <ul><li> with CSS list-style — that depends on
+  // list-style-type/::marker actually surviving whatever global reset
+  // stylesheet and PDF/print engine the page runs through, which is
+  // exactly what silently swallowed the bullet glyph before. The bullet
+  // character here is real rendered text content in its own column, so it
+  // physically cannot be stripped by CSS the way a list-marker can.
   return (
-    <ul className={className || 'cv-job-bullets'} style={{ margin: '4px 0 0', paddingLeft: 18, ...style }}>
-      {lines.map((l, i) => <li key={i} style={{ marginBottom: 4, lineHeight: 1.4, ...liStyle }}>{l}</li>)}
-    </ul>
+    <div className={className || 'cv-job-bullets'} style={{ margin: '4px 0 0', ...style }}>
+      {lines.map((l, i) => (
+        <div key={i} className="cv-bullet-row" style={{ display: 'grid', gridTemplateColumns: '12px 1fr', alignItems: 'start', columnGap: 4, marginBottom: 4, ...liStyle }}>
+          <span className="cv-bullet-marker" style={{ lineHeight: 'inherit' }}>•</span>
+          <span className="cv-bullet-text" style={{ minWidth: 0, lineHeight: 'inherit' }}>{l}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 

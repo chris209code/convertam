@@ -55,6 +55,19 @@ export default function CVImproverWorkspace() {
   const [cvText, setCvText] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [structured, setStructured] = useState(null);
+
+  // See ResumeBuilderWorkspace's identical handler for the full explanation:
+  // the browser's native print header (when enabled in the person's print
+  // settings) can't be suppressed via CSS, but it must never say
+  // "Convertam" — the title is swapped to the CV owner's name for the
+  // duration of printing only.
+  function handlePrint() {
+    const previousTitle = document.title;
+    document.title = structured?.name?.trim() || 'CV';
+    const restore = () => { document.title = previousTitle; window.removeEventListener('afterprint', restore); };
+    window.addEventListener('afterprint', restore);
+    window.print();
+  }
   const [template, setTemplate] = useState('mpSidebar');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -135,7 +148,7 @@ export default function CVImproverWorkspace() {
 
           <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
             <button className="btn btn-ghost" onClick={() => { setStructured(null); setCvText(''); setStatus(''); }}>Improve Another CV</button>
-            <button className="btn btn-primary" onClick={() => window.print()}>⬇️ Download PDF</button>
+            <button className="btn btn-primary" onClick={handlePrint}>⬇️ Download PDF</button>
             <a href="/pdf-to-word" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600, color: '#2563EB', textDecoration: 'none', padding: '10px 14px', borderRadius: 8, border: '1px solid #BFDBFE', background: '#EFF6FF' }}>
               <Icon.doc /> Convert to MS Word
             </a>

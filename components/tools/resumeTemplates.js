@@ -51,15 +51,42 @@ export function certDisplayLines(cert) {
   return { titleLine: cert.name, subLine: cert.issuer, dateLine };
 }
 
-export function ExpBullets({ exp }) {
-  const lines = exp.bullets?.length
-    ? exp.bullets
-    : (exp.description ? exp.description.split('\n').filter(Boolean)
-      : (exp.whatYouDid ? exp.whatYouDid.split('\n').filter(Boolean) : []));
+// Strips a leading bullet symbol (-, *, •) or numbered-list marker (1. / 1))
+// from a pasted line, without touching the rest of the text.
+const BULLET_PREFIX_RE = /^\s*(?:[-*•]|\d+[.)])\s+/;
+
+// Single source of truth for turning whatever shape a job's responsibilities
+// happen to be stored in into a clean array of distinct bullet lines.
+// Handles every input pattern this data can realistically arrive in:
+//  - an already-split array of separate bullet strings (used as-is)
+//  - a single-item array whose one entry actually contains multiple lines
+//    (a common upstream shape when bullets weren't split before storage)
+//  - a plain string (from `description` or `whatYouDid`) with real line breaks
+//  - lines that still have a pasted "-", "*", "•", or "1." prefix
+// Deliberately only splits on line breaks — never on sentence punctuation —
+// so a single explicit bullet is never silently exploded into several.
+export function normalizeBulletLines(exp) {
+  let rawLines;
+  if (Array.isArray(exp.bullets) && exp.bullets.length) {
+    rawLines = exp.bullets.length > 1 ? exp.bullets : String(exp.bullets[0]).split('\n');
+  } else if (exp.description) {
+    rawLines = String(exp.description).split('\n');
+  } else if (exp.whatYouDid) {
+    rawLines = String(exp.whatYouDid).split('\n');
+  } else {
+    rawLines = [];
+  }
+  return rawLines
+    .map((line) => String(line).replace(BULLET_PREFIX_RE, '').trim())
+    .filter(Boolean);
+}
+
+export function ExpBullets({ exp, className, style, liStyle }) {
+  const lines = normalizeBulletLines(exp);
   if (!lines.length) return null;
   return (
-    <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
-      {lines.map((l, i) => <li key={i} style={{ marginBottom: 3 }}>{l}</li>)}
+    <ul className={className || 'cv-job-bullets'} style={{ margin: '4px 0 0', paddingLeft: 18, ...style }}>
+      {lines.map((l, i) => <li key={i} style={{ marginBottom: 4, lineHeight: 1.4, ...liStyle }}>{l}</li>)}
     </ul>
   );
 }
@@ -390,15 +417,15 @@ function MPSidebar({ data }) {
           <div style={{ marginTop: 26 }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f172a', borderBottom: `2px solid ${accent}`, paddingBottom: 5, marginBottom: 14 }}><MPIcon.briefcase style={{ color: accent }} />Work Experience</div>
             {data.experience.map((exp, i) => (
-              <div key={i} style={{ marginBottom: 18, breakInside: 'avoid' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>{exp.role} <span style={{ fontWeight: 500, color: '#64748b' }}>· {exp.company}</span></div>
-                  <div style={{ fontSize: 12.5, color: '#94a3b8', whiteSpace: 'nowrap' }}>{exp.start} – {exp.end}</div>
+              <div key={i} style={{ marginBottom: 18 }}>
+                <div style={{ breakInside: 'avoid' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>{exp.role} <span style={{ fontWeight: 500, color: '#64748b' }}>· {exp.company}</span></div>
+                    <div style={{ fontSize: 12.5, color: '#94a3b8', whiteSpace: 'nowrap' }}>{exp.start} – {exp.end}</div>
+                  </div>
+                  {exp.location && <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 2 }}>{exp.location}</div>}
                 </div>
-                {exp.location && <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 2 }}>{exp.location}</div>}
-                <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
-                  {exp.bullets.map((b, bi) => <li key={bi} style={{ fontSize: 14, lineHeight: 1.55, color: '#374151', marginBottom: 4 }}>{b}</li>)}
-                </ul>
+                <ExpBullets exp={exp} style={{ margin: '8px 0 0' }} liStyle={{ fontSize: 14, lineHeight: 1.55, color: '#374151', marginBottom: 4 }} />
               </div>
             ))}
           </div>
@@ -481,15 +508,15 @@ function MPCentered({ data }) {
         <div style={{ marginTop: 30, paddingTop: 28, borderTop: '1px solid #e5e7eb' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: accent, marginBottom: 18 }}><MPIcon.briefcase />Experience</div>
           {data.experience.map((exp, i) => (
-            <div key={i} style={{ marginBottom: 20, breakInside: 'avoid' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-                <div style={{ fontSize: 15.5, fontWeight: 700, color: '#0f172a' }}>{exp.role} <span style={{ fontWeight: 500, color: '#64748b' }}>— {exp.company}</span></div>
-                <div style={{ fontSize: 12.5, color: '#94a3b8', whiteSpace: 'nowrap' }}>{exp.start} – {exp.end}</div>
+            <div key={i} style={{ marginBottom: 20 }}>
+              <div style={{ breakInside: 'avoid' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 15.5, fontWeight: 700, color: '#0f172a' }}>{exp.role} <span style={{ fontWeight: 500, color: '#64748b' }}>— {exp.company}</span></div>
+                  <div style={{ fontSize: 12.5, color: '#94a3b8', whiteSpace: 'nowrap' }}>{exp.start} – {exp.end}</div>
+                </div>
+                {exp.location && <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 2 }}>{exp.location}</div>}
               </div>
-              {exp.location && <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 2 }}>{exp.location}</div>}
-              <ul style={{ margin: '9px 0 0', paddingLeft: 18 }}>
-                {exp.bullets.map((b, bi) => <li key={bi} style={{ fontSize: 14, lineHeight: 1.6, color: '#374151', marginBottom: 4 }}>{b}</li>)}
-              </ul>
+              <ExpBullets exp={exp} style={{ margin: '9px 0 0' }} liStyle={{ fontSize: 14, lineHeight: 1.6, color: '#374151', marginBottom: 4 }} />
             </div>
           ))}
         </div>
@@ -594,15 +621,15 @@ function MPHeaderBand({ data }) {
               <div style={{ marginBottom: 24 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: accent, paddingBottom: 6, borderBottom: `1px solid ${accent}`, marginBottom: 14 }}><MPIcon.briefcase />Experience</div>
                 {data.experience.map((exp, i) => (
-                  <div key={i} style={{ marginBottom: 18, breakInside: 'avoid' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-                      <div style={{ fontSize: 14.5, fontWeight: 700, color: '#0f172a' }}>{exp.role}</div>
-                      <div style={{ fontSize: 12, color: '#94a3b8', whiteSpace: 'nowrap' }}>{exp.start} – {exp.end}</div>
+                  <div key={i} style={{ marginBottom: 18 }}>
+                    <div style={{ breakInside: 'avoid' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+                        <div style={{ fontSize: 14.5, fontWeight: 700, color: '#0f172a' }}>{exp.role}</div>
+                        <div style={{ fontSize: 12, color: '#94a3b8', whiteSpace: 'nowrap' }}>{exp.start} – {exp.end}</div>
+                      </div>
+                      <div style={{ fontSize: 13, color: '#64748b', marginTop: 1 }}>{exp.company}{exp.location ? ` · ${exp.location}` : ''}</div>
                     </div>
-                    <div style={{ fontSize: 13, color: '#64748b', marginTop: 1 }}>{exp.company}{exp.location ? ` · ${exp.location}` : ''}</div>
-                    <ul style={{ margin: '7px 0 0', paddingLeft: 17 }}>
-                      {exp.bullets.map((b, bi) => <li key={bi} style={{ fontSize: 13.5, lineHeight: 1.55, color: '#374151', marginBottom: 4 }}>{b}</li>)}
-                    </ul>
+                    <ExpBullets exp={exp} style={{ margin: '7px 0 0', paddingLeft: 17 }} liStyle={{ fontSize: 13.5, lineHeight: 1.55, color: '#374151', marginBottom: 4 }} />
                   </div>
                 ))}
               </div>

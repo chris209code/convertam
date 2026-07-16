@@ -14,9 +14,13 @@ import { CURRENCIES } from '@/lib/invoice-studio/constants';
 import Gallery from './Gallery';
 import Toolbar from './Toolbar';
 import Canvas from './Canvas';
+import CanvasElement from './elements/CanvasElement';
 import DesignPanel from './panels/DesignPanel';
 import ContentPanel from './panels/ContentPanel';
 import LetterheadCropModal from './LetterheadCropModal';
+import { CANVAS_W, CANVAS_H } from '@/lib/invoice-studio/constants';
+
+const HIDDEN_WHEN_LETTERHEAD = new Set(['logo', 'companyText', 'contactInfo', 'accentBar']);
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -465,32 +469,29 @@ export default function InvoiceStudioWorkspace() {
   const templateName = (TEMPLATE_GALLERY.find((t) => t.id === templateId)?.name || 'Invoice') + ' Template';
 
   return (
-    <div className={`${poppins.variable} ${inter.variable} ${caveat.variable}`} style={{ height: 'calc(100vh - 64px)', minHeight: 560, width: '100%', display: 'flex', fontFamily: 'var(--cs-font-inter), Inter, sans-serif', color: '#0F172A', overflow: 'hidden', background: '#F7F8FA' }}>
+    <div className={`cs-app-root ${poppins.variable} ${inter.variable} ${caveat.variable}`} style={{ height: 'calc(100vh - 64px)', minHeight: 560, width: '100%', display: 'flex', fontFamily: 'var(--cs-font-inter), Inter, sans-serif', color: '#0F172A', overflow: 'hidden', background: '#F7F8FA' }}>
       <style>{`
         @media print {
-          /* The real bug: visibility:hidden hides elements but does NOT
-             collapse their layout space. Every other invisible element
-             (toolbar, sidebar, panels) was still occupying its full size
-             during print, which is why the print engine scaled the whole
-             (mostly invisible) oversized page down to fit A4 - shrinking
-             the one visible piece along with it - and needed 2 pages to
-             fit that invisible height. display:none actually removes
-             elements from layout; :has() keeps it targeted to only the
-             invoice's own ancestor chain, not a hardcoded list of class
-             names elsewhere in the app. */
-          body *:not(.cs-print):not(.cs-print *):not(:has(.cs-print)) {
-            display: none !important;
-          }
-          .cs-print {
-            position: fixed !important;
-            left: 0 !important; top: 0 !important;
-            transform: none !important;
-            box-shadow: none !important;
-            margin: 0 !important;
-          }
-          @page { size: A4; margin: 10mm; }
+          /* A dedicated, separate print-only container (not the same node
+             used for interactive on-screen editing) is simpler and more
+             reliable than trying to selectively hide parts of the editor UI
+             for print - it needs no modern selector support, and it can
+             never be affected by the editor's own zoom/scaling state. Every
+             other direct child of the app root (nav rail, toolbar+canvas+
+             sidebar) is hidden completely; only .cs-print-only remains. */
+          .cs-app-root > *:not(.cs-print-only) { display: none !important; }
+          .cs-print-only { display: block !important; }
+          @page { size: A4; margin: 0; }
         }
       `}</style>
+      <div
+        className="cs-print-only"
+        style={{ display: 'none', position: 'fixed', left: 0, top: 0, width: CANVAS_W, height: CANVAS_H, background: '#fff' }}
+      >
+        {renderElements
+          .filter((el) => el.visible && !((doc.elements.find((e) => e.id === 'letterhead')?.visible) && HIDDEN_WHEN_LETTERHEAD.has(el.id)))
+          .map((el) => <CanvasElement key={el.id} el={el} ctx={ctx} selected={false} previewMode={true} />)}
+      </div>
       <div style={{ width: 88, flexShrink: 0, background: '#FFFFFF', borderRight: '1px solid #E7EAF0', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0', gap: 18 }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#2563EB,#10B981)' }} />
         <button

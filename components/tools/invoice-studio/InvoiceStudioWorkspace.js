@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { poppins, inter, caveat, fontStack } from '@/lib/invoice-studio/fonts';
-import { buildTemplateElements, cloneElements, TEMPLATE_DEFAULTS, TEMPLATE_GALLERY, recomputeDynamicLayout, contentExceedsOnePage } from '@/lib/invoice-studio/templates';
+import { buildTemplateElements, cloneElements, TEMPLATE_DEFAULTS, TEMPLATE_GALLERY, recomputeDynamicLayout, contentExceedsOnePage, applyTemplateSkin } from '@/lib/invoice-studio/templates';
 import { DEFAULT_CURRENCY, DEFAULT_DISCOUNT, DEFAULT_VAT_RATE, HISTORY_LIMIT, ZOOM_DEFAULT, ZOOM_MIN, ZOOM_MAX, ZOOM_STEP } from '@/lib/invoice-studio/constants';
 import { computeInvoiceTotals, computeItemLine } from '@/lib/invoice-studio/calculations';
 import { amountInWords } from '@/lib/invoice-studio/numberToWords';
@@ -115,9 +115,20 @@ export default function InvoiceStudioWorkspace() {
   }, []);
 
   const openTemplate = useCallback((id) => {
-    const seeded = applyLegacySeed(buildTemplateElements(id));
+    // Templates are skins — if there's already a document in progress
+    // (this is a template swap, not the very first launch), the current
+    // content is preserved and merged into the new template's layout via
+    // applyTemplateSkin. Only a genuine fresh start seeds the sample data.
+    const hasExistingDoc = docRef.current.elements.length > 0;
+    const seeded = hasExistingDoc ? applyTemplateSkin(docRef.current.elements, id) : applyLegacySeed(buildTemplateElements(id));
     const defaults = TEMPLATE_DEFAULTS[id] || TEMPLATE_DEFAULTS.modern;
-    const initial = { ...emptyDoc(), elements: seeded, ...defaults };
+    // Currency/discount/VAT rate are data, not styling — carried over on a
+    // swap. Brand colors/fonts are the "skin" itself, so the new template's
+    // own defaults apply, same as picking a different Canva template would
+    // change its color scheme without touching your text.
+    const initial = hasExistingDoc
+      ? { ...docRef.current, elements: seeded, ...defaults }
+      : { ...emptyDoc(), elements: seeded, ...defaults };
     setTemplateId(id);
     docRef.current = initial;
     setDoc(initial);
@@ -378,27 +389,31 @@ export default function InvoiceStudioWorkspace() {
   // "the preview and the PDF don't match" bugs happen — screenshotting
   // what's actually on screen makes mismatch structurally impossible.
   const handleDownload = useCallback(async (format) => {
-    const node = document.querySelector('.cs-print');
-    if (!node) return;
     showToast('Preparing download…');
+    const filename = `Invoice-${templateId}-${Date.now()}`;
     try {
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(node, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
-      const filename = `Invoice-${templateId}-${Date.now()}`;
-
       if (format === 'pdf') {
-        const { PDFDocument } = await import('pdf-lib');
-        const pdfDoc = await PDFDocument.create();
-        // Standard A4-in-points page size (210mm x 297mm), matching the same
-        // values already used by Convertam's other PDF-generating tools.
-        const page = pdfDoc.addPage([595, 842]);
-        const pngDataUrl = canvas.toDataURL('image/png');
-        const pngBytes = await fetch(pngDataUrl).then((r) => r.arrayBuffer());
-        const embedded = await pdfDoc.embedPng(pngBytes);
-        page.drawImage(embedded, { x: 0, y: 0, width: 595, height: 842 });
-        const bytes = await pdfDoc.save();
+        // The PDF is Convertam's master output — real vector/text content,
+        // never a screenshot. It's built from the exact same computed
+        // element positions (renderElements) the on-screen preview uses, so
+        // the two stay structurally in sync without needing to look
+        // pixel-identical via a shared image.
+        const { renderInvoiceToPdf } = await import('@/lib/invoice-studio/pdfRenderer');
+        const pdfCtx = {
+          currency: doc.currency, totals, wordsText, pageLabel: 'Page 1 of 1',
+          brandPrimary: doc.brandPrimary, brandSecondary: doc.brandSecondary, brandAccent: doc.brandAccent,
+          companyName: companyTextEl?.name || '', headingFontName: doc.headingFont,
+        };
+        const bytes = await renderInvoiceToPdf(renderElements, pdfCtx);
         downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${filename}.pdf`);
       } else {
+        // PNG/JPG are genuinely image formats, so a screenshot of the actual
+        // rendered page is the right tool here — html2canvas is fine for
+        // these two, just not for the PDF master output.
+        const node = document.querySelector('.cs-print');
+        if (!node) return;
+        const html2canvas = (await import('html2canvas')).default;
+        const canvas = await html2canvas(node, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
         const mime = format === 'png' ? 'image/png' : 'image/jpeg';
         canvas.toBlob((blob) => { if (blob) downloadBlob(blob, `${filename}.${format}`); }, mime, format === 'jpg' ? 0.92 : undefined);
       }
@@ -407,7 +422,7 @@ export default function InvoiceStudioWorkspace() {
       console.error(err);
       showToast('Could not generate the download — please try again.');
     }
-  }, [templateId, showToast]);
+  }, [templateId, showToast, doc.currency, doc.brandPrimary, doc.brandSecondary, doc.brandAccent, doc.headingFont, totals, wordsText, companyTextEl, renderElements]);
 
   // Reported by Canvas whenever the available preview space changes (window
   // resize, sidebar toggling, etc.) — applied automatically unless the user

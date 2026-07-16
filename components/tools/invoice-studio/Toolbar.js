@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronLeft, Undo2, Redo2, Minus, Plus, Eye, EyeOff, Save } from 'lucide-react';
+import { ChevronLeft, Undo2, Redo2, Minus, Plus, Printer, Save } from 'lucide-react';
 import { ZOOM_MIN, ZOOM_MAX } from '@/lib/invoice-studio/constants';
 
 function IconBtn({ onClick, disabled, title, children }) {
@@ -23,7 +23,7 @@ function IconBtn({ onClick, disabled, title, children }) {
 
 export default function Toolbar({
   templateName, canUndo, canRedo, onUndo, onRedo,
-  zoom, onZoomIn, onZoomOut, previewMode, onTogglePreview, onBack, onSaveDraft,
+  zoom, onZoomIn, onZoomOut, onPrint, onBack, onSaveDraft,
 }) {
   return (
     <div style={{
@@ -61,15 +61,13 @@ export default function Toolbar({
       </div>
 
       <button
-        onClick={onTogglePreview}
+        onClick={onPrint}
         style={{
-          height: 36, padding: '0 14px', borderRadius: 8, border: '1px solid #E2E6ED',
+          height: 36, padding: '0 14px', borderRadius: 8, border: '1px solid #E2E6ED', background: '#fff', color: '#334155',
           display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-          background: previewMode ? '#EFF6FF' : '#fff', color: previewMode ? '#2563EB' : '#334155',
         }}
       >
-        {previewMode ? <EyeOff size={15} /> : <Eye size={15} />}
-        {previewMode ? 'Exit Preview' : 'Preview'}
+        <Printer size={15} /> Print
       </button>
 
       <button

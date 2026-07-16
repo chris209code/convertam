@@ -10,12 +10,12 @@ import { readLegacyBizProfile } from '@/lib/invoice-studio/legacySeed';
 import { validateImageFile, readFileAsDataURL } from '@/lib/invoice-studio/fileUpload';
 import { generateQrDataUrl } from '@/lib/invoice-studio/qrGenerate';
 import { saveDraft, loadDraft, clearDraft } from '@/lib/invoice-studio/draftStorage';
-import { useCanvasInteractions } from './useCanvasInteractions';
+import { CURRENCIES } from '@/lib/invoice-studio/constants';
 import Gallery from './Gallery';
 import Toolbar from './Toolbar';
 import Canvas from './Canvas';
 import DesignPanel from './panels/DesignPanel';
-import ElementPanel from './panels/ElementPanel';
+import ContentPanel from './panels/ContentPanel';
 import LetterheadCropModal from './LetterheadCropModal';
 
 function clamp(v, a, b) {
@@ -50,10 +50,8 @@ export default function InvoiceStudioWorkspace() {
   const [doc, setDoc] = useState(emptyDoc);
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const [selectedId, setSelectedId] = useState(null);
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
-  const [previewMode, setPreviewMode] = useState(false);
-  const [panelTab, setPanelTab] = useState('design');
+  const [panelTab, setPanelTab] = useState('content');
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [toast, setToast] = useState('');
   const [savedDraftMeta, setSavedDraftMeta] = useState(null);
@@ -105,8 +103,7 @@ export default function InvoiceStudioWorkspace() {
     setTemplateId(id);
     docRef.current = initial;
     setDoc(initial);
-    setSelectedId(null);
-    setPanelTab('design');
+    setPanelTab('content');
     setView('editor');
     historyIndexRef.current = 0;
     setHistory([{ ...initial, elements: cloneElements(seeded) }]);
@@ -120,8 +117,7 @@ export default function InvoiceStudioWorkspace() {
     setTemplateId(d.templateId);
     docRef.current = restored;
     setDoc(restored);
-    setSelectedId(null);
-    setPanelTab('design');
+    setPanelTab('content');
     setView('editor');
     historyIndexRef.current = 0;
     setHistory([{ ...restored, elements: cloneElements(restored.elements) }]);
@@ -151,27 +147,6 @@ export default function InvoiceStudioWorkspace() {
     setHistoryIndex(idx);
     restoreSnapshot(history[idx]);
   }, [history, restoreSnapshot]);
-
-  const updateElementLive = useCallback((id, patch) => {
-    updateDoc((prev) => ({ ...prev, elements: prev.elements.map((e) => (e.id === id ? { ...e, ...patch } : e)) }));
-  }, [updateDoc]);
-
-  const select = useCallback((id) => {
-    setSelectedId(id);
-    setPanelTab('element');
-  }, []);
-
-  const deselect = useCallback((e) => {
-    if (e && e.target && e.target.isContentEditable) return;
-    setSelectedId(null);
-  }, []);
-
-  const { dragStart, resizeStart, guideX, guideY } = useCanvasInteractions({
-    elements: doc.elements, zoom, previewMode,
-    onLiveChange: updateElementLive,
-    onCommit: pushHistory,
-    onSelect: select,
-  });
 
   // Every one-shot edit (a blur, a click, a picker change) follows the same
   // shape: patch the doc, then immediately commit it as one history step —
@@ -374,12 +349,7 @@ export default function InvoiceStudioWorkspace() {
 
   const zoomIn = useCallback(() => setZoom((z) => clamp(Math.round((z + ZOOM_STEP) * 100) / 100, ZOOM_MIN, ZOOM_MAX)), []);
   const zoomOut = useCallback(() => setZoom((z) => clamp(Math.round((z - ZOOM_STEP) * 100) / 100, ZOOM_MIN, ZOOM_MAX)), []);
-  const togglePreview = useCallback(() => {
-    setPreviewMode((p) => {
-      if (!p) setSelectedId(null);
-      return !p;
-    });
-  }, []);
+  const handlePrint = useCallback(() => window.print(), []);
 
   const tableEl = doc.elements.find((e) => e.kind === 'table');
   const totals = useMemo(() => computeInvoiceTotals(tableEl ? tableEl.rows : [], doc.discount), [tableEl, doc.discount]);
@@ -388,18 +358,32 @@ export default function InvoiceStudioWorkspace() {
   const ctx = useMemo(() => ({
     headFont: fontStack(doc.headingFont), bodyFont: fontStack(doc.bodyFont),
     brandPrimary: doc.brandPrimary, brandSecondary: doc.brandSecondary, brandAccent: doc.brandAccent,
-    currency: doc.currency, totals, wordsText, lineFor: computeItemLine, editable: !previewMode, pageLabel: 'Page 1 of 1',
+    // The invoice preview is always read-only now — all editing happens
+    // through the sidebar ContentPanel, which calls these same mutation
+    // functions directly, not through contentEditable on the canvas.
+    currency: doc.currency, totals, wordsText, lineFor: computeItemLine, editable: false, pageLabel: 'Page 1 of 1',
     onFieldBlur, onMetaRowBlur, onBankRowBlur, onRowFieldBlur, onAddRow, onRemoveRow, onMoveRow, onTogglePaymentMethod,
     onTableRowImageUpload, onTableRowImageRemove,
-  }), [doc.headingFont, doc.bodyFont, doc.brandPrimary, doc.brandSecondary, doc.brandAccent, doc.currency, totals, wordsText, previewMode,
+  }), [doc.headingFont, doc.bodyFont, doc.brandPrimary, doc.brandSecondary, doc.brandAccent, doc.currency, totals, wordsText,
     onFieldBlur, onMetaRowBlur, onBankRowBlur, onRowFieldBlur, onAddRow, onRemoveRow, onMoveRow, onTogglePaymentMethod,
     onTableRowImageUpload, onTableRowImageRemove]);
 
-  const selectedElement = doc.elements.find((e) => e.id === selectedId) || null;
   const templateName = (TEMPLATE_GALLERY.find((t) => t.id === templateId)?.name || 'Invoice') + ' Template';
 
   return (
     <div className={`${poppins.variable} ${inter.variable} ${caveat.variable}`} style={{ height: 'calc(100vh - 64px)', minHeight: 560, width: '100%', display: 'flex', fontFamily: 'var(--cs-font-inter), Inter, sans-serif', color: '#0F172A', overflow: 'hidden', background: '#F7F8FA' }}>
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          .cs-print, .cs-print * { visibility: visible; }
+          .cs-print {
+            position: absolute; left: 0; top: 0;
+            transform: none !important;
+            box-shadow: none !important;
+          }
+          @page { size: A4; margin: 10mm; }
+        }
+      `}</style>
       <div style={{ width: 88, flexShrink: 0, background: '#FFFFFF', borderRight: '1px solid #E7EAF0', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0', gap: 18 }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#2563EB,#10B981)' }} />
         <button
@@ -435,28 +419,24 @@ export default function InvoiceStudioWorkspace() {
               zoom={zoom}
               onZoomIn={zoomIn}
               onZoomOut={zoomOut}
-              previewMode={previewMode}
-              onTogglePreview={togglePreview}
+              onPrint={handlePrint}
               onBack={goToGallery}
               onSaveDraft={onSaveDraft}
             />
             <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+              {/* The invoice preview is display-only — no drag, no resize, no
+                  click-to-edit. Zoom and print are the only interactions. */}
               <Canvas
                 elements={doc.elements}
                 ctx={ctx}
                 zoom={zoom}
-                selectedId={selectedId}
-                previewMode={previewMode}
-                onDeselect={deselect}
-                dragStart={dragStart}
-                resizeStart={resizeStart}
-                guideX={guideX}
-                guideY={guideY}
+                selectedId={null}
+                previewMode={true}
               />
 
-              <div style={{ width: 340, flexShrink: 0, background: '#fff', borderLeft: '1px solid #E7EAF0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <div style={{ width: 380, flexShrink: 0, background: '#fff', borderLeft: '1px solid #E7EAF0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <div style={{ display: 'flex', borderBottom: '1px solid #E7EAF0', flexShrink: 0 }}>
-                  {['design', 'element'].map((tab) => (
+                  {['content', 'design'].map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setPanelTab(tab)}
@@ -466,13 +446,42 @@ export default function InvoiceStudioWorkspace() {
                         borderBottom: panelTab === tab ? '2px solid #2563EB' : '2px solid transparent',
                       }}
                     >
-                      {tab === 'design' ? 'Design' : 'Element'}
+                      {tab === 'content' ? 'Content' : 'Design'}
                     </button>
                   ))}
                 </div>
                 <div style={{ flex: 1, overflow: 'auto', padding: 18 }}>
-                  {panelTab === 'design'
+                  {panelTab === 'content'
                     ? (
+                      <ContentPanel
+                        elements={doc.elements}
+                        onFieldBlur={onFieldBlur}
+                        onMetaRowBlur={onMetaRowBlur}
+                        onBankRowBlur={onBankRowBlur}
+                        onRowFieldBlur={onRowFieldBlur}
+                        onAddRow={onAddRow}
+                        onRemoveRow={onRemoveRow}
+                        onMoveRow={onMoveRow}
+                        onTogglePaymentMethod={onTogglePaymentMethod}
+                        onTableRowImageUpload={onTableRowImageUpload}
+                        onTableRowImageRemove={onTableRowImageRemove}
+                        onQrValueBlur={onQrValueBlur}
+                        onImageUpload={onImageUpload}
+                        onImageRemove={onImageRemove}
+                        onOpenCrop={() => setCropModalOpen(true)}
+                        onLetterheadRemove={onLetterheadRemove}
+                        onSignatureUpload={onSignatureUpload}
+                        onSignatureDrawSave={onSignatureDrawSave}
+                        onSignatureTypedSave={onSignatureTypedSave}
+                        onStampOpacityChange={onStampOpacityChange}
+                        onCommitStampOpacity={commitStampOpacity}
+                        docSettings={{ currency: doc.currency, discount: doc.discount, vatRate: doc.vatRate }}
+                        onDocSettingChange={handleDocSettingChange}
+                        onCommitDocSetting={commitDocSetting}
+                        currencies={CURRENCIES}
+                      />
+                    )
+                    : (
                       <DesignPanel
                         brand={{ brandPrimary: doc.brandPrimary, brandSecondary: doc.brandSecondary, brandAccent: doc.brandAccent, headingFont: doc.headingFont, bodyFont: doc.bodyFont }}
                         onBrandChange={handleBrandChange}
@@ -486,23 +495,6 @@ export default function InvoiceStudioWorkspace() {
                         letterheadEl={letterheadEl}
                         onOpenCrop={() => setCropModalOpen(true)}
                         onLetterheadRemove={onLetterheadRemove}
-                      />
-                    )
-                    : (
-                      <ElementPanel
-                        selectedElement={selectedElement}
-                        onDeselect={() => setSelectedId(null)}
-                        onToggleTableImages={onToggleTableImages}
-                        onImageUpload={onImageUpload}
-                        onImageRemove={onImageRemove}
-                        onSignatureUpload={onSignatureUpload}
-                        onSignatureDrawSave={onSignatureDrawSave}
-                        onSignatureTypedSave={onSignatureTypedSave}
-                        onStampOpacityChange={onStampOpacityChange}
-                        onCommitStampOpacity={commitStampOpacity}
-                        onQrValueBlur={onQrValueBlur}
-                        onTableRowImageUpload={onTableRowImageUpload}
-                        onTableRowImageRemove={onTableRowImageRemove}
                       />
                     )}
                 </div>

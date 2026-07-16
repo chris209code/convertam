@@ -468,12 +468,25 @@ export default function InvoiceStudioWorkspace() {
     <div className={`${poppins.variable} ${inter.variable} ${caveat.variable}`} style={{ height: 'calc(100vh - 64px)', minHeight: 560, width: '100%', display: 'flex', fontFamily: 'var(--cs-font-inter), Inter, sans-serif', color: '#0F172A', overflow: 'hidden', background: '#F7F8FA' }}>
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          .cs-print, .cs-print * { visibility: visible; }
+          /* The real bug: visibility:hidden hides elements but does NOT
+             collapse their layout space. Every other invisible element
+             (toolbar, sidebar, panels) was still occupying its full size
+             during print, which is why the print engine scaled the whole
+             (mostly invisible) oversized page down to fit A4 - shrinking
+             the one visible piece along with it - and needed 2 pages to
+             fit that invisible height. display:none actually removes
+             elements from layout; :has() keeps it targeted to only the
+             invoice's own ancestor chain, not a hardcoded list of class
+             names elsewhere in the app. */
+          body *:not(.cs-print):not(.cs-print *):not(:has(.cs-print)) {
+            display: none !important;
+          }
           .cs-print {
-            position: absolute; left: 0; top: 0;
+            position: fixed !important;
+            left: 0 !important; top: 0 !important;
             transform: none !important;
             box-shadow: none !important;
+            margin: 0 !important;
           }
           @page { size: A4; margin: 10mm; }
         }

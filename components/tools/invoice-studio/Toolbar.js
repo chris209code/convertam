@@ -23,7 +23,7 @@ function IconBtn({ onClick, disabled, title, children }) {
 
 export default function Toolbar({
   templateName, canUndo, canRedo, onUndo, onRedo,
-  zoom, onZoomIn, onZoomOut, onPrint, onBack, onSaveDraft,
+  zoom, onZoomIn, onZoomOut, onResetToFit, onPrint, onBack, onSaveDraft,
 }) {
   return (
     <div style={{
@@ -56,7 +56,13 @@ export default function Toolbar({
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F3F5F8', borderRadius: 8, padding: '4px 8px' }}>
         <IconBtn onClick={onZoomOut} disabled={zoom <= ZOOM_MIN} title="Zoom out"><Minus size={16} /></IconBtn>
-        <span style={{ fontSize: 12, color: '#5B6472', width: 42, textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
+        <button
+          onClick={onResetToFit}
+          title="Reset to Fit Page"
+          style={{ fontSize: 12, color: '#5B6472', width: 42, textAlign: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+        >
+          {Math.round(zoom * 100)}%
+        </button>
         <IconBtn onClick={onZoomIn} disabled={zoom >= ZOOM_MAX} title="Zoom in"><Plus size={16} /></IconBtn>
       </div>
 

@@ -9,7 +9,7 @@ import { amountInWords } from '@/lib/invoice-studio/numberToWords';
 import { readLegacyBizProfile } from '@/lib/invoice-studio/legacySeed';
 import { validateImageFile, readFileAsDataURL } from '@/lib/invoice-studio/fileUpload';
 import { generateQrDataUrl } from '@/lib/invoice-studio/qrGenerate';
-import { saveDraft, loadDraft, clearDraft } from '@/lib/invoice-studio/draftStorage';
+import { loadDraft } from '@/lib/invoice-studio/draftStorage';
 import { CURRENCIES } from '@/lib/invoice-studio/constants';
 import Gallery from './Gallery';
 import Toolbar from './Toolbar';
@@ -372,16 +372,6 @@ export default function InvoiceStudioWorkspace() {
     commitElementPatch(elId, { value, src: dataUrl });
   }, [commitElementPatch, doc.brandSecondary]);
 
-  const onSaveDraft = useCallback(() => {
-    const ok = saveDraft({ templateId, doc: docRef.current });
-    if (ok) {
-      setSavedDraftMeta({ templateId, savedAt: Date.now() });
-      showToast('Draft saved');
-    } else {
-      showToast('Could not save — storage may be full');
-    }
-  }, [templateId, showToast]);
-
   const zoomIn = useCallback(() => { setZoomIsManual(true); setZoom((z) => clamp(Math.round((z + ZOOM_STEP) * 100) / 100, ZOOM_MIN, ZOOM_MAX)); }, []);
   const zoomOut = useCallback(() => { setZoomIsManual(true); setZoom((z) => clamp(Math.round((z - ZOOM_STEP) * 100) / 100, ZOOM_MIN, ZOOM_MAX)); }, []);
   const handlePrint = useCallback(() => window.print(), []);
@@ -531,7 +521,6 @@ export default function InvoiceStudioWorkspace() {
               onPrint={handlePrint}
               onDownload={handleDownload}
               onBack={goToGallery}
-              onSaveDraft={onSaveDraft}
             />
             {overflowsPage && (
               <div style={{ padding: '8px 20px', background: '#FFFBEB', borderBottom: '1px solid #FDE68A', color: '#92400E', fontSize: 12.5, flexShrink: 0 }}>

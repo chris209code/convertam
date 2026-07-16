@@ -30,7 +30,32 @@ function ImageFill({ src, alt, style, radius }) {
   return <img src={src} alt={alt} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: radius, display: 'block', ...style }} />;
 }
 
-function Logo({ el }) {
+// "Prime Tech Digital" -> "PT" (first letter of the first two words),
+// "Convertam" -> "C" (single word -> just its first letter). Matches the
+// two examples given exactly, and degrades gracefully for any name shape.
+function companyAbbreviation(name) {
+  if (!name) return '';
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '';
+  if (words.length === 1) return words[0][0].toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+
+function Logo({ el, ctx }) {
+  if (!el.src) {
+    // The header should never appear empty — an auto-generated initials
+    // badge stands in for a real logo until one is uploaded.
+    const radius = el.shape === 'rounded' ? 14 : '50%';
+    return (
+      <div style={{
+        width: '100%', height: '100%', borderRadius: radius, background: ctx.brandPrimary,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: '#fff', fontFamily: ctx.headFont, fontWeight: 700, fontSize: '38%',
+      }}>
+        {companyAbbreviation(ctx.companyName)}
+      </div>
+    );
+  }
   return <ImageFill src={el.src} alt="Company logo" radius={el.shape === 'rounded' ? 14 : 6} style={{ objectFit: 'contain' }} />;
 }
 

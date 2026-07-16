@@ -51,6 +51,7 @@ export default function InvoiceStudioWorkspace() {
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
+  const [zoomIsManual, setZoomIsManual] = useState(false); // true once the user clicks +/- ; reset whenever a template opens
   const [panelTab, setPanelTab] = useState('content');
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [toast, setToast] = useState('');
@@ -76,6 +77,12 @@ export default function InvoiceStudioWorkspace() {
   // the value *after* the interaction, not a stale snapshot from before it.
   const docRef = useRef(doc);
   const historyIndexRef = useRef(historyIndex);
+  // ResizeObserver's callback (inside Canvas) is created once and needs the
+  // CURRENT zoomIsManual value at call time, not whatever it was when the
+  // effect first ran — a ref avoids the stale-closure trap a plain state
+  // read inside a dependency-less callback would otherwise hit.
+  const zoomIsManualRef = useRef(false);
+  useEffect(() => { zoomIsManualRef.current = zoomIsManual; }, [zoomIsManual]);
 
   const updateDoc = useCallback((patch) => {
     setDoc((prev) => {
@@ -105,6 +112,7 @@ export default function InvoiceStudioWorkspace() {
     setDoc(initial);
     setPanelTab('content');
     setView('editor');
+    setZoomIsManual(false);
     historyIndexRef.current = 0;
     setHistory([{ ...initial, elements: cloneElements(seeded) }]);
     setHistoryIndex(0);
@@ -119,6 +127,7 @@ export default function InvoiceStudioWorkspace() {
     setDoc(restored);
     setPanelTab('content');
     setView('editor');
+    setZoomIsManual(false);
     historyIndexRef.current = 0;
     setHistory([{ ...restored, elements: cloneElements(restored.elements) }]);
     setHistoryIndex(0);
@@ -347,9 +356,20 @@ export default function InvoiceStudioWorkspace() {
     }
   }, [templateId, showToast]);
 
-  const zoomIn = useCallback(() => setZoom((z) => clamp(Math.round((z + ZOOM_STEP) * 100) / 100, ZOOM_MIN, ZOOM_MAX)), []);
-  const zoomOut = useCallback(() => setZoom((z) => clamp(Math.round((z - ZOOM_STEP) * 100) / 100, ZOOM_MIN, ZOOM_MAX)), []);
+  const zoomIn = useCallback(() => { setZoomIsManual(true); setZoom((z) => clamp(Math.round((z + ZOOM_STEP) * 100) / 100, ZOOM_MIN, ZOOM_MAX)); }, []);
+  const zoomOut = useCallback(() => { setZoomIsManual(true); setZoom((z) => clamp(Math.round((z - ZOOM_STEP) * 100) / 100, ZOOM_MIN, ZOOM_MAX)); }, []);
   const handlePrint = useCallback(() => window.print(), []);
+
+  // Reported by Canvas whenever the available preview space changes (window
+  // resize, sidebar toggling, etc.) — applied automatically unless the user
+  // has manually zoomed since the template was opened, so a resize never
+  // fights a deliberate zoom choice but always keeps the default state
+  // genuinely fit-to-page.
+  const handleFitZoomChange = useCallback((fitZoom) => {
+    setZoom((current) => (zoomIsManualRef.current ? current : clamp(Math.round(fitZoom * 100) / 100, ZOOM_MIN, ZOOM_MAX)));
+  }, []);
+
+  const resetToFit = useCallback(() => setZoomIsManual(false), []);
 
   const tableEl = doc.elements.find((e) => e.kind === 'table');
   const totals = useMemo(() => computeInvoiceTotals(tableEl ? tableEl.rows : [], doc.discount), [tableEl, doc.discount]);
@@ -419,6 +439,7 @@ export default function InvoiceStudioWorkspace() {
               zoom={zoom}
               onZoomIn={zoomIn}
               onZoomOut={zoomOut}
+              onResetToFit={resetToFit}
               onPrint={handlePrint}
               onBack={goToGallery}
               onSaveDraft={onSaveDraft}
@@ -430,8 +451,7 @@ export default function InvoiceStudioWorkspace() {
                 elements={doc.elements}
                 ctx={ctx}
                 zoom={zoom}
-                selectedId={null}
-                previewMode={true}
+                onFitZoomChange={handleFitZoomChange}
               />
 
               <div style={{ width: 380, flexShrink: 0, background: '#fff', borderLeft: '1px solid #E7EAF0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

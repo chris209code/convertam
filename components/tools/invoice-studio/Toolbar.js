@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, Undo2, Redo2, Minus, Plus, Printer, Save, Download, ChevronDown, FileText, Image as ImageIcon } from 'lucide-react';
+import { ChevronLeft, Undo2, Redo2, Minus, Plus, Printer, Download, ChevronDown, FileText, Image as ImageIcon } from 'lucide-react';
 import { ZOOM_MIN, ZOOM_MAX } from '@/lib/invoice-studio/constants';
 
 function IconBtn({ onClick, disabled, title, children }) {
@@ -65,7 +65,7 @@ function DownloadMenu({ onDownload }) {
 
 export default function Toolbar({
   templateName, canUndo, canRedo, onUndo, onRedo,
-  zoom, onZoomIn, onZoomOut, onResetToFit, onPrint, onDownload, onBack, onSaveDraft,
+  zoom, onZoomIn, onZoomOut, onResetToFit, onPrint, onDownload, onBack,
 }) {
   return (
     <div style={{
@@ -116,16 +116,6 @@ export default function Toolbar({
         }}
       >
         <Printer size={15} /> Print
-      </button>
-
-      <button
-        onClick={onSaveDraft}
-        style={{
-          height: 36, padding: '0 14px', borderRadius: 8, border: '1px solid #E2E6ED', background: '#fff', color: '#334155',
-          display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-        }}
-      >
-        <Save size={15} /> Save Draft
       </button>
 
       <DownloadMenu onDownload={onDownload} />

@@ -144,7 +144,7 @@ export function ClassicProfessional({ data }) {
       )}
 
       {education.length > 0 && (
-        <section style={{ marginBottom: 6 }}>
+        <section style={{ marginBottom: 6, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
           <p style={S.sectionHead}><Icon.grad /> Education</p>
           {education.map((edu, i) => {
             const { titleLine, subLine, dateLine, gradeLine } = eduDisplayLines(edu);
@@ -160,7 +160,7 @@ export function ClassicProfessional({ data }) {
       )}
 
       {certifications.length > 0 && (
-        <section style={{ marginBottom: 6 }}>
+        <section style={{ marginBottom: 6, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
           <p style={S.sectionHead}><Icon.doc /> Certifications</p>
           {certifications.map((cert, i) => {
             const { titleLine, subLine, dateLine } = certDisplayLines(cert);
@@ -192,7 +192,7 @@ export function ClassicProfessional({ data }) {
       )}
 
       {skills.length > 0 && (
-        <section>
+        <section style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
           <p style={S.sectionHead}><Icon.gear /> Core Skills</p>
           <div style={{ columns: 3, fontSize: 11.5, color: '#374151' }}>
             {skills.map((s, i) => <div key={i} style={{ marginBottom: 4, breakInside: 'avoid' }}>• {s}</div>)}
@@ -250,7 +250,7 @@ export function ExecutiveMinimal({ data }) {
       )}
 
       {education.length > 0 && (
-        <section style={{ marginBottom: 6 }}>
+        <section style={{ marginBottom: 6, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
           <p style={S.sectionHead}><Icon.grad style={{ color: green }} /> Education</p>
           {education.map((edu, i) => {
             const { titleLine, subLine, dateLine, gradeLine } = eduDisplayLines(edu);
@@ -266,7 +266,7 @@ export function ExecutiveMinimal({ data }) {
       )}
 
       {certifications.length > 0 && (
-        <section style={{ marginBottom: 6 }}>
+        <section style={{ marginBottom: 6, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
           <p style={S.sectionHead}><Icon.doc style={{ color: green }} /> Certifications</p>
           {certifications.map((cert, i) => {
             const { titleLine, subLine, dateLine } = certDisplayLines(cert);
@@ -298,7 +298,7 @@ export function ExecutiveMinimal({ data }) {
       )}
 
       {skills.length > 0 && (
-        <section>
+        <section style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
           <p style={S.sectionHead}><Icon.star style={{ color: green }} /> Core Skills</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px 12px', fontSize: 11, color: '#374151' }}>
             {skills.map((s, i) => <div key={i}>{s}</div>)}
@@ -383,7 +383,7 @@ function MPSidebar({ data }) {
           </div>
         </div>
         {hasSkills && (
-          <div>
+          <div style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.55)', marginBottom: 12 }}><MPIcon.diamond />SKILLS</div>
             {data.skills.map((skill, i) => (
               <div key={i} style={{ fontSize: 13, marginBottom: 8, lineHeight: 1.5 }}>{skill.name}</div>
@@ -391,7 +391,7 @@ function MPSidebar({ data }) {
           </div>
         )}
         {hasCerts && (
-          <div>
+          <div style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.55)', marginBottom: 10 }}><MPIcon.badge />CERTIFICATIONS</div>
             {data.certifications.map((cert, i) => (
               <div key={i} style={{ fontSize: 13, lineHeight: 1.45, marginBottom: 9 }}>
@@ -402,7 +402,7 @@ function MPSidebar({ data }) {
           </div>
         )}
         {hasLanguages && (
-          <div>
+          <div style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(255,255,255,0.55)', marginBottom: 10 }}><MPIcon.globe />LANGUAGES</div>
             {data.languages.map((lang, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
@@ -534,7 +534,7 @@ function MPCentered({ data }) {
       )}
 
       {hasEducation && (
-        <div style={{ marginTop: 8, paddingTop: 28, borderTop: '1px solid #e5e7eb' }}>
+        <div style={{ marginTop: 8, paddingTop: 28, borderTop: '1px solid #e5e7eb', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: accent, marginBottom: 16 }}><MPIcon.cap />Education</div>
           {data.education.map((edu, i) => (
             <div key={i} style={{ textAlign: 'center', marginBottom: 12, breakInside: 'avoid' }}>
@@ -567,7 +567,7 @@ function MPCentered({ data }) {
       )}
 
       {hasSkills && (
-        <div style={{ marginTop: 8, paddingTop: 28, borderTop: '1px solid #e5e7eb' }}>
+        <div style={{ marginTop: 8, paddingTop: 28, borderTop: '1px solid #e5e7eb', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: accent, marginBottom: 14 }}><MPIcon.diamond />Skills</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8 }}>
             {data.skills.map((skill, i) => <span key={i} style={{ fontSize: 13, fontWeight: 600, color: '#065f46', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 999, padding: '5px 13px' }}>{skill.name}</span>)}
@@ -576,7 +576,7 @@ function MPCentered({ data }) {
       )}
 
       {hasCerts && (
-        <div style={{ marginTop: 8, paddingTop: 28, borderTop: '1px solid #e5e7eb' }}>
+        <div style={{ marginTop: 8, paddingTop: 28, borderTop: '1px solid #e5e7eb', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: accent, marginBottom: 14 }}><MPIcon.badge />Certifications</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px 22px' }}>
             {data.certifications.map((cert, i) => (
@@ -668,7 +668,7 @@ function MPHeaderBand({ data }) {
 
           <div style={{ minWidth: 0 }}>
             {hasEducation && (
-              <div style={{ marginBottom: 22 }}>
+              <div style={{ marginBottom: 22, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: accent, paddingBottom: 6, borderBottom: `1px solid ${accent}`, marginBottom: 12 }}><MPIcon.cap />Education</div>
                 {data.education.map((edu, i) => (
                   <div key={i} style={{ marginBottom: 10, breakInside: 'avoid' }}>
@@ -680,7 +680,7 @@ function MPHeaderBand({ data }) {
               </div>
             )}
             {hasSkills && (
-              <div style={{ marginBottom: 22 }}>
+              <div style={{ marginBottom: 22, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: accent, paddingBottom: 6, borderBottom: `1px solid ${accent}`, marginBottom: 12 }}><MPIcon.diamond />Skills</div>
                 {data.skills.map((skill, i) => (
                   <div key={i} style={{ fontSize: 13, color: '#374151', marginBottom: 8, lineHeight: 1.5 }}>{skill.name}</div>
@@ -688,7 +688,7 @@ function MPHeaderBand({ data }) {
               </div>
             )}
             {hasCerts && (
-              <div style={{ marginBottom: 22 }}>
+              <div style={{ marginBottom: 22, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: accent, paddingBottom: 6, borderBottom: `1px solid ${accent}`, marginBottom: 12 }}><MPIcon.badge />Certifications</div>
                 {data.certifications.map((cert, i) => (
                   <div key={i} style={{ fontSize: 13, lineHeight: 1.5, color: '#374151', marginBottom: 8 }}>
@@ -699,7 +699,7 @@ function MPHeaderBand({ data }) {
               </div>
             )}
             {hasLanguages && (
-              <div>
+              <div style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: accent, paddingBottom: 6, borderBottom: `1px solid ${accent}`, marginBottom: 12 }}><MPIcon.globe />Languages</div>
                 {data.languages.map((lang, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>

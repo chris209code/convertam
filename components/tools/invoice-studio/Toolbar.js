@@ -1,6 +1,7 @@
 'use client';
 
-import { ChevronLeft, Undo2, Redo2, Minus, Plus, Printer, Save } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronLeft, Undo2, Redo2, Minus, Plus, Printer, Save, Download, ChevronDown, FileText, Image as ImageIcon } from 'lucide-react';
 import { ZOOM_MIN, ZOOM_MAX } from '@/lib/invoice-studio/constants';
 
 function IconBtn({ onClick, disabled, title, children }) {
@@ -21,9 +22,50 @@ function IconBtn({ onClick, disabled, title, children }) {
   );
 }
 
+function DownloadMenu({ onDownload }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  function choose(format) {
+    setOpen(false);
+    onDownload(format);
+  }
+
+  const optionStyle = { display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 14px', border: 'none', background: 'none', textAlign: 'left', fontSize: 13, fontWeight: 500, color: '#334155', cursor: 'pointer' };
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          height: 36, padding: '0 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: '#fff',
+          display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+        }}
+      >
+        <Download size={15} /> Download <ChevronDown size={14} />
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: 42, right: 0, background: '#fff', border: '1px solid #E2E6ED', borderRadius: 10, boxShadow: '0 8px 24px rgba(15,23,42,.12)', minWidth: 180, overflow: 'hidden', zIndex: 20 }}>
+          <button onClick={() => choose('pdf')} style={optionStyle}><FileText size={16} color="#DC2626" /> Download PDF</button>
+          <button onClick={() => choose('png')} style={optionStyle}><ImageIcon size={16} color="#2563EB" /> Download PNG</button>
+          <button onClick={() => choose('jpg')} style={optionStyle}><ImageIcon size={16} color="#10B981" /> Download JPG</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Toolbar({
   templateName, canUndo, canRedo, onUndo, onRedo,
-  zoom, onZoomIn, onZoomOut, onResetToFit, onPrint, onBack, onSaveDraft,
+  zoom, onZoomIn, onZoomOut, onResetToFit, onPrint, onDownload, onBack, onSaveDraft,
 }) {
   return (
     <div style={{
@@ -85,6 +127,8 @@ export default function Toolbar({
       >
         <Save size={15} /> Save Draft
       </button>
+
+      <DownloadMenu onDownload={onDownload} />
     </div>
   );
 }

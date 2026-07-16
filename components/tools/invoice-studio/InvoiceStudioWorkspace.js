@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { poppins, inter, caveat, fontStack } from '@/lib/invoice-studio/fonts';
-import { buildTemplateElements, cloneElements, TEMPLATE_DEFAULTS, TEMPLATE_GALLERY } from '@/lib/invoice-studio/templates';
+import { buildTemplateElements, cloneElements, TEMPLATE_DEFAULTS, TEMPLATE_GALLERY, recomputeDynamicLayout, contentExceedsOnePage } from '@/lib/invoice-studio/templates';
 import { DEFAULT_CURRENCY, DEFAULT_DISCOUNT, DEFAULT_VAT_RATE, HISTORY_LIMIT, ZOOM_DEFAULT, ZOOM_MIN, ZOOM_MAX, ZOOM_STEP } from '@/lib/invoice-studio/constants';
 import { computeInvoiceTotals, computeItemLine } from '@/lib/invoice-studio/calculations';
 import { amountInWords } from '@/lib/invoice-studio/numberToWords';
@@ -17,6 +17,17 @@ import Canvas from './Canvas';
 import DesignPanel from './panels/DesignPanel';
 import ContentPanel from './panels/ContentPanel';
 import LetterheadCropModal from './LetterheadCropModal';
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 function clamp(v, a, b) {
   return Math.max(a, Math.min(b, v));
@@ -360,6 +371,44 @@ export default function InvoiceStudioWorkspace() {
   const zoomOut = useCallback(() => { setZoomIsManual(true); setZoom((z) => clamp(Math.round((z - ZOOM_STEP) * 100) / 100, ZOOM_MIN, ZOOM_MAX)); }, []);
   const handlePrint = useCallback(() => window.print(), []);
 
+  // Screenshots the actual rendered .cs-print DOM node (the same one the
+  // browser's own print/save-as-PDF targets) rather than redrawing the
+  // invoice from scratch via a separate PDF-drawing pipeline. That's a
+  // deliberate choice: a second independent rendering path is exactly how
+  // "the preview and the PDF don't match" bugs happen — screenshotting
+  // what's actually on screen makes mismatch structurally impossible.
+  const handleDownload = useCallback(async (format) => {
+    const node = document.querySelector('.cs-print');
+    if (!node) return;
+    showToast('Preparing download…');
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(node, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+      const filename = `Invoice-${templateId}-${Date.now()}`;
+
+      if (format === 'pdf') {
+        const { PDFDocument } = await import('pdf-lib');
+        const pdfDoc = await PDFDocument.create();
+        // Standard A4-in-points page size (210mm x 297mm), matching the same
+        // values already used by Convertam's other PDF-generating tools.
+        const page = pdfDoc.addPage([595, 842]);
+        const pngDataUrl = canvas.toDataURL('image/png');
+        const pngBytes = await fetch(pngDataUrl).then((r) => r.arrayBuffer());
+        const embedded = await pdfDoc.embedPng(pngBytes);
+        page.drawImage(embedded, { x: 0, y: 0, width: 595, height: 842 });
+        const bytes = await pdfDoc.save();
+        downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${filename}.pdf`);
+      } else {
+        const mime = format === 'png' ? 'image/png' : 'image/jpeg';
+        canvas.toBlob((blob) => { if (blob) downloadBlob(blob, `${filename}.${format}`); }, mime, format === 'jpg' ? 0.92 : undefined);
+      }
+      showToast(`Downloaded as ${format.toUpperCase()}`);
+    } catch (err) {
+      console.error(err);
+      showToast('Could not generate the download — please try again.');
+    }
+  }, [templateId, showToast]);
+
   // Reported by Canvas whenever the available preview space changes (window
   // resize, sidebar toggling, etc.) — applied automatically unless the user
   // has manually zoomed since the template was opened, so a resize never
@@ -375,16 +424,26 @@ export default function InvoiceStudioWorkspace() {
   const totals = useMemo(() => computeInvoiceTotals(tableEl ? tableEl.rows : [], doc.discount), [tableEl, doc.discount]);
   const wordsText = useMemo(() => amountInWords(totals.total, doc.currency), [totals.total, doc.currency]);
 
+  const companyTextEl = doc.elements.find((e) => e.id === 'companyText');
+  // Recomputed fresh whenever doc.elements changes — this is what prevents
+  // a 6-item invoice from overlapping/clipping content that was positioned
+  // assuming the original 3-row sample. doc.elements itself is left as the
+  // "authored" state (field values, visibility, colors); only this derived
+  // array carries corrected positions for actual rendering.
+  const renderElements = useMemo(() => recomputeDynamicLayout(doc.elements), [doc.elements]);
+  const overflowsPage = useMemo(() => contentExceedsOnePage(doc.elements), [doc.elements]);
+
   const ctx = useMemo(() => ({
     headFont: fontStack(doc.headingFont), bodyFont: fontStack(doc.bodyFont),
     brandPrimary: doc.brandPrimary, brandSecondary: doc.brandSecondary, brandAccent: doc.brandAccent,
+    companyName: companyTextEl?.name || '',
     // The invoice preview is always read-only now — all editing happens
     // through the sidebar ContentPanel, which calls these same mutation
     // functions directly, not through contentEditable on the canvas.
     currency: doc.currency, totals, wordsText, lineFor: computeItemLine, editable: false, pageLabel: 'Page 1 of 1',
     onFieldBlur, onMetaRowBlur, onBankRowBlur, onRowFieldBlur, onAddRow, onRemoveRow, onMoveRow, onTogglePaymentMethod,
     onTableRowImageUpload, onTableRowImageRemove,
-  }), [doc.headingFont, doc.bodyFont, doc.brandPrimary, doc.brandSecondary, doc.brandAccent, doc.currency, totals, wordsText,
+  }), [doc.headingFont, doc.bodyFont, doc.brandPrimary, doc.brandSecondary, doc.brandAccent, doc.currency, totals, wordsText, companyTextEl?.name,
     onFieldBlur, onMetaRowBlur, onBankRowBlur, onRowFieldBlur, onAddRow, onRemoveRow, onMoveRow, onTogglePaymentMethod,
     onTableRowImageUpload, onTableRowImageRemove]);
 
@@ -441,14 +500,20 @@ export default function InvoiceStudioWorkspace() {
               onZoomOut={zoomOut}
               onResetToFit={resetToFit}
               onPrint={handlePrint}
+              onDownload={handleDownload}
               onBack={goToGallery}
               onSaveDraft={onSaveDraft}
             />
+            {overflowsPage && (
+              <div style={{ padding: '8px 20px', background: '#FFFBEB', borderBottom: '1px solid #FDE68A', color: '#92400E', fontSize: 12.5, flexShrink: 0 }}>
+                This invoice's content is taller than one A4 page — some items or sections may be cut off in the exported PDF. Consider shortening descriptions, reducing line items, or hiding optional sections (Notes, Terms) in the Design panel.
+              </div>
+            )}
             <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
               {/* The invoice preview is display-only — no drag, no resize, no
                   click-to-edit. Zoom and print are the only interactions. */}
               <Canvas
-                elements={doc.elements}
+                elements={renderElements}
                 ctx={ctx}
                 zoom={zoom}
                 onFitZoomChange={handleFitZoomChange}

@@ -6,12 +6,12 @@ import { renderInvoiceHtml } from '@/lib/invoice-studio/htmlRenderer';
 export async function POST(request) {
   let browser;
   try {
-    const { elements, ctx } = await request.json();
-    if (!Array.isArray(elements) || !ctx) {
+    const { doc, style, totals, wordsText } = await request.json();
+    if (!doc || !doc.sections || !style) {
       return Response.json({ error: 'Missing invoice data.' }, { status: 400 });
     }
 
-    const html = renderInvoiceHtml(elements, ctx);
+    const html = renderInvoiceHtml(doc, style, totals, wordsText);
 
     // @sparticuz/chromium ships a Chromium binary specifically packaged to
     // fit within Vercel/AWS Lambda's serverless function size limits;

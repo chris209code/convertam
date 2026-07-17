@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Poppins, Inter, Caveat } from 'next/font/google';
-import { emptyDoc, buildDefaultSections } from '@/lib/invoice-studio/sectionsModel';
+import { emptyDoc, buildDefaultSections, addDaysIso } from '@/lib/invoice-studio/sectionsModel';
 import { stylesFor, TEMPLATE_GALLERY } from '@/lib/invoice-studio/styleTokens';
 import { computeInvoiceTotals } from '@/lib/invoice-studio/calculations';
 import { amountInWords } from '@/lib/invoice-studio/numberToWords';
@@ -215,6 +215,21 @@ export default function InvoiceStudioWorkspace() {
   const onStampOpacityChange = useCallback((opacity) => onPatchSection('stamp', { opacity }), [onPatchSection]);
 
   const onCurrencyChange = useCallback((currency) => updateDoc((prev) => ({ ...prev, currency })), [updateDoc]);
+
+  const onInvoiceDateChange = useCallback((iso) => {
+    updateDoc((prev) => {
+      const ci = prev.sections.clientInfo;
+      // Recalculate due date to stay 30 days out UNLESS the person has
+      // already edited due date themselves - once they have, their choice
+      // is respected and this stops touching it automatically.
+      const dueDate = ci.dueDateManual ? ci.dueDate : addDaysIso(iso, 30);
+      return { ...prev, sections: { ...prev.sections, clientInfo: { ...ci, invoiceDate: iso, dueDate } } };
+    });
+  }, [updateDoc]);
+
+  const onDueDateChange = useCallback((iso) => {
+    onPatchSection('clientInfo', { dueDate: iso, dueDateManual: true });
+  }, [onPatchSection]);
   const onDocSettingChange = useCallback((key, value) => updateDoc((prev) => ({ ...prev, [key]: value })), [updateDoc]);
 
   const zoomIn = useCallback(() => { setZoomIsManual(true); setZoom((z) => clamp(Math.round((z + ZOOM_STEP) * 100) / 100, ZOOM_MIN, ZOOM_MAX)); }, []);
@@ -312,6 +327,7 @@ export default function InvoiceStudioWorkspace() {
                   <ContentPanel
                     sections={doc.sections} currency={doc.currency}
                     onPatchSection={onPatchSection} onCurrencyChange={onCurrencyChange}
+                    onInvoiceDateChange={onInvoiceDateChange} onDueDateChange={onDueDateChange}
                     onRowField={onRowField} onAddRow={onAddRow} onRemoveRow={onRemoveRow} onMoveRow={onMoveRow}
                     onRowImageUpload={onRowImageUpload} onRowImageRemove={onRowImageRemove}
                     onTogglePaymentMethod={onTogglePaymentMethod} onBankRowField={onBankRowField} onPatchQr={onPatchQr}

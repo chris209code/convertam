@@ -1,6 +1,7 @@
 export const runtime = 'nodejs';
 export const maxDuration = 60; // launching a real browser + rendering + PDF export genuinely takes a few seconds, longer than a typical API call
 
+import path from 'path';
 import { renderInvoiceHtml } from '@/lib/invoice-studio/htmlRenderer';
 
 export async function POST(request) {
@@ -20,9 +21,23 @@ export async function POST(request) {
     const chromium = (await import('@sparticuz/chromium')).default;
     const puppeteer = await import('puppeteer-core');
 
+    // Serverless has no GPU, so graphics-mode Chromium features have
+    // nothing to run against — leaving this on has caused silent launch
+    // failures on Vercel.
+    if (typeof chromium.setGraphicsMode === 'function') {
+      chromium.setGraphicsMode(false);
+    }
+
+    const executablePath = await chromium.executablePath();
+    // chromium's shared libraries (libnss3.so etc.) get extracted next to
+    // the binary, but the system loader won't find them there unless
+    // LD_LIBRARY_PATH points at that directory — this has to be set before
+    // puppeteer.launch() actually spawns the process.
+    process.env.LD_LIBRARY_PATH = path.dirname(executablePath);
+
     browser = await puppeteer.launch({
       args: chromium.args,
-      executablePath: await chromium.executablePath(),
+      executablePath,
       headless: chromium.headless,
     });
 

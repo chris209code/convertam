@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import {
   LetterheadSection, HeaderSection, ClientInfoSection, ItemsTableSection, TotalsSection,
-  NotesSection, PaymentBankSection, SignatureSection, TermsSection, FooterSection,
+  NotesSection, PaymentBankSection, TermsSection, FooterSection, QrOverlay,
 } from './sections/SectionComponents';
 
 // A4 at 96dpi. Same physical page size used throughout this rewrite and
@@ -17,7 +17,7 @@ const FOOTER_H = 56; // footer is fixed-height and always reserved on every page
 
 // Ordered as they render — this order IS the document flow, exactly as
 // approved. Watermark/stamp/QR are overlays (see below), not part of flow.
-const FLOW_KEYS = ['letterhead', 'header', 'clientInfo', 'itemsTable', 'totals', 'notes', 'paymentBank', 'signature', 'terms'];
+const FLOW_KEYS = ['letterhead', 'header', 'clientInfo', 'itemsTable', 'totals', 'notes', 'paymentBank', 'terms'];
 
 function SectionByKey({ sectionKey, doc, style, totals, wordsText }) {
   const s = doc.sections;
@@ -28,8 +28,7 @@ function SectionByKey({ sectionKey, doc, style, totals, wordsText }) {
     case 'itemsTable': return <ItemsTableSection data={s.itemsTable} style={style} currency={doc.currency} />;
     case 'totals': return <TotalsSection data={s.totals} style={style} currency={doc.currency} totals={totals} wordsText={wordsText} />;
     case 'notes': return <NotesSection data={s.notes} style={style} />;
-    case 'paymentBank': return <PaymentBankSection payment={s.payment} bank={s.bank} style={style} />;
-    case 'signature': return <SignatureSection data={s.signature} style={style} />;
+    case 'paymentBank': return <PaymentBankSection payment={s.payment} bank={s.bank} signature={s.signature} style={style} />;
     case 'terms': return <TermsSection data={s.terms} style={style} />;
     default: return null;
   }
@@ -106,14 +105,22 @@ export default function FlowCanvas({ doc, style, totals, wordsText, zoom, onFitZ
 
         {/* Real, visible, paginated output — separate A4 sheets with a
             genuine visible gap between them, not one continuous scroll. */}
-        {(pages || [FLOW_KEYS]).map((pageKeys, pageIndex, allPages) => (
-          <div key={pageIndex} style={{ ...pageStyle, marginBottom: pageIndex < allPages.length - 1 ? 40 : 0 }}>
-            <div style={{ minHeight: USABLE_H - FOOTER_H }}>
-              {pageKeys.map((key) => <SectionByKey key={key} sectionKey={key} doc={doc} style={style} totals={totals} wordsText={wordsText} />)}
+        {(() => {
+          const allPages = pages || [FLOW_KEYS];
+          // QR is payment-related, so it belongs on whichever page the
+          // payment/bank/signature row actually landed on — falls back to
+          // the last page if that section is hidden.
+          const qrPageIndex = Math.max(0, allPages.findIndex((keys) => keys.includes('paymentBank')));
+          return allPages.map((pageKeys, pageIndex) => (
+            <div key={pageIndex} style={{ ...pageStyle, marginBottom: pageIndex < allPages.length - 1 ? 40 : 0 }}>
+              <div style={{ minHeight: USABLE_H - FOOTER_H }}>
+                {pageKeys.map((key) => <SectionByKey key={key} sectionKey={key} doc={doc} style={style} totals={totals} wordsText={wordsText} />)}
+              </div>
+              {pageIndex === qrPageIndex && <QrOverlay data={doc.sections.qr} footerHeight={FOOTER_H} />}
+              <FooterSection data={doc.sections.footer} style={style} pageLabel={`Page ${pageIndex + 1} of ${allPages.length}`} />
             </div>
-            <FooterSection data={doc.sections.footer} style={style} pageLabel={`Page ${pageIndex + 1} of ${allPages.length}`} />
-          </div>
-        ))}
+          ));
+        })()}
       </div>
     </div>
   );

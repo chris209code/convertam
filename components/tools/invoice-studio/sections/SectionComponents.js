@@ -202,11 +202,19 @@ export function NotesSection({ data, style: tokens }) {
 
 const PAYMENT_ICONS = { 'Bank Transfer': '🏦', POS: '💳', USSD: '📱', Cash: '💵' };
 
-export function PaymentBankSection({ payment, bank, style: tokens }) {
-  if (!payment.visible && !bank.visible) return null;
-  const body = fontCss(tokens.bodyFont);
+// Payment Methods, Bank Details, and Signature render as three columns of
+// ONE flex row (one <Section>), not three separately-stacked sections —
+// that was the actual cause of Signature visually "drifting downward"
+// below Payment/Bank instead of sitting in the same row: it was a wholly
+// separate block-level section underneath them, not a column beside them.
+// Keeping them as one section also means they can't be split across a page
+// break from each other during pagination.
+export function PaymentBankSection({ payment, bank, signature, style: tokens }) {
+  if (!payment.visible && !bank.visible && !signature?.visible) return null;
+  const head = fontCss(tokens.headingFont), body = fontCss(tokens.bodyFont);
+  const isTyped = signature && (signature.mode === 'typed' || !signature.mode);
   return (
-    <Section style={{ display: 'flex', gap: 32 }}>
+    <Section style={{ display: 'flex', gap: 32, alignItems: 'flex-start' }}>
       {payment.visible && (
         <div style={{ flex: 1 }}>
           <div style={{ fontFamily: body, fontSize: 11, fontWeight: 700, letterSpacing: '.05em', color: tokens.brandAccent, marginBottom: 8 }}>PAYMENT METHODS</div>
@@ -230,30 +238,22 @@ export function PaymentBankSection({ payment, bank, style: tokens }) {
           ))}
         </div>
       )}
-    </Section>
-  );
-}
-
-export function SignatureSection({ data, style: tokens }) {
-  if (!data.visible) return null;
-  const head = fontCss(tokens.headingFont), body = fontCss(tokens.bodyFont);
-  const isTyped = data.mode === 'typed' || !data.mode;
-  return (
-    <Section style={{ display: 'flex', justifyContent: 'flex-end' }}>
-      <div style={{ width: 200, textAlign: 'left' }}>
-        <div style={{ minHeight: 40, display: 'flex', alignItems: 'flex-end' }}>
-          {isTyped && data.text && <div style={{ fontFamily: "'Caveat', cursive", fontSize: 26, color: tokens.textDark }}>{data.text}</div>}
-          {!isTyped && data.src && <img src={data.src} alt="Signature" style={{ maxHeight: 40, objectFit: 'contain' }} />}
+      {signature?.visible && (
+        <div style={{ flex: 1, textAlign: 'left' }}>
+          <div style={{ minHeight: 40, display: 'flex', alignItems: 'flex-end' }}>
+            {isTyped && signature.text && <div style={{ fontFamily: "'Caveat', cursive", fontSize: 26, color: tokens.textDark }}>{signature.text}</div>}
+            {!isTyped && signature.src && <img src={signature.src} alt="Signature" style={{ maxHeight: 40, objectFit: 'contain' }} />}
+          </div>
+          <div style={{ borderTop: '1.5px solid #CBD5E1', marginTop: 4 }} />
+          {signature.approvedName && (
+            <>
+              <div style={{ fontFamily: body, fontSize: 10, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: '.04em', marginTop: 8 }}>Approved By</div>
+              <div style={{ fontFamily: head, fontWeight: 600, fontSize: 13, color: tokens.textDark, marginTop: 2 }}>{signature.approvedName}</div>
+              <div style={{ fontFamily: body, fontSize: 11.5, color: tokens.textGray }}>{signature.approvedRole}</div>
+            </>
+          )}
         </div>
-        <div style={{ borderTop: '1.5px solid #CBD5E1', marginTop: 4 }} />
-        {data.approvedName && (
-          <>
-            <div style={{ fontFamily: body, fontSize: 10, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: '.04em', marginTop: 8 }}>Approved By</div>
-            <div style={{ fontFamily: head, fontWeight: 600, fontSize: 13, color: tokens.textDark, marginTop: 2 }}>{data.approvedName}</div>
-            <div style={{ fontFamily: body, fontSize: 11.5, color: tokens.textGray }}>{data.approvedRole}</div>
-          </>
-        )}
-      </div>
+      )}
     </Section>
   );
 }
@@ -276,6 +276,21 @@ export function FooterSection({ data, style: tokens, pageLabel }) {
     <div style={{ marginTop: SECTION_GAP + 10, background: bg, padding: '14px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <div style={{ fontFamily: body, fontSize: 13, fontWeight: 600, color: tokens.footerStyle === 'bar' ? '#fff' : tokens.textGray }}>{data.content}</div>
       <div style={{ fontFamily: body, fontSize: 11.5, color: tokens.footerStyle === 'bar' ? 'rgba(255,255,255,.75)' : tokens.textMuted }}>{pageLabel}</div>
+    </div>
+  );
+}
+
+// QR is positioned content, not flow content — it doesn't push anything
+// else down the page, it sits pinned in the page's own corner. Real,
+// scannable image (see onPatchQr / generateQrDataUrl) — not a decorative
+// placeholder. Absent an uploaded/generated src, this renders nothing, not
+// an empty box.
+export function QrOverlay({ data, footerHeight }) {
+  if (!data?.visible || !data.src) return null;
+  return (
+    <div style={{ position: 'absolute', left: 40, bottom: footerHeight + 24, width: 68, height: 68 }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={data.src} alt="Payment QR code" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
     </div>
   );
 }

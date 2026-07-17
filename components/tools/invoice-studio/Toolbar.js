@@ -44,7 +44,7 @@ function DownloadMenu({ onDownload }) {
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button
-        onClick={() => { alert('Download button was clicked — this popup is temporary, just for testing'); setOpen((o) => !o); }}
+        onClick={() => setOpen((o) => !o)}
         style={{
           height: 36, padding: '0 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: '#fff',
           display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer',
@@ -70,7 +70,7 @@ export default function Toolbar({
   return (
     <div style={{
       height: 64, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '0 20px',
-      borderBottom: '1px solid #E7EAF0', background: '#fff', overflow: 'hidden',
+      borderBottom: '1px solid #E7EAF0', background: '#fff',
     }}>
       <button
         onClick={onBack}

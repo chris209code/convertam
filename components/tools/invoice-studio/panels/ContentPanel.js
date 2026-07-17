@@ -264,15 +264,17 @@ function PaymentSection({ payment, bank, qr, onPatch, onTogglePaymentMethod, onB
   );
 }
 
-function NotesTermsSection({ notes, terms, onPatch }) {
+function NotesTermsSection({ notes, terms, watermark, onPatch }) {
   const notesField = useFieldState(notes.content, (v) => onPatch('notes', { content: v }));
   const termsField = useFieldState(terms.content, (v) => onPatch('terms', { content: v }));
+  const watermarkField = useFieldState(watermark.content, (v) => onPatch('watermark', { content: v }));
   return (
     <div>
       <div style={groupTitle}>Notes & Terms</div>
       <div style={groupSub}>Shown below the totals on the invoice.</div>
       <Field label="Notes" {...notesField} textarea placeholder="Thank you for your business." />
       <Field label="Terms & Conditions" {...termsField} textarea placeholder="Payment terms, late fees, etc." />
+      <Field label="Watermark Text (e.g. UNPAID, PAID, DRAFT)" {...watermarkField} placeholder="UNPAID" />
     </div>
   );
 }
@@ -384,7 +386,7 @@ export default function ContentPanel({
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
       <PaymentSection payment={sections.payment} bank={sections.bank} qr={sections.qr} onPatch={onPatchSection} onTogglePaymentMethod={onTogglePaymentMethod} onBankRowField={onBankRowField} onPatchQr={onPatchQr} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
-      <NotesTermsSection notes={sections.notes} terms={sections.terms} onPatch={onPatchSection} />
+      <NotesTermsSection notes={sections.notes} terms={sections.terms} watermark={sections.watermark} onPatch={onPatchSection} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
       <SignatureSectionPanel
         signature={sections.signature} stamp={sections.stamp} onPatch={onPatchSection}

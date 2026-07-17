@@ -280,17 +280,43 @@ export function FooterSection({ data, style: tokens, pageLabel }) {
   );
 }
 
-// QR is positioned content, not flow content — it doesn't push anything
-// else down the page, it sits pinned in the page's own corner. Real,
-// scannable image (see onPatchQr / generateQrDataUrl) — not a decorative
-// placeholder. Absent an uploaded/generated src, this renders nothing, not
-// an empty box.
-export function QrOverlay({ data, footerHeight }) {
+// QR is a normal flow section like any other, not a pinned overlay — it
+// used to be position:absolute anchored to the page's bottom edge, which
+// meant it never actually knew how tall the content above it was and could
+// land on top of Terms & Conditions once that section pushed the real
+// content down further than the QR's fixed offset accounted for. As a flow
+// section it now measures and paginates exactly like everything else, so
+// it always sits below whatever's above it and pushes Terms down when it's
+// present, instead of floating over it. Real, scannable image (see
+// onPatchQr / generateQrDataUrl) — not a decorative placeholder. Absent an
+// uploaded/generated src, this renders nothing, not an empty box.
+export function QrSection({ data }) {
   if (!data?.visible || !data.src) return null;
   return (
-    <div style={{ position: 'absolute', left: 40, bottom: footerHeight + 24, width: 68, height: 68 }}>
+    <Section style={{ width: 68, height: 68 }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={data.src} alt="Payment QR code" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+    </Section>
+  );
+}
+
+// Full-page background layer, not flow content — sits behind every
+// section (negative z-index within the page's own positioned containing
+// block) so it can never overlap or block readable content the way a
+// foreground element would. Renders nothing without real text, same rule
+// every optional section here follows.
+export function WatermarkLayer({ data, style: tokens }) {
+  if (!data?.visible || !data.content) return null;
+  const head = fontCss(tokens.headingFont);
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: -1, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <div style={{
+        fontFamily: head, fontWeight: 700, fontSize: 96, color: tokens.textDark, whiteSpace: 'nowrap',
+        letterSpacing: '.05em', textTransform: 'uppercase', opacity: (data.opacity ?? 12) / 100,
+        transform: `rotate(${data.rotation ?? -28}deg)`,
+      }}>
+        {data.content}
+      </div>
     </div>
   );
 }

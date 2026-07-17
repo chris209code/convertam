@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import {
   LetterheadSection, HeaderSection, ClientInfoSection, ItemsTableSection, TotalsSection,
-  NotesSection, PaymentBankSection, TermsSection, FooterSection, QrOverlay,
+  NotesSection, PaymentBankSection, TermsSection, FooterSection, QrSection, WatermarkLayer,
 } from './sections/SectionComponents';
 
 // A4 at 96dpi. Same physical page size used throughout this rewrite and
@@ -16,8 +16,10 @@ const USABLE_H = PAGE_H - PAGE_PADDING * 2;
 const FOOTER_H = 56; // footer is fixed-height and always reserved on every page
 
 // Ordered as they render — this order IS the document flow, exactly as
-// approved. Watermark/stamp/QR are overlays (see below), not part of flow.
-const FLOW_KEYS = ['letterhead', 'header', 'clientInfo', 'itemsTable', 'totals', 'notes', 'paymentBank', 'terms'];
+// approved. QR sits right after Payment/Bank since it's payment-related
+// content, then Terms. Watermark is a background layer, not flow content
+// (see WatermarkLayer below) — it never takes up flow space.
+const FLOW_KEYS = ['letterhead', 'header', 'clientInfo', 'itemsTable', 'totals', 'notes', 'paymentBank', 'qr', 'terms'];
 
 function SectionByKey({ sectionKey, doc, style, totals, wordsText }) {
   const s = doc.sections;
@@ -29,6 +31,7 @@ function SectionByKey({ sectionKey, doc, style, totals, wordsText }) {
     case 'totals': return <TotalsSection data={s.totals} style={style} currency={doc.currency} totals={totals} wordsText={wordsText} />;
     case 'notes': return <NotesSection data={s.notes} style={style} />;
     case 'paymentBank': return <PaymentBankSection payment={s.payment} bank={s.bank} signature={s.signature} style={style} />;
+    case 'qr': return <QrSection data={s.qr} />;
     case 'terms': return <TermsSection data={s.terms} style={style} />;
     default: return null;
   }
@@ -87,7 +90,7 @@ export default function FlowCanvas({ doc, style, totals, wordsText, zoom, onFitZ
 
   const pageStyle = {
     width: PAGE_W, minHeight: PAGE_H, background: '#fff', padding: PAGE_PADDING,
-    boxShadow: '0 8px 30px rgba(15,23,42,.12)', position: 'relative', flexShrink: 0,
+    boxShadow: '0 8px 30px rgba(15,23,42,.12)', position: 'relative', zIndex: 0, flexShrink: 0,
     fontFamily: 'Inter, sans-serif', boxSizing: 'border-box',
   };
 
@@ -107,16 +110,12 @@ export default function FlowCanvas({ doc, style, totals, wordsText, zoom, onFitZ
             genuine visible gap between them, not one continuous scroll. */}
         {(() => {
           const allPages = pages || [FLOW_KEYS];
-          // QR is payment-related, so it belongs on whichever page the
-          // payment/bank/signature row actually landed on — falls back to
-          // the last page if that section is hidden.
-          const qrPageIndex = Math.max(0, allPages.findIndex((keys) => keys.includes('paymentBank')));
           return allPages.map((pageKeys, pageIndex) => (
             <div key={pageIndex} style={{ ...pageStyle, marginBottom: pageIndex < allPages.length - 1 ? 40 : 0 }}>
+              <WatermarkLayer data={doc.sections.watermark} style={style} />
               <div style={{ minHeight: USABLE_H - FOOTER_H }}>
                 {pageKeys.map((key) => <SectionByKey key={key} sectionKey={key} doc={doc} style={style} totals={totals} wordsText={wordsText} />)}
               </div>
-              {pageIndex === qrPageIndex && <QrOverlay data={doc.sections.qr} footerHeight={FOOTER_H} />}
               <FooterSection data={doc.sections.footer} style={style} pageLabel={`Page ${pageIndex + 1} of ${allPages.length}`} />
             </div>
           ));

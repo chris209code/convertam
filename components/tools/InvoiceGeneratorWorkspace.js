@@ -1,568 +1,599 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { PDFDocument } from 'pdf-lib';
-
-const CURRENCIES = ['NGN', 'USD', 'EUR', 'GBP', 'GHS', 'KES', 'ZAR'];
-const CURRENCY_SYMBOLS = { NGN: '₦', USD: '$', EUR: '€', GBP: '£', GHS: 'GH₵', KES: 'KSh', ZAR: 'R' };
-const STORAGE_KEY = 'convertam_biz_profile_v2';
-
-function sym(c) { return CURRENCY_SYMBOLS[c] || c; }
-const emptyItem = () => ({ description: '', quantity: '1', unitPrice: '' });
-function autoInvNum() {
-  const d = new Date().toISOString().slice(0,10).replace(/-/g,'');
-  return `INV-${d}-${Math.floor(1000 + Math.random() * 9000)}`;
-}
-function getInitials(name) {
-  return name.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
-}
-function fmt(num, currency) {
-  return sym(currency) + num.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { poppins, inter, caveat, fontStack } from '@/lib/invoice-studio/fonts';
+import { buildTemplateElements, cloneElements, TEMPLATE_DEFAULTS, TEMPLATE_GALLERY, recomputeDynamicLayout, contentExceedsOnePage, applyTemplateSkin } from '@/lib/invoice-studio/templates';
+import { DEFAULT_CURRENCY, DEFAULT_DISCOUNT, DEFAULT_VAT_RATE, HISTORY_LIMIT, ZOOM_DEFAULT, ZOOM_MIN, ZOOM_MAX, ZOOM_STEP } from '@/lib/invoice-studio/constants';
+import { computeInvoiceTotals, computeItemLine } from '@/lib/invoice-studio/calculations';
+import { amountInWords } from '@/lib/invoice-studio/numberToWords';
+import { readLegacyBizProfile } from '@/lib/invoice-studio/legacySeed';
+import { validateImageFile, readFileAsDataURL } from '@/lib/invoice-studio/fileUpload';
+import { generateQrDataUrl } from '@/lib/invoice-studio/qrGenerate';
+import { loadDraft } from '@/lib/invoice-studio/draftStorage';
+import { CURRENCIES } from '@/lib/invoice-studio/constants';
+import Gallery from './Gallery';
+import Toolbar from './Toolbar';
+import Canvas from './Canvas';
+import DesignPanel from './panels/DesignPanel';
+import ContentPanel from './panels/ContentPanel';
+import LetterheadCropModal from './LetterheadCropModal';
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click();
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
 
-// ── INVOICE TEMPLATE (rendered in DOM, captured as image) ──
-function InvoiceTemplate({ biz, client, invoice, items, logo, subtotal, discountAmt, taxAmt, total }) {
-  const amber = '#E2962C';
-  const dark = '#161E38';
-  const gray = '#666';
-
-  const paymentLabels = {
-    cash: { label: 'Cash', icon: '💵' },
-    bankTransfer: { label: 'Bank Transfer', icon: '🏦' },
-    pos: { label: 'POS', icon: '💳' },
-    ussd: { label: 'USSD', icon: '📱' },
-  };
-
-  const activeMethods = [
-    { label: 'Cash', icon: '💵' },
-    { label: 'Bank Transfer', icon: '🏦' },
-    { label: 'POS', icon: '💳' },
-    { label: 'USSD', icon: '📱' },
-  ];
-
-  const hasBankDetails = invoice.bankName || invoice.bankAccount || invoice.bankAccountName;
-
-  return (
-    <div id="invoice-template" style={{
-      width: 794, background: 'white', fontFamily: 'Arial, Helvetica, sans-serif',
-      color: dark, position: 'absolute', left: '-9999px', top: 0,
-    }}>
-      {/* Top amber bar */}
-      <div style={{ background: amber, height: 10, width: '100%' }} />
-
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '20px 40px 10px' }}>
-        {/* Left: Logo + Business */}
-        <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-          {logo && <img src={logo} alt="logo" style={{ width: 70, height: 70, objectFit: 'contain', borderRadius: 8 }} />}
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 900, color: dark, letterSpacing: 1 }}>{biz.name.toUpperCase()}</div>
-            {biz.tagline && <div style={{ color: amber, fontSize: 11, fontWeight: 600, marginBottom: 4 }}>{biz.tagline}</div>}
-            {biz.address && <div style={{ fontSize: 10, color: gray, display: 'flex', alignItems: 'center', gap: 4 }}>📍 {biz.address}</div>}
-            {biz.phone && <div style={{ fontSize: 10, color: gray, display: 'flex', alignItems: 'center', gap: 4 }}>📞 {biz.phone}</div>}
-            {biz.email && <div style={{ fontSize: 10, color: gray, display: 'flex', alignItems: 'center', gap: 4 }}>✉️ {biz.email}</div>}
-          </div>
-        </div>
-
-        {/* Right: INVOICE label + meta */}
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 28, fontWeight: 900, color: amber, letterSpacing: 2 }}>INVOICE</div>
-          <table style={{ marginLeft: 'auto', fontSize: 10, borderCollapse: 'collapse' }}>
-            <tbody>
-              {[
-                ['Invoice No.', invoice.number],
-                ['Invoice Date', invoice.date],
-                ...(invoice.dueDate ? [['Due Date', invoice.dueDate]] : []),
-                ['Status', invoice.status],
-              ].map(([label, value]) => (
-                <tr key={label}>
-                  <td style={{ fontWeight: 700, color: gray, paddingRight: 8, paddingBottom: 3 }}>{label}</td>
-                  <td style={{ color: dark, paddingBottom: 3 }}>: {value}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Amber divider */}
-      <div style={{ height: 2, background: amber, margin: '0 40px' }} />
-
-      {/* Bill To + Thank You */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 40px', alignItems: 'flex-start' }}>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-          <div style={{ width: 36, height: 36, borderRadius: '50%', border: `2px solid ${amber}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={amber} strokeWidth="2">
-              <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-            </svg>
-          </div>
-          <div>
-            <div style={{ color: amber, fontWeight: 700, fontSize: 11, letterSpacing: 1 }}>BILL TO</div>
-            <div style={{ fontWeight: 800, fontSize: 14, color: dark }}>{client.name}</div>
-            {client.address && <div style={{ fontSize: 10, color: gray }}>{client.address}</div>}
-            {client.email && <div style={{ fontSize: 10, color: gray }}>{client.email}</div>}
-          </div>
-        </div>
-
-        {/* Thank you box */}
-        <div style={{ border: `1.5px solid ${amber}`, borderRadius: 8, padding: '8px 14px', display: 'flex', gap: 10, alignItems: 'center', maxWidth: 220 }}>
-          <div style={{ width: 36, height: 36, border: `2px solid ${amber}`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={amber} strokeWidth="2">
-              <rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/>
-              <line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/>
-            </svg>
-          </div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 11, color: dark }}>Thank you for your business!</div>
-            <div style={{ fontSize: 10, color: gray }}>We appreciate your patronage.</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Items table */}
-      <div style={{ margin: '0 40px' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-          <thead>
-            <tr style={{ background: dark, color: 'white' }}>
-              <th style={{ padding: '10px 12px', textAlign: 'left', width: 30 }}>#</th>
-              <th style={{ padding: '10px 12px', textAlign: 'left' }}>DESCRIPTION</th>
-              <th style={{ padding: '10px 12px', textAlign: 'center', width: 60 }}>QTY</th>
-              <th style={{ padding: '10px 12px', textAlign: 'right', width: 120 }}>RATE</th>
-              <th style={{ padding: '10px 12px', textAlign: 'right', width: 120 }}>AMOUNT</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.filter(i => i.description).map((item, idx) => {
-              const qty = parseFloat(item.quantity) || 0;
-              const price = parseFloat(item.unitPrice) || 0;
-              return (
-                <tr key={idx} style={{ background: idx % 2 === 1 ? '#f7f7f7' : 'white' }}>
-                  <td style={{ padding: '10px 12px', borderBottom: '1px solid #eee' }}>{idx + 1}</td>
-                  <td style={{ padding: '10px 12px', borderBottom: '1px solid #eee' }}>{item.description}</td>
-                  <td style={{ padding: '10px 12px', textAlign: 'center', borderBottom: '1px solid #eee' }}>{qty}</td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', borderBottom: '1px solid #eee' }}>{fmt(price, invoice.currency)}</td>
-                  <td style={{ padding: '10px 12px', textAlign: 'right', borderBottom: '1px solid #eee' }}>{fmt(qty * price, invoice.currency)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Notes + Totals */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 40px', gap: 20 }}>
-        {/* Notes */}
-        <div style={{ flex: 1 }}>
-          {invoice.notes && (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <div style={{ width: 28, height: 28, border: `2px solid ${amber}`, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={amber} strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14 2 14 8 20 8"/>
-                    <line x1="16" y1="13" x2="8" y2="13"/>
-                    <line x1="16" y1="17" x2="8" y2="17"/>
-                  </svg>
-                </div>
-                <span style={{ color: amber, fontWeight: 700, fontSize: 11, letterSpacing: 1 }}>NOTES</span>
-              </div>
-              <div style={{ fontSize: 10, color: gray, marginLeft: 34 }}>{invoice.notes}</div>
-            </>
-          )}
-        </div>
-
-        {/* Totals */}
-        <div style={{ minWidth: 260 }}>
-          {[
-            ['Subtotal', subtotal],
-            ...(discountAmt > 0 ? [[`Discount (${invoice.discount}%)`, -discountAmt]] : []),
-            [`Tax (${invoice.tax || 0}%)`, taxAmt],
-          ].map(([label, value]) => (
-            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, paddingBottom: 6, borderBottom: '1px dashed #eee', marginBottom: 6 }}>
-              <span style={{ color: gray }}>{label}</span>
-              <span style={{ color: dark }}>{fmt(Math.abs(value), invoice.currency)}</span>
-            </div>
-          ))}
-          <div style={{ background: amber, borderRadius: 6, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-            <span style={{ color: 'white', fontWeight: 700, fontSize: 12 }}>TOTAL DUE</span>
-            <span style={{ color: 'white', fontWeight: 900, fontSize: 15 }}>{fmt(total, invoice.currency)}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Payment Methods + Bank Details */}
-      {(activeMethods.length > 0 || hasBankDetails) && (
-        <div style={{ display: 'flex', gap: 12, margin: '0 40px 16px', }}>
-          {activeMethods.length > 0 && (
-            <div style={{ flex: 1, border: `1px solid #eee`, borderRadius: 8, padding: '10px 14px', background: '#fafafa' }}>
-              <div style={{ color: amber, fontWeight: 700, fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>PAYMENT METHODS</div>
-              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                {activeMethods.map(({ label, icon }) => (
-                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: dark }}>
-                    <span style={{ fontSize: 16 }}>{icon}</span> {label}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {hasBankDetails && (
-            <div style={{ flex: 1, border: `1px solid #eee`, borderRadius: 8, padding: '10px 14px', background: '#fafafa' }}>
-              <div style={{ color: amber, fontWeight: 700, fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>BANK DETAILS</div>
-              {invoice.bankName && <div style={{ fontSize: 10, color: dark, marginBottom: 3 }}>Bank Name &nbsp;&nbsp;&nbsp;: {invoice.bankName}</div>}
-              {invoice.bankAccountName && <div style={{ fontSize: 10, color: dark, marginBottom: 3 }}>Account Name : {invoice.bankAccountName}</div>}
-              {invoice.bankAccount && <div style={{ fontSize: 10, color: dark }}>Account No. &nbsp;: {invoice.bankAccount}</div>}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Footer */}
-      <div style={{ background: dark, padding: '16px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-            <div style={{ width: 32, height: 32, border: `2px solid ${amber}`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={amber} strokeWidth="2.5">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-            </div>
-            <div>
-              <div style={{ color: amber, fontWeight: 900, fontSize: 16, fontStyle: 'italic' }}>Thank You!</div>
-              <div style={{ color: '#aaa', fontSize: 9 }}>We look forward to serving you again.</div>
-            </div>
-          </div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          {biz.phone && <div style={{ color: '#ccc', fontSize: 10, marginBottom: 3 }}>📞 {biz.phone}</div>}
-          {biz.email && <div style={{ color: '#ccc', fontSize: 10, marginBottom: 3 }}>✉️ {biz.email}</div>}
-          {biz.address && <div style={{ color: '#ccc', fontSize: 10 }}>📍 {biz.address}</div>}
-        </div>
-      </div>
-
-      {/* Bottom tag */}
-      <div style={{ textAlign: 'center', padding: '6px', fontSize: 8, color: '#aaa' }}>
-        Generated by convertam.app
-      </div>
-    </div>
-  );
+function clamp(v, a, b) {
+  return Math.max(a, Math.min(b, v));
 }
 
-// ── MAIN COMPONENT ──
-export default function InvoiceGeneratorWorkspace() {
-  const [savedBiz, setSavedBiz] = useState(null);
-  const [editingBiz, setEditingBiz] = useState(false);
-  const [logo, setLogo] = useState(null);
-  const [biz, setBiz] = useState({ name: '', tagline: '', address: '', phone: '', email: '' });
-  const [client, setClient] = useState({ name: '', address: '', email: '' });
-  const [invoice, setInvoice] = useState({
-    number: autoInvNum(),
-    date: new Date().toISOString().slice(0, 10),
-    dueDate: '',
-    currency: 'NGN',
-    tax: '',
-    discount: '',
-    notes: 'Thank you for your Patronage.',
-    paymentMethods: { cash: true, bankTransfer: true, pos: true, ussd: true },
-    bankName: '', bankAccount: '', bankAccountName: '',
-    status: 'Pending',
+// One-time seed from the classic Invoice Generator's saved business profile,
+// applied to a freshly picked template so returning users don't start from
+// the sample "Nimbus Office Supplies" data. Read-only — never mutates the
+// legacy key, which the old tool still owns until it's retired.
+function applyLegacySeed(elements) {
+  const legacy = readLegacyBizProfile();
+  if (!legacy || !legacy.name) return elements;
+  return elements.map((el) => {
+    if (el.id === 'logo' && legacy.logoDataUrl) return { ...el, src: legacy.logoDataUrl };
+    if (el.id === 'companyText') return { ...el, name: legacy.name, tagline: legacy.tagline || el.tagline };
+    if (el.id === 'contactInfo') return { ...el, phone: legacy.phone || '', email: legacy.email || '', address: legacy.address || '', website: '' };
+    return el;
   });
-  const [items, setItems] = useState([emptyItem()]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [generated, setGenerated] = useState(false);
-  const [lastBlob, setLastBlob] = useState(null);
-  const [lastFilename, setLastFilename] = useState('');
-  const fileInputRef = useRef(null);
+}
+
+const emptyDoc = () => ({
+  elements: [], brandPrimary: '#2563EB', brandSecondary: '#0F172A', brandAccent: '#10B981',
+  headingFont: 'Poppins', bodyFont: 'Inter', currency: DEFAULT_CURRENCY, discount: DEFAULT_DISCOUNT, vatRate: DEFAULT_VAT_RATE,
+});
+
+const emptyRow = (vatRate) => ({ name: '', desc: '', qty: 1, rate: 0, vat: vatRate, img: null });
+
+export default function InvoiceStudioWorkspace() {
+  const [view, setView] = useState('gallery');
+  const [templateId, setTemplateId] = useState('modern');
+  const [doc, setDoc] = useState(emptyDoc);
+  const [history, setHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [zoom, setZoom] = useState(ZOOM_DEFAULT);
+  const [zoomIsManual, setZoomIsManual] = useState(false); // true once the user clicks +/- ; reset whenever a template opens
+  const [panelTab, setPanelTab] = useState('content');
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [toast, setToast] = useState('');
+  const [savedDraftMeta, setSavedDraftMeta] = useState(null);
+  const toastTimerRef = useRef(null);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const p = JSON.parse(saved);
-        setSavedBiz(p);
-        if (p.biz) setBiz(p.biz);
-        if (p.logo) setLogo(p.logo);
-        if (p.invoice) setInvoice(prev => ({ ...prev, ...p.invoice, number: prev.number, date: prev.date, dueDate: '', status: 'Pending', notes: prev.notes, paymentMethods: p.invoice.paymentMethods || { cash: true, bankTransfer: true, pos: true, ussd: true } }));
-      }
-    } catch {}
+    const d = loadDraft();
+    if (d) setSavedDraftMeta({ templateId: d.templateId, savedAt: d.savedAt });
   }, []);
 
-  function saveProfile() {
-    if (!biz.name) { setError('Please enter your business name first.'); return; }
-    const profile = { biz, logo, invoice: { currency: invoice.currency, paymentMethods: invoice.paymentMethods, bankName: invoice.bankName, bankAccount: invoice.bankAccount, bankAccountName: invoice.bankAccountName } };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-    setSavedBiz(profile);
-    setEditingBiz(false);
-    setError('');
-  }
+  const showToast = useCallback((msg, durationMs = 2200) => {
+    clearTimeout(toastTimerRef.current);
+    setToast(msg);
+    toastTimerRef.current = setTimeout(() => setToast(''), durationMs);
+  }, []);
 
-  function clearProfile() {
-    localStorage.removeItem(STORAGE_KEY);
-    setSavedBiz(null);
-    setBiz({ name: '', tagline: '', address: '', phone: '', email: '' });
-    setLogo(null);
-  }
+  // Mirrors of `doc`/`historyIndex` that update synchronously (inside the
+  // setState updater itself, not on the next render). Drag/resize event
+  // listeners are bound once at mousedown and would otherwise close over
+  // whatever `doc`/`historyIndex` were at that instant — reading these refs
+  // instead of the plain state variables is what makes pushHistory() commit
+  // the value *after* the interaction, not a stale snapshot from before it.
+  const docRef = useRef(doc);
+  const historyIndexRef = useRef(historyIndex);
+  // ResizeObserver's callback (inside Canvas) is created once and needs the
+  // CURRENT zoomIsManual value at call time, not whatever it was when the
+  // effect first ran — a ref avoids the stale-closure trap a plain state
+  // read inside a dependency-less callback would otherwise hit.
+  const zoomIsManualRef = useRef(false);
+  useEffect(() => { zoomIsManualRef.current = zoomIsManual; }, [zoomIsManual]);
 
-  function handleLogo(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => setLogo(ev.target.result);
-    reader.readAsDataURL(file);
-  }
+  const updateDoc = useCallback((patch) => {
+    setDoc((prev) => {
+      const next = typeof patch === 'function' ? patch(prev) : { ...prev, ...patch };
+      docRef.current = next;
+      return next;
+    });
+  }, []);
 
-  function updateItem(i, field, value) {
-    const updated = [...items];
-    updated[i][field] = value;
-    setItems(updated);
-  }
+  const pushHistory = useCallback(() => {
+    setHistory((h) => {
+      const trimmed = h.slice(0, historyIndexRef.current + 1);
+      trimmed.push({ ...docRef.current, elements: cloneElements(docRef.current.elements) });
+      if (trimmed.length > HISTORY_LIMIT) trimmed.shift();
+      historyIndexRef.current = trimmed.length - 1;
+      setHistoryIndex(historyIndexRef.current);
+      return trimmed;
+    });
+  }, []);
 
-  const subtotal = items.reduce((s, i) => s + (parseFloat(i.quantity)||0) * (parseFloat(i.unitPrice)||0), 0);
-  const discountAmt = subtotal * ((parseFloat(invoice.discount)||0) / 100);
-  const taxAmt = (subtotal - discountAmt) * ((parseFloat(invoice.tax)||0) / 100);
-  const total = subtotal - discountAmt + taxAmt;
+  const openTemplate = useCallback((id) => {
+    // Templates are skins — if there's already a document in progress
+    // (this is a template swap, not the very first launch), the current
+    // content is preserved and merged into the new template's layout via
+    // applyTemplateSkin. Only a genuine fresh start seeds the sample data.
+    const hasExistingDoc = docRef.current.elements.length > 0;
+    const seeded = hasExistingDoc ? applyTemplateSkin(docRef.current.elements, id) : applyLegacySeed(buildTemplateElements(id));
+    const defaults = TEMPLATE_DEFAULTS[id] || TEMPLATE_DEFAULTS.modern;
+    // Currency/discount/VAT rate are data, not styling — carried over on a
+    // swap. Brand colors/fonts are the "skin" itself, so the new template's
+    // own defaults apply, same as picking a different Canva template would
+    // change its color scheme without touching your text.
+    const initial = hasExistingDoc
+      ? { ...docRef.current, elements: seeded, ...defaults }
+      : { ...emptyDoc(), elements: seeded, ...defaults };
+    setTemplateId(id);
+    docRef.current = initial;
+    setDoc(initial);
+    setPanelTab('content');
+    setView('editor');
+    setZoomIsManual(false);
+    historyIndexRef.current = 0;
+    setHistory([{ ...initial, elements: cloneElements(seeded) }]);
+    setHistoryIndex(0);
+  }, []);
 
-  async function handleGenerate() {
-    if (!biz.name || !client.name || items.every(i => !i.description)) {
-      setError('Please fill in your business name, client name, and at least one item.');
-      return;
-    }
-    setBusy(true);
-    setError('');
+  const resumeDraft = useCallback(() => {
+    const d = loadDraft();
+    if (!d) { showToast('No draft found'); return; }
+    const restored = { ...d.doc, elements: cloneElements(d.doc.elements) };
+    setTemplateId(d.templateId);
+    docRef.current = restored;
+    setDoc(restored);
+    setPanelTab('content');
+    setView('editor');
+    setZoomIsManual(false);
+    historyIndexRef.current = 0;
+    setHistory([{ ...restored, elements: cloneElements(restored.elements) }]);
+    setHistoryIndex(0);
+  }, [showToast]);
+
+  const goToGallery = useCallback(() => setView('gallery'), []);
+
+  const restoreSnapshot = useCallback((snap) => {
+    const restored = { ...snap, elements: cloneElements(snap.elements) };
+    docRef.current = restored;
+    setDoc(restored);
+  }, []);
+
+  const undo = useCallback(() => {
+    if (historyIndexRef.current <= 0) return;
+    const idx = historyIndexRef.current - 1;
+    historyIndexRef.current = idx;
+    setHistoryIndex(idx);
+    restoreSnapshot(history[idx]);
+  }, [history, restoreSnapshot]);
+
+  const redo = useCallback(() => {
+    if (historyIndexRef.current >= history.length - 1) return;
+    const idx = historyIndexRef.current + 1;
+    historyIndexRef.current = idx;
+    setHistoryIndex(idx);
+    restoreSnapshot(history[idx]);
+  }, [history, restoreSnapshot]);
+
+  // Every one-shot edit (a blur, a click, a picker change) follows the same
+  // shape: patch the doc, then immediately commit it as one history step —
+  // never one step per keystroke, and never silently uncommitted.
+  const patchElement = useCallback((elId, patch) => {
+    updateDoc((prev) => ({ ...prev, elements: prev.elements.map((e) => (e.id === elId ? { ...e, ...patch } : e)) }));
+  }, [updateDoc]);
+
+  const commitElementPatch = useCallback((elId, patch) => {
+    patchElement(elId, patch);
+    pushHistory();
+  }, [patchElement, pushHistory]);
+
+  const handleBrandChange = useCallback((key, value) => {
+    updateDoc({ [key]: value });
+    pushHistory();
+  }, [updateDoc, pushHistory]);
+
+  const handleDocSettingChange = useCallback((key, value) => {
+    updateDoc({ [key]: value });
+  }, [updateDoc]);
+
+  const commitDocSetting = useCallback(() => pushHistory(), [pushHistory]);
+
+  const onFieldBlur = useCallback((elId, field, value) => {
+    commitElementPatch(elId, { [field]: value });
+  }, [commitElementPatch]);
+
+  const onMetaRowBlur = useCallback((elId, rowKey, value) => {
+    updateDoc((prev) => ({
+      ...prev,
+      elements: prev.elements.map((e) => (e.id !== elId ? e : { ...e, rows: e.rows.map((r) => (r.key === rowKey ? { ...r, value } : r)) })),
+    }));
+    pushHistory();
+  }, [updateDoc, pushHistory]);
+
+  const onBankRowBlur = useCallback((elId, idx, value) => {
+    updateDoc((prev) => ({
+      ...prev,
+      elements: prev.elements.map((e) => (e.id !== elId ? e : { ...e, rows: e.rows.map((r, i) => (i === idx ? { ...r, v: value } : r)) })),
+    }));
+    pushHistory();
+  }, [updateDoc, pushHistory]);
+
+  const onRowFieldBlur = useCallback((tableId, idx, field, value, isNumber) => {
+    const v = isNumber ? (parseFloat(String(value).replace(/[^0-9.-]/g, '')) || 0) : value;
+    updateDoc((prev) => ({
+      ...prev,
+      elements: prev.elements.map((e) => (e.id !== tableId ? e : { ...e, rows: e.rows.map((r, i) => (i === idx ? { ...r, [field]: v } : r)) })),
+    }));
+    pushHistory();
+  }, [updateDoc, pushHistory]);
+
+  const onAddRow = useCallback((tableId) => {
+    updateDoc((prev) => ({
+      ...prev,
+      elements: prev.elements.map((e) => (e.id !== tableId ? e : { ...e, rows: [...e.rows, emptyRow(prev.vatRate)] })),
+    }));
+    pushHistory();
+  }, [updateDoc, pushHistory]);
+
+  const onRemoveRow = useCallback((tableId, idx) => {
+    updateDoc((prev) => ({
+      ...prev,
+      elements: prev.elements.map((e) => (e.id !== tableId ? e : { ...e, rows: e.rows.length > 1 ? e.rows.filter((_, i) => i !== idx) : e.rows })),
+    }));
+    pushHistory();
+  }, [updateDoc, pushHistory]);
+
+  const onMoveRow = useCallback((tableId, idx, dir) => {
+    updateDoc((prev) => ({
+      ...prev,
+      elements: prev.elements.map((e) => {
+        if (e.id !== tableId) return e;
+        const target = idx + dir;
+        if (target < 0 || target >= e.rows.length) return e;
+        const rows = [...e.rows];
+        [rows[idx], rows[target]] = [rows[target], rows[idx]];
+        return { ...e, rows };
+      }),
+    }));
+    pushHistory();
+  }, [updateDoc, pushHistory]);
+
+  const onTogglePaymentMethod = useCallback((elId, method) => {
+    updateDoc((prev) => ({
+      ...prev,
+      elements: prev.elements.map((e) => {
+        if (e.id !== elId) return e;
+        const has = e.methods.includes(method);
+        return { ...e, methods: has ? e.methods.filter((m) => m !== method) : [...e.methods, method] };
+      }),
+    }));
+    pushHistory();
+  }, [updateDoc, pushHistory]);
+
+  const onToggleVisible = useCallback((elId) => {
+    updateDoc((prev) => ({ ...prev, elements: prev.elements.map((e) => (e.id === elId ? { ...e, visible: !e.visible } : e)) }));
+    pushHistory();
+  }, [updateDoc, pushHistory]);
+
+  const onToggleTableImages = useCallback((tableId) => {
+    updateDoc((prev) => ({ ...prev, elements: prev.elements.map((e) => (e.id === tableId ? { ...e, showImages: !e.showImages } : e)) }));
+    pushHistory();
+  }, [updateDoc, pushHistory]);
+
+  // Returns an error string on failure, or null on success — callers show
+  // the error inline rather than failing silently.
+  const onImageUpload = useCallback(async (elId, file) => {
+    const err = validateImageFile(file);
+    if (err) return err;
     try {
-      // Wait for template to render
-      await new Promise(r => setTimeout(r, 300));
+      const dataUrl = await readFileAsDataURL(file);
+      commitElementPatch(elId, { src: dataUrl });
+      return null;
+    } catch (e) {
+      return e.message || 'Could not upload that image.';
+    }
+  }, [commitElementPatch]);
 
-      const el = document.getElementById('invoice-template');
-      if (!el) throw new Error('Template not found');
+  const onImageRemove = useCallback((elId) => {
+    commitElementPatch(elId, { src: null });
+  }, [commitElementPatch]);
 
-      // Dynamically import html2canvas
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        width: 794,
-      });
+  const onTableRowImageUpload = useCallback(async (tableId, idx, file) => {
+    const err = validateImageFile(file);
+    if (err) return err;
+    try {
+      const dataUrl = await readFileAsDataURL(file);
+      updateDoc((prev) => ({
+        ...prev,
+        elements: prev.elements.map((e) => (e.id !== tableId ? e : { ...e, rows: e.rows.map((r, i) => (i === idx ? { ...r, img: dataUrl } : r)) })),
+      }));
+      pushHistory();
+      return null;
+    } catch (e) {
+      return e.message || 'Could not upload that image.';
+    }
+  }, [updateDoc, pushHistory]);
 
-      const imgData = canvas.toDataURL('image/png');
+  const onTableRowImageRemove = useCallback((tableId, idx) => {
+    updateDoc((prev) => ({
+      ...prev,
+      elements: prev.elements.map((e) => (e.id !== tableId ? e : { ...e, rows: e.rows.map((r, i) => (i === idx ? { ...r, img: null } : r)) })),
+    }));
+    pushHistory();
+  }, [updateDoc, pushHistory]);
 
-      // Wrap in PDF
-      const pdfDoc = await PDFDocument.create();
-      const page = pdfDoc.addPage([canvas.width / 2, canvas.height / 2]);
-      const img = await pdfDoc.embedPng(imgData);
-      page.drawImage(img, { x: 0, y: 0, width: canvas.width / 2, height: canvas.height / 2 });
+  const onSignatureUpload = useCallback(async (elId, file) => {
+    const err = validateImageFile(file);
+    if (err) return err;
+    try {
+      const dataUrl = await readFileAsDataURL(file);
+      commitElementPatch(elId, { mode: 'image', src: dataUrl });
+      return null;
+    } catch (e) {
+      return e.message || 'Could not upload that image.';
+    }
+  }, [commitElementPatch]);
 
-      const pdfBytes = await pdfDoc.save();
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-      const fname = `Invoice-${invoice.number}-${client.name}.pdf`;
-      downloadBlob(blob, fname);
-      setLastBlob(blob);
-      setLastFilename(fname);
-      setGenerated(true);
+  const onSignatureDrawSave = useCallback((elId, dataUrl) => {
+    commitElementPatch(elId, { mode: 'image', src: dataUrl });
+  }, [commitElementPatch]);
+
+  const onSignatureTypedSave = useCallback((elId, text) => {
+    commitElementPatch(elId, { mode: 'typed', text });
+  }, [commitElementPatch]);
+
+  const onStampOpacityChange = useCallback((elId, opacity) => {
+    updateDoc((prev) => ({ ...prev, elements: prev.elements.map((e) => (e.id === elId ? { ...e, opacity } : e)) }));
+  }, [updateDoc]);
+
+  const commitStampOpacity = useCallback(() => pushHistory(), [pushHistory]);
+
+  const letterheadEl = doc.elements.find((e) => e.id === 'letterhead');
+
+  const onLetterheadSave = useCallback((dataUrl) => {
+    commitElementPatch('letterhead', { src: dataUrl, visible: true });
+    setCropModalOpen(false);
+  }, [commitElementPatch]);
+
+  const onLetterheadRemove = useCallback(() => {
+    commitElementPatch('letterhead', { src: null, visible: false });
+  }, [commitElementPatch]);
+
+  const onQrValueBlur = useCallback(async (elId, value) => {
+    const dataUrl = await generateQrDataUrl(value, { color: doc.brandSecondary });
+    commitElementPatch(elId, { value, src: dataUrl });
+  }, [commitElementPatch, doc.brandSecondary]);
+
+  const zoomIn = useCallback(() => { setZoomIsManual(true); setZoom((z) => clamp(Math.round((z + ZOOM_STEP) * 100) / 100, ZOOM_MIN, ZOOM_MAX)); }, []);
+  const zoomOut = useCallback(() => { setZoomIsManual(true); setZoom((z) => clamp(Math.round((z - ZOOM_STEP) * 100) / 100, ZOOM_MIN, ZOOM_MAX)); }, []);
+
+  // Reported by Canvas whenever the available preview space changes (window
+  // resize, sidebar toggling, etc.) — applied automatically unless the user
+  // has manually zoomed since the template was opened, so a resize never
+  // fights a deliberate zoom choice but always keeps the default state
+  // genuinely fit-to-page.
+  const handleFitZoomChange = useCallback((fitZoom) => {
+    setZoom((current) => (zoomIsManualRef.current ? current : clamp(Math.round(fitZoom * 100) / 100, ZOOM_MIN, ZOOM_MAX)));
+  }, []);
+
+  const resetToFit = useCallback(() => setZoomIsManual(false), []);
+
+  const tableEl = doc.elements.find((e) => e.kind === 'table');
+  const totals = useMemo(() => computeInvoiceTotals(tableEl ? tableEl.rows : [], doc.discount), [tableEl, doc.discount]);
+  const wordsText = useMemo(() => amountInWords(totals.total, doc.currency), [totals.total, doc.currency]);
+
+  const companyTextEl = doc.elements.find((e) => e.id === 'companyText');
+  // Recomputed fresh whenever doc.elements changes — this is what prevents
+  // a 6-item invoice from overlapping/clipping content that was positioned
+  // assuming the original 3-row sample. doc.elements itself is left as the
+  // "authored" state (field values, visibility, colors); only this derived
+  // array carries corrected positions for actual rendering.
+  const renderElements = useMemo(() => recomputeDynamicLayout(doc.elements), [doc.elements]);
+  const overflowsPage = useMemo(() => contentExceedsOnePage(doc.elements), [doc.elements]);
+
+  const ctx = useMemo(() => ({
+    headFont: fontStack(doc.headingFont), bodyFont: fontStack(doc.bodyFont),
+    brandPrimary: doc.brandPrimary, brandSecondary: doc.brandSecondary, brandAccent: doc.brandAccent,
+    companyName: companyTextEl?.name || '',
+    // The invoice preview is always read-only now — all editing happens
+    // through the sidebar ContentPanel, which calls these same mutation
+    // functions directly, not through contentEditable on the canvas.
+    currency: doc.currency, totals, wordsText, lineFor: computeItemLine, editable: false, pageLabel: 'Page 1 of 1',
+    onFieldBlur, onMetaRowBlur, onBankRowBlur, onRowFieldBlur, onAddRow, onRemoveRow, onMoveRow, onTogglePaymentMethod,
+    onTableRowImageUpload, onTableRowImageRemove,
+  }), [doc.headingFont, doc.bodyFont, doc.brandPrimary, doc.brandSecondary, doc.brandAccent, doc.currency, totals, wordsText, companyTextEl?.name,
+    onFieldBlur, onMetaRowBlur, onBankRowBlur, onRowFieldBlur, onAddRow, onRemoveRow, onMoveRow, onTogglePaymentMethod,
+    onTableRowImageUpload, onTableRowImageRemove]);
+
+  // Screenshots the actual rendered .cs-print DOM node (the same one the
+  // browser's own print/save-as-PDF targets) rather than redrawing the
+  // invoice from scratch via a separate PDF-drawing pipeline. That's a
+  // deliberate choice: a second independent rendering path is exactly how
+  // "the preview and the PDF don't match" bugs happen — screenshotting
+  // what's actually on screen makes mismatch structurally impossible.
+  const handleDownload = useCallback(async (format) => {
+    showToast('Preparing download…');
+    const filename = `Invoice-${templateId}-${Date.now()}`;
+    try {
+      if (format === 'pdf') {
+        // The PDF is Convertam's master output — real vector/text content,
+        // never a screenshot. It's built from the exact same computed
+        // element positions (renderElements) the on-screen preview uses, so
+        // the two stay structurally in sync without needing to look
+        // pixel-identical via a shared image.
+        const { renderInvoiceToPdf } = await import('@/lib/invoice-studio/pdfRenderer');
+        const pdfCtx = {
+          currency: doc.currency, totals, wordsText, pageLabel: 'Page 1 of 1',
+          brandPrimary: doc.brandPrimary, brandSecondary: doc.brandSecondary, brandAccent: doc.brandAccent,
+          companyName: companyTextEl?.name || '', headingFontName: doc.headingFont,
+        };
+        const bytes = await renderInvoiceToPdf(renderElements, pdfCtx);
+        downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${filename}.pdf`);
+      } else {
+        // PNG/JPG are genuinely image formats, so a screenshot of the actual
+        // rendered page is the right tool here — html2canvas is fine for
+        // these two, just not for the PDF master output.
+        const node = document.querySelector('.cs-print');
+        if (!node) return;
+        const html2canvas = (await import('html2canvas')).default;
+        const canvas = await html2canvas(node, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+        const mime = format === 'png' ? 'image/png' : 'image/jpeg';
+        canvas.toBlob((blob) => { if (blob) downloadBlob(blob, `${filename}.${format}`); }, mime, format === 'jpg' ? 0.92 : undefined);
+      }
+      showToast(`Downloaded as ${format.toUpperCase()}`);
     } catch (err) {
       console.error(err);
-      setError('Could not generate invoice. Please try again.');
-    } finally {
-      setBusy(false);
+      showToast(`Download failed: ${err?.message || String(err)}`, 15000);
     }
-  }
+  }, [templateId, showToast, doc.currency, doc.brandPrimary, doc.brandSecondary, doc.brandAccent, doc.headingFont, totals, wordsText, companyTextEl, renderElements]);
 
-  async function handleShare() {
-    if (!lastBlob || !lastFilename) return;
-
-    // Try native share (works on mobile — shows all apps including WhatsApp, Telegram, Gmail etc.)
-    if (navigator.share && navigator.canShare) {
-      try {
-        const file = new File([lastBlob], lastFilename, { type: 'application/pdf' });
-        if (navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            title: `Invoice #${invoice.number} from ${biz.name}`,
-            text: `Hello ${client.name},\n\nPlease find attached your invoice #${invoice.number} from ${biz.name}.\n\nTotal Due: ${fmt(total, invoice.currency)}\n\nGenerated via convertam.app`,
-            files: [file],
-          });
-          return;
-        }
-      } catch (err) {
-        if (err.name !== 'AbortError') console.error(err);
-        return;
-      }
-    }
-
-    // Fallback for desktop — copy message to clipboard
-    try {
-      await navigator.clipboard.writeText(
-        `Hello ${client.name},\n\nPlease find attached your invoice #${invoice.number} from ${biz.name}.\n\nTotal Due: ${fmt(total, invoice.currency)}\n\nGenerated via convertam.app`
-      );
-      alert('Message copied! Open WhatsApp or any app, find your contact, attach the downloaded PDF, and paste this message.');
-    } catch {
-      alert('To share: open WhatsApp or any app, find your contact, attach the downloaded PDF from your downloads folder.');
-    }
-  }
-
-  const s = sym(invoice.currency);
-  const ic = inputCls => 'w-full border rounded-lg px-3 py-2 text-sm';
-  const is = { borderColor: '#e2dcc9', background: '#fffefb' };
-  const lb = 'text-xs font-medium text-ink-soft block mb-1';
+  const templateName = (TEMPLATE_GALLERY.find((t) => t.id === templateId)?.name || 'Invoice') + ' Template';
 
   return (
-    <>
-      {/* Hidden invoice template rendered in DOM */}
-      <InvoiceTemplate
-        biz={biz} client={client} invoice={invoice}
-        items={items} logo={logo}
-        subtotal={subtotal} discountAmt={discountAmt}
-        taxAmt={taxAmt} total={total}
-      />
+    <div className={`${poppins.variable} ${inter.variable} ${caveat.variable}`} style={{ height: 'calc(100vh - 64px)', minHeight: 560, width: '100%', display: 'flex', fontFamily: 'var(--cs-font-inter), Inter, sans-serif', color: '#0F172A', overflow: 'hidden', background: '#F7F8FA' }}>
+      <div style={{ width: 88, flexShrink: 0, background: '#FFFFFF', borderRight: '1px solid #E7EAF0', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0', gap: 18 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#2563EB,#10B981)' }} />
+        <button
+          onClick={goToGallery}
+          aria-label="Template gallery"
+          style={{
+            width: 36, height: 36, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none',
+            color: view === 'gallery' ? '#2563EB' : '#94A3B8', background: view === 'gallery' ? '#EFF6FF' : 'transparent',
+          }}
+        >
+          <div style={{ width: 20, height: 20, borderRadius: 5, background: 'currentColor', opacity: 0.85 }} />
+        </button>
+      </div>
 
-      <div className="panel">
-        {/* Business profile */}
-        {savedBiz && !editingBiz ? (
-          <div className="rounded-xl p-4 mb-6 flex items-center justify-between gap-4" style={{ background: '#f0f5ff', border: '1.5px solid #3a63b8' }}>
-            <div className="flex items-center gap-3">
-              {logo
-                ? <img src={logo} alt="logo" className="rounded-lg object-contain flex-shrink-0" style={{ width: 44, height: 44 }} />
-                : <div className="rounded-lg flex items-center justify-center font-bold text-white flex-shrink-0" style={{ width: 44, height: 44, background: '#3a63b8', fontSize: 14 }}>{getInitials(biz.name)}</div>
-              }
-              <div>
-                <div className="font-bold text-ink">{biz.name}</div>
-                {biz.tagline && <div className="text-xs" style={{ color: '#e2962c' }}>{biz.tagline}</div>}
-                <div className="text-xs text-ink-soft">{[biz.phone, biz.address].filter(Boolean).join(' · ')}</div>
-              </div>
-            </div>
-            <div className="flex flex-col items-end gap-1 flex-shrink-0">
-              <span className="text-xs font-medium" style={{ color: '#2f8f5b' }}>✅ Saved on this device</span>
-              <button className="text-xs underline text-stamp-blue" onClick={() => setEditingBiz(true)}>✏️ Edit</button>
-              <button className="text-xs underline" style={{ color: '#cc4444' }} onClick={clearProfile}>🗑️ Clear</button>
-            </div>
-          </div>
-        ) : (
-          <div className="mb-6">
-            <h3 className="font-semibold text-ink mb-1 flex items-center gap-2">🏢 Your Business <span className="text-xs font-normal text-ink-soft">(saved to this device)</span></h3>
-            <p className="text-xs text-ink-soft mb-3">Fill in once — remembered for future invoices on this device.</p>
-            <div className="flex items-center gap-4 mb-4">
-              {logo && <img src={logo} alt="Logo" className="rounded-lg object-contain" style={{ width: 56, height: 56, border: '1px solid #e2dcc9' }} />}
-              <div>
-                <button className="btn-ghost-sm" onClick={() => fileInputRef.current?.click()}>{logo ? '🔄 Change logo' : '📁 Upload logo (optional)'}</button>
-                {logo && <button className="btn-ghost-sm ml-2" onClick={() => setLogo(null)}>✕ Remove</button>}
-                <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleLogo} />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-              <div><label className={lb}>Business Name *</label><input className={ic()} style={is} placeholder="OBG Noble Laundry" value={biz.name} onChange={e => setBiz({ ...biz, name: e.target.value })} /></div>
-              <div><label className={lb}>Tagline</label><input className={ic()} style={is} placeholder="Clean Clothes, Happy You." value={biz.tagline} onChange={e => setBiz({ ...biz, tagline: e.target.value })} /></div>
-              <div><label className={lb}>Address</label><input className={ic()} style={is} placeholder="Kajola, Sagamu" value={biz.address} onChange={e => setBiz({ ...biz, address: e.target.value })} /></div>
-              <div><label className={lb}>Phone</label><input className={ic()} style={is} placeholder="+234 800 000 0000" value={biz.phone} onChange={e => setBiz({ ...biz, phone: e.target.value })} /></div>
-              <div className="md:col-span-2"><label className={lb}>Email</label><input className={ic()} style={is} placeholder="you@example.com" value={biz.email} onChange={e => setBiz({ ...biz, email: e.target.value })} /></div>
-            </div>
-            <div className="flex gap-2">
-              <button className="btn btn-primary text-sm py-2 px-4" onClick={saveProfile}>💾 Save my business details</button>
-              {savedBiz && <button className="btn-ghost-sm" onClick={() => setEditingBiz(false)}>Cancel</button>}
-            </div>
-          </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {view === 'gallery' && (
+          <Gallery
+            onSelectTemplate={openTemplate}
+            hasSavedDraft={!!savedDraftMeta}
+            savedDraftTemplateName={savedDraftMeta ? (TEMPLATE_GALLERY.find((t) => t.id === savedDraftMeta.templateId)?.name || '') : ''}
+            onResumeDraft={resumeDraft}
+          />
         )}
 
-        {/* Client */}
-        <div className="mb-6">
-          <h3 className="font-semibold text-ink mb-3">👤 Client Details</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div><label className={lb}>Client Name *</label><input className={ic()} style={is} placeholder="Mr Jacob" value={client.name} onChange={e => setClient({ ...client, name: e.target.value })} /></div>
-            <div><label className={lb}>Address</label><input className={ic()} style={is} placeholder="Sagamu" value={client.address} onChange={e => setClient({ ...client, address: e.target.value })} /></div>
-            <div><label className={lb}>Email</label><input className={ic()} style={is} placeholder="client@example.com" value={client.email} onChange={e => setClient({ ...client, email: e.target.value })} /></div>
-          </div>
-        </div>
-
-        {/* Invoice details */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-          <div><label className={lb}>Invoice #</label><input className={ic()} style={is} value={invoice.number} onChange={e => setInvoice({ ...invoice, number: e.target.value })} /></div>
-          <div><label className={lb}>Date</label><input type="date" className={ic()} style={is} value={invoice.date} onChange={e => setInvoice({ ...invoice, date: e.target.value })} /></div>
-          <div><label className={lb}>Due Date</label><input type="date" className={ic()} style={is} value={invoice.dueDate} onChange={e => setInvoice({ ...invoice, dueDate: e.target.value })} /></div>
-          <div><label className={lb}>Currency</label>
-            <select className={ic()} style={is} value={invoice.currency} onChange={e => setInvoice({ ...invoice, currency: e.target.value })}>
-              {CURRENCIES.map(c => <option key={c} value={c}>{CURRENCY_SYMBOLS[c]} {c}</option>)}
-            </select>
-          </div>
-          <div><label className={lb}>Status</label>
-            <select className={ic()} style={is} value={invoice.status} onChange={e => setInvoice({ ...invoice, status: e.target.value })}>
-              {['Pending','Paid','Overdue','Draft'].map(s => <option key={s}>{s}</option>)}
-            </select>
-          </div>
-        </div>
-
-        {/* Items */}
-        <div className="mb-6">
-          <h3 className="font-semibold text-ink mb-3">📋 Items</h3>
-          <div className="flex flex-col gap-2">
-            {items.map((item, i) => (
-              <div key={i} className="grid gap-2" style={{ gridTemplateColumns: '3fr 1fr 1.5fr auto' }}>
-                <input className={ic()} style={is} placeholder="Description" value={item.description} onChange={e => updateItem(i, 'description', e.target.value)} />
-                <input className={ic()} style={is} placeholder="Qty" type="number" min="1" value={item.quantity} onChange={e => updateItem(i, 'quantity', e.target.value)} />
-                <input className={ic()} style={is} placeholder={`Unit price (${s})`} type="number" min="0" value={item.unitPrice} onChange={e => updateItem(i, 'unitPrice', e.target.value)} />
-                <button onClick={() => items.length > 1 && setItems(items.filter((_,idx) => idx !== i))} className="text-red-400 font-mono text-lg px-2" disabled={items.length === 1}>×</button>
+        {view === 'editor' && (
+          <>
+            <Toolbar
+              templateName={templateName}
+              canUndo={historyIndex > 0}
+              canRedo={historyIndex < history.length - 1}
+              onUndo={undo}
+              onRedo={redo}
+              zoom={zoom}
+              onZoomIn={zoomIn}
+              onZoomOut={zoomOut}
+              onResetToFit={resetToFit}
+              onDownload={handleDownload}
+              onBack={goToGallery}
+            />
+            {overflowsPage && (
+              <div style={{ padding: '8px 20px', background: '#FFFBEB', borderBottom: '1px solid #FDE68A', color: '#92400E', fontSize: 12.5, flexShrink: 0 }}>
+                This invoice's content is taller than one A4 page — some items or sections may be cut off in the exported PDF. Consider shortening descriptions, reducing line items, or hiding optional sections (Notes, Terms) in the Design panel.
               </div>
-            ))}
-          </div>
-          <button onClick={() => setItems([...items, emptyItem()])} className="btn-ghost-sm mt-2">+ Add item</button>
-        </div>
+            )}
+            <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+              {/* The invoice preview is display-only — no drag, no resize, no
+                  click-to-edit. Zoom and print are the only interactions. */}
+              <Canvas
+                elements={renderElements}
+                ctx={ctx}
+                zoom={zoom}
+                onFitZoomChange={handleFitZoomChange}
+              />
 
-        {/* Totals preview */}
-        <div className="rounded-xl p-4 mb-6" style={{ background: '#fffefb', border: '1px solid #e2dcc9' }}>
-          <div className="flex justify-between text-sm mb-2"><span className="text-ink-soft">Subtotal</span><span>{s}{subtotal.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span></div>
-          <div className="flex gap-4 mb-2 flex-wrap">
-            <div className="flex items-center gap-2"><span className="text-sm text-ink-soft">Discount (%)</span><input type="number" min="0" max="100" className="border rounded px-2 py-1 text-sm w-20" style={{ borderColor: '#e2dcc9' }} placeholder="0" value={invoice.discount} onChange={e => setInvoice({ ...invoice, discount: e.target.value })} /></div>
-            <div className="flex items-center gap-2"><span className="text-sm text-ink-soft">Tax (%)</span><input type="number" min="0" max="100" className="border rounded px-2 py-1 text-sm w-20" style={{ borderColor: '#e2dcc9' }} placeholder="0" value={invoice.tax} onChange={e => setInvoice({ ...invoice, tax: e.target.value })} /></div>
-          </div>
-          <div className="flex justify-between font-bold text-base pt-2" style={{ borderTop: '2px solid #e2962c', color: '#e2962c' }}>
-            <span>TOTAL DUE</span><span>{s}{total.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
-          </div>
-        </div>
-
-        {/* Payment methods */}
-        <div className="mb-6">
-          <h3 className="font-semibold text-ink mb-3">💳 Bank Details <span className="text-xs font-normal text-ink-soft">(all payment methods shown on invoice)</span></h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div><label className={lb}>Bank Name</label><input className={ic()} style={is} placeholder="First Bank of Nigeria" value={invoice.bankName} onChange={e => setInvoice({ ...invoice, bankName: e.target.value })} /></div>
-            <div><label className={lb}>Account Name</label><input className={ic()} style={is} placeholder="OBG Noble Laundry" value={invoice.bankAccountName} onChange={e => setInvoice({ ...invoice, bankAccountName: e.target.value })} /></div>
-            <div><label className={lb}>Account Number</label><input className={ic()} style={is} placeholder="2034025678" value={invoice.bankAccount} onChange={e => setInvoice({ ...invoice, bankAccount: e.target.value })} /></div>
-          </div>
-        </div>
-
-        {/* Notes */}
-        <div className="mb-6">
-          <label className={lb}>Notes</label>
-          <textarea className={ic()} style={{ ...is, minHeight: '60px', resize: 'vertical' }} value={invoice.notes} onChange={e => setInvoice({ ...invoice, notes: e.target.value })} />
-        </div>
-
-        {error && <div className="status error mb-3">{error}</div>}
-
-        <div className="actions flex-wrap gap-3">
-          <button className="btn btn-primary" disabled={busy} onClick={handleGenerate}>
-            {busy ? '⏳ Generating…' : '📄 Generate Invoice PDF'}
-          </button>
-          {generated && (
-            <button
-              className="btn flex items-center gap-2"
-              onClick={handleShare}
-              style={{ background: '#25D366', color: 'white', border: 'none', borderRadius: '8px', padding: '10px 16px', fontWeight: 600 }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-              </svg>
-              Share Invoice
-            </button>
-          )}
-        </div>
-        <p className="privacy-note mt-4">Generated entirely in your browser — nothing is uploaded or stored.</p>
+              <div style={{ width: 380, flexShrink: 0, background: '#fff', borderLeft: '1px solid #E7EAF0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', borderBottom: '1px solid #E7EAF0', flexShrink: 0 }}>
+                  {['content', 'design'].map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setPanelTab(tab)}
+                      style={{
+                        flex: 1, padding: '12px 0', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none',
+                        color: panelTab === tab ? '#2563EB' : '#8891A0',
+                        borderBottom: panelTab === tab ? '2px solid #2563EB' : '2px solid transparent',
+                      }}
+                    >
+                      {tab === 'content' ? 'Content' : 'Design'}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ flex: 1, overflow: 'auto', padding: 18 }}>
+                  {panelTab === 'content'
+                    ? (
+                      <ContentPanel
+                        elements={doc.elements}
+                        onFieldBlur={onFieldBlur}
+                        onMetaRowBlur={onMetaRowBlur}
+                        onBankRowBlur={onBankRowBlur}
+                        onRowFieldBlur={onRowFieldBlur}
+                        onAddRow={onAddRow}
+                        onRemoveRow={onRemoveRow}
+                        onMoveRow={onMoveRow}
+                        onTogglePaymentMethod={onTogglePaymentMethod}
+                        onTableRowImageUpload={onTableRowImageUpload}
+                        onTableRowImageRemove={onTableRowImageRemove}
+                        onQrValueBlur={onQrValueBlur}
+                        onImageUpload={onImageUpload}
+                        onImageRemove={onImageRemove}
+                        onOpenCrop={() => setCropModalOpen(true)}
+                        onLetterheadRemove={onLetterheadRemove}
+                        onSignatureUpload={onSignatureUpload}
+                        onSignatureDrawSave={onSignatureDrawSave}
+                        onSignatureTypedSave={onSignatureTypedSave}
+                        onStampOpacityChange={onStampOpacityChange}
+                        onCommitStampOpacity={commitStampOpacity}
+                        docSettings={{ currency: doc.currency, discount: doc.discount, vatRate: doc.vatRate }}
+                        onDocSettingChange={handleDocSettingChange}
+                        onCommitDocSetting={commitDocSetting}
+                        currencies={CURRENCIES}
+                      />
+                    )
+                    : (
+                      <DesignPanel
+                        brand={{ brandPrimary: doc.brandPrimary, brandSecondary: doc.brandSecondary, brandAccent: doc.brandAccent, headingFont: doc.headingFont, bodyFont: doc.bodyFont }}
+                        onBrandChange={handleBrandChange}
+                        elements={doc.elements}
+                        onToggleVisible={onToggleVisible}
+                        docSettings={{ currency: doc.currency, discount: doc.discount, vatRate: doc.vatRate }}
+                        onDocSettingChange={handleDocSettingChange}
+                        onCommitDocSetting={commitDocSetting}
+                        onImageUpload={onImageUpload}
+                        onImageRemove={onImageRemove}
+                        letterheadEl={letterheadEl}
+                        onOpenCrop={() => setCropModalOpen(true)}
+                        onLetterheadRemove={onLetterheadRemove}
+                      />
+                    )}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
-    </>
+
+      {cropModalOpen && letterheadEl && (
+        <LetterheadCropModal
+          targetW={letterheadEl.w}
+          targetH={letterheadEl.h}
+          initialSrc={letterheadEl.src}
+          onSave={onLetterheadSave}
+          onCancel={() => setCropModalOpen(false)}
+        />
+      )}
+
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#0F172A', color: '#fff', padding: '10px 18px', borderRadius: 8, fontSize: 13, zIndex: 60, maxWidth: 480, textAlign: 'center' }}>
+          {toast}
+        </div>
+      )}
+    </div>
   );
 }

@@ -292,7 +292,7 @@ export default function InvoiceStudioWorkspace() {
             onBack={goToGallery}
           />
           <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-            <div className="cs-flow-pages" style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+            <div className="cs-flow-pages" style={{ flex: 1, display: 'flex', minHeight: 0, minWidth: 0, overflow: 'hidden' }}>
               <FlowCanvas doc={doc} style={style} totals={totals} wordsText={wordsText} zoom={zoom} onFitZoomChange={handleFitZoomChange} />
             </div>
 

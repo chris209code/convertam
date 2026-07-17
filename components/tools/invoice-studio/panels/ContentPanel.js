@@ -111,10 +111,8 @@ function ClientSection({ clientInfo, onPatch }) {
   );
 }
 
-function InvoiceDetailsSection({ clientInfo, onPatch, currency, onCurrencyChange }) {
+function InvoiceDetailsSection({ clientInfo, onPatch, currency, onCurrencyChange, onInvoiceDateChange, onDueDateChange }) {
   const no = useFieldState(clientInfo.invoiceNo, (v) => onPatch('clientInfo', { invoiceNo: v }));
-  const date = useFieldState(clientInfo.invoiceDate, (v) => onPatch('clientInfo', { invoiceDate: v }));
-  const due = useFieldState(clientInfo.dueDate, (v) => onPatch('clientInfo', { dueDate: v }));
   const status = useFieldState(clientInfo.status, (v) => onPatch('clientInfo', { status: v }));
 
   return (
@@ -122,8 +120,14 @@ function InvoiceDetailsSection({ clientInfo, onPatch, currency, onCurrencyChange
       <div style={groupTitle}>Invoice Details</div>
       <div style={groupSub}>Invoice number, dates, status, and currency.</div>
       <Field label="Invoice Number" {...no} placeholder="INV-2026-0001" />
-      <Field label="Invoice Date" {...date} placeholder="e.g. Jul 15, 2026" />
-      <Field label="Due Date" {...due} placeholder="e.g. Jul 30, 2026" />
+      <div style={fieldWrap}>
+        <div style={miniLabel}>Invoice Date</div>
+        <input type="date" value={clientInfo.invoiceDate || ''} onChange={(e) => onInvoiceDateChange(e.target.value)} style={textInput} />
+      </div>
+      <div style={fieldWrap}>
+        <div style={miniLabel}>Due Date {!clientInfo.dueDateManual && <span style={{ color: '#94A3B8', fontWeight: 400 }}>(auto: 30 days after invoice date)</span>}</div>
+        <input type="date" value={clientInfo.dueDate || ''} onChange={(e) => onDueDateChange(e.target.value)} style={textInput} />
+      </div>
       <Field label="Status" {...status} placeholder="Unpaid / Paid / Overdue" />
       <div style={fieldWrap}>
         <div style={miniLabel}>Currency</div>
@@ -362,7 +366,7 @@ function SignatureSectionPanel({ signature, stamp, onPatch, onSignatureUpload, o
 }
 
 export default function ContentPanel({
-  sections, currency, onPatchSection, onCurrencyChange,
+  sections, currency, onPatchSection, onCurrencyChange, onInvoiceDateChange, onDueDateChange,
   onRowField, onAddRow, onRemoveRow, onMoveRow, onRowImageUpload, onRowImageRemove,
   onTogglePaymentMethod, onBankRowField, onPatchQr,
   onImageUpload, onImageRemove, onOpenCrop, onLetterheadRemove,
@@ -374,7 +378,7 @@ export default function ContentPanel({
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
       <ClientSection clientInfo={sections.clientInfo} onPatch={onPatchSection} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
-      <InvoiceDetailsSection clientInfo={sections.clientInfo} onPatch={onPatchSection} currency={currency} onCurrencyChange={onCurrencyChange} />
+      <InvoiceDetailsSection clientInfo={sections.clientInfo} onPatch={onPatchSection} currency={currency} onCurrencyChange={onCurrencyChange} onInvoiceDateChange={onInvoiceDateChange} onDueDateChange={onDueDateChange} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
       <ItemsSection itemsTable={sections.itemsTable} onRowField={onRowField} onAddRow={onAddRow} onRemoveRow={onRemoveRow} onMoveRow={onMoveRow} onRowImageUpload={onRowImageUpload} onRowImageRemove={onRowImageRemove} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />

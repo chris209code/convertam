@@ -3,11 +3,21 @@ const nextConfig = {
   // puppeteer-core and @sparticuz/chromium ship non-JS binary asset files
   // that webpack's normal bundling silently drops during build (a known,
   // documented issue: https://github.com/Sparticuz/chromium/issues/147).
-  // Marking them external tells Next.js to leave them untouched and load
-  // them via native Node require at runtime instead, so those files
-  // actually make it into the deployed serverless function.
+  // Marking them external stops webpack from mangling the import, but that
+  // alone does NOT get the actual .br binary archives (chromium.br,
+  // al2.tar.br, al2023.tar.br — the second two contain the shared
+  // libraries @sparticuz/chromium extracts to /tmp at runtime, including
+  // libnss3.so) into the deployed function. Vercel's file-tracing step is
+  // a separate mechanism from webpack and can't statically see the
+  // runtime-computed path @sparticuz/chromium uses to find its own binary,
+  // so those files silently never leave node_modules unless explicitly
+  // included below — this was the actual cause of the "libnss3.so: cannot
+  // open shared object file" launch failure in production.
   experimental: {
     serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
+    outputFileTracingIncludes: {
+      '/api/invoice-pdf': ['./node_modules/@sparticuz/chromium/bin/**/*'],
+    },
   },
   webpack: (config, { webpack }) => {
     // pptxgenjs (v4+) declares Node-only modules using the "node:" URI scheme

@@ -44,7 +44,7 @@ function DownloadMenu({ onDownload }) {
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => { alert('Download button was clicked — this popup is temporary, just for testing'); setOpen((o) => !o); }}
         style={{
           height: 36, padding: '0 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: '#fff',
           display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer',

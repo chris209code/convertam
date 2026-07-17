@@ -376,6 +376,44 @@ export default function InvoiceStudioWorkspace() {
   const zoomOut = useCallback(() => { setZoomIsManual(true); setZoom((z) => clamp(Math.round((z - ZOOM_STEP) * 100) / 100, ZOOM_MIN, ZOOM_MAX)); }, []);
   const handlePrint = useCallback(() => window.print(), []);
 
+  // Reported by Canvas whenever the available preview space changes (window
+  // resize, sidebar toggling, etc.) — applied automatically unless the user
+  // has manually zoomed since the template was opened, so a resize never
+  // fights a deliberate zoom choice but always keeps the default state
+  // genuinely fit-to-page.
+  const handleFitZoomChange = useCallback((fitZoom) => {
+    setZoom((current) => (zoomIsManualRef.current ? current : clamp(Math.round(fitZoom * 100) / 100, ZOOM_MIN, ZOOM_MAX)));
+  }, []);
+
+  const resetToFit = useCallback(() => setZoomIsManual(false), []);
+
+  const tableEl = doc.elements.find((e) => e.kind === 'table');
+  const totals = useMemo(() => computeInvoiceTotals(tableEl ? tableEl.rows : [], doc.discount), [tableEl, doc.discount]);
+  const wordsText = useMemo(() => amountInWords(totals.total, doc.currency), [totals.total, doc.currency]);
+
+  const companyTextEl = doc.elements.find((e) => e.id === 'companyText');
+  // Recomputed fresh whenever doc.elements changes — this is what prevents
+  // a 6-item invoice from overlapping/clipping content that was positioned
+  // assuming the original 3-row sample. doc.elements itself is left as the
+  // "authored" state (field values, visibility, colors); only this derived
+  // array carries corrected positions for actual rendering.
+  const renderElements = useMemo(() => recomputeDynamicLayout(doc.elements), [doc.elements]);
+  const overflowsPage = useMemo(() => contentExceedsOnePage(doc.elements), [doc.elements]);
+
+  const ctx = useMemo(() => ({
+    headFont: fontStack(doc.headingFont), bodyFont: fontStack(doc.bodyFont),
+    brandPrimary: doc.brandPrimary, brandSecondary: doc.brandSecondary, brandAccent: doc.brandAccent,
+    companyName: companyTextEl?.name || '',
+    // The invoice preview is always read-only now — all editing happens
+    // through the sidebar ContentPanel, which calls these same mutation
+    // functions directly, not through contentEditable on the canvas.
+    currency: doc.currency, totals, wordsText, lineFor: computeItemLine, editable: false, pageLabel: 'Page 1 of 1',
+    onFieldBlur, onMetaRowBlur, onBankRowBlur, onRowFieldBlur, onAddRow, onRemoveRow, onMoveRow, onTogglePaymentMethod,
+    onTableRowImageUpload, onTableRowImageRemove,
+  }), [doc.headingFont, doc.bodyFont, doc.brandPrimary, doc.brandSecondary, doc.brandAccent, doc.currency, totals, wordsText, companyTextEl?.name,
+    onFieldBlur, onMetaRowBlur, onBankRowBlur, onRowFieldBlur, onAddRow, onRemoveRow, onMoveRow, onTogglePaymentMethod,
+    onTableRowImageUpload, onTableRowImageRemove]);
+
   // Screenshots the actual rendered .cs-print DOM node (the same one the
   // browser's own print/save-as-PDF targets) rather than redrawing the
   // invoice from scratch via a separate PDF-drawing pipeline. That's a
@@ -417,44 +455,6 @@ export default function InvoiceStudioWorkspace() {
       showToast('Could not generate the download — please try again.');
     }
   }, [templateId, showToast, doc.currency, doc.brandPrimary, doc.brandSecondary, doc.brandAccent, doc.headingFont, totals, wordsText, companyTextEl, renderElements]);
-
-  // Reported by Canvas whenever the available preview space changes (window
-  // resize, sidebar toggling, etc.) — applied automatically unless the user
-  // has manually zoomed since the template was opened, so a resize never
-  // fights a deliberate zoom choice but always keeps the default state
-  // genuinely fit-to-page.
-  const handleFitZoomChange = useCallback((fitZoom) => {
-    setZoom((current) => (zoomIsManualRef.current ? current : clamp(Math.round(fitZoom * 100) / 100, ZOOM_MIN, ZOOM_MAX)));
-  }, []);
-
-  const resetToFit = useCallback(() => setZoomIsManual(false), []);
-
-  const tableEl = doc.elements.find((e) => e.kind === 'table');
-  const totals = useMemo(() => computeInvoiceTotals(tableEl ? tableEl.rows : [], doc.discount), [tableEl, doc.discount]);
-  const wordsText = useMemo(() => amountInWords(totals.total, doc.currency), [totals.total, doc.currency]);
-
-  const companyTextEl = doc.elements.find((e) => e.id === 'companyText');
-  // Recomputed fresh whenever doc.elements changes — this is what prevents
-  // a 6-item invoice from overlapping/clipping content that was positioned
-  // assuming the original 3-row sample. doc.elements itself is left as the
-  // "authored" state (field values, visibility, colors); only this derived
-  // array carries corrected positions for actual rendering.
-  const renderElements = useMemo(() => recomputeDynamicLayout(doc.elements), [doc.elements]);
-  const overflowsPage = useMemo(() => contentExceedsOnePage(doc.elements), [doc.elements]);
-
-  const ctx = useMemo(() => ({
-    headFont: fontStack(doc.headingFont), bodyFont: fontStack(doc.bodyFont),
-    brandPrimary: doc.brandPrimary, brandSecondary: doc.brandSecondary, brandAccent: doc.brandAccent,
-    companyName: companyTextEl?.name || '',
-    // The invoice preview is always read-only now — all editing happens
-    // through the sidebar ContentPanel, which calls these same mutation
-    // functions directly, not through contentEditable on the canvas.
-    currency: doc.currency, totals, wordsText, lineFor: computeItemLine, editable: false, pageLabel: 'Page 1 of 1',
-    onFieldBlur, onMetaRowBlur, onBankRowBlur, onRowFieldBlur, onAddRow, onRemoveRow, onMoveRow, onTogglePaymentMethod,
-    onTableRowImageUpload, onTableRowImageRemove,
-  }), [doc.headingFont, doc.bodyFont, doc.brandPrimary, doc.brandSecondary, doc.brandAccent, doc.currency, totals, wordsText, companyTextEl?.name,
-    onFieldBlur, onMetaRowBlur, onBankRowBlur, onRowFieldBlur, onAddRow, onRemoveRow, onMoveRow, onTogglePaymentMethod,
-    onTableRowImageUpload, onTableRowImageRemove]);
 
   const templateName = (TEMPLATE_GALLERY.find((t) => t.id === templateId)?.name || 'Invoice') + ' Template';
 

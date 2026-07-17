@@ -103,7 +103,10 @@ export function ItemsTableSection({ data, style: tokens, currency }) {
   if (!data.visible) return null;
   const body = fontCss(tokens.bodyFont);
   const outline = tokens.tableHeaderStyle === 'outline';
-  const showImages = data.showImages && data.rows.some((r) => r.img);
+  // The image column shows automatically whenever at least one row has an
+  // uploaded product image — there's no separate manual toggle to forget
+  // to flip on, so an uploaded image is never silently invisible.
+  const showImages = data.rows.some((r) => r.img);
 
   const headCellStyle = {
     fontFamily: body, fontSize: 11, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase',
@@ -164,21 +167,34 @@ export function ItemsTableSection({ data, style: tokens, currency }) {
   );
 }
 
-export function TotalsSection({ data, style: tokens, currency, totals, wordsText }) {
+// QR renders in the gap between "Total in words" and the totals box when
+// Bank Details is showing (per the approved layout) — the totals box
+// itself never moves or changes size, it's still the same fixed-width
+// flexShrink:0 element anchored at the end of the row; QR just becomes a
+// new sibling before it, occupying white space that was previously empty.
+// When Bank Details is off, QR moves down into BankSignatureSection
+// instead so this space stays clean rather than showing QR with nothing
+// next to it.
+export function TotalsSection({ data, style: tokens, currency, totals, wordsText, qr, bank }) {
   if (!data.visible) return null;
   const body = fontCss(tokens.bodyFont), head = fontCss(tokens.headingFont);
   const bg = tokens.totalsBg === 'tan' ? '#FBF3E3' : tokens.totalsBg === 'plain' ? 'transparent' : '#F7F8FA';
+  const showQrHere = bank?.visible && qr?.visible && qr.src;
   const line = (label, value, big) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: body, fontSize: big ? 15 : 12.5, fontWeight: big ? 700 : 400, color: big ? tokens.brandPrimary : tokens.textGray, marginTop: big ? 10 : 6, paddingTop: big ? 10 : 0, borderTop: big ? `1px solid ${tokens.divider}` : 'none' }}>
       <span>{label}</span><span style={{ color: big ? tokens.brandPrimary : tokens.textDark }}>{value}</span>
     </div>
   );
   return (
-    <Section style={{ display: 'flex', justifyContent: 'space-between', gap: 24, alignItems: 'flex-start' }}>
+    <Section style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontFamily: body, fontSize: 10.5, color: tokens.textMuted, letterSpacing: '.05em', textTransform: 'uppercase' }}>Total in words</div>
         <div style={{ fontFamily: head, fontWeight: 600, fontSize: 13, color: tokens.textDark, marginTop: 4, lineHeight: 1.5 }}>{wordsText}</div>
       </div>
+      {showQrHere && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={qr.src} alt="Payment QR code" style={{ width: 72, height: 72, objectFit: 'contain', flexShrink: 0 }} />
+      )}
       <div style={{ width: 230, flexShrink: 0, background: bg, borderRadius: 10, padding: '14px 16px' }}>
         {line('Subtotal', formatMoney(totals.subtotal, currency))}
         {line('VAT', formatMoney(totals.vat, currency))}
@@ -200,33 +216,20 @@ export function NotesSection({ data, style: tokens }) {
   );
 }
 
-const PAYMENT_ICONS = { 'Bank Transfer': '🏦', POS: '💳', USSD: '📱', Cash: '💵' };
-
-// Payment Methods, Bank Details, and Signature render as three columns of
-// ONE flex row (one <Section>), not three separately-stacked sections —
-// that was the actual cause of Signature visually "drifting downward"
-// below Payment/Bank instead of sitting in the same row: it was a wholly
-// separate block-level section underneath them, not a column beside them.
-// Keeping them as one section also means they can't be split across a page
-// break from each other during pagination.
-export function PaymentBankSection({ payment, bank, signature, style: tokens }) {
-  if (!payment.visible && !bank.visible && !signature?.visible) return null;
+// Bank Details and Signature render as columns of ONE flex row (one
+// <Section>), not separately-stacked sections — that keeps them from ever
+// splitting across a page break from each other during pagination. QR only
+// appears here (filling Bank's spot) when Bank Details is turned off —
+// otherwise it renders up in TotalsSection instead, per the approved
+// layout, so it's never shown in both places at once.
+export function BankSignatureSection({ bank, signature, qr, style: tokens }) {
+  const showQrHere = !bank.visible && qr?.visible && qr.src;
+  if (!bank.visible && !signature?.visible && !showQrHere) return null;
   const head = fontCss(tokens.headingFont), body = fontCss(tokens.bodyFont);
   const isTyped = signature && (signature.mode === 'typed' || !signature.mode);
+  const signatureSize = signature?.size ?? 40;
   return (
     <Section style={{ display: 'flex', gap: 32, alignItems: 'flex-start' }}>
-      {payment.visible && (
-        <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: body, fontSize: 11, fontWeight: 700, letterSpacing: '.05em', color: tokens.brandAccent, marginBottom: 8 }}>PAYMENT METHODS</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {payment.methods.map((m) => (
-              <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderRadius: 9, border: `1px solid ${tokens.divider}`, fontFamily: body, fontSize: 12, color: tokens.textDark }}>
-                <span>{PAYMENT_ICONS[m]}</span>{m}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
       {bank.visible && (
         <div style={{ flex: 1 }}>
           <div style={{ fontFamily: body, fontSize: 11, fontWeight: 700, letterSpacing: '.05em', color: tokens.brandAccent, marginBottom: 8 }}>BANK DETAILS</div>
@@ -238,11 +241,23 @@ export function PaymentBankSection({ payment, bank, signature, style: tokens }) 
           ))}
         </div>
       )}
+      {showQrHere && (
+        <div style={{ flex: 1 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={qr.src} alt="Payment QR code" style={{ width: 72, height: 72, objectFit: 'contain' }} />
+        </div>
+      )}
       {signature?.visible && (
         <div style={{ flex: 1, textAlign: 'left' }}>
-          <div style={{ minHeight: 40, display: 'flex', alignItems: 'flex-end' }}>
+          <div style={{ minHeight: signatureSize, display: 'flex', alignItems: 'flex-end' }}>
             {isTyped && signature.text && <div style={{ fontFamily: "'Caveat', cursive", fontSize: 26, color: tokens.textDark }}>{signature.text}</div>}
-            {!isTyped && signature.src && <img src={signature.src} alt="Signature" style={{ maxHeight: 40, objectFit: 'contain' }} />}
+            {!isTyped && signature.src && (
+              // height (not maxHeight) so the slider always has a visible
+              // effect even on a small/low-res source image, not just
+              // capping large ones — width stays auto with objectFit:
+              // contain so the aspect ratio is preserved either way.
+              <img src={signature.src} alt="Signature" style={{ height: signatureSize, width: 'auto', maxWidth: '100%', objectFit: 'contain' }} />
+            )}
           </div>
           <div style={{ borderTop: '1.5px solid #CBD5E1', marginTop: 4 }} />
           {signature.approvedName && (
@@ -277,26 +292,6 @@ export function FooterSection({ data, style: tokens, pageLabel }) {
       <div style={{ fontFamily: body, fontSize: 13, fontWeight: 600, color: tokens.footerStyle === 'bar' ? '#fff' : tokens.textGray }}>{data.content}</div>
       <div style={{ fontFamily: body, fontSize: 11.5, color: tokens.footerStyle === 'bar' ? 'rgba(255,255,255,.75)' : tokens.textMuted }}>{pageLabel}</div>
     </div>
-  );
-}
-
-// QR is a normal flow section like any other, not a pinned overlay — it
-// used to be position:absolute anchored to the page's bottom edge, which
-// meant it never actually knew how tall the content above it was and could
-// land on top of Terms & Conditions once that section pushed the real
-// content down further than the QR's fixed offset accounted for. As a flow
-// section it now measures and paginates exactly like everything else, so
-// it always sits below whatever's above it and pushes Terms down when it's
-// present, instead of floating over it. Real, scannable image (see
-// onPatchQr / generateQrDataUrl) — not a decorative placeholder. Absent an
-// uploaded/generated src, this renders nothing, not an empty box.
-export function QrSection({ data }) {
-  if (!data?.visible || !data.src) return null;
-  return (
-    <Section style={{ width: 68, height: 68 }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={data.src} alt="Payment QR code" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-    </Section>
   );
 }
 

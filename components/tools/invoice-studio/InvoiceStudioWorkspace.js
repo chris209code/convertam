@@ -168,15 +168,6 @@ export default function InvoiceStudioWorkspace() {
 
   const onRowImageRemove = useCallback((idx) => onRowField(idx, 'img', null), [onRowField]);
 
-  const onTogglePaymentMethod = useCallback((method) => {
-    updateDoc((prev) => {
-      const methods = prev.sections.payment.methods.includes(method)
-        ? prev.sections.payment.methods.filter((m) => m !== method)
-        : [...prev.sections.payment.methods, method];
-      return { ...prev, sections: { ...prev.sections, payment: { ...prev.sections.payment, methods } } };
-    });
-  }, [updateDoc]);
-
   const onBankRowField = useCallback((idx, value) => {
     updateDoc((prev) => {
       const rows = prev.sections.bank.rows.map((r, i) => (i === idx ? { ...r, v: value } : r));
@@ -189,7 +180,7 @@ export default function InvoiceStudioWorkspace() {
     onPatchSection('qr', { value, src });
   }, [onPatchSection]);
 
-  // --- generic image upload/remove for logo/stamp/letterhead ------------
+  // --- generic image upload/remove for logo/letterhead -------------------
   const onImageUpload = useCallback(async (sectionKey, field, file) => {
     const err = validateImageFile(file);
     if (err) { showToast(err); return err; }
@@ -212,7 +203,6 @@ export default function InvoiceStudioWorkspace() {
   }, [onPatchSection]);
   const onSignatureDrawSave = useCallback((dataUrl) => onPatchSection('signature', { mode: 'uploaded', src: dataUrl }), [onPatchSection]);
   const onSignatureTypedSave = useCallback((text) => onPatchSection('signature', { mode: 'typed', text }), [onPatchSection]);
-  const onStampOpacityChange = useCallback((opacity) => onPatchSection('stamp', { opacity }), [onPatchSection]);
 
   const onCurrencyChange = useCallback((currency) => updateDoc((prev) => ({ ...prev, currency })), [updateDoc]);
 
@@ -330,11 +320,10 @@ export default function InvoiceStudioWorkspace() {
                     onInvoiceDateChange={onInvoiceDateChange} onDueDateChange={onDueDateChange}
                     onRowField={onRowField} onAddRow={onAddRow} onRemoveRow={onRemoveRow} onMoveRow={onMoveRow}
                     onRowImageUpload={onRowImageUpload} onRowImageRemove={onRowImageRemove}
-                    onTogglePaymentMethod={onTogglePaymentMethod} onBankRowField={onBankRowField} onPatchQr={onPatchQr}
+                    onBankRowField={onBankRowField} onPatchQr={onPatchQr}
                     onImageUpload={onImageUpload} onImageRemove={onImageRemove}
                     onOpenCrop={() => setCropModalOpen(true)} onLetterheadRemove={onLetterheadRemove}
                     onSignatureUpload={onSignatureUpload} onSignatureDrawSave={onSignatureDrawSave} onSignatureTypedSave={onSignatureTypedSave}
-                    onStampOpacityChange={onStampOpacityChange}
                   />
                 ) : (
                   <DesignPanel

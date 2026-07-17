@@ -3,7 +3,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import {
   LetterheadSection, HeaderSection, ClientInfoSection, ItemsTableSection, TotalsSection,
-  NotesSection, PaymentBankSection, TermsSection, FooterSection, QrSection, WatermarkLayer,
+  NotesSection, BankSignatureSection, TermsSection, FooterSection, WatermarkLayer,
 } from './sections/SectionComponents';
 
 // A4 at 96dpi. Same physical page size used throughout this rewrite and
@@ -16,10 +16,19 @@ const USABLE_H = PAGE_H - PAGE_PADDING * 2;
 const FOOTER_H = 56; // footer is fixed-height and always reserved on every page
 
 // Ordered as they render — this order IS the document flow, exactly as
-// approved. QR sits right after Payment/Bank since it's payment-related
-// content, then Terms. Watermark is a background layer, not flow content
-// (see WatermarkLayer below) — it never takes up flow space.
-const FLOW_KEYS = ['letterhead', 'header', 'clientInfo', 'itemsTable', 'totals', 'notes', 'paymentBank', 'qr', 'terms'];
+// approved. QR has no key of its own: it renders embedded inside 'totals'
+// (beside the totals box) when Bank Details is showing, or inside
+// 'bankSignature' (filling Bank's spot) when Bank Details is off — never
+// both, and never as separate flow space of its own. Watermark is a
+// background layer, not flow content (see WatermarkLayer below) — it never
+// takes up flow space either.
+const FLOW_KEYS = ['letterhead', 'header', 'clientInfo', 'itemsTable', 'totals', 'notes', 'bankSignature', 'terms'];
+
+// Notes, Bank/Signature, and Terms behave as one atomic unit for
+// pagination purposes (see the useLayoutEffect below) — either all of them
+// fit on the current page together, or all of them move to the next page
+// together. Never some here and the rest there.
+const LOWER_GROUP = ['notes', 'bankSignature', 'terms'];
 
 function SectionByKey({ sectionKey, doc, style, totals, wordsText }) {
   const s = doc.sections;
@@ -28,10 +37,9 @@ function SectionByKey({ sectionKey, doc, style, totals, wordsText }) {
     case 'header': return <HeaderSection data={s.header} style={style} />;
     case 'clientInfo': return <ClientInfoSection data={s.clientInfo} style={style} />;
     case 'itemsTable': return <ItemsTableSection data={s.itemsTable} style={style} currency={doc.currency} />;
-    case 'totals': return <TotalsSection data={s.totals} style={style} currency={doc.currency} totals={totals} wordsText={wordsText} />;
+    case 'totals': return <TotalsSection data={s.totals} style={style} currency={doc.currency} totals={totals} wordsText={wordsText} qr={s.qr} bank={s.bank} />;
     case 'notes': return <NotesSection data={s.notes} style={style} />;
-    case 'paymentBank': return <PaymentBankSection payment={s.payment} bank={s.bank} signature={s.signature} style={style} />;
-    case 'qr': return <QrSection data={s.qr} />;
+    case 'bankSignature': return <BankSignatureSection bank={s.bank} signature={s.signature} qr={s.qr} style={style} />;
     case 'terms': return <TermsSection data={s.terms} style={style} />;
     default: return null;
   }
@@ -47,22 +55,46 @@ export default function FlowCanvas({ doc, style, totals, wordsText, zoom, onFitZ
   // into actual page containers. This is the only reliable way to know
   // how tall a section is — asking the browser, not guessing a number.
   useLayoutEffect(() => {
-    const heights = FLOW_KEYS.map((key) => {
+    const heightOf = (key) => {
       const el = measureRefs.current[key];
-      return { key, height: el ? el.getBoundingClientRect().height : 0 };
-    }).filter((s) => s.height > 0 || doc.sections[s.key === 'paymentBank' ? 'payment' : s.key]?.visible !== false);
+      return el ? el.getBoundingClientRect().height : 0;
+    };
 
     const grouped = [[]];
     let currentH = 0;
-    for (const { key, height } of heights) {
-      if (height === 0) continue; // section rendered nothing (hidden/empty) - takes no page space at all
+    const place = (key, height) => {
+      if (height === 0) return; // section rendered nothing (hidden/empty) - takes no page space at all
       if (currentH + height > USABLE_H - FOOTER_H && grouped[grouped.length - 1].length > 0) {
         grouped.push([]);
         currentH = 0;
       }
       grouped[grouped.length - 1].push(key);
       currentH += height;
+    };
+
+    // Everything above the lower group still packs one section at a time,
+    // same as before.
+    for (const key of FLOW_KEYS) {
+      if (LOWER_GROUP.includes(key)) continue;
+      place(key, heightOf(key));
     }
+
+    // Notes / Bank+Signature / Terms move as one atomic block: measure
+    // their combined height and place them together, so a page break can
+    // never land in the middle of this group.
+    const lowerEntries = LOWER_GROUP.map((key) => ({ key, height: heightOf(key) })).filter((e) => e.height > 0);
+    const lowerTotalH = lowerEntries.reduce((sum, e) => sum + e.height, 0);
+    if (lowerTotalH > 0) {
+      if (currentH + lowerTotalH > USABLE_H - FOOTER_H && grouped[grouped.length - 1].length > 0) {
+        grouped.push([]);
+        currentH = 0;
+      }
+      for (const { key, height } of lowerEntries) {
+        grouped[grouped.length - 1].push(key);
+        currentH += height;
+      }
+    }
+
     setPages(grouped.length ? grouped : [[]]);
     // Re-measure whenever the actual content changes - a new row, a longer
     // note, a template swap all change real heights, so pagination has to

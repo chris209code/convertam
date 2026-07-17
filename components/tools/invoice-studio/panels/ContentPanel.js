@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { Plus, X, ChevronUp, ChevronDown, ImagePlus } from 'lucide-react';
 import SignatureDraw from '../SignatureDraw';
-import { ALL_PAYMENT_METHODS, CURRENCIES } from '@/lib/invoice-studio/sectionsModel';
+import { CURRENCIES } from '@/lib/invoice-studio/sectionsModel';
 
 const sectionTitle = { fontSize: 11, fontWeight: 700, letterSpacing: '.05em', color: '#8891A0', textTransform: 'uppercase', marginBottom: 10, marginTop: 22 };
 const groupTitle = { fontFamily: 'var(--cs-font-poppins), Poppins, sans-serif', fontWeight: 700, fontSize: 14, color: '#0F172A', marginBottom: 4 };
@@ -24,14 +24,6 @@ function Field({ label, value, onChange, onBlur, placeholder, type = 'text', tex
         <input type={type} value={value || ''} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} placeholder={placeholder} style={textInput} />
       )}
     </div>
-  );
-}
-
-function ToggleSwitch({ on, onClick, label }) {
-  return (
-    <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={onClick} style={{ width: 36, height: 20, borderRadius: 10, padding: 2, cursor: 'pointer', border: 'none', background: on ? '#2563EB' : '#E2E6ED', flexShrink: 0 }}>
-      <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'transform .15s', transform: `translateX(${on ? 16 : 0}px)` }} />
-    </button>
   );
 }
 
@@ -237,22 +229,11 @@ function BankRow({ row, idx, onBankRowField }) {
   return <Field label={row.k} {...field} />;
 }
 
-function PaymentSection({ payment, bank, qr, onPatch, onTogglePaymentMethod, onBankRowField, onPatchQr }) {
-  const active = new Set(payment.methods || []);
+function BankQrSection({ bank, qr, onBankRowField, onPatchQr }) {
   return (
     <div>
       <div style={groupTitle}>Payment Details</div>
-      <div style={groupSub}>Accepted payment methods, bank details, and payment QR code.</div>
-
-      <div style={fieldWrap}>
-        <div style={miniLabel}>Accepted payment methods</div>
-        {ALL_PAYMENT_METHODS.map((label) => (
-          <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
-            <span style={{ fontSize: 12.5, color: '#334155' }}>{label}</span>
-            <ToggleSwitch on={active.has(label)} onClick={() => onTogglePaymentMethod(label)} label={label} />
-          </div>
-        ))}
-      </div>
+      <div style={groupSub}>Bank details and payment QR code. Turn Bank Details off from the Design tab if you don't need it.</div>
 
       <div style={fieldWrap}>
         <div style={miniLabel}>Bank Details</div>
@@ -322,47 +303,35 @@ function SignatureControls({ signature, onSignatureUpload, onSignatureDrawSave, 
   );
 }
 
-function StampControls({ stamp, onImageUpload, onImageRemove, onStampOpacityChange }) {
-  const inputRef = useRef(null);
-  const [error, setError] = useState('');
-  async function handleChange(e) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    const err = await onImageUpload('stamp', 'src', file);
-    setError(err || '');
-  }
+function SignatureSizeControl({ signature, onPatch }) {
+  if (!signature.src) return null;
   return (
     <div style={fieldWrap}>
-      <div style={miniLabel}>Company Stamp (optional)</div>
-      <input ref={inputRef} type="file" accept="image/*" hidden onChange={handleChange} />
-      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-        <button type="button" onClick={() => inputRef.current?.click()} style={smallBtnGhost}>{stamp.src ? 'Change Stamp' : 'Upload Stamp'}</button>
-        {stamp.src && <button type="button" onClick={() => onImageRemove('stamp', 'src')} style={smallBtnGhost}>Remove</button>}
+      <div style={miniLabel}>Signature Size</div>
+      <input
+        type="range" min="24" max="90" step="2" value={signature.size ?? 40}
+        onChange={(e) => onPatch('signature', { size: Number(e.target.value) })}
+        style={{ width: '100%' }}
+      />
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: '#8891A0', marginTop: 2 }}>
+        <span>Small</span><span>Medium</span><span>Large</span>
       </div>
-      {error && <div style={{ color: '#DC2626', fontSize: 11.5, marginBottom: 8 }}>{error}</div>}
-      {stamp.src && (
-        <>
-          <div style={miniLabel}>Opacity</div>
-          <input type="range" min="10" max="100" value={stamp.opacity ?? 30} onChange={(e) => onStampOpacityChange(Number(e.target.value))} style={{ width: '100%' }} />
-        </>
-      )}
     </div>
   );
 }
 
-function SignatureSectionPanel({ signature, stamp, onPatch, onSignatureUpload, onSignatureDrawSave, onSignatureTypedSave, onImageUpload, onImageRemove, onStampOpacityChange }) {
+function SignatureSectionPanel({ signature, onPatch, onSignatureUpload, onSignatureDrawSave, onSignatureTypedSave }) {
   const name = useFieldState(signature.approvedName, (v) => onPatch('signature', { approvedName: v }));
   const role = useFieldState(signature.approvedRole, (v) => onPatch('signature', { approvedRole: v }));
 
   return (
     <div>
       <div style={groupTitle}>Signature</div>
-      <div style={groupSub}>Approval name/title, signature, and an optional company stamp.</div>
+      <div style={groupSub}>Approval name/title and signature.</div>
       <Field label="Approved By (name)" {...name} placeholder="Full name" />
       <Field label="Title" {...role} placeholder="e.g. Finance Officer" />
       <SignatureControls signature={signature} onSignatureUpload={onSignatureUpload} onSignatureDrawSave={onSignatureDrawSave} onSignatureTypedSave={onSignatureTypedSave} />
-      <StampControls stamp={stamp} onImageUpload={onImageUpload} onImageRemove={onImageRemove} onStampOpacityChange={onStampOpacityChange} />
+      <SignatureSizeControl signature={signature} onPatch={onPatch} />
     </div>
   );
 }
@@ -370,9 +339,9 @@ function SignatureSectionPanel({ signature, stamp, onPatch, onSignatureUpload, o
 export default function ContentPanel({
   sections, currency, onPatchSection, onCurrencyChange, onInvoiceDateChange, onDueDateChange,
   onRowField, onAddRow, onRemoveRow, onMoveRow, onRowImageUpload, onRowImageRemove,
-  onTogglePaymentMethod, onBankRowField, onPatchQr,
+  onBankRowField, onPatchQr,
   onImageUpload, onImageRemove, onOpenCrop, onLetterheadRemove,
-  onSignatureUpload, onSignatureDrawSave, onSignatureTypedSave, onStampOpacityChange,
+  onSignatureUpload, onSignatureDrawSave, onSignatureTypedSave,
 }) {
   return (
     <div>
@@ -384,14 +353,13 @@ export default function ContentPanel({
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
       <ItemsSection itemsTable={sections.itemsTable} onRowField={onRowField} onAddRow={onAddRow} onRemoveRow={onRemoveRow} onMoveRow={onMoveRow} onRowImageUpload={onRowImageUpload} onRowImageRemove={onRowImageRemove} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
-      <PaymentSection payment={sections.payment} bank={sections.bank} qr={sections.qr} onPatch={onPatchSection} onTogglePaymentMethod={onTogglePaymentMethod} onBankRowField={onBankRowField} onPatchQr={onPatchQr} />
+      <BankQrSection bank={sections.bank} qr={sections.qr} onBankRowField={onBankRowField} onPatchQr={onPatchQr} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
       <NotesTermsSection notes={sections.notes} terms={sections.terms} watermark={sections.watermark} onPatch={onPatchSection} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
       <SignatureSectionPanel
-        signature={sections.signature} stamp={sections.stamp} onPatch={onPatchSection}
+        signature={sections.signature} onPatch={onPatchSection}
         onSignatureUpload={onSignatureUpload} onSignatureDrawSave={onSignatureDrawSave} onSignatureTypedSave={onSignatureTypedSave}
-        onImageUpload={onImageUpload} onImageRemove={onImageRemove} onStampOpacityChange={onStampOpacityChange}
       />
     </div>
   );

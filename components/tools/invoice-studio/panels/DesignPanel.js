@@ -68,8 +68,7 @@ export default function DesignPanel({
 
       <div style={sectionTitle}>Display Options</div>
       <ToggleRow label="Notes" on={sections.notes.visible} onClick={() => onToggleSection('notes')} />
-      <ToggleRow label="Payment Methods" on={sections.payment.visible} onClick={() => onToggleSection('payment')} />
-      <ToggleRow label="Bank Details" on={sections.bank.visible} onClick={() => onToggleSection('bank')} />
+      <ToggleRow label="Show Bank Details" on={sections.bank.visible} onClick={() => onToggleSection('bank')} />
       <ToggleRow label="Signature Block" on={sections.signature.visible} onClick={() => onToggleSection('signature')} />
       <ToggleRow label="Terms & Conditions" on={sections.terms.visible} onClick={() => onToggleSection('terms')} />
       <ToggleRow label="Watermark" on={sections.watermark.visible} onClick={() => onToggleSection('watermark')} />

@@ -1,443 +1,256 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { poppins, inter, caveat, fontStack } from '@/lib/invoice-studio/fonts';
-import { buildTemplateElements, cloneElements, TEMPLATE_DEFAULTS, TEMPLATE_GALLERY, recomputeDynamicLayout, contentExceedsOnePage, applyTemplateSkin } from '@/lib/invoice-studio/templates';
-import { DEFAULT_CURRENCY, DEFAULT_DISCOUNT, DEFAULT_VAT_RATE, HISTORY_LIMIT, ZOOM_DEFAULT, ZOOM_MIN, ZOOM_MAX, ZOOM_STEP } from '@/lib/invoice-studio/constants';
-import { computeInvoiceTotals, computeItemLine } from '@/lib/invoice-studio/calculations';
+import { Poppins, Inter, Caveat } from 'next/font/google';
+import { emptyDoc, buildDefaultSections } from '@/lib/invoice-studio/sectionsModel';
+import { stylesFor, TEMPLATE_GALLERY } from '@/lib/invoice-studio/styleTokens';
+import { computeInvoiceTotals } from '@/lib/invoice-studio/calculations';
 import { amountInWords } from '@/lib/invoice-studio/numberToWords';
-import { readLegacyBizProfile } from '@/lib/invoice-studio/legacySeed';
 import { validateImageFile, readFileAsDataURL } from '@/lib/invoice-studio/fileUpload';
 import { generateQrDataUrl } from '@/lib/invoice-studio/qrGenerate';
-import { loadDraft } from '@/lib/invoice-studio/draftStorage';
-import { CURRENCIES } from '@/lib/invoice-studio/constants';
 import Gallery from './Gallery';
 import Toolbar from './Toolbar';
-import Canvas from './Canvas';
-import DesignPanel from './panels/DesignPanel';
+import FlowCanvas from './FlowCanvas';
 import ContentPanel from './panels/ContentPanel';
+import DesignPanel from './panels/DesignPanel';
 import LetterheadCropModal from './LetterheadCropModal';
+
+const poppins = Poppins({ subsets: ['latin'], weight: ['500', '600', '700'], variable: '--cs-font-poppins' });
+const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--cs-font-inter' });
+const caveat = Caveat({ subsets: ['latin'], weight: ['600'], variable: '--cs-font-caveat' });
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
 
-function clamp(v, a, b) {
-  return Math.max(a, Math.min(b, v));
-}
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
-// One-time seed from the classic Invoice Generator's saved business profile,
-// applied to a freshly picked template so returning users don't start from
-// the sample "Nimbus Office Supplies" data. Read-only — never mutates the
-// legacy key, which the old tool still owns until it's retired.
-function applyLegacySeed(elements) {
-  const legacy = readLegacyBizProfile();
-  if (!legacy || !legacy.name) return elements;
-  return elements.map((el) => {
-    if (el.id === 'logo' && legacy.logoDataUrl) return { ...el, src: legacy.logoDataUrl };
-    if (el.id === 'companyText') return { ...el, name: legacy.name, tagline: legacy.tagline || el.tagline };
-    if (el.id === 'contactInfo') return { ...el, phone: legacy.phone || '', email: legacy.email || '', address: legacy.address || '', website: '' };
-    return el;
-  });
-}
-
-const emptyDoc = () => ({
-  elements: [], brandPrimary: '#2563EB', brandSecondary: '#0F172A', brandAccent: '#10B981',
-  headingFont: 'Poppins', bodyFont: 'Inter', currency: DEFAULT_CURRENCY, discount: DEFAULT_DISCOUNT, vatRate: DEFAULT_VAT_RATE,
-});
-
-const emptyRow = (vatRate) => ({ name: '', desc: '', qty: 1, rate: 0, vat: vatRate, img: null });
+const ZOOM_MIN = 0.3, ZOOM_MAX = 1.5, ZOOM_STEP = 0.1, ZOOM_DEFAULT = 0.75;
+const HISTORY_LIMIT = 60;
 
 export default function InvoiceStudioWorkspace() {
   const [view, setView] = useState('gallery');
   const [templateId, setTemplateId] = useState('modern');
-  const [doc, setDoc] = useState(emptyDoc);
+  const [doc, setDoc] = useState(emptyDoc());
+  const [colorOverrides, setColorOverrides] = useState(null); // null = use template defaults untouched
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
-  const [zoomIsManual, setZoomIsManual] = useState(false); // true once the user clicks +/- ; reset whenever a template opens
-  const [panelTab, setPanelTab] = useState('content');
-  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [zoomIsManual, setZoomIsManual] = useState(false);
   const [toast, setToast] = useState('');
-  const [savedDraftMeta, setSavedDraftMeta] = useState(null);
-  const toastTimerRef = useRef(null);
+  const [cropModalOpen, setCropModalOpen] = useState(false);
 
-  useEffect(() => {
-    const d = loadDraft();
-    if (d) setSavedDraftMeta({ templateId: d.templateId, savedAt: d.savedAt });
-  }, []);
-
-  const showToast = useCallback((msg) => {
-    clearTimeout(toastTimerRef.current);
-    setToast(msg);
-    toastTimerRef.current = setTimeout(() => setToast(''), 2200);
-  }, []);
-
-  // Mirrors of `doc`/`historyIndex` that update synchronously (inside the
-  // setState updater itself, not on the next render). Drag/resize event
-  // listeners are bound once at mousedown and would otherwise close over
-  // whatever `doc`/`historyIndex` were at that instant — reading these refs
-  // instead of the plain state variables is what makes pushHistory() commit
-  // the value *after* the interaction, not a stale snapshot from before it.
   const docRef = useRef(doc);
   const historyIndexRef = useRef(historyIndex);
-  // ResizeObserver's callback (inside Canvas) is created once and needs the
-  // CURRENT zoomIsManual value at call time, not whatever it was when the
-  // effect first ran — a ref avoids the stale-closure trap a plain state
-  // read inside a dependency-less callback would otherwise hit.
   const zoomIsManualRef = useRef(false);
   useEffect(() => { zoomIsManualRef.current = zoomIsManual; }, [zoomIsManual]);
 
-  const updateDoc = useCallback((patch) => {
-    setDoc((prev) => {
-      const next = typeof patch === 'function' ? patch(prev) : { ...prev, ...patch };
-      docRef.current = next;
+  const toastTimerRef = useRef(null);
+  const showToast = useCallback((msg, durationMs = 2200) => {
+    clearTimeout(toastTimerRef.current);
+    setToast(msg);
+    toastTimerRef.current = setTimeout(() => setToast(''), durationMs);
+  }, []);
+
+  const pushHistory = useCallback((nextDoc) => {
+    setHistory((prev) => {
+      const truncated = prev.slice(0, historyIndexRef.current + 1);
+      const next = [...truncated, nextDoc].slice(-HISTORY_LIMIT);
+      historyIndexRef.current = next.length - 1;
+      setHistoryIndex(historyIndexRef.current);
       return next;
     });
   }, []);
 
-  const pushHistory = useCallback(() => {
-    setHistory((h) => {
-      const trimmed = h.slice(0, historyIndexRef.current + 1);
-      trimmed.push({ ...docRef.current, elements: cloneElements(docRef.current.elements) });
-      if (trimmed.length > HISTORY_LIMIT) trimmed.shift();
-      historyIndexRef.current = trimmed.length - 1;
-      setHistoryIndex(historyIndexRef.current);
-      return trimmed;
+  const updateDoc = useCallback((updater, commit = true) => {
+    setDoc((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      docRef.current = next;
+      if (commit) pushHistory(next);
+      return next;
     });
-  }, []);
+  }, [pushHistory]);
 
-  const openTemplate = useCallback((id) => {
-    // Templates are skins — if there's already a document in progress
-    // (this is a template swap, not the very first launch), the current
-    // content is preserved and merged into the new template's layout via
-    // applyTemplateSkin. Only a genuine fresh start seeds the sample data.
-    const hasExistingDoc = docRef.current.elements.length > 0;
-    const seeded = hasExistingDoc ? applyTemplateSkin(docRef.current.elements, id) : applyLegacySeed(buildTemplateElements(id));
-    const defaults = TEMPLATE_DEFAULTS[id] || TEMPLATE_DEFAULTS.modern;
-    // Currency/discount/VAT rate are data, not styling — carried over on a
-    // swap. Brand colors/fonts are the "skin" itself, so the new template's
-    // own defaults apply, same as picking a different Canva template would
-    // change its color scheme without touching your text.
-    const initial = hasExistingDoc
-      ? { ...docRef.current, elements: seeded, ...defaults }
-      : { ...emptyDoc(), elements: seeded, ...defaults };
-    setTemplateId(id);
-    docRef.current = initial;
-    setDoc(initial);
-    setPanelTab('content');
-    setView('editor');
-    setZoomIsManual(false);
-    historyIndexRef.current = 0;
-    setHistory([{ ...initial, elements: cloneElements(seeded) }]);
-    setHistoryIndex(0);
-  }, []);
-
-  const resumeDraft = useCallback(() => {
-    const d = loadDraft();
-    if (!d) { showToast('No draft found'); return; }
-    const restored = { ...d.doc, elements: cloneElements(d.doc.elements) };
-    setTemplateId(d.templateId);
-    docRef.current = restored;
-    setDoc(restored);
-    setPanelTab('content');
-    setView('editor');
-    setZoomIsManual(false);
-    historyIndexRef.current = 0;
-    setHistory([{ ...restored, elements: cloneElements(restored.elements) }]);
-    setHistoryIndex(0);
-  }, [showToast]);
-
-  const goToGallery = useCallback(() => setView('gallery'), []);
-
-  const restoreSnapshot = useCallback((snap) => {
-    const restored = { ...snap, elements: cloneElements(snap.elements) };
-    docRef.current = restored;
-    setDoc(restored);
+  const restoreSnapshot = useCallback((snapshot) => {
+    docRef.current = snapshot;
+    setDoc(snapshot);
   }, []);
 
   const undo = useCallback(() => {
-    if (historyIndexRef.current <= 0) return;
     const idx = historyIndexRef.current - 1;
+    if (idx < 0) return;
     historyIndexRef.current = idx;
     setHistoryIndex(idx);
     restoreSnapshot(history[idx]);
   }, [history, restoreSnapshot]);
 
   const redo = useCallback(() => {
-    if (historyIndexRef.current >= history.length - 1) return;
     const idx = historyIndexRef.current + 1;
+    if (idx >= history.length) return;
     historyIndexRef.current = idx;
     setHistoryIndex(idx);
     restoreSnapshot(history[idx]);
   }, [history, restoreSnapshot]);
 
-  // Every one-shot edit (a blur, a click, a picker change) follows the same
-  // shape: patch the doc, then immediately commit it as one history step —
-  // never one step per keystroke, and never silently uncommitted.
-  const patchElement = useCallback((elId, patch) => {
-    updateDoc((prev) => ({ ...prev, elements: prev.elements.map((e) => (e.id === elId ? { ...e, ...patch } : e)) }));
+  // Templates are skins — swapping preserves every field of content by
+  // construction, since sections carry no position/style data of their
+  // own. Only the style tokens (read separately, below) change.
+  const openTemplate = useCallback((id) => {
+    const hasExistingDoc = docRef.current.sections.itemsTable.rows.some((r) => r.name);
+    const initial = hasExistingDoc ? { ...docRef.current, templateId: id } : { ...emptyDoc(id) };
+    setTemplateId(id);
+    docRef.current = initial;
+    setDoc(initial);
+    setColorOverrides(null);
+    setPanelTab('content');
+    setView('editor');
+    setZoomIsManual(false);
+    historyIndexRef.current = 0;
+    setHistory([initial]);
+    setHistoryIndex(0);
+  }, []);
+
+  const [panelTab, setPanelTab] = useState('content');
+  const goToGallery = useCallback(() => setView('gallery'), []);
+
+  // --- section field updates ---------------------------------------------
+  const onPatchSection = useCallback((key, patch) => {
+    updateDoc((prev) => ({ ...prev, sections: { ...prev.sections, [key]: { ...prev.sections[key], ...patch } } }));
   }, [updateDoc]);
 
-  const commitElementPatch = useCallback((elId, patch) => {
-    patchElement(elId, patch);
-    pushHistory();
-  }, [patchElement, pushHistory]);
-
-  const handleBrandChange = useCallback((key, value) => {
-    updateDoc({ [key]: value });
-    pushHistory();
-  }, [updateDoc, pushHistory]);
-
-  const handleDocSettingChange = useCallback((key, value) => {
-    updateDoc({ [key]: value });
+  const onToggleSection = useCallback((key) => {
+    updateDoc((prev) => ({ ...prev, sections: { ...prev.sections, [key]: { ...prev.sections[key], visible: !prev.sections[key].visible } } }));
   }, [updateDoc]);
 
-  const commitDocSetting = useCallback(() => pushHistory(), [pushHistory]);
-
-  const onFieldBlur = useCallback((elId, field, value) => {
-    commitElementPatch(elId, { [field]: value });
-  }, [commitElementPatch]);
-
-  const onMetaRowBlur = useCallback((elId, rowKey, value) => {
-    updateDoc((prev) => ({
-      ...prev,
-      elements: prev.elements.map((e) => (e.id !== elId ? e : { ...e, rows: e.rows.map((r) => (r.key === rowKey ? { ...r, value } : r)) })),
-    }));
-    pushHistory();
-  }, [updateDoc, pushHistory]);
-
-  const onBankRowBlur = useCallback((elId, idx, value) => {
-    updateDoc((prev) => ({
-      ...prev,
-      elements: prev.elements.map((e) => (e.id !== elId ? e : { ...e, rows: e.rows.map((r, i) => (i === idx ? { ...r, v: value } : r)) })),
-    }));
-    pushHistory();
-  }, [updateDoc, pushHistory]);
-
-  const onRowFieldBlur = useCallback((tableId, idx, field, value, isNumber) => {
-    const v = isNumber ? (parseFloat(String(value).replace(/[^0-9.-]/g, '')) || 0) : value;
-    updateDoc((prev) => ({
-      ...prev,
-      elements: prev.elements.map((e) => (e.id !== tableId ? e : { ...e, rows: e.rows.map((r, i) => (i === idx ? { ...r, [field]: v } : r)) })),
-    }));
-    pushHistory();
-  }, [updateDoc, pushHistory]);
-
-  const onAddRow = useCallback((tableId) => {
-    updateDoc((prev) => ({
-      ...prev,
-      elements: prev.elements.map((e) => (e.id !== tableId ? e : { ...e, rows: [...e.rows, emptyRow(prev.vatRate)] })),
-    }));
-    pushHistory();
-  }, [updateDoc, pushHistory]);
-
-  const onRemoveRow = useCallback((tableId, idx) => {
-    updateDoc((prev) => ({
-      ...prev,
-      elements: prev.elements.map((e) => (e.id !== tableId ? e : { ...e, rows: e.rows.length > 1 ? e.rows.filter((_, i) => i !== idx) : e.rows })),
-    }));
-    pushHistory();
-  }, [updateDoc, pushHistory]);
-
-  const onMoveRow = useCallback((tableId, idx, dir) => {
-    updateDoc((prev) => ({
-      ...prev,
-      elements: prev.elements.map((e) => {
-        if (e.id !== tableId) return e;
-        const target = idx + dir;
-        if (target < 0 || target >= e.rows.length) return e;
-        const rows = [...e.rows];
-        [rows[idx], rows[target]] = [rows[target], rows[idx]];
-        return { ...e, rows };
-      }),
-    }));
-    pushHistory();
-  }, [updateDoc, pushHistory]);
-
-  const onTogglePaymentMethod = useCallback((elId, method) => {
-    updateDoc((prev) => ({
-      ...prev,
-      elements: prev.elements.map((e) => {
-        if (e.id !== elId) return e;
-        const has = e.methods.includes(method);
-        return { ...e, methods: has ? e.methods.filter((m) => m !== method) : [...e.methods, method] };
-      }),
-    }));
-    pushHistory();
-  }, [updateDoc, pushHistory]);
-
-  const onToggleVisible = useCallback((elId) => {
-    updateDoc((prev) => ({ ...prev, elements: prev.elements.map((e) => (e.id === elId ? { ...e, visible: !e.visible } : e)) }));
-    pushHistory();
-  }, [updateDoc, pushHistory]);
-
-  const onToggleTableImages = useCallback((tableId) => {
-    updateDoc((prev) => ({ ...prev, elements: prev.elements.map((e) => (e.id === tableId ? { ...e, showImages: !e.showImages } : e)) }));
-    pushHistory();
-  }, [updateDoc, pushHistory]);
-
-  // Returns an error string on failure, or null on success — callers show
-  // the error inline rather than failing silently.
-  const onImageUpload = useCallback(async (elId, file) => {
-    const err = validateImageFile(file);
-    if (err) return err;
-    try {
-      const dataUrl = await readFileAsDataURL(file);
-      commitElementPatch(elId, { src: dataUrl });
-      return null;
-    } catch (e) {
-      return e.message || 'Could not upload that image.';
-    }
-  }, [commitElementPatch]);
-
-  const onImageRemove = useCallback((elId) => {
-    commitElementPatch(elId, { src: null });
-  }, [commitElementPatch]);
-
-  const onTableRowImageUpload = useCallback(async (tableId, idx, file) => {
-    const err = validateImageFile(file);
-    if (err) return err;
-    try {
-      const dataUrl = await readFileAsDataURL(file);
-      updateDoc((prev) => ({
-        ...prev,
-        elements: prev.elements.map((e) => (e.id !== tableId ? e : { ...e, rows: e.rows.map((r, i) => (i === idx ? { ...r, img: dataUrl } : r)) })),
-      }));
-      pushHistory();
-      return null;
-    } catch (e) {
-      return e.message || 'Could not upload that image.';
-    }
-  }, [updateDoc, pushHistory]);
-
-  const onTableRowImageRemove = useCallback((tableId, idx) => {
-    updateDoc((prev) => ({
-      ...prev,
-      elements: prev.elements.map((e) => (e.id !== tableId ? e : { ...e, rows: e.rows.map((r, i) => (i === idx ? { ...r, img: null } : r)) })),
-    }));
-    pushHistory();
-  }, [updateDoc, pushHistory]);
-
-  const onSignatureUpload = useCallback(async (elId, file) => {
-    const err = validateImageFile(file);
-    if (err) return err;
-    try {
-      const dataUrl = await readFileAsDataURL(file);
-      commitElementPatch(elId, { mode: 'image', src: dataUrl });
-      return null;
-    } catch (e) {
-      return e.message || 'Could not upload that image.';
-    }
-  }, [commitElementPatch]);
-
-  const onSignatureDrawSave = useCallback((elId, dataUrl) => {
-    commitElementPatch(elId, { mode: 'image', src: dataUrl });
-  }, [commitElementPatch]);
-
-  const onSignatureTypedSave = useCallback((elId, text) => {
-    commitElementPatch(elId, { mode: 'typed', text });
-  }, [commitElementPatch]);
-
-  const onStampOpacityChange = useCallback((elId, opacity) => {
-    updateDoc((prev) => ({ ...prev, elements: prev.elements.map((e) => (e.id === elId ? { ...e, opacity } : e)) }));
+  const onRowField = useCallback((idx, field, value) => {
+    updateDoc((prev) => {
+      const rows = prev.sections.itemsTable.rows.map((r, i) => (i === idx ? { ...r, [field]: value } : r));
+      return { ...prev, sections: { ...prev.sections, itemsTable: { ...prev.sections.itemsTable, rows } } };
+    });
   }, [updateDoc]);
 
-  const commitStampOpacity = useCallback(() => pushHistory(), [pushHistory]);
+  const onAddRow = useCallback(() => {
+    updateDoc((prev) => ({
+      ...prev,
+      sections: { ...prev.sections, itemsTable: { ...prev.sections.itemsTable, rows: [...prev.sections.itemsTable.rows, { name: '', desc: '', qty: 1, rate: 0, vat: prev.vatRate, img: null }] } },
+    }));
+  }, [updateDoc]);
 
-  const letterheadEl = doc.elements.find((e) => e.id === 'letterhead');
+  const onRemoveRow = useCallback((idx) => {
+    updateDoc((prev) => {
+      if (prev.sections.itemsTable.rows.length <= 1) return prev;
+      const rows = prev.sections.itemsTable.rows.filter((_, i) => i !== idx);
+      return { ...prev, sections: { ...prev.sections, itemsTable: { ...prev.sections.itemsTable, rows } } };
+    });
+  }, [updateDoc]);
 
-  const onLetterheadSave = useCallback((dataUrl) => {
-    commitElementPatch('letterhead', { src: dataUrl, visible: true });
-    setCropModalOpen(false);
-  }, [commitElementPatch]);
+  const onMoveRow = useCallback((idx, dir) => {
+    updateDoc((prev) => {
+      const rows = [...prev.sections.itemsTable.rows];
+      const target = idx + dir;
+      if (target < 0 || target >= rows.length) return prev;
+      [rows[idx], rows[target]] = [rows[target], rows[idx]];
+      return { ...prev, sections: { ...prev.sections, itemsTable: { ...prev.sections.itemsTable, rows } } };
+    });
+  }, [updateDoc]);
 
-  const onLetterheadRemove = useCallback(() => {
-    commitElementPatch('letterhead', { src: null, visible: false });
-  }, [commitElementPatch]);
+  const onRowImageUpload = useCallback(async (idx, file) => {
+    const err = validateImageFile(file);
+    if (err) { showToast(err); return err; }
+    const dataUrl = await readFileAsDataURL(file);
+    onRowField(idx, 'img', dataUrl);
+    return null;
+  }, [onRowField, showToast]);
 
-  const onQrValueBlur = useCallback(async (elId, value) => {
-    const dataUrl = await generateQrDataUrl(value, { color: doc.brandSecondary });
-    commitElementPatch(elId, { value, src: dataUrl });
-  }, [commitElementPatch, doc.brandSecondary]);
+  const onRowImageRemove = useCallback((idx) => onRowField(idx, 'img', null), [onRowField]);
+
+  const onTogglePaymentMethod = useCallback((method) => {
+    updateDoc((prev) => {
+      const methods = prev.sections.payment.methods.includes(method)
+        ? prev.sections.payment.methods.filter((m) => m !== method)
+        : [...prev.sections.payment.methods, method];
+      return { ...prev, sections: { ...prev.sections, payment: { ...prev.sections.payment, methods } } };
+    });
+  }, [updateDoc]);
+
+  const onBankRowField = useCallback((idx, value) => {
+    updateDoc((prev) => {
+      const rows = prev.sections.bank.rows.map((r, i) => (i === idx ? { ...r, v: value } : r));
+      return { ...prev, sections: { ...prev.sections, bank: { ...prev.sections.bank, rows } } };
+    });
+  }, [updateDoc]);
+
+  const onPatchQr = useCallback(async (value) => {
+    const src = value ? await generateQrDataUrl(value) : null;
+    onPatchSection('qr', { value, src });
+  }, [onPatchSection]);
+
+  // --- generic image upload/remove for logo/stamp/letterhead ------------
+  const onImageUpload = useCallback(async (sectionKey, field, file) => {
+    const err = validateImageFile(file);
+    if (err) { showToast(err); return err; }
+    const dataUrl = await readFileAsDataURL(file);
+    onPatchSection(sectionKey, { [field]: dataUrl });
+    return null;
+  }, [onPatchSection, showToast]);
+
+  const onImageRemove = useCallback((sectionKey, field) => onPatchSection(sectionKey, { [field]: null }), [onPatchSection]);
+
+  const onLetterheadRemove = useCallback(() => onPatchSection('letterhead', { src: null, visible: false }), [onPatchSection]);
+  const onLetterheadSave = useCallback((dataUrl) => { onPatchSection('letterhead', { src: dataUrl, visible: true }); setCropModalOpen(false); }, [onPatchSection]);
+
+  const onSignatureUpload = useCallback(async (file) => {
+    const err = validateImageFile(file);
+    if (err) return err;
+    const dataUrl = await readFileAsDataURL(file);
+    onPatchSection('signature', { mode: 'uploaded', src: dataUrl });
+    return null;
+  }, [onPatchSection]);
+  const onSignatureDrawSave = useCallback((dataUrl) => onPatchSection('signature', { mode: 'uploaded', src: dataUrl }), [onPatchSection]);
+  const onSignatureTypedSave = useCallback((text) => onPatchSection('signature', { mode: 'typed', text }), [onPatchSection]);
+  const onStampOpacityChange = useCallback((opacity) => onPatchSection('stamp', { opacity }), [onPatchSection]);
+
+  const onCurrencyChange = useCallback((currency) => updateDoc((prev) => ({ ...prev, currency })), [updateDoc]);
+  const onDocSettingChange = useCallback((key, value) => updateDoc((prev) => ({ ...prev, [key]: value })), [updateDoc]);
 
   const zoomIn = useCallback(() => { setZoomIsManual(true); setZoom((z) => clamp(Math.round((z + ZOOM_STEP) * 100) / 100, ZOOM_MIN, ZOOM_MAX)); }, []);
   const zoomOut = useCallback(() => { setZoomIsManual(true); setZoom((z) => clamp(Math.round((z - ZOOM_STEP) * 100) / 100, ZOOM_MIN, ZOOM_MAX)); }, []);
-
-  // Reported by Canvas whenever the available preview space changes (window
-  // resize, sidebar toggling, etc.) — applied automatically unless the user
-  // has manually zoomed since the template was opened, so a resize never
-  // fights a deliberate zoom choice but always keeps the default state
-  // genuinely fit-to-page.
+  const resetToFit = useCallback(() => setZoomIsManual(false), []);
   const handleFitZoomChange = useCallback((fitZoom) => {
     setZoom((current) => (zoomIsManualRef.current ? current : clamp(Math.round(fitZoom * 100) / 100, ZOOM_MIN, ZOOM_MAX)));
   }, []);
 
-  const resetToFit = useCallback(() => setZoomIsManual(false), []);
-
-  const tableEl = doc.elements.find((e) => e.kind === 'table');
-  const totals = useMemo(() => computeInvoiceTotals(tableEl ? tableEl.rows : [], doc.discount), [tableEl, doc.discount]);
+  const tableRows = doc.sections.itemsTable.rows;
+  const totals = useMemo(() => computeInvoiceTotals(tableRows, doc.discount), [tableRows, doc.discount]);
   const wordsText = useMemo(() => amountInWords(totals.total, doc.currency), [totals.total, doc.currency]);
+  const baseStyle = useMemo(() => stylesFor(doc.templateId), [doc.templateId]);
+  const style = useMemo(() => (colorOverrides ? { ...baseStyle, ...colorOverrides } : baseStyle), [baseStyle, colorOverrides]);
+  const onColorChange = useCallback((key, value) => setColorOverrides((prev) => ({ ...(prev || baseStyle), [key]: value })), [baseStyle]);
 
-  const companyTextEl = doc.elements.find((e) => e.id === 'companyText');
-  // Recomputed fresh whenever doc.elements changes — this is what prevents
-  // a 6-item invoice from overlapping/clipping content that was positioned
-  // assuming the original 3-row sample. doc.elements itself is left as the
-  // "authored" state (field values, visibility, colors); only this derived
-  // array carries corrected positions for actual rendering.
-  const renderElements = useMemo(() => recomputeDynamicLayout(doc.elements), [doc.elements]);
-  const overflowsPage = useMemo(() => contentExceedsOnePage(doc.elements), [doc.elements]);
-
-  const ctx = useMemo(() => ({
-    headFont: fontStack(doc.headingFont), bodyFont: fontStack(doc.bodyFont),
-    brandPrimary: doc.brandPrimary, brandSecondary: doc.brandSecondary, brandAccent: doc.brandAccent,
-    companyName: companyTextEl?.name || '',
-    // The invoice preview is always read-only now — all editing happens
-    // through the sidebar ContentPanel, which calls these same mutation
-    // functions directly, not through contentEditable on the canvas.
-    currency: doc.currency, totals, wordsText, lineFor: computeItemLine, editable: false, pageLabel: 'Page 1 of 1',
-    onFieldBlur, onMetaRowBlur, onBankRowBlur, onRowFieldBlur, onAddRow, onRemoveRow, onMoveRow, onTogglePaymentMethod,
-    onTableRowImageUpload, onTableRowImageRemove,
-  }), [doc.headingFont, doc.bodyFont, doc.brandPrimary, doc.brandSecondary, doc.brandAccent, doc.currency, totals, wordsText, companyTextEl?.name,
-    onFieldBlur, onMetaRowBlur, onBankRowBlur, onRowFieldBlur, onAddRow, onRemoveRow, onMoveRow, onTogglePaymentMethod,
-    onTableRowImageUpload, onTableRowImageRemove]);
-
-  // Screenshots the actual rendered .cs-print DOM node (the same one the
-  // browser's own print/save-as-PDF targets) rather than redrawing the
-  // invoice from scratch via a separate PDF-drawing pipeline. That's a
-  // deliberate choice: a second independent rendering path is exactly how
-  // "the preview and the PDF don't match" bugs happen — screenshotting
-  // what's actually on screen makes mismatch structurally impossible.
   const handleDownload = useCallback(async (format) => {
     showToast('Preparing download…');
-    const filename = `Invoice-${templateId}-${Date.now()}`;
+    const filename = `Invoice-${doc.templateId}-${Date.now()}`;
     try {
       if (format === 'pdf') {
-        // The PDF is Convertam's master output — real vector/text content,
-        // never a screenshot. It's built from the exact same computed
-        // element positions (renderElements) the on-screen preview uses, so
-        // the two stay structurally in sync without needing to look
-        // pixel-identical via a shared image.
-        const { renderInvoiceToPdf } = await import('@/lib/invoice-studio/pdfRenderer');
-        const pdfCtx = {
-          currency: doc.currency, totals, wordsText, pageLabel: 'Page 1 of 1',
-          brandPrimary: doc.brandPrimary, brandSecondary: doc.brandSecondary, brandAccent: doc.brandAccent,
-          companyName: companyTextEl?.name || '', headingFontName: doc.headingFont,
-        };
-        const bytes = await renderInvoiceToPdf(renderElements, pdfCtx);
+        // Real headless-browser PDF, built from the exact same doc/style
+        // structure the editor renders — one shared source of truth, not
+        // a second implementation to keep in sync by hand.
+        const res = await fetch('/api/invoice-pdf', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ doc, style, totals, wordsText }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || `PDF generation failed (${res.status})`);
+        }
+        const bytes = await res.arrayBuffer();
         downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${filename}.pdf`);
       } else {
-        // PNG/JPG are genuinely image formats, so a screenshot of the actual
-        // rendered page is the right tool here — html2canvas is fine for
-        // these two, just not for the PDF master output.
-        const node = document.querySelector('.cs-print');
+        const node = document.querySelector('.cs-flow-pages');
         if (!node) return;
         const html2canvas = (await import('html2canvas')).default;
         const canvas = await html2canvas(node, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
@@ -447,150 +260,89 @@ export default function InvoiceStudioWorkspace() {
       showToast(`Downloaded as ${format.toUpperCase()}`);
     } catch (err) {
       console.error(err);
-      showToast('Could not generate the download — please try again.');
+      showToast(`Download failed: ${err?.message || String(err)}`, 15000);
     }
-  }, [templateId, showToast, doc.currency, doc.brandPrimary, doc.brandSecondary, doc.brandAccent, doc.headingFont, totals, wordsText, companyTextEl, renderElements]);
+  }, [doc, style, totals, wordsText, showToast]);
 
   const templateName = (TEMPLATE_GALLERY.find((t) => t.id === templateId)?.name || 'Invoice') + ' Template';
+  const letterhead = doc.sections.letterhead;
 
   return (
     <div className={`${poppins.variable} ${inter.variable} ${caveat.variable}`} style={{ height: 'calc(100vh - 64px)', minHeight: 560, width: '100%', display: 'flex', fontFamily: 'var(--cs-font-inter), Inter, sans-serif', color: '#0F172A', overflow: 'hidden', background: '#F7F8FA' }}>
       <div style={{ width: 88, flexShrink: 0, background: '#FFFFFF', borderRight: '1px solid #E7EAF0', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0', gap: 18 }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#2563EB,#10B981)' }} />
-        <button
-          onClick={goToGallery}
-          aria-label="Template gallery"
-          style={{
-            width: 36, height: 36, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: 'none',
-            color: view === 'gallery' ? '#2563EB' : '#94A3B8', background: view === 'gallery' ? '#EFF6FF' : 'transparent',
-          }}
-        >
-          <div style={{ width: 20, height: 20, borderRadius: 5, background: 'currentColor', opacity: 0.85 }} />
-        </button>
+        <button onClick={goToGallery} style={{ width: 44, height: 44, borderRadius: 12, border: 'none', background: view === 'gallery' ? '#EFF6FF' : 'transparent', cursor: 'pointer' }} title="Templates" />
       </div>
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        {view === 'gallery' && (
-          <Gallery
-            onSelectTemplate={openTemplate}
-            hasSavedDraft={!!savedDraftMeta}
-            savedDraftTemplateName={savedDraftMeta ? (TEMPLATE_GALLERY.find((t) => t.id === savedDraftMeta.templateId)?.name || '') : ''}
-            onResumeDraft={resumeDraft}
+      {view === 'gallery' && <Gallery onSelectTemplate={openTemplate} />}
+
+      {view === 'editor' && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <Toolbar
+            templateName={templateName}
+            canUndo={historyIndex > 0}
+            canRedo={historyIndex < history.length - 1}
+            onUndo={undo}
+            onRedo={redo}
+            zoom={zoom}
+            onZoomIn={zoomIn}
+            onZoomOut={zoomOut}
+            onResetToFit={resetToFit}
+            onDownload={handleDownload}
+            onBack={goToGallery}
           />
-        )}
+          <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+            <div className="cs-flow-pages" style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+              <FlowCanvas doc={doc} style={style} totals={totals} wordsText={wordsText} zoom={zoom} onFitZoomChange={handleFitZoomChange} />
+            </div>
 
-        {view === 'editor' && (
-          <>
-            <Toolbar
-              templateName={templateName}
-              canUndo={historyIndex > 0}
-              canRedo={historyIndex < history.length - 1}
-              onUndo={undo}
-              onRedo={redo}
-              zoom={zoom}
-              onZoomIn={zoomIn}
-              onZoomOut={zoomOut}
-              onResetToFit={resetToFit}
-              onDownload={handleDownload}
-              onBack={goToGallery}
-            />
-            {overflowsPage && (
-              <div style={{ padding: '8px 20px', background: '#FFFBEB', borderBottom: '1px solid #FDE68A', color: '#92400E', fontSize: 12.5, flexShrink: 0 }}>
-                This invoice's content is taller than one A4 page — some items or sections may be cut off in the exported PDF. Consider shortening descriptions, reducing line items, or hiding optional sections (Notes, Terms) in the Design panel.
+            <div style={{ width: 380, flexShrink: 0, background: '#fff', borderLeft: '1px solid #E7EAF0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', borderBottom: '1px solid #E7EAF0', flexShrink: 0 }}>
+                {['content', 'design'].map((tab) => (
+                  <button
+                    key={tab} onClick={() => setPanelTab(tab)}
+                    style={{ flex: 1, padding: '12px 0', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: panelTab === tab ? '#2563EB' : '#8891A0', borderBottom: panelTab === tab ? '2px solid #2563EB' : '2px solid transparent' }}
+                  >
+                    {tab === 'content' ? 'Content' : 'Design'}
+                  </button>
+                ))}
               </div>
-            )}
-            <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-              {/* The invoice preview is display-only — no drag, no resize, no
-                  click-to-edit. Zoom and print are the only interactions. */}
-              <Canvas
-                elements={renderElements}
-                ctx={ctx}
-                zoom={zoom}
-                onFitZoomChange={handleFitZoomChange}
-              />
-
-              <div style={{ width: 380, flexShrink: 0, background: '#fff', borderLeft: '1px solid #E7EAF0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                <div style={{ display: 'flex', borderBottom: '1px solid #E7EAF0', flexShrink: 0 }}>
-                  {['content', 'design'].map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setPanelTab(tab)}
-                      style={{
-                        flex: 1, padding: '12px 0', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none',
-                        color: panelTab === tab ? '#2563EB' : '#8891A0',
-                        borderBottom: panelTab === tab ? '2px solid #2563EB' : '2px solid transparent',
-                      }}
-                    >
-                      {tab === 'content' ? 'Content' : 'Design'}
-                    </button>
-                  ))}
-                </div>
-                <div style={{ flex: 1, overflow: 'auto', padding: 18 }}>
-                  {panelTab === 'content'
-                    ? (
-                      <ContentPanel
-                        elements={doc.elements}
-                        onFieldBlur={onFieldBlur}
-                        onMetaRowBlur={onMetaRowBlur}
-                        onBankRowBlur={onBankRowBlur}
-                        onRowFieldBlur={onRowFieldBlur}
-                        onAddRow={onAddRow}
-                        onRemoveRow={onRemoveRow}
-                        onMoveRow={onMoveRow}
-                        onTogglePaymentMethod={onTogglePaymentMethod}
-                        onTableRowImageUpload={onTableRowImageUpload}
-                        onTableRowImageRemove={onTableRowImageRemove}
-                        onQrValueBlur={onQrValueBlur}
-                        onImageUpload={onImageUpload}
-                        onImageRemove={onImageRemove}
-                        onOpenCrop={() => setCropModalOpen(true)}
-                        onLetterheadRemove={onLetterheadRemove}
-                        onSignatureUpload={onSignatureUpload}
-                        onSignatureDrawSave={onSignatureDrawSave}
-                        onSignatureTypedSave={onSignatureTypedSave}
-                        onStampOpacityChange={onStampOpacityChange}
-                        onCommitStampOpacity={commitStampOpacity}
-                        docSettings={{ currency: doc.currency, discount: doc.discount, vatRate: doc.vatRate }}
-                        onDocSettingChange={handleDocSettingChange}
-                        onCommitDocSetting={commitDocSetting}
-                        currencies={CURRENCIES}
-                      />
-                    )
-                    : (
-                      <DesignPanel
-                        brand={{ brandPrimary: doc.brandPrimary, brandSecondary: doc.brandSecondary, brandAccent: doc.brandAccent, headingFont: doc.headingFont, bodyFont: doc.bodyFont }}
-                        onBrandChange={handleBrandChange}
-                        elements={doc.elements}
-                        onToggleVisible={onToggleVisible}
-                        docSettings={{ currency: doc.currency, discount: doc.discount, vatRate: doc.vatRate }}
-                        onDocSettingChange={handleDocSettingChange}
-                        onCommitDocSetting={commitDocSetting}
-                        onImageUpload={onImageUpload}
-                        onImageRemove={onImageRemove}
-                        letterheadEl={letterheadEl}
-                        onOpenCrop={() => setCropModalOpen(true)}
-                        onLetterheadRemove={onLetterheadRemove}
-                      />
-                    )}
-                </div>
+              <div style={{ flex: 1, overflow: 'auto', padding: 18 }}>
+                {panelTab === 'content' ? (
+                  <ContentPanel
+                    sections={doc.sections} currency={doc.currency}
+                    onPatchSection={onPatchSection} onCurrencyChange={onCurrencyChange}
+                    onRowField={onRowField} onAddRow={onAddRow} onRemoveRow={onRemoveRow} onMoveRow={onMoveRow}
+                    onRowImageUpload={onRowImageUpload} onRowImageRemove={onRowImageRemove}
+                    onTogglePaymentMethod={onTogglePaymentMethod} onBankRowField={onBankRowField} onPatchQr={onPatchQr}
+                    onImageUpload={onImageUpload} onImageRemove={onImageRemove}
+                    onOpenCrop={() => setCropModalOpen(true)} onLetterheadRemove={onLetterheadRemove}
+                    onSignatureUpload={onSignatureUpload} onSignatureDrawSave={onSignatureDrawSave} onSignatureTypedSave={onSignatureTypedSave}
+                    onStampOpacityChange={onStampOpacityChange}
+                  />
+                ) : (
+                  <DesignPanel
+                    templateId={templateId} onSelectTemplate={openTemplate}
+                    colorOverrides={style} onColorChange={onColorChange}
+                    docSettings={{ discount: doc.discount, vatRate: doc.vatRate }} onDocSettingChange={onDocSettingChange}
+                    sections={doc.sections} onToggleSection={onToggleSection}
+                  />
+                )}
               </div>
             </div>
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
 
-      {cropModalOpen && letterheadEl && (
+      {cropModalOpen && (
         <LetterheadCropModal
-          targetW={letterheadEl.w}
-          targetH={letterheadEl.h}
-          initialSrc={letterheadEl.src}
+          onClose={() => setCropModalOpen(false)}
           onSave={onLetterheadSave}
-          onCancel={() => setCropModalOpen(false)}
         />
       )}
 
       {toast && (
-        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#0F172A', color: '#fff', padding: '10px 18px', borderRadius: 8, fontSize: 13, zIndex: 60 }}>
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: '#0F172A', color: '#fff', padding: '10px 18px', borderRadius: 8, fontSize: 13, zIndex: 60, maxWidth: 480, textAlign: 'center' }}>
           {toast}
         </div>
       )}

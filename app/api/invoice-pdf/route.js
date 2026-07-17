@@ -1,7 +1,6 @@
 export const runtime = 'nodejs';
 export const maxDuration = 60; // launching a real browser + rendering + PDF export genuinely takes a few seconds, longer than a typical API call
 
-import path from 'path';
 import { renderInvoiceHtml } from '@/lib/invoice-studio/htmlRenderer';
 
 export async function POST(request) {
@@ -21,19 +20,25 @@ export async function POST(request) {
     const chromium = (await import('@sparticuz/chromium')).default;
     const puppeteer = await import('puppeteer-core');
 
-    // Serverless has no GPU, so graphics-mode Chromium features have
-    // nothing to run against — leaving this on has caused silent launch
-    // failures on Vercel.
-    if (typeof chromium.setGraphicsMode === 'function') {
-      chromium.setGraphicsMode(false);
-    }
-
+    // Do NOT set LD_LIBRARY_PATH manually here. @sparticuz/chromium already
+    // does this correctly at import time (build/index.js calls
+    // setupLambdaEnvironment("/tmp/al2023/lib") once it detects the Node 20
+    // Lambda runtime via AWS_LAMBDA_JS_RUNTIME, which is set in the Vercel
+    // dashboard), and chromium.executablePath() below extracts al2023.tar.br
+    // — the archive that actually contains libnss3.so — into that exact
+    // directory. Overwriting LD_LIBRARY_PATH afterwards with the chromium
+    // binary's own directory (/tmp, not /tmp/al2023/lib) clobbers that
+    // correct value and was the actual cause of the "libnss3.so: cannot
+    // open shared object file" launch failure — a previous version of this
+    // file did exactly that.
+    //
+    // Similarly, there's no working way to disable graphics mode on the
+    // currently installed @sparticuz/chromium version: its setGraphicsMode
+    // setter is neutered upstream (blocked by
+    // https://github.com/Sparticuz/chromium/issues/247) and always forces
+    // graphics mode back on regardless of what's passed in, so it isn't
+    // called here.
     const executablePath = await chromium.executablePath();
-    // chromium's shared libraries (libnss3.so etc.) get extracted next to
-    // the binary, but the system loader won't find them there unless
-    // LD_LIBRARY_PATH points at that directory — this has to be set before
-    // puppeteer.launch() actually spawns the process.
-    process.env.LD_LIBRARY_PATH = path.dirname(executablePath);
 
     browser = await puppeteer.launch({
       args: chromium.args,

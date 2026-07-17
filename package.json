@@ -8,6 +8,8 @@
     "start": "next start"
   },
   "dependencies": {
+    "@sparticuz/chromium": "131.0.1",
+    "puppeteer-core": "24.1.1",
     "docx": "8.5.0",
     "google-auth-library": "9.14.1",
     "html2canvas": "1.4.1",

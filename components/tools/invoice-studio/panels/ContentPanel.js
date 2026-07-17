@@ -14,6 +14,26 @@ const textareaInput = { ...textInput, height: 'auto', padding: 10, resize: 'vert
 const smallBtnGhost = { padding: '7px 14px', borderRadius: 7, border: '1px solid #E2E6ED', background: '#fff', color: '#334155', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' };
 const fieldWrap = { marginBottom: 10 };
 
+// Placed next to the section it controls, reads/writes the exact same
+// sections[key].visible field the Design tab's own toggle does (via the
+// same onToggleSection handler) — so there is only ever one underlying
+// state, not a duplicate copy that could drift out of sync. Flipping
+// either one re-renders both, since both are just views onto the same
+// doc.sections.
+function InlineToggle({ label, on, onClick }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 10px', marginBottom: 12, borderRadius: 8, background: '#F7F8FA', border: '1px solid #EEF0F3' }}>
+      <span style={{ fontSize: 12, color: '#334155', fontWeight: 500 }}>{label}</span>
+      <button
+        type="button" role="switch" aria-checked={on} aria-label={label} onClick={onClick}
+        style={{ width: 34, height: 19, borderRadius: 10, padding: 2, cursor: 'pointer', border: 'none', background: on ? '#2563EB' : '#E2E6ED', flexShrink: 0 }}
+      >
+        <div style={{ width: 15, height: 15, borderRadius: '50%', background: '#fff', transition: 'transform .15s', transform: `translateX(${on ? 15 : 0}px)` }} />
+      </button>
+    </div>
+  );
+}
+
 function Field({ label, value, onChange, onBlur, placeholder, type = 'text', textarea, rows = 3 }) {
   return (
     <div style={fieldWrap}>
@@ -229,23 +249,25 @@ function BankRow({ row, idx, onBankRowField }) {
   return <Field label={row.k} {...field} />;
 }
 
-function BankQrSection({ bank, qr, onBankRowField, onPatchQr }) {
+function BankQrSection({ bank, qr, onBankRowField, onPatchQr, onToggleSection }) {
   return (
     <div>
       <div style={groupTitle}>Payment Details</div>
-      <div style={groupSub}>Bank details and payment QR code. Turn Bank Details off from the Design tab if you don't need it.</div>
+      <div style={groupSub}>Bank details and payment QR code.</div>
 
       <div style={fieldWrap}>
+        <InlineToggle label="Show Bank Details on invoice" on={bank.visible} onClick={() => onToggleSection('bank')} />
         <div style={miniLabel}>Bank Details</div>
         {bank.rows.map((r, i) => <BankRow key={i} row={r} idx={i} onBankRowField={onBankRowField} />)}
       </div>
 
+      <InlineToggle label="Show QR code on invoice" on={qr.visible} onClick={() => onToggleSection('qr')} />
       <QrControls qr={qr} onPatchQr={onPatchQr} />
     </div>
   );
 }
 
-function NotesTermsSection({ notes, terms, watermark, onPatch }) {
+function NotesTermsSection({ notes, terms, watermark, onPatch, onToggleSection }) {
   const notesField = useFieldState(notes.content, (v) => onPatch('notes', { content: v }));
   const termsField = useFieldState(terms.content, (v) => onPatch('terms', { content: v }));
   const watermarkField = useFieldState(watermark.content, (v) => onPatch('watermark', { content: v }));
@@ -253,7 +275,9 @@ function NotesTermsSection({ notes, terms, watermark, onPatch }) {
     <div>
       <div style={groupTitle}>Notes & Terms</div>
       <div style={groupSub}>Shown below the totals on the invoice.</div>
+      <InlineToggle label="Show Notes on invoice" on={notes.visible} onClick={() => onToggleSection('notes')} />
       <Field label="Notes" {...notesField} textarea placeholder="Thank you for your business." />
+      <InlineToggle label="Show Terms & Conditions on invoice" on={terms.visible} onClick={() => onToggleSection('terms')} />
       <Field label="Terms & Conditions" {...termsField} textarea placeholder="Payment terms, late fees, etc." />
       <Field label="Watermark Text (e.g. UNPAID, PAID, DRAFT)" {...watermarkField} placeholder="UNPAID" />
     </div>
@@ -320,7 +344,7 @@ function SignatureSizeControl({ signature, onPatch }) {
   );
 }
 
-function SignatureSectionPanel({ signature, onPatch, onSignatureUpload, onSignatureDrawSave, onSignatureTypedSave }) {
+function SignatureSectionPanel({ signature, onPatch, onSignatureUpload, onSignatureDrawSave, onSignatureTypedSave, onToggleSection }) {
   const name = useFieldState(signature.approvedName, (v) => onPatch('signature', { approvedName: v }));
   const role = useFieldState(signature.approvedRole, (v) => onPatch('signature', { approvedRole: v }));
 
@@ -328,6 +352,7 @@ function SignatureSectionPanel({ signature, onPatch, onSignatureUpload, onSignat
     <div>
       <div style={groupTitle}>Signature</div>
       <div style={groupSub}>Approval name/title and signature.</div>
+      <InlineToggle label="Show Approval and Signature" on={signature.visible} onClick={() => onToggleSection('signature')} />
       <Field label="Approved By (name)" {...name} placeholder="Full name" />
       <Field label="Title" {...role} placeholder="e.g. Finance Officer" />
       <SignatureControls signature={signature} onSignatureUpload={onSignatureUpload} onSignatureDrawSave={onSignatureDrawSave} onSignatureTypedSave={onSignatureTypedSave} />
@@ -339,7 +364,7 @@ function SignatureSectionPanel({ signature, onPatch, onSignatureUpload, onSignat
 export default function ContentPanel({
   sections, currency, onPatchSection, onCurrencyChange, onInvoiceDateChange, onDueDateChange,
   onRowField, onAddRow, onRemoveRow, onMoveRow, onRowImageUpload, onRowImageRemove,
-  onBankRowField, onPatchQr,
+  onBankRowField, onPatchQr, onToggleSection,
   onImageUpload, onImageRemove, onOpenCrop, onLetterheadRemove,
   onSignatureUpload, onSignatureDrawSave, onSignatureTypedSave,
 }) {
@@ -353,13 +378,14 @@ export default function ContentPanel({
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
       <ItemsSection itemsTable={sections.itemsTable} onRowField={onRowField} onAddRow={onAddRow} onRemoveRow={onRemoveRow} onMoveRow={onMoveRow} onRowImageUpload={onRowImageUpload} onRowImageRemove={onRowImageRemove} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
-      <BankQrSection bank={sections.bank} qr={sections.qr} onBankRowField={onBankRowField} onPatchQr={onPatchQr} />
+      <BankQrSection bank={sections.bank} qr={sections.qr} onBankRowField={onBankRowField} onPatchQr={onPatchQr} onToggleSection={onToggleSection} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
-      <NotesTermsSection notes={sections.notes} terms={sections.terms} watermark={sections.watermark} onPatch={onPatchSection} />
+      <NotesTermsSection notes={sections.notes} terms={sections.terms} watermark={sections.watermark} onPatch={onPatchSection} onToggleSection={onToggleSection} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
       <SignatureSectionPanel
         signature={sections.signature} onPatch={onPatchSection}
         onSignatureUpload={onSignatureUpload} onSignatureDrawSave={onSignatureDrawSave} onSignatureTypedSave={onSignatureTypedSave}
+        onToggleSection={onToggleSection}
       />
     </div>
   );

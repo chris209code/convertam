@@ -139,7 +139,16 @@ export default function FlowCanvas({ doc, style, totals, wordsText, zoom, onFitZ
         </div>
 
         {/* Real, visible, paginated output — separate A4 sheets with a
-            genuine visible gap between them, not one continuous scroll. */}
+            genuine visible gap between them, not one continuous scroll.
+            (Tried scoping PNG/JPG export to just this subtree, skipping
+            the invisible measurement-pass clone above it, as a performance
+            optimization — reverted: this whole thing sits inside the
+            transform:scale() wrapper above, and html2canvas is known to
+            render incorrectly when its snapshot target has a transform on
+            an ancestor. It produced doubled, offset text. The
+            .cs-flow-pages container one level up in InvoiceStudioWorkspace
+            — outside the transform — is the correct, working target and
+            is what PNG/JPG export still uses.) */}
         {(() => {
           const allPages = pages || [FLOW_KEYS];
           return allPages.map((pageKeys, pageIndex) => (

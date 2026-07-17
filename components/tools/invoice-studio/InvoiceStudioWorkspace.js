@@ -43,11 +43,22 @@ export default function InvoiceStudioWorkspace() {
   const [zoomIsManual, setZoomIsManual] = useState(false);
   const [toast, setToast] = useState('');
   const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const docRef = useRef(doc);
   const historyIndexRef = useRef(historyIndex);
   const zoomIsManualRef = useRef(false);
   useEffect(() => { zoomIsManualRef.current = zoomIsManual; }, [zoomIsManual]);
+
+  // Download job tracking - see handleDownload. downloadingRef is the
+  // actual lock (checked synchronously so rapid clicks can't race past the
+  // isDownloading state before a re-render disables the button); seqRef
+  // lets a stale job's result be recognized and discarded instead of
+  // downloading a file nobody asked for anymore.
+  const downloadingRef = useRef(false);
+  const downloadSeqRef = useRef(0);
+  const downloadAbortRef = useRef(null);
+  useEffect(() => () => downloadAbortRef.current?.abort(), []); // cancel any in-flight export if the workspace unmounts
 
   const toastTimerRef = useRef(null);
   const showToast = useCallback((msg, durationMs = 2200) => {
@@ -236,36 +247,110 @@ export default function InvoiceStudioWorkspace() {
   const style = useMemo(() => (colorOverrides ? { ...baseStyle, ...colorOverrides } : baseStyle), [baseStyle, colorOverrides]);
   const onColorChange = useCallback((key, value) => setColorOverrides((prev) => ({ ...(prev || baseStyle), [key]: value })), [baseStyle]);
 
+  // Single-job export lock: downloadingRef is checked synchronously so a
+  // second click landing before React re-renders the disabled button can't
+  // slip through; downloadSeqRef lets a job whose result arrives after it's
+  // no longer the current job recognize that and discard itself instead of
+  // triggering a download nobody is waiting on. Previously there was no
+  // guard here at all — every click fired an independent request, so five
+  // rapid clicks meant five concurrent PDF generations (each spinning up
+  // its own server-side Chromium) and, eventually, up to five downloaded
+  // files landing minutes apart.
   const handleDownload = useCallback(async (format) => {
-    showToast('Preparing download…');
+    if (downloadingRef.current) return;
+    downloadingRef.current = true;
+    setIsDownloading(true);
+    const mySeq = ++downloadSeqRef.current;
+    const isCurrent = () => mySeq === downloadSeqRef.current;
+
+    const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const log = (stage) => {
+      const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      console.log(`[invoice-download] job #${mySeq} ${stage} at ${(now - t0).toFixed(0)}ms`);
+    };
+
+    const controller = new AbortController();
+    downloadAbortRef.current = controller;
+    // Just under the PDF API route's own 60s maxDuration, so a genuinely
+    // stuck request surfaces here as a clean, reported timeout instead of
+    // the client just waiting on a connection Vercel is about to kill
+    // anyway (which browsers typically surface as an opaque "Failed to
+    // fetch" with no useful explanation).
+    const CLIENT_TIMEOUT_MS = 55000;
+    const timeoutId = setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
+
     const filename = `Invoice-${doc.templateId}-${Date.now()}`;
+    log('preparing invoice');
+    showToast('Preparing invoice…');
+
     try {
       if (format === 'pdf') {
         // Real headless-browser PDF, built from the exact same doc/style
         // structure the editor renders — one shared source of truth, not
         // a second implementation to keep in sync by hand.
+        showToast('Generating PDF…');
+        log('PDF request sent');
         const res = await fetch('/api/invoice-pdf', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ doc, style, totals, wordsText }),
+          signal: controller.signal,
         });
+        log('PDF response received');
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error || `PDF generation failed (${res.status})`);
         }
         const bytes = await res.arrayBuffer();
+        log('PDF bytes downloaded');
+        if (!isCurrent()) { log('stale — discarded, not downloaded'); return; }
+        showToast('Starting download…');
         downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${filename}.pdf`);
       } else {
+        showToast('Loading assets…');
+        // .cs-flow-pages is outside FlowCanvas's own transform:scale()
+        // wrapper — that matters because html2canvas is known to render
+        // incorrectly (doubled/offset content) when its snapshot target
+        // sits *inside* an element with a CSS transform applied to an
+        // ancestor. A narrower selector was tried to skip the invisible
+        // measurement-pass clone FlowCanvas keeps mounted alongside the
+        // real pages, but that clone lives inside the scaled wrapper, so
+        // it broke rendering. Not worth it for skipping a hidden sibling.
         const node = document.querySelector('.cs-flow-pages');
         if (!node) return;
         const html2canvas = (await import('html2canvas')).default;
+        log('assets loaded');
+        showToast(format === 'png' ? 'Generating PNG…' : 'Generating JPG…');
         const canvas = await html2canvas(node, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+        log('snapshot rendered');
+        if (!isCurrent()) { log('stale — discarded, not downloaded'); return; }
         const mime = format === 'png' ? 'image/png' : 'image/jpeg';
-        canvas.toBlob((blob) => { if (blob) downloadBlob(blob, `${filename}.${format}`); }, mime, format === 'jpg' ? 0.92 : undefined);
+        await new Promise((resolve) => {
+          canvas.toBlob((blob) => {
+            if (blob && isCurrent()) {
+              showToast('Starting download…');
+              downloadBlob(blob, `${filename}.${format}`);
+            }
+            resolve();
+          }, mime, format === 'jpg' ? 0.92 : undefined);
+        });
       }
-      showToast(`Downloaded as ${format.toUpperCase()}`);
+      log('done');
+      if (isCurrent()) showToast(`Downloaded as ${format.toUpperCase()}`);
     } catch (err) {
-      console.error(err);
-      showToast(`Download failed: ${err?.message || String(err)}`, 15000);
+      if (!isCurrent()) { log('stale error — suppressed'); return; }
+      if (err?.name === 'AbortError') {
+        log('timed out / cancelled');
+        showToast('Download timed out — please try again.', 15000);
+      } else {
+        log('failed: ' + (err?.message || String(err)));
+        console.error(err);
+        showToast(`Download failed: ${err?.message || String(err)}`, 15000);
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      if (downloadAbortRef.current === controller) downloadAbortRef.current = null;
+      downloadingRef.current = false;
+      setIsDownloading(false);
     }
   }, [doc, style, totals, wordsText, showToast]);
 
@@ -294,6 +379,7 @@ export default function InvoiceStudioWorkspace() {
             onZoomOut={zoomOut}
             onResetToFit={resetToFit}
             onDownload={handleDownload}
+            isDownloading={isDownloading}
             onBack={goToGallery}
           />
           <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
@@ -320,7 +406,7 @@ export default function InvoiceStudioWorkspace() {
                     onInvoiceDateChange={onInvoiceDateChange} onDueDateChange={onDueDateChange}
                     onRowField={onRowField} onAddRow={onAddRow} onRemoveRow={onRemoveRow} onMoveRow={onMoveRow}
                     onRowImageUpload={onRowImageUpload} onRowImageRemove={onRowImageRemove}
-                    onBankRowField={onBankRowField} onPatchQr={onPatchQr}
+                    onBankRowField={onBankRowField} onPatchQr={onPatchQr} onToggleSection={onToggleSection}
                     onImageUpload={onImageUpload} onImageRemove={onImageRemove}
                     onOpenCrop={() => setCropModalOpen(true)} onLetterheadRemove={onLetterheadRemove}
                     onSignatureUpload={onSignatureUpload} onSignatureDrawSave={onSignatureDrawSave} onSignatureTypedSave={onSignatureTypedSave}

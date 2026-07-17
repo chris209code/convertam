@@ -22,7 +22,7 @@ function IconBtn({ onClick, disabled, title, children }) {
   );
 }
 
-function DownloadMenu({ onDownload }) {
+function DownloadMenu({ onDownload, isDownloading }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -45,14 +45,18 @@ function DownloadMenu({ onDownload }) {
     <div ref={ref} style={{ position: 'relative' }}>
       <button
         onClick={() => setOpen((o) => !o)}
+        disabled={isDownloading}
+        aria-busy={isDownloading}
         style={{
-          height: 36, padding: '0 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: '#fff',
-          display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+          height: 36, padding: '0 14px', borderRadius: 8, border: 'none',
+          background: isDownloading ? '#93B4F5' : '#2563EB', color: '#fff',
+          display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700,
+          cursor: isDownloading ? 'default' : 'pointer',
         }}
       >
-        <Download size={15} /> Download <ChevronDown size={14} />
+        <Download size={15} /> {isDownloading ? 'Preparing…' : 'Download'} <ChevronDown size={14} />
       </button>
-      {open && (
+      {open && !isDownloading && (
         <div style={{ position: 'absolute', top: 42, right: 0, background: '#fff', border: '1px solid #E2E6ED', borderRadius: 10, boxShadow: '0 8px 24px rgba(15,23,42,.12)', minWidth: 180, overflow: 'hidden', zIndex: 20 }}>
           <button onClick={() => choose('pdf')} style={optionStyle}><FileText size={16} color="#DC2626" /> Download PDF</button>
           <button onClick={() => choose('png')} style={optionStyle}><ImageIcon size={16} color="#2563EB" /> Download PNG</button>
@@ -65,7 +69,7 @@ function DownloadMenu({ onDownload }) {
 
 export default function Toolbar({
   templateName, canUndo, canRedo, onUndo, onRedo,
-  zoom, onZoomIn, onZoomOut, onResetToFit, onDownload, onBack,
+  zoom, onZoomIn, onZoomOut, onResetToFit, onDownload, onBack, isDownloading,
 }) {
   return (
     <div style={{
@@ -108,7 +112,7 @@ export default function Toolbar({
         <IconBtn onClick={onZoomIn} disabled={zoom >= ZOOM_MAX} title="Zoom in"><Plus size={16} /></IconBtn>
       </div>
 
-      <DownloadMenu onDownload={onDownload} />
+      <DownloadMenu onDownload={onDownload} isDownloading={isDownloading} />
     </div>
   );
 }

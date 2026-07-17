@@ -93,7 +93,7 @@ export default function FlowCanvas({ doc, style, totals, wordsText, zoom, onFitZ
   };
 
   return (
-    <div ref={containerRef} style={{ flex: 1, background: '#EEF1F5', overflow: 'auto', display: 'flex', justifyContent: 'center', padding: 32 }}>
+    <div ref={containerRef} style={{ flex: 1, minWidth: 0, background: '#EEF1F5', overflow: 'auto', display: 'flex', justifyContent: 'center', padding: 32 }}>
       <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
         {/* Invisible measurement pass — same content, unpaginated, used only to compute real heights before the real (visible) pass below. */}
         <div aria-hidden style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none', width: PAGE_W - PAGE_PADDING * 2 }}>

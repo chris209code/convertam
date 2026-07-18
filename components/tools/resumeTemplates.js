@@ -765,6 +765,49 @@ export function TemplatePicker({ selected, onSelect }) {
   );
 }
 
+// Generates the actual PDF file server-side (Puppeteer, one canonical
+// Chromium instance/font/DPI on every machine) instead of relying on the
+// visitor's own window.print() — which handed pagination, margins, fonts,
+// and header/footer rendering to whatever browser/OS/print-driver the
+// person happened to have, producing different output on different PCs
+// and an unsuppressable browser header/footer on machines where the print
+// dialog's "Headers and footers" setting was on. Shared by both Resume
+// Builder and CV Improver so there is exactly one download implementation,
+// same as there is exactly one set of templates above.
+const DOWNLOAD_TIMEOUT_MS = 50000;
+
+export async function downloadResumePdf({ templateKey, templateData, fileName }) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
+  let res;
+  try {
+    res = await fetch('/api/resume-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ templateKey, templateData }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('PDF generation timed out. Please try again.');
+    throw new Error('Could not reach the server. Please check your connection and try again.');
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Could not generate the PDF.');
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 // Shared print isolation CSS — only the resume itself is visible when printing,
 // regardless of what else is on the page (sidebar controls, other UI, etc.)
 export const RESUME_PRINT_STYLES = `

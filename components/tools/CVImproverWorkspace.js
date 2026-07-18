@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptToModernProfessionalData, RESUME_PRINT_STYLES } from './resumeTemplates';
+import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptToModernProfessionalData, RESUME_PRINT_STYLES, downloadResumePdf } from './resumeTemplates';
 
 const inputStyle = { width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' };
 const labelStyle = { fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' };
@@ -56,22 +56,34 @@ export default function CVImproverWorkspace() {
   const [jobTitle, setJobTitle] = useState('');
   const [structured, setStructured] = useState(null);
 
-  // See ResumeBuilderWorkspace's identical handler for the full explanation:
-  // the browser's native print header (when enabled in the person's print
-  // settings) can't be suppressed via CSS, but it must never say
-  // "Convertam" — the title is swapped to the CV owner's name for the
-  // duration of printing only.
-  function handlePrint() {
-    const previousTitle = document.title;
-    document.title = structured?.name?.trim() || 'CV';
-    const restore = () => { document.title = previousTitle; window.removeEventListener('afterprint', restore); };
-    window.addEventListener('afterprint', restore);
-    window.print();
-  }
   const [template, setTemplate] = useState('mpSidebar');
   const [busy, setBusy] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
+
+  // Generates the PDF server-side (see resumeTemplates.js's
+  // downloadResumePdf) instead of relying on the visitor's own
+  // window.print() — that used to produce different pagination on
+  // different PCs (client-dependent fonts/DPI/print-scale) and an
+  // unsuppressable browser header/footer on machines with "Headers and
+  // footers" enabled in their print settings.
+  async function handleDownload() {
+    if (downloading) return;
+    setDownloading(true);
+    setError('');
+    try {
+      await downloadResumePdf({
+        templateKey: template,
+        templateData,
+        fileName: `${(structured?.name || 'CV').trim().replace(/\s+/g, '-')}.pdf`,
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   async function handleImprove() {
     if (!cvText.trim()) { setError('Please paste your CV text first.'); return; }
@@ -148,7 +160,7 @@ export default function CVImproverWorkspace() {
 
           <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
             <button className="btn btn-ghost" onClick={() => { setStructured(null); setCvText(''); setStatus(''); }}>Improve Another CV</button>
-            <button className="btn btn-primary" onClick={handlePrint}>⬇️ Download PDF</button>
+            <button className="btn btn-primary" onClick={handleDownload} disabled={downloading}>{downloading ? 'Preparing PDF…' : '⬇️ Download PDF'}</button>
             <a href="/pdf-to-word" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600, color: '#2563EB', textDecoration: 'none', padding: '10px 14px', borderRadius: 8, border: '1px solid #BFDBFE', background: '#EFF6FF' }}>
               <Icon.doc /> Convert to MS Word
             </a>

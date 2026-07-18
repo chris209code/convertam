@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptToModernProfessionalData, RESUME_PRINT_STYLES } from './resumeTemplates';
+import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptToModernProfessionalData, RESUME_PRINT_STYLES, downloadResumePdf } from './resumeTemplates';
 
 async function callAI(action, payload) {
   const res = await fetch('/api/resume-ai', {
@@ -52,18 +52,29 @@ export default function ResumeBuilderWorkspace() {
 
   const [form, setForm] = useState({ fullName: '', jobTitle: '', email: '', phone: '', location: '', linkedin: '', summary: '' });
 
-  // window.print() relies on the browser's own print dialog, which (when
-  // the person has "Headers and footers" enabled in their print settings)
-  // renders document.title and the page URL — a browser-controlled feature
-  // no amount of CSS can suppress. This can't be eliminated entirely, but it
-  // must never say "Convertam": the title is swapped to the person's own
-  // name for the duration of printing, then restored immediately after.
-  function handlePrint() {
-    const previousTitle = document.title;
-    document.title = form.fullName?.trim() || 'CV';
-    const restore = () => { document.title = previousTitle; window.removeEventListener('afterprint', restore); };
-    window.addEventListener('afterprint', restore);
-    window.print();
+  const [downloading, setDownloading] = useState(false);
+
+  // Generates the PDF server-side (see resumeTemplates.js's
+  // downloadResumePdf) instead of relying on the visitor's own
+  // window.print() — that used to produce different pagination on
+  // different PCs (client-dependent fonts/DPI/print-scale) and an
+  // unsuppressable browser header/footer on machines with "Headers and
+  // footers" enabled in their print settings.
+  async function handleDownload() {
+    if (downloading) return;
+    setDownloading(true);
+    setError('');
+    try {
+      await downloadResumePdf({
+        templateKey: template,
+        templateData,
+        fileName: `${(form.fullName || 'CV').trim().replace(/\s+/g, '-')}.pdf`,
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDownloading(false);
+    }
   }
   const [experience, setExperience] = useState([{ ...EMPTY_EXP }]);
   const [education, setEducation] = useState([{ ...EMPTY_EDU }]);
@@ -456,7 +467,7 @@ export default function ResumeBuilderWorkspace() {
 
           <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
             <button className="btn btn-ghost" onClick={() => setStep(5)}>← Back</button>
-            <button className="btn btn-primary" onClick={handlePrint}>⬇️ Download PDF</button>
+            <button className="btn btn-primary" onClick={handleDownload} disabled={downloading}>{downloading ? 'Preparing PDF…' : '⬇️ Download PDF'}</button>
             <a href="/pdf-to-word" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600, color: '#2563EB', textDecoration: 'none', padding: '10px 14px', borderRadius: 8, border: '1px solid #BFDBFE', background: '#EFF6FF' }}>
               <Icon.doc /> Convert to MS Word
             </a>

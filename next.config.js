@@ -17,6 +17,7 @@ const nextConfig = {
     serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
     outputFileTracingIncludes: {
       '/api/invoice-pdf': ['./node_modules/@sparticuz/chromium/bin/**/*'],
+      '/api/resume-pdf': ['./node_modules/@sparticuz/chromium/bin/**/*'],
     },
   },
   webpack: (config, { webpack }) => {

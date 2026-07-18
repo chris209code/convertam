@@ -248,7 +248,14 @@ export function BankSignatureSection({ bank, signature, qr, style: tokens }) {
         </div>
       )}
       {signature?.visible && (
-        <div style={{ flex: 1, textAlign: 'left' }}>
+        // Fixed width + marginLeft:auto (not flex:1) so this column is
+        // always exactly as wide as the signature area itself and always
+        // anchored to the row's right edge — flex:1 previously made it
+        // stretch to share the row equally with Bank Details (or take the
+        // whole row alone when Bank Details is off), which is what pushed
+        // the underline out toward the middle of the page instead of
+        // hugging the signature.
+        <div style={{ width: 200, flexShrink: 0, marginLeft: 'auto', textAlign: 'left' }}>
           <div style={{ minHeight: signatureSize, display: 'flex', alignItems: 'flex-end' }}>
             {isTyped && signature.text && <div style={{ fontFamily: "'Caveat', cursive", fontSize: 26, color: tokens.textDark }}>{signature.text}</div>}
             {!isTyped && signature.src && (

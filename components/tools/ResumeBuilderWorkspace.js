@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptToModernProfessionalData, RESUME_PRINT_STYLES, downloadResumePdf } from './resumeTemplates';
+import { useState, useRef } from 'react';
+import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptToModernProfessionalData, RESUME_PRINT_STYLES, downloadResumePdf, DOWNLOAD_STAGE_LABELS } from './resumeTemplates';
 
 async function callAI(action, payload) {
   const res = await fetch('/api/resume-ai', {
@@ -52,7 +52,8 @@ export default function ResumeBuilderWorkspace() {
 
   const [form, setForm] = useState({ fullName: '', jobTitle: '', email: '', phone: '', location: '', linkedin: '', summary: '' });
 
-  const [downloading, setDownloading] = useState(false);
+  const [downloadStage, setDownloadStage] = useState(null); // null | 'preparing' | 'generating' | 'starting-download'
+  const downloadingRef = useRef(false);
 
   // Generates the PDF server-side (see resumeTemplates.js's
   // downloadResumePdf) instead of relying on the visitor's own
@@ -60,20 +61,28 @@ export default function ResumeBuilderWorkspace() {
   // different PCs (client-dependent fonts/DPI/print-scale) and an
   // unsuppressable browser header/footer on machines with "Headers and
   // footers" enabled in their print settings.
+  //
+  // downloadingRef (not just downloadStage state) guards against duplicate
+  // requests from rapid double-clicks: a ref updates synchronously the
+  // instant this function runs, whereas the disabled= attribute on the
+  // button can't take effect until React actually re-renders — a gap a
+  // fast double-click could otherwise land in.
   async function handleDownload() {
-    if (downloading) return;
-    setDownloading(true);
+    if (downloadingRef.current) return;
+    downloadingRef.current = true;
     setError('');
     try {
       await downloadResumePdf({
         templateKey: template,
         templateData,
         fileName: `${(form.fullName || 'CV').trim().replace(/\s+/g, '-')}.pdf`,
+        onStage: setDownloadStage,
       });
     } catch (err) {
       setError(err.message);
     } finally {
-      setDownloading(false);
+      downloadingRef.current = false;
+      setDownloadStage(null);
     }
   }
   const [experience, setExperience] = useState([{ ...EMPTY_EXP }]);
@@ -467,7 +476,7 @@ export default function ResumeBuilderWorkspace() {
 
           <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
             <button className="btn btn-ghost" onClick={() => setStep(5)}>← Back</button>
-            <button className="btn btn-primary" onClick={handleDownload} disabled={downloading}>{downloading ? 'Preparing PDF…' : '⬇️ Download PDF'}</button>
+            <button className="btn btn-primary" onClick={handleDownload} disabled={!!downloadStage}>{downloadStage ? DOWNLOAD_STAGE_LABELS[downloadStage] : '⬇️ Download PDF'}</button>
             <a href="/pdf-to-word" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600, color: '#2563EB', textDecoration: 'none', padding: '10px 14px', borderRadius: 8, border: '1px solid #BFDBFE', background: '#EFF6FF' }}>
               <Icon.doc /> Convert to MS Word
             </a>

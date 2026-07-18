@@ -776,11 +776,31 @@ export function TemplatePicker({ selected, onSelect }) {
 // same as there is exactly one set of templates above.
 const DOWNLOAD_TIMEOUT_MS = 50000;
 
-export async function downloadResumePdf({ templateKey, templateData, fileName }) {
+// Shared button-label text for each real download stage — kept in one
+// place so both tools show identical wording rather than each hand-writing
+// its own copy that could drift.
+export const DOWNLOAD_STAGE_LABELS = {
+  preparing: 'Preparing CV…',
+  generating: 'Generating PDF…',
+  'starting-download': 'Starting download…',
+};
+
+// Three real, sequential stages tied to actual async boundaries (request
+// built → request in flight on the server → file handed to the browser) —
+// not a fake progress percentage, since there's no meaningful sub-progress
+// to report inside a single server round trip.
+export async function downloadResumePdf({ templateKey, templateData, fileName, onStage }) {
+  onStage?.('preparing');
+  // Yields one frame so the "preparing" label actually paints before the
+  // fetch call below starts — without this, the state update and the
+  // fetch would both happen within the same synchronous stretch and the
+  // browser would never get a chance to render the transition at all.
+  await new Promise((resolve) => requestAnimationFrame(resolve));
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
   let res;
   try {
+    onStage?.('generating');
     res = await fetch('/api/resume-pdf', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -788,15 +808,16 @@ export async function downloadResumePdf({ templateKey, templateData, fileName })
       signal: controller.signal,
     });
   } catch (err) {
-    if (err.name === 'AbortError') throw new Error('PDF generation timed out. Please try again.');
-    throw new Error('Could not reach the server. Please check your connection and try again.');
+    if (err.name === 'AbortError') throw new Error('PDF generation is taking longer than expected. Please try again.');
+    throw new Error('Could not reach the server — check your internet connection and try again.');
   } finally {
     clearTimeout(timeoutId);
   }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || 'Could not generate the PDF.');
+    throw new Error(data.error || `The server could not generate the PDF (error ${res.status}). Please try again.`);
   }
+  onStage?.('starting-download');
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

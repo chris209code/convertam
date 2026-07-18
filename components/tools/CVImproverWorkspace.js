@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptToModernProfessionalData, RESUME_PRINT_STYLES, downloadResumePdf } from './resumeTemplates';
+import { useState, useRef } from 'react';
+import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptToModernProfessionalData, RESUME_PRINT_STYLES, downloadResumePdf, DOWNLOAD_STAGE_LABELS } from './resumeTemplates';
 
 const inputStyle = { width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' };
 const labelStyle = { fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' };
@@ -58,7 +58,8 @@ export default function CVImproverWorkspace() {
 
   const [template, setTemplate] = useState('mpSidebar');
   const [busy, setBusy] = useState(false);
-  const [downloading, setDownloading] = useState(false);
+  const [downloadStage, setDownloadStage] = useState(null); // null | 'preparing' | 'generating' | 'starting-download'
+  const downloadingRef = useRef(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
 
@@ -68,20 +69,28 @@ export default function CVImproverWorkspace() {
   // different PCs (client-dependent fonts/DPI/print-scale) and an
   // unsuppressable browser header/footer on machines with "Headers and
   // footers" enabled in their print settings.
+  //
+  // downloadingRef (not just downloadStage state) guards against duplicate
+  // requests from rapid double-clicks: a ref updates synchronously the
+  // instant this function runs, whereas the disabled= attribute on the
+  // button can't take effect until React actually re-renders — a gap a
+  // fast double-click could otherwise land in.
   async function handleDownload() {
-    if (downloading) return;
-    setDownloading(true);
+    if (downloadingRef.current) return;
+    downloadingRef.current = true;
     setError('');
     try {
       await downloadResumePdf({
         templateKey: template,
         templateData,
         fileName: `${(structured?.name || 'CV').trim().replace(/\s+/g, '-')}.pdf`,
+        onStage: setDownloadStage,
       });
     } catch (err) {
       setError(err.message);
     } finally {
-      setDownloading(false);
+      downloadingRef.current = false;
+      setDownloadStage(null);
     }
   }
 
@@ -160,7 +169,7 @@ export default function CVImproverWorkspace() {
 
           <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
             <button className="btn btn-ghost" onClick={() => { setStructured(null); setCvText(''); setStatus(''); }}>Improve Another CV</button>
-            <button className="btn btn-primary" onClick={handleDownload} disabled={downloading}>{downloading ? 'Preparing PDF…' : '⬇️ Download PDF'}</button>
+            <button className="btn btn-primary" onClick={handleDownload} disabled={!!downloadStage}>{downloadStage ? DOWNLOAD_STAGE_LABELS[downloadStage] : '⬇️ Download PDF'}</button>
             <a href="/pdf-to-word" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600, color: '#2563EB', textDecoration: 'none', padding: '10px 14px', borderRadius: 8, border: '1px solid #BFDBFE', background: '#EFF6FF' }}>
               <Icon.doc /> Convert to MS Word
             </a>

@@ -17,7 +17,12 @@ const nextConfig = {
     serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
     outputFileTracingIncludes: {
       '/api/invoice-pdf': ['./node_modules/@sparticuz/chromium/bin/**/*'],
-      '/api/resume-pdf': ['./node_modules/@sparticuz/chromium/bin/**/*'],
+      // Also includes lib/resume/fonts/*.woff2 explicitly, not just the
+      // Chromium binaries — it's read via fs.readFileSync(path.join(...))
+      // at runtime, the same kind of runtime-computed path that silently
+      // failed to ship for @sparticuz/chromium above, so it isn't left to
+      // Vercel's static tracer to catch on its own.
+      '/api/resume-pdf': ['./node_modules/@sparticuz/chromium/bin/**/*', './lib/resume/fonts/**/*'],
     },
   },
   webpack: (config, { webpack }) => {

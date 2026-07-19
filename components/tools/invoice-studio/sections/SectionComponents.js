@@ -256,6 +256,9 @@ export function BankSignatureSection({ bank, signature, qr, style: tokens }) {
         // the underline out toward the middle of the page instead of
         // hugging the signature.
         <div style={{ width: 200, flexShrink: 0, marginLeft: 'auto', textAlign: 'left' }}>
+          {signature.approvedName && (
+            <div style={{ fontFamily: body, fontSize: 10, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>Approved By</div>
+          )}
           <div style={{ minHeight: signatureSize, display: 'flex', alignItems: 'flex-end' }}>
             {isTyped && signature.text && <div style={{ fontFamily: "'Caveat', cursive", fontSize: 26, color: tokens.textDark }}>{signature.text}</div>}
             {!isTyped && signature.src && (
@@ -269,8 +272,7 @@ export function BankSignatureSection({ bank, signature, qr, style: tokens }) {
           <div style={{ borderTop: '1.5px solid #CBD5E1', marginTop: 4 }} />
           {signature.approvedName && (
             <>
-              <div style={{ fontFamily: body, fontSize: 10, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: '.04em', marginTop: 8 }}>Approved By</div>
-              <div style={{ fontFamily: head, fontWeight: 600, fontSize: 13, color: tokens.textDark, marginTop: 2 }}>{signature.approvedName}</div>
+              <div style={{ fontFamily: head, fontWeight: 600, fontSize: 13, color: tokens.textDark, marginTop: 8 }}>{signature.approvedName}</div>
               <div style={{ fontFamily: body, fontSize: 11.5, color: tokens.textGray }}>{signature.approvedRole}</div>
             </>
           )}

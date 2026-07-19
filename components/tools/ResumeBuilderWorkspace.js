@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptToModernProfessionalData, RESUME_PRINT_STYLES, downloadResumePdf, DOWNLOAD_STAGE_LABELS } from './resumeTemplates';
 
 async function callAI(action, payload) {
@@ -25,6 +25,11 @@ const EMPTY_EXP = {
 };
 const EMPTY_EDU = { degree: '', course: '', institution: '', location: '', startYear: '', endYear: '', current: false, grade: '', notes: '' };
 const EMPTY_CERT = { name: '', issuer: '', dateIssued: '', expiryDate: '', doesNotExpire: false, credentialId: '', credentialUrl: '' };
+
+// Must match RESUME_BUILDER_IMPORT_KEY in CVImproverWorkspace.js — its "Send
+// to CV Builder" button writes the improved CV here in this same shape so it
+// can be picked up below without the two tools importing from each other.
+const CV_IMPORT_KEY = 'convertam_cv_builder_import';
 
 const inputStyle = { width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' };
 const labelStyle = { fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' };
@@ -51,6 +56,7 @@ export default function ResumeBuilderWorkspace() {
   const [template, setTemplate] = useState('mpSidebar');
 
   const [form, setForm] = useState({ fullName: '', jobTitle: '', email: '', phone: '', location: '', linkedin: '', summary: '' });
+  const [importBanner, setImportBanner] = useState(false);
 
   const [downloadStage, setDownloadStage] = useState(null); // null | 'preparing' | 'generating' | 'starting-download'
   const downloadingRef = useRef(false);
@@ -91,6 +97,29 @@ export default function ResumeBuilderWorkspace() {
   const [skills, setSkills] = useState('');
   const [skillSuggestions, setSkillSuggestions] = useState(null);
   const [suggestingSkills, setSuggestingSkills] = useState(false);
+
+  // One-time pre-fill from the CV Improver's "Send to CV Builder" handoff —
+  // consumes and clears the key so it doesn't re-apply on a later visit.
+  useEffect(() => {
+    let raw;
+    try { raw = localStorage.getItem(CV_IMPORT_KEY); } catch { return; }
+    if (!raw) return;
+    try {
+      const imported = JSON.parse(raw);
+      if (imported.form) setForm((f) => ({ ...f, ...imported.form }));
+      if (imported.experience?.length) setExperience(imported.experience.map((e) => ({ ...EMPTY_EXP, ...e })));
+      if (imported.education?.length) setEducation(imported.education.map((e) => ({ ...EMPTY_EDU, ...e })));
+      if (imported.certifications?.length) setCertifications(imported.certifications.map((c) => ({ ...EMPTY_CERT, ...c })));
+      if (imported.skills) setSkills(imported.skills);
+      if (imported.targetPosition) setCustomRole(imported.targetPosition);
+      setImportBanner(true);
+    } catch (err) {
+      console.error('Could not read imported CV data:', err);
+    } finally {
+      try { localStorage.removeItem(CV_IMPORT_KEY); } catch { /* ignore */ }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [generatingSummary, setGeneratingSummary] = useState(false);
   const [refiningSummary, setRefiningSummary] = useState(false);
@@ -238,6 +267,11 @@ export default function ResumeBuilderWorkspace() {
 
       {step === 0 && (
         <div>
+          {importBanner && (
+            <div style={{ padding: '10px 14px', background: '#F5F3FF', border: '1px solid #DDD6FE', borderRadius: 8, color: '#5B21B6', fontSize: '0.82rem', marginBottom: 16 }} className="no-print">
+              🧩 We've pre-filled your details from CV Improver — your info, experience, education, and skills are already in. Just pick a career level and target role below, and everything else is ready to review.
+            </div>
+          )}
           <p style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>What best describes you?</p>
           <p style={{ fontSize: '0.8rem', color: '#64748B', marginBottom: 12 }}>This helps us ask the right questions and write in the right tone for your situation.</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 24 }}>

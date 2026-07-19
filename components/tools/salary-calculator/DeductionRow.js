@@ -21,6 +21,25 @@ export default function DeductionRow({ deduction, currency, base, freqMultiplier
   const equivalents = deductionEquivalents(deduction, base, freqMultiplier);
   const isPercent = deduction.type === 'percent';
 
+  // Switching modes must carry the deduction's actual MEANING across —
+  // ₦80,681 stays ₦80,681 whichever way it's displayed. Without this, the
+  // raw stored string was left untouched across a mode switch and simply
+  // reinterpreted under the new unit (a fixed amount of "80681" becoming a
+  // literal 80,681% the moment Percentage was clicked), which could
+  // silently turn a normal deduction into one wildly larger than gross
+  // income. onChange updates value and type as two separate calls, but
+  // both land on the same functional setState update in the parent, so
+  // they can't be torn apart by a re-render landing in between.
+  function switchMode(newType) {
+    if (newType === deduction.type) return;
+    const hasValue = deduction.value !== '' && Number(deduction.value) > 0;
+    if (hasValue) {
+      const converted = newType === 'percent' ? equivalents.percent : equivalents.amountPerPeriod;
+      onChange('value', String(Math.round(converted * 100) / 100));
+    }
+    onChange('type', newType);
+  }
+
   return (
     <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 12, padding: 14, marginBottom: 10 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -42,8 +61,8 @@ export default function DeductionRow({ deduction, currency, base, freqMultiplier
       </label>
 
       <div role="radiogroup" aria-label={`${deduction.name || 'Deduction'} input mode`} style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-        <button role="radio" aria-checked={isPercent} style={pillBtn(isPercent)} onClick={() => onChange('type', 'percent')}>Percentage</button>
-        <button role="radio" aria-checked={!isPercent} style={pillBtn(!isPercent)} onClick={() => onChange('type', 'fixed')}>Amount</button>
+        <button role="radio" aria-checked={isPercent} style={pillBtn(isPercent)} onClick={() => switchMode('percent')}>Percentage</button>
+        <button role="radio" aria-checked={!isPercent} style={pillBtn(!isPercent)} onClick={() => switchMode('fixed')}>Amount</button>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>

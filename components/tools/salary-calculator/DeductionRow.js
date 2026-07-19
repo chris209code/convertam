@@ -20,6 +20,8 @@ const pillBtn = (active) => ({
 export default function DeductionRow({ deduction, currency, base, freqMultiplier, freqLabel, onChange, onRemove, showRemove }) {
   const equivalents = deductionEquivalents(deduction, base, freqMultiplier);
   const isPercent = deduction.type === 'percent';
+  const numValue = Number(deduction.value);
+  const hasValue = deduction.value !== '' && Number.isFinite(numValue);
 
   // Switching modes must carry the deduction's actual MEANING across —
   // ₦80,681 stays ₦80,681 whichever way it's displayed. Without this, the
@@ -32,13 +34,30 @@ export default function DeductionRow({ deduction, currency, base, freqMultiplier
   // they can't be torn apart by a re-render landing in between.
   function switchMode(newType) {
     if (newType === deduction.type) return;
-    const hasValue = deduction.value !== '' && Number(deduction.value) > 0;
-    if (hasValue) {
+    if (hasValue && numValue > 0) {
       const converted = newType === 'percent' ? equivalents.percent : equivalents.amountPerPeriod;
       onChange('value', String(Math.round(converted * 100) / 100));
     }
     onChange('type', newType);
   }
+
+  // The "did you mean an amount?" fix is deliberately NOT the same
+  // conversion switchMode() does above — that path preserves what a
+  // percentage/amount actually MEANS when someone deliberately re-labels
+  // it. Here the person's number was never a real percentage to begin
+  // with (it was a mistaken mode selection), so the fix is to keep the
+  // digits exactly as typed and just reinterpret the unit — 150 stays
+  // 150, now read as a currency amount instead of a nonsensical 150%.
+  function acceptAmountSuggestion() {
+    onChange('type', 'fixed');
+  }
+
+  const overHundred = isPercent && hasValue && numValue > 100;
+  // NumberInput already strips any "-" a person types or pastes, so a
+  // negative value can't actually reach this component through the UI —
+  // this only guards against one arriving some other way (e.g. a future
+  // template or programmatic change) without silently coercing it.
+  const isNegative = hasValue && numValue < 0;
 
   return (
     <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 12, padding: 14, marginBottom: 10 }}>
@@ -73,7 +92,7 @@ export default function DeductionRow({ deduction, currency, base, freqMultiplier
             <NumberInput ariaLabel={`${deduction.name || 'Deduction'} amount`} value={deduction.value} onChange={(v) => onChange('value', v)} placeholder="0.00" prefix={currency} />
           )}
         </div>
-        {deduction.value !== '' && Number(deduction.value) > 0 && (
+        {hasValue && numValue > 0 && !overHundred && (
           <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>
             {isPercent
               ? <>≈ {formatCurrencyCompact(equivalents.amountPerPeriod, currency)} / {freqLabel.toLowerCase()}</>
@@ -81,6 +100,25 @@ export default function DeductionRow({ deduction, currency, base, freqMultiplier
           </div>
         )}
       </div>
+
+      {overHundred && (
+        <div role="alert" style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 10, padding: '10px 12px', borderRadius: 10, background: '#FFFBEB', border: '1px solid #FDE68A' }}>
+          <span aria-hidden="true" style={{ fontSize: '0.95rem', flexShrink: 0 }}>⚠️</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '0.78rem', color: '#92400E' }}>
+              This value is above 100. Did you mean {currency}{deduction.value} instead of {deduction.value}%?
+            </div>
+            <button onClick={acceptAmountSuggestion} style={{ marginTop: 6, fontSize: '0.75rem', fontWeight: 700, color: '#92400E', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+              Switch to Amount
+            </button>
+          </div>
+        </div>
+      )}
+      {isNegative && (
+        <div role="alert" style={{ marginTop: 10, padding: '10px 12px', borderRadius: 10, background: '#FEF2F2', border: '1px solid #FECACA', fontSize: '0.78rem', color: '#991B1B' }}>
+          {isPercent ? 'Percentage' : 'Amount'} cannot be negative.
+        </div>
+      )}
     </div>
   );
 }

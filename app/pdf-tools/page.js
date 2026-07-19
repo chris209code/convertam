@@ -30,7 +30,7 @@ const SECTIONS = [
       { slug: 'sign-pdf', title: 'Sign PDF', desc: 'Place your signature anywhere on a PDF', free: true },
       { slug: 'watermark-pdf', title: 'Watermark PDF', desc: 'Add custom text watermarks to your PDF', free: true },
       { slug: 'reorder-pdf', title: 'Reorder Pages', desc: 'Drag and drop pages into any order', free: true },
-      { slug: 'redact-pdf', title: 'Redact PDF', desc: 'Permanently black out sensitive text or areas', free: true },
+      { slug: 'redact-pdf', title: 'Redact & Edit PDF', desc: 'Permanently redact sensitive info, or whiteout and correct mistakes', free: true },
       { slug: 'pdf-overlay', title: 'PDF Overlay', desc: 'Stamp one PDF (like a letterhead) on top of another', free: true },
     ],
   },

@@ -31,7 +31,7 @@ const ALL_TOOLS = [
   { name: 'Images to PDF', href: '/images-to-pdf' },
   { name: 'Extract PDF Images', href: '/extract-pdf-images' },
   { name: 'Compare PDFs', href: '/compare-pdf' },
-  { name: 'Redact PDF', href: '/redact-pdf' },
+  { name: 'Redact & Edit PDF', href: '/redact-pdf' },
   { name: 'PDF Overlay', href: '/pdf-overlay' },
   { name: 'PDF to Images', href: '/pdf-to-png' },
   { name: 'Write on PDF', href: '/write-on-pdf' },

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import SalaryCalculator from '@/components/tools/SalaryCalculator';
+import SalaryCalculator from '@/components/tools/salary-calculator/SalaryCalculator';
 
 
 const CALCULATORS = [

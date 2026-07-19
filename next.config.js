@@ -49,5 +49,20 @@ const nextConfig = {
     };
     return config;
   },
+  async redirects() {
+    // These 5 calculators never actually lived at these flat paths before —
+    // they were internal tabs inside /calculator-hub, never their own
+    // route or sitemap entry — so there's no real indexed/bookmarked link
+    // to protect here. Redirecting anyway costs nothing and covers anyone
+    // who guesses the flat URL by analogy with /salary-calculator.
+    return [
+      { source: '/loan-calculator', destination: '/calculators/loan-calculator', permanent: true },
+      { source: '/vat-calculator', destination: '/calculators/vat-calculator', permanent: true },
+      { source: '/profit-margin', destination: '/calculators/profit-margin', permanent: true },
+      { source: '/profit-margin-calculator', destination: '/calculators/profit-margin', permanent: true },
+      { source: '/discount-calculator', destination: '/calculators/discount-calculator', permanent: true },
+      { source: '/age-calculator', destination: '/calculators/age-calculator', permanent: true },
+    ];
+  },
 };
 module.exports = nextConfig;

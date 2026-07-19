@@ -25,6 +25,7 @@ import OcrPdfWorkspace from '@/components/tools/OcrPdfWorkspace';
 import OverlayTextWorkspace from '@/components/tools/OverlayTextWorkspace';
 import QuotationWorkspace from '@/components/tools/QuotationWorkspace';
 import CalculatorWorkspace from '@/components/tools/CalculatorWorkspace';
+import SalaryCalculator from '@/components/tools/salary-calculator/SalaryCalculator';
 import UtilitiesWorkspace from '@/components/tools/UtilitiesWorkspace';
 import CVImproverWorkspace from '@/components/tools/CVImproverWorkspace';
 import QrCodeStudioWorkspace from '@/components/tools/QrCodeStudioWorkspace';
@@ -52,7 +53,7 @@ const isFree = (mode) =>
   ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice',
    'images-to-pdf', 'extract-pdf-images', 'compare-pdf', 'redact-pdf', 'pdf-overlay', 'convert-image-format', 'meme-generator',
    'remove-pages', 'add-page-numbers', 'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize',
-   'fill', 'write-on-pdf', 'quotation', 'calculator-hub', 'utilities-hub', 'cv-improver', 'resume-builder', 'ask-solve-ai', 'qr-code-generator',
+   'fill', 'write-on-pdf', 'quotation', 'calculator-hub', 'salary-calculator', 'utilities-hub', 'cv-improver', 'resume-builder', 'ask-solve-ai', 'qr-code-generator',
    'cover-letter', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'presentation-generator', 'data-analyst',
    'id-card-generator', 'document-enhancer', 'delivery-note-waybill'].includes(mode);
 
@@ -132,6 +133,7 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'ocr-pdf' && <OcrPdfWorkspace />}
       {tool.mode === 'quotation' && <QuotationWorkspace />}
       {tool.mode === 'calculator-hub' && <CalculatorWorkspace />}
+      {tool.mode === 'salary-calculator' && <SalaryCalculator />}
       {tool.mode === 'utilities-hub' && <UtilitiesWorkspace />}
       {tool.mode === 'cv-improver' && <CVImproverWorkspace />}
       {tool.mode === 'qr-code-studio' && <QrCodeStudioWorkspace />}

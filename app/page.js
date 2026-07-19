@@ -145,7 +145,7 @@ const CATEGORIES = [
     icon: 'calculator',
     viewAllHref: '/calculator-hub',
     tools: [
-      { name: 'Salary Calculator', href: '/calculator-hub' },
+      { name: 'Salary Calculator', href: '/salary-calculator' },
       { name: 'Loan Calculator', href: '/calculator-hub' },
       { name: 'VAT Calculator', href: '/calculator-hub' },
       { name: 'Profit Margin', href: '/calculator-hub' },

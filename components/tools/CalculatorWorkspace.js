@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import SalaryCalculator from '@/components/tools/salary-calculator/SalaryCalculator';
+import Link from 'next/link';
 
 
 const CALCULATORS = [
@@ -255,7 +255,20 @@ function TipCalc() {
   );
 }
 
-const CALC_COMPONENTS = { vat: VATCalc, loan: LoanCalc, salary: SalaryCalculator, bmi: BMICalc, age: AgeCalc, discount: DiscountCalc, profit: ProfitCalc, tip: TipCalc };
+const CALC_COMPONENTS = { vat: VATCalc, loan: LoanCalc, bmi: BMICalc, age: AgeCalc, discount: DiscountCalc, profit: ProfitCalc, tip: TipCalc };
+
+function tileStyle(isActive, color) {
+  return {
+    padding: '10px 8px', borderRadius: 10, border: '1px solid',
+    borderColor: isActive ? color : '#E2E8F0',
+    background: isActive ? `${color}15` : 'white',
+    color: isActive ? color : '#475569',
+    fontWeight: isActive ? 700 : 400,
+    cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.75rem',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+    transition: 'all 0.15s ease', textDecoration: 'none', boxSizing: 'border-box', width: '100%',
+  };
+}
 
 export default function CalculatorWorkspace() {
   const [active, setActive] = useState('vat');
@@ -263,22 +276,22 @@ export default function CalculatorWorkspace() {
 
   return (
     <div className="panel">
-      {/* Calculator selector */}
+      {/* Calculator selector — Salary Calculator now lives on its own
+          standalone page (/salary-calculator), so its tile here links out
+          instead of switching an internal tab like the others. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 24 }}>
         {CALCULATORS.map(({ id, label, icon, color }) => (
-          <button key={id} onClick={() => setActive(id)} style={{
-            padding: '10px 8px', borderRadius: 10, border: '1px solid',
-            borderColor: active === id ? color : '#E2E8F0',
-            background: active === id ? `${color}15` : 'white',
-            color: active === id ? color : '#475569',
-            fontWeight: active === id ? 700 : 400,
-            cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.75rem',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-            transition: 'all 0.15s ease',
-          }}>
-            <span style={{ fontSize: '1.2rem' }}>{icon}</span>
-            <span style={{ lineHeight: 1.2 }}>{label}</span>
-          </button>
+          id === 'salary' ? (
+            <Link key={id} href="/salary-calculator" style={tileStyle(false, color)}>
+              <span style={{ fontSize: '1.2rem' }}>{icon}</span>
+              <span style={{ lineHeight: 1.2 }}>{label} ↗</span>
+            </Link>
+          ) : (
+            <button key={id} onClick={() => setActive(id)} style={tileStyle(active === id, color)}>
+              <span style={{ fontSize: '1.2rem' }}>{icon}</span>
+              <span style={{ lineHeight: 1.2 }}>{label}</span>
+            </button>
+          )
         ))}
       </div>
 

@@ -7,6 +7,7 @@ import DoughnutChart from './DoughnutChart';
 import ExportBar from './ExportBar';
 import { getDeductionIcon } from './deductionIcons';
 import { buildResultsText } from './exportText';
+import { POPULAR_CURRENCIES, OTHER_CURRENCIES, symbolForCode } from './currencies';
 import { formatCurrency, formatCurrencyCompact, formatPercent } from './format';
 import { FREQUENCIES, computeSalary, buildConversionTable, buildInsights, categorizeDeductions, perPeriod } from './calculations';
 
@@ -66,7 +67,8 @@ function StatCard({ label, value, tone }) {
 export default function SalaryCalculator() {
   const [gross, setGross] = useState('');
   const [frequency, setFrequency] = useState('monthly');
-  const [currency, setCurrency] = useState('₦');
+  const [currencyCode, setCurrencyCode] = useState('NGN');
+  const currency = symbolForCode(currencyCode);
   const [deductions, setDeductions] = useState([
     { id: 1, name: 'Tax', type: 'percent', value: '', beforeTax: true },
     { id: 2, name: 'Pension', type: 'percent', value: '', beforeTax: true },
@@ -143,9 +145,20 @@ export default function SalaryCalculator() {
           <SectionCard icon="👤" title="Salary Details">
             <p className="sal2-card-sub">Enter your salary information</p>
             <div className="sal2-field-row">
-              <div style={{ width: 74 }}>
+              <div style={{ width: 132, flexShrink: 0 }}>
                 <label className="sal2-label" htmlFor="sal2-currency">Currency</label>
-                <input id="sal2-currency" className="sal2-plain-input" value={currency} onChange={(e) => setCurrency(e.target.value)} maxLength={3} aria-label="Currency symbol" />
+                <select id="sal2-currency" className="sal2-select" value={currencyCode} onChange={(e) => setCurrencyCode(e.target.value)} aria-label="Currency">
+                  <optgroup label="Popular">
+                    {POPULAR_CURRENCIES.map((c) => (
+                      <option key={c.code} value={c.code}>{c.symbol} {c.code} — {c.country}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="All Currencies">
+                    {OTHER_CURRENCIES.map((c) => (
+                      <option key={c.code} value={c.code}>{c.symbol} {c.code} — {c.country}</option>
+                    ))}
+                  </optgroup>
+                </select>
               </div>
               <div style={{ flex: 1 }}>
                 <label className="sal2-label" htmlFor="sal2-gross">Gross Salary</label>
@@ -338,7 +351,7 @@ const SAL2_STYLES = `
   .sal2-label { font-size: 0.72rem; font-weight: 600; color: #475569; display: block; margin-bottom: 5px; }
   .sal2-field-row { display: flex; gap: 10px; }
   .sal2-plain-input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #E2E8F0; font-size: 0.85rem; font-family: inherit; outline: none; }
-  .sal2-select { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #E2E8F0; font-size: 0.85rem; font-family: inherit; outline: none; background: #fff; }
+  .sal2-select { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #E2E8F0; font-size: 0.85rem; font-family: inherit; outline: none; background: #fff; text-overflow: ellipsis; }
 
   .sal2-ghost-btn { font-size: 0.75rem; padding: 6px 12px; border-radius: 8px; border: 1px solid #DDD6FE; background: #F5F3FF; color: #7C3AED; cursor: pointer; font-family: inherit; font-weight: 600; white-space: nowrap; }
   .sal2-template-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }

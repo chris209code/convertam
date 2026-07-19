@@ -13,7 +13,7 @@ const btnStyle = {
 // Download PDF reuses the same html2canvas + jsPDF pattern already used
 // elsewhere in this codebase (CertificateGeneratorWorkspace) rather than
 // pulling in a different export approach.
-export default function ExportBar({ captureRef, buildText, fileNamePrefix }) {
+export default function ExportBar({ captureRef, buildText, fileNamePrefix, fileNameSuffix = 'salary-summary' }) {
   const [busy, setBusy] = useState(null); // null | 'pdf' | 'copy' | 'share'
   const [copied, setCopied] = useState(false);
   const [shared, setShared] = useState(false);
@@ -41,7 +41,7 @@ export default function ExportBar({ captureRef, buildText, fileNamePrefix }) {
       const pageHeightMm = (canvas.height / canvas.width) * pageWidthMm;
       const pdf = new jsPDF({ orientation: pageHeightMm > pageWidthMm ? 'portrait' : 'landscape', unit: 'mm', format: [pageWidthMm, pageHeightMm] });
       pdf.addImage(imgData, 'JPEG', 0, 0, pageWidthMm, pageHeightMm);
-      pdf.save(`${fileNamePrefix}-salary-summary.pdf`);
+      pdf.save(`${fileNamePrefix}-${fileNameSuffix}.pdf`);
     } catch (err) {
       console.error('Salary PDF export failed:', err);
       window.alert('Something went wrong generating the PDF. Please try again.');

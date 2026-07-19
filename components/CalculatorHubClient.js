@@ -14,12 +14,12 @@ const ACTIVE_CALCULATORS = [
   { id: 'profit-margin', href: '/calculators/profit-margin', icon: '📈', title: 'Profit Margin Calculator', desc: 'Work out profit, margin and markup from cost and selling price.', category: 'financial' },
   { id: 'discount', href: '/calculators/discount-calculator', icon: '🏷️', title: 'Discount Calculator', desc: 'Find the final price and total savings on any discounted item.', category: 'financial' },
   { id: 'age', href: '/calculators/age-calculator', icon: '🎂', title: 'Age Calculator', desc: 'Calculate exact age in years, months and days from a date of birth.', category: 'personal' },
+  { id: 'expense-budget', href: '/calculators/expense-budget-calculator', icon: '💵', title: 'Expense & Budget Calculator', desc: 'Track income, expenses and savings, and see your remaining balance live.', category: 'financial' },
 ];
 
 const FEATURED_ID = 'salary';
 
 const COMING_SOON = [
-  { icon: '💵', title: 'Expense / Budget Calculator', desc: 'Track income, expenses and savings in one place.' },
   { icon: '📊', title: 'Profit & Loss Calculator', desc: 'Get a full profit and loss breakdown for your business.' },
   { icon: '🎯', title: 'Savings Goal Calculator', desc: 'Plan how much to save each month to hit a target.' },
   { icon: '⚖️', title: 'Break-even Calculator', desc: 'Find out how many sales you need to cover your costs.' },

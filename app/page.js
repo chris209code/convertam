@@ -151,6 +151,7 @@ const CATEGORIES = [
       { name: 'Profit Margin', href: '/calculators/profit-margin' },
       { name: 'Discount Calculator', href: '/calculators/discount-calculator' },
       { name: 'Age Calculator', href: '/calculators/age-calculator' },
+      { name: 'Expense & Budget Calculator', href: '/calculators/expense-budget-calculator' },
     ],
   },
   {

@@ -4,7 +4,11 @@ const BASE_URL = 'https://www.convertam.app';
 
 export default function sitemap() {
   const toolPages = tools.map((tool) => ({
-    url: `${BASE_URL}/${tool.slug}`,
+    // Tools with a basePath (currently just /calculators/*) live under a
+    // nested path instead of the usual flat /<slug> — see
+    // app/calculators/[tool]/page.js and the notFound() guard that keeps
+    // the flat URL from also resolving for these.
+    url: tool.basePath ? `${BASE_URL}/${tool.basePath}/${tool.slug}` : `${BASE_URL}/${tool.slug}`,
     lastModified: new Date(),
     changeFrequency: 'monthly',
     priority: tool.mode === 'office' || tool.mode === 'compress' ? 0.9 : 0.8,
@@ -18,6 +22,7 @@ export default function sitemap() {
     'business',
     'ai-tools',
     'image-tools',
+    'calculator-hub',
   ].map((slug) => ({
     url: `${BASE_URL}/${slug}`,
     lastModified: new Date(),

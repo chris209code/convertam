@@ -146,11 +146,11 @@ const CATEGORIES = [
     viewAllHref: '/calculator-hub',
     tools: [
       { name: 'Salary Calculator', href: '/salary-calculator' },
-      { name: 'Loan Calculator', href: '/calculator-hub' },
-      { name: 'VAT Calculator', href: '/calculator-hub' },
-      { name: 'Profit Margin', href: '/calculator-hub' },
-      { name: 'Age Calculator', href: '/calculator-hub' },
-      { name: 'BMI Calculator', href: '/calculator-hub' },
+      { name: 'Loan Calculator', href: '/calculators/loan-calculator' },
+      { name: 'VAT Calculator', href: '/calculators/vat-calculator' },
+      { name: 'Profit Margin', href: '/calculators/profit-margin' },
+      { name: 'Discount Calculator', href: '/calculators/discount-calculator' },
+      { name: 'Age Calculator', href: '/calculators/age-calculator' },
     ],
   },
   {

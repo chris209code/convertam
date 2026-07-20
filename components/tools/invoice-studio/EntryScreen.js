@@ -16,17 +16,8 @@ function FlowStep({ label, isFirst }) {
 
 export default function EntryScreen({ onStartFlow, onSelectSingle }) {
   return (
-    <div style={{ flex: 1, overflow: 'auto', padding: '48px 48px 64px', display: 'flex', justifyContent: 'center' }}>
+    <div style={{ flex: 1, overflow: 'auto', padding: '28px 48px 64px', display: 'flex', justifyContent: 'center' }}>
       <div style={{ width: '100%', maxWidth: 880 }}>
-        <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <div style={{ fontFamily: 'var(--cs-font-poppins), Poppins, sans-serif', fontWeight: 700, fontSize: 28, color: '#0F172A', marginBottom: 8 }}>
-            Business Document Studio
-          </div>
-          <div style={{ fontSize: 14.5, color: '#6B7280', maxWidth: 520, margin: '0 auto' }}>
-            Create invoices, quotations, delivery notes and waybills from one professional workspace.
-          </div>
-        </div>
-
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
           {/* Option A: Start a Business Document Flow */}
           <button

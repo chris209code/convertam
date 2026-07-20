@@ -23,7 +23,6 @@ import ProtectPdfWorkspace from '@/components/tools/ProtectPdfWorkspace';
 import HtmlToPdfWorkspace from '@/components/tools/HtmlToPdfWorkspace';
 import OcrPdfWorkspace from '@/components/tools/OcrPdfWorkspace';
 import OverlayTextWorkspace from '@/components/tools/OverlayTextWorkspace';
-import QuotationWorkspace from '@/components/tools/QuotationWorkspace';
 import SalaryCalculator from '@/components/tools/salary-calculator/SalaryCalculator';
 import LoanCalculatorWorkspace from '@/components/tools/calculators/LoanCalculatorWorkspace';
 import VatCalculatorWorkspace from '@/components/tools/calculators/VatCalculatorWorkspace';
@@ -49,7 +48,6 @@ import MemeGeneratorWorkspace from '@/components/tools/MemeGeneratorWorkspace';
 import ResumeBuilderWorkspace from '@/components/tools/ResumeBuilderWorkspace';
 import IdCardGeneratorWorkspace from '@/components/tools/IdCardGeneratorWorkspace';
 import DocumentEnhancerWorkspace from '@/components/tools/DocumentEnhancerWorkspace';
-import DeliveryNoteWaybillWorkspace from '@/components/tools/DeliveryNoteWaybillWorkspace';
 import PaymentGate from '@/components/PaymentGate';
 import ComingSoon from '@/components/tools/ComingSoon';
 import Link from 'next/link';
@@ -64,7 +62,7 @@ const isFree = (mode) =>
    'expense-budget-calculator', 'break-even-calculator', 'savings-goal-calculator',
    'utilities-hub', 'cv-improver', 'resume-builder', 'ask-solve-ai', 'qr-code-generator',
    'cover-letter', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'presentation-generator', 'data-analyst',
-   'id-card-generator', 'document-enhancer', 'delivery-note-waybill'].includes(mode);
+   'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio'].includes(mode);
 
 function getPriceBadge(mode) {
   if (isFree(mode)) return 'Free';
@@ -135,12 +133,13 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'reorder' && <ReorderPdfWorkspace />}
       {tool.mode === 'watermark' && <WatermarkPdfWorkspace />}
       {tool.mode === 'invoice' && <BusinessDocumentStudioWorkspace initialDocType="invoice" />}
+      {tool.mode === 'business-document-studio' && <BusinessDocumentStudioWorkspace />}
       {tool.mode === 'remove-pages' && <RemovePagesWorkspace />}
       {tool.mode === 'add-page-numbers' && <AddPageNumbersWorkspace />}
       {tool.mode === 'protect-pdf' && <ProtectPdfWorkspace />}
       {tool.mode === 'html-to-pdf' && <HtmlToPdfWorkspace />}
       {tool.mode === 'ocr-pdf' && <OcrPdfWorkspace />}
-      {tool.mode === 'quotation' && <QuotationWorkspace />}
+      {tool.mode === 'quotation' && <BusinessDocumentStudioWorkspace initialDocType="quotation" />}
       {tool.mode === 'salary-calculator' && <SalaryCalculator />}
       {tool.mode === 'loan-calculator' && <LoanCalculatorWorkspace />}
       {tool.mode === 'vat-calculator' && <VatCalculatorWorkspace />}
@@ -166,7 +165,7 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'resume-builder' && <ResumeBuilderWorkspace />}
       {tool.mode === 'id-card-generator' && <IdCardGeneratorWorkspace />}
       {tool.mode === 'document-enhancer' && <DocumentEnhancerWorkspace />}
-      {tool.mode === 'delivery-note-waybill' && <DeliveryNoteWaybillWorkspace />}
+      {tool.mode === 'delivery-note-waybill' && <BusinessDocumentStudioWorkspace initialDocType="delivery-note" />}
       {tool.mode === 'soon' && <ComingSoon title={tool.title} note={tool.note} />}
 
       <div className="flex items-center gap-2 mt-4 px-4 py-3 rounded-xl text-sm" style={{ background: '#f0f5ff', border: '1px solid #d0dcf5' }}>

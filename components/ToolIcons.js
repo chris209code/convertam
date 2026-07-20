@@ -212,6 +212,7 @@ export function ToolIcon({ slug, size = 22 }) {
     'reorder-pdf': <><ReorderIcon size={size}/></>,
     'watermark-pdf': <><WatermarkIcon size={size}/></>,
     'invoice-generator': <><InvoiceIcon size={size}/></>,
+    'business-document-studio': <><InvoiceIcon size={size}/></>,
     'receipt-scanner': <><ReceiptIcon size={size}/></>,
     'smart-converter': <><AIIcon size={size}/></>,
   };

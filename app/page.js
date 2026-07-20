@@ -106,10 +106,8 @@ const ALL_TOOLS = [
   { name: 'Reorder PDF Pages', href: '/reorder-pdf' },
   { name: 'Watermark PDF', href: '/watermark-pdf' },
   { name: 'OCR PDF', href: '/ocr-pdf' },
-  { name: 'Invoice Generator', href: '/invoice-generator' },
-  { name: 'Quotation Generator', href: '/quotation-generator' },
+  { name: 'Business Document Studio', href: '/business-document-studio' },
   { name: 'ID Card Generator', href: '/id-card-generator' },
-  { name: 'Delivery Note & Waybill Generator', href: '/delivery-note-waybill' },
   { name: 'Summarize PDF', href: '/summarize-pdf' },
   { name: 'Smart AI Converter', href: '/smart-converter' },
   { name: 'Receipt & Invoice Scanner', href: '/receipt-scanner' },
@@ -159,10 +157,8 @@ const CATEGORIES = [
     icon: 'briefcase',
     viewAllHref: '/business',
     tools: [
-      { name: 'Invoice Generator', href: '/invoice-generator' },
-      { name: 'Quotation Generator', href: '/quotation-generator' },
+      { name: 'Business Document Studio', href: '/business-document-studio' },
       { name: 'ID Card Generator', href: '/id-card-generator' },
-      { name: 'Delivery Note & Waybill', href: '/delivery-note-waybill' },
     ],
   },
   {

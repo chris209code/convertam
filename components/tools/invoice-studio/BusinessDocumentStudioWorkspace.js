@@ -8,8 +8,9 @@ import { computeInvoiceTotals } from '@/lib/invoice-studio/calculations';
 import { amountInWords } from '@/lib/invoice-studio/numberToWords';
 import { validateImageFile, readFileAsDataURL } from '@/lib/invoice-studio/fileUpload';
 import { generateQrDataUrl } from '@/lib/invoice-studio/qrGenerate';
-import { docTypeConfig, DOC_TYPES } from '@/lib/invoice-studio/docTypes';
+import { docTypeConfig, DOC_TYPES, FLOW_SEQUENCE } from '@/lib/invoice-studio/docTypes';
 import { convertDocument } from '@/lib/invoice-studio/convertDocType';
+import EntryScreen from './EntryScreen';
 import Gallery from './Gallery';
 import Toolbar from './Toolbar';
 import FlowCanvas from './FlowCanvas';
@@ -35,11 +36,17 @@ function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 const ZOOM_MIN = 0.3, ZOOM_MAX = 1.5, ZOOM_STEP = 0.1, ZOOM_DEFAULT = 0.75;
 const HISTORY_LIMIT = 60;
 
-export default function BusinessDocumentStudioWorkspace({ initialDocType = 'invoice' }) {
-  const [view, setView] = useState('gallery');
-  const [docType, setDocType] = useState(initialDocType);
+// initialDocType is set only by the compatibility routes (old
+// /invoice-generator, /quotation-generator, /delivery-note-waybill URLs) —
+// they skip straight to that type's template gallery. The flagship
+// /business-document-studio route passes nothing, so the workspace opens
+// on the entry screen instead (Start a Flow / Create a Single Document).
+export default function BusinessDocumentStudioWorkspace({ initialDocType = null }) {
+  const startDocType = initialDocType || 'invoice';
+  const [view, setView] = useState(initialDocType ? 'gallery' : 'entry');
+  const [docType, setDocType] = useState(startDocType);
   const [templateId, setTemplateId] = useState('modern');
-  const [doc, setDoc] = useState(() => emptyDoc('modern', initialDocType));
+  const [doc, setDoc] = useState(() => emptyDoc('modern', startDocType));
   const [colorOverrides, setColorOverrides] = useState(null); // null = use template defaults untouched
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -167,6 +174,19 @@ export default function BusinessDocumentStudioWorkspace({ initialDocType = 'invo
   }, [pendingConversion, applyDocTypeChange]);
 
   const cancelPendingConversion = useCallback(() => setPendingConversion(null), []);
+
+  // Entry screen actions — both just pick a docType (never anything to
+  // confirm this early, since we're not in the editor yet) and move to
+  // that type's template gallery.
+  const handleStartFlow = useCallback(() => {
+    requestDocTypeChange(FLOW_SEQUENCE[0]);
+    setView('gallery');
+  }, [requestDocTypeChange]);
+
+  const handleSelectSingle = useCallback((toType) => {
+    requestDocTypeChange(toType);
+    setView('gallery');
+  }, [requestDocTypeChange]);
 
   const [panelTab, setPanelTab] = useState('content');
   const goToGallery = useCallback(() => setView('gallery'), []);
@@ -442,6 +462,8 @@ export default function BusinessDocumentStudioWorkspace({ initialDocType = 'invo
           ))}
         </div>
       </div>
+
+      {view === 'entry' && <EntryScreen onStartFlow={handleStartFlow} onSelectSingle={handleSelectSingle} />}
 
       {view === 'gallery' && <Gallery onSelectTemplate={openTemplate} docType={docType} />}
 

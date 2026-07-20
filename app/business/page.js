@@ -12,9 +12,7 @@ const SECTIONS = [
     label: 'All Business Tools',
     icon: '🧾',
     tools: [
-      { slug: 'invoice-generator', title: 'Invoice Generator', desc: 'Create professional PDF invoices in seconds', icon: '🧾', badge: 'free' },
-      { slug: 'quotation-generator', title: 'Quotation Generator', desc: 'Generate professional quotations and proforma invoices', icon: '📋', badge: 'free' },
-      { slug: 'delivery-note-waybill', title: 'Delivery Note & Waybill Generator', desc: 'Confirm delivery or document goods in transit', icon: '🚚', badge: 'free' },
+      { slug: 'business-document-studio', title: 'Business Document Studio', desc: 'Create invoices, quotations, delivery notes and waybills from one professional workspace', icon: '🧾', badge: 'new', available: true },
       { slug: 'id-card-generator', title: 'ID Card Generator', desc: 'Design and print professional ID cards', icon: '🪪', badge: 'free' },
     ],
   },
@@ -30,7 +28,7 @@ export default function BusinessPage() {
       title="Business Tools"
       subtitle="Professional business documents — invoices, quotations, receipts and more."
       searchPlaceholder="Search business tools…"
-      featured={{ slug: 'invoice-generator', href: '/invoice-generator', icon: '🧾', title: 'Invoice Generator', desc: 'Your most common business document — create a professional PDF invoice in seconds.' }}
+      featured={{ slug: 'business-document-studio', href: '/business-document-studio', icon: '🧾', title: 'Business Document Studio', desc: 'Create invoices, quotations, delivery notes and waybills from one professional workspace.' }}
       sections={SECTIONS_WITH_HREF}
     />
   );

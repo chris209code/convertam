@@ -28,6 +28,31 @@ const textareaInput = { ...textInput, height: 'auto', padding: 10, resize: 'vert
 const smallBtnGhost = { padding: '7px 14px', borderRadius: 7, border: '1px solid #E2E6ED', background: '#fff', color: '#334155', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' };
 const fieldWrap = { marginBottom: 10 };
 
+// Wraps a section so it can be scrolled into view and briefly highlighted
+// right after a docType conversion — so a person sees the genuinely new
+// fields immediately instead of scrolling past already-completed sections
+// to find them. `active` is only true for a few seconds (the parent clears
+// it on a timer), then the wrap becomes a no-op div again.
+function HighlightWrap({ active, children }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (active && ref.current) {
+      ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [active]);
+  return (
+    <div
+      ref={ref}
+      style={active ? {
+        borderRadius: 12, background: '#EFF6FF', boxShadow: '0 0 0 2px #93C5FD',
+        padding: 12, margin: '-12px -12px 8px', transition: 'background .4s, box-shadow .4s',
+      } : undefined}
+    >
+      {children}
+    </div>
+  );
+}
+
 // Placed next to the section it controls, reads/writes the exact same
 // sections[key].visible field the Design tab's own toggle does (via the
 // same onToggleSection handler) — so there is only ever one underlying
@@ -472,6 +497,7 @@ export default function ContentPanel({
   onImageUpload, onImageRemove, onOpenCrop, onLetterheadRemove,
   onSignatureUpload, onSignatureDrawSave, onSignatureTypedSave,
   onSignatureUpload2, onSignatureDrawSave2, onSignatureTypedSave2,
+  highlightSection,
 }) {
   const config = docTypeConfig(docType);
   return (
@@ -480,11 +506,15 @@ export default function ContentPanel({
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
       <ClientSection clientInfo={sections.clientInfo} onPatch={onPatchSection} docType={docType} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
-      <DocumentDetailsSection clientInfo={sections.clientInfo} onPatch={onPatchSection} currency={currency} onCurrencyChange={onCurrencyChange} onDocDateChange={onDocDateChange} onSecondaryDateChange={onSecondaryDateChange} docType={docType} />
+      <HighlightWrap active={highlightSection === 'documentDetails'}>
+        <DocumentDetailsSection clientInfo={sections.clientInfo} onPatch={onPatchSection} currency={currency} onCurrencyChange={onCurrencyChange} onDocDateChange={onDocDateChange} onSecondaryDateChange={onSecondaryDateChange} docType={docType} />
+      </HighlightWrap>
       {config.showLogistics && (
         <>
           <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
-          <LogisticsSection logistics={sections.logistics} onPatch={onPatchSection} docType={docType} />
+          <HighlightWrap active={highlightSection === 'logistics'}>
+            <LogisticsSection logistics={sections.logistics} onPatch={onPatchSection} docType={docType} />
+          </HighlightWrap>
         </>
       )}
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />

@@ -55,6 +55,7 @@ export default function BusinessDocumentStudioWorkspace({ initialDocType = null 
   const [toast, setToast] = useState('');
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [panelTab, setPanelTab] = useState('content');
 
   const docRef = useRef(doc);
   const historyIndexRef = useRef(historyIndex);
@@ -136,9 +137,11 @@ export default function BusinessDocumentStudioWorkspace({ initialDocType = null 
     setHistoryIndex(0);
   }, []);
 
-  const [pendingConversion, setPendingConversion] = useState(null); // { toType, nextDoc, changes } while the confirmation modal is open
+  const [pendingConversion, setPendingConversion] = useState(null); // { toType, nextDoc, changes, newSection } while the confirmation modal is open
+  const [highlightSection, setHighlightSection] = useState(null); // section key to scroll to + highlight right after a conversion commits
+  const highlightTimerRef = useRef(null);
 
-  const applyDocTypeChange = useCallback((toType, nextDoc) => {
+  const applyDocTypeChange = useCallback((toType, nextDoc, newSection) => {
     setDocType(toType);
     docRef.current = nextDoc;
     setDoc(nextDoc);
@@ -146,7 +149,15 @@ export default function BusinessDocumentStudioWorkspace({ initialDocType = null 
     historyIndexRef.current = 0;
     setHistory([nextDoc]);
     setHistoryIndex(0);
+    setPanelTab('content');
+    if (newSection) {
+      clearTimeout(highlightTimerRef.current);
+      setHighlightSection(newSection);
+      // Long enough to register, short enough not to linger once the point's made.
+      highlightTimerRef.current = setTimeout(() => setHighlightSection(null), 3000);
+    }
   }, []);
+  useEffect(() => () => clearTimeout(highlightTimerRef.current), []);
 
   // Entry point for every document-type change — the sidebar quick-switcher,
   // the toolbar's "Document Type: X ▾" dropdown, and the "Convert to Y →"
@@ -159,17 +170,17 @@ export default function BusinessDocumentStudioWorkspace({ initialDocType = null 
   // there's nothing at risk to confirm.
   const requestDocTypeChange = useCallback((toType) => {
     if (toType === docRef.current.docType) return;
-    const { nextDoc, changes } = convertDocument(docRef.current, toType);
+    const { nextDoc, changes, newSection } = convertDocument(docRef.current, toType);
     if (view !== 'editor') {
-      applyDocTypeChange(toType, nextDoc);
+      applyDocTypeChange(toType, nextDoc, newSection);
       return;
     }
-    setPendingConversion({ toType, nextDoc, changes });
+    setPendingConversion({ toType, nextDoc, changes, newSection });
   }, [view, applyDocTypeChange]);
 
   const confirmPendingConversion = useCallback(() => {
     if (!pendingConversion) return;
-    applyDocTypeChange(pendingConversion.toType, pendingConversion.nextDoc);
+    applyDocTypeChange(pendingConversion.toType, pendingConversion.nextDoc, pendingConversion.newSection);
     setPendingConversion(null);
   }, [pendingConversion, applyDocTypeChange]);
 
@@ -188,7 +199,6 @@ export default function BusinessDocumentStudioWorkspace({ initialDocType = null 
     setView('gallery');
   }, [requestDocTypeChange]);
 
-  const [panelTab, setPanelTab] = useState('content');
   const goToGallery = useCallback(() => setView('gallery'), []);
 
   // --- section field updates ---------------------------------------------
@@ -517,6 +527,7 @@ export default function BusinessDocumentStudioWorkspace({ initialDocType = null 
                     onOpenCrop={() => setCropModalOpen(true)} onLetterheadRemove={onLetterheadRemove}
                     onSignatureUpload={onSignatureUpload} onSignatureDrawSave={onSignatureDrawSave} onSignatureTypedSave={onSignatureTypedSave}
                     onSignatureUpload2={onSignatureUpload2} onSignatureDrawSave2={onSignatureDrawSave2} onSignatureTypedSave2={onSignatureTypedSave2}
+                    highlightSection={highlightSection}
                   />
                 ) : (
                   <DesignPanel

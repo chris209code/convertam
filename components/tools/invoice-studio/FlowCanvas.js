@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, useState } from 'react';
 import {
-  LetterheadSection, HeaderSection, ClientInfoSection, ItemsTableSection, TotalsSection,
+  LetterheadSection, HeaderSection, ClientInfoSection, LogisticsSection, ItemsTableSection, TotalsSection,
   NotesSection, BankSignatureSection, TermsSection, FooterSection, WatermarkLayer,
 } from './sections/SectionComponents';
 
@@ -22,7 +22,7 @@ const FOOTER_H = 56; // footer is fixed-height and always reserved on every page
 // both, and never as separate flow space of its own. Watermark is a
 // background layer, not flow content (see WatermarkLayer below) — it never
 // takes up flow space either.
-const FLOW_KEYS = ['letterhead', 'header', 'clientInfo', 'itemsTable', 'totals', 'notes', 'bankSignature', 'terms'];
+const FLOW_KEYS = ['letterhead', 'header', 'clientInfo', 'logistics', 'itemsTable', 'totals', 'notes', 'bankSignature', 'terms'];
 
 // Notes, Bank/Signature, and Terms behave as one atomic unit for
 // pagination purposes (see the useLayoutEffect below) — either all of them
@@ -37,10 +37,11 @@ function SectionByKey({ sectionKey, doc, style, totals, wordsText }) {
     case 'letterhead': return <LetterheadSection data={s.letterhead} />;
     case 'header': return <HeaderSection data={s.header} style={style} />;
     case 'clientInfo': return <ClientInfoSection data={s.clientInfo} style={style} docType={docType} />;
-    case 'itemsTable': return <ItemsTableSection data={s.itemsTable} style={style} currency={doc.currency} />;
+    case 'logistics': return <LogisticsSection data={s.logistics} style={style} docType={docType} />;
+    case 'itemsTable': return <ItemsTableSection data={s.itemsTable} style={style} currency={doc.currency} docType={docType} />;
     case 'totals': return <TotalsSection data={s.totals} style={style} currency={doc.currency} totals={totals} wordsText={wordsText} qr={s.qr} bank={s.bank} docType={docType} />;
     case 'notes': return <NotesSection data={s.notes} style={style} />;
-    case 'bankSignature': return <BankSignatureSection bank={s.bank} signature={s.signature} qr={s.qr} style={style} docType={docType} />;
+    case 'bankSignature': return <BankSignatureSection bank={s.bank} signature={s.signature} signature2={s.signature2} qr={s.qr} style={style} docType={docType} />;
     case 'terms': return <TermsSection data={s.terms} style={style} />;
     default: return null;
   }

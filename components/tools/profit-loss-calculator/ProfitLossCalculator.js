@@ -10,7 +10,7 @@ import CostRow from './CostRow';
 import { buildPLSummaryText } from './exportText';
 import {
   OPEX_FIELDS, computeSimple, computeDetailed, buildExpenseBreakdown, buildStatus,
-  computeBreakEven, computePricing, comparePeriods, buildInsights,
+  computeBreakEven, computePricing, comparePeriods, buildInsights, computeWhatIf, buildWhatIfInsight, num,
 } from './calculations';
 
 const INSIGHT_ICONS = { profit: '📈', loss: '📉', expense: '💸', percent: '➗', target: '🎯', tag: '🏷️' };
@@ -86,6 +86,18 @@ export default function ProfitLossCalculator() {
   const [prevGrossProfit, setPrevGrossProfit] = useState('');
   const [prevNetProfit, setPrevNetProfit] = useState('');
 
+  // What-If Simulator (optional, independent of mode) — these never touch
+  // the actual input state above; they're purely levers into computeWhatIf.
+  const [whatIfOpen, setWhatIfOpen] = useState(false);
+  const [revenueDeltaPct, setRevenueDeltaPct] = useState('');
+  const [revenueDeltaDirection, setRevenueDeltaDirection] = useState('increase');
+  const [priceDeltaPct, setPriceDeltaPct] = useState('');
+  const [priceDeltaDirection, setPriceDeltaDirection] = useState('increase');
+  const [expenseDeltaAmount, setExpenseDeltaAmount] = useState('');
+  const [expenseDeltaDirection, setExpenseDeltaDirection] = useState('reduce');
+  const [cogsDeltaPct, setCogsDeltaPct] = useState('');
+  const [cogsDeltaDirection, setCogsDeltaDirection] = useState('reduce');
+
   const summaryRef = useRef(null);
 
   function updateOpex(id, key, val) {
@@ -131,7 +143,26 @@ export default function ProfitLossCalculator() {
     () => (comparisonOpen ? comparePeriods(result, { revenue: prevRevenue, totalCosts: prevTotalCosts, grossProfit: prevGrossProfit, netProfit: prevNetProfit }) : null),
     [comparisonOpen, result, prevRevenue, prevTotalCosts, prevGrossProfit, prevNetProfit]
   );
-  const insights = useMemo(() => buildInsights(result, { breakdown, breakEven, pricing }), [result, breakdown, breakEven, pricing]);
+  // NumberInput strips any "-" a person types (an app-wide convention to
+  // prevent stray negative entries), so every What-If lever pairs a
+  // magnitude-only input with its own direction toggle here rather than
+  // relying on the user typing a negative percentage directly.
+  const whatIfDeltas = useMemo(() => ({
+    revenueDeltaPct: revenueDeltaPct ? (revenueDeltaDirection === 'decrease' ? -Math.abs(num(revenueDeltaPct)) : Math.abs(num(revenueDeltaPct))) : '',
+    priceDeltaPct: priceDeltaPct ? (priceDeltaDirection === 'decrease' ? -Math.abs(num(priceDeltaPct)) : Math.abs(num(priceDeltaPct))) : '',
+    cogsDeltaPct: cogsDeltaPct ? (cogsDeltaDirection === 'decrease' ? -Math.abs(num(cogsDeltaPct)) : Math.abs(num(cogsDeltaPct))) : '',
+    expenseDeltaAmount: expenseDeltaAmount ? (expenseDeltaDirection === 'reduce' ? -Math.abs(num(expenseDeltaAmount)) : Math.abs(num(expenseDeltaAmount))) : '',
+  }), [revenueDeltaPct, revenueDeltaDirection, priceDeltaPct, priceDeltaDirection, cogsDeltaPct, cogsDeltaDirection, expenseDeltaAmount, expenseDeltaDirection]);
+  const whatIfResult = useMemo(
+    () => (whatIfOpen ? computeWhatIf(result, whatIfDeltas) : { hasResults: false }),
+    [whatIfOpen, result, whatIfDeltas]
+  );
+  const whatIfInsight = useMemo(() => buildWhatIfInsight(result, whatIfResult, whatIfDeltas), [result, whatIfResult, whatIfDeltas]);
+
+  const insights = useMemo(() => {
+    const base = buildInsights(result, { breakdown, breakEven, pricing });
+    return whatIfInsight ? [...base, whatIfInsight] : base;
+  }, [result, breakdown, breakEven, pricing, whatIfInsight]);
 
   const totalCosts = result.totalCosts;
   const isLoss = result.netProfit < 0;
@@ -167,7 +198,7 @@ export default function ProfitLossCalculator() {
             <p className="pl2-card-sub">Choose Simple for a quick answer, or Detailed for a full breakdown.</p>
             <div role="radiogroup" aria-label="Calculation mode" style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
               <button role="radio" aria-checked={mode === 'simple'} className={`pl2-pill ${mode === 'simple' ? 'active' : ''}`} onClick={() => setMode('simple')}>Simple</button>
-              <button role="radio" aria-checked={mode === 'detailed'} className={`pl2-pill ${mode === 'detailed' ? 'active' : ''}`} onClick={() => setMode('detailed')}>Detailed</button>
+              <button role="radio" aria-checked={mode === 'detailed'} className={`pl2-pill ${mode === 'detailed' ? 'active' : ''}`} onClick={() => setMode('detailed')}>Business</button>
             </div>
 
             <label className="pl2-label" htmlFor="pl2-currency">Currency</label>
@@ -191,8 +222,8 @@ export default function ProfitLossCalculator() {
               <>
                 <div className="pl2-field-row">
                   <div style={{ flex: 1 }}>
-                    <label className="pl2-label">Sales Revenue</label>
-                    <NumberInput ariaLabel="Sales revenue" value={salesRevenue} onChange={setSalesRevenue} placeholder="e.g. 1,000,000" prefix={currency} />
+                    <label className="pl2-label">Revenue</label>
+                    <NumberInput ariaLabel="Business revenue" value={salesRevenue} onChange={setSalesRevenue} placeholder="e.g. 1,000,000" prefix={currency} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <label className="pl2-label">Other Income</label>
@@ -303,6 +334,63 @@ export default function ProfitLossCalculator() {
                     <NumberInput ariaLabel="Previous period net profit" value={prevNetProfit} onChange={setPrevNetProfit} placeholder="0.00" prefix={currency} />
                   </div>
                 </div>
+              </div>
+            )}
+          </div>
+
+          <div className="pl2-card">
+            <button className="pl2-collapsible-head" onClick={() => setWhatIfOpen((v) => !v)} aria-expanded={whatIfOpen}>
+              <span className="pl2-card-title"><span aria-hidden="true">🧪</span> What-If Simulator {whatIfResult.hasResults && <span className="pl2-badge">active</span>}</span>
+              <span aria-hidden="true" className={`pl2-chevron ${whatIfOpen ? 'open' : ''}`}>▾</span>
+            </button>
+            {whatIfOpen && (
+              <div className="pl2-collapsible-body">
+                <p className="pl2-card-sub">Test a scenario without changing your actual figures above — only Projected results move.</p>
+                <div className="pl2-field-row">
+                  <div style={{ flex: 1 }}>
+                    <label className="pl2-label">Revenue Change</label>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <select className="pl2-select" style={{ width: 100, flexShrink: 0 }} value={revenueDeltaDirection} onChange={(e) => setRevenueDeltaDirection(e.target.value)} aria-label="Revenue change direction">
+                        <option value="increase">Increase</option>
+                        <option value="decrease">Decrease</option>
+                      </select>
+                      <NumberInput ariaLabel="Revenue change percent" value={revenueDeltaPct} onChange={setRevenueDeltaPct} placeholder="e.g. 10" suffix="%" />
+                    </div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label className="pl2-label">Selling Price Change</label>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <select className="pl2-select" style={{ width: 100, flexShrink: 0 }} value={priceDeltaDirection} onChange={(e) => setPriceDeltaDirection(e.target.value)} aria-label="Selling price change direction">
+                        <option value="increase">Increase</option>
+                        <option value="decrease">Decrease</option>
+                      </select>
+                      <NumberInput ariaLabel="Selling price change percent" value={priceDeltaPct} onChange={setPriceDeltaPct} placeholder="e.g. 5" suffix="%" />
+                    </div>
+                  </div>
+                </div>
+                <div className="pl2-field-row" style={{ marginTop: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <label className="pl2-label">Cost of Goods Change</label>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <select className="pl2-select" style={{ width: 100, flexShrink: 0 }} value={cogsDeltaDirection} onChange={(e) => setCogsDeltaDirection(e.target.value)} aria-label="Cost of goods change direction">
+                        <option value="decrease">Decrease</option>
+                        <option value="increase">Increase</option>
+                      </select>
+                      <NumberInput ariaLabel="Cost of goods change percent" value={cogsDeltaPct} onChange={setCogsDeltaPct} placeholder="e.g. 8" suffix="%" />
+                    </div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label className="pl2-label">Expense Change</label>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <select className="pl2-select" style={{ width: 100, flexShrink: 0 }} value={expenseDeltaDirection} onChange={(e) => setExpenseDeltaDirection(e.target.value)} aria-label="Expense change direction">
+                        <option value="reduce">Reduce</option>
+                        <option value="increase">Increase</option>
+                      </select>
+                      <NumberInput ariaLabel="Expense change amount" value={expenseDeltaAmount} onChange={setExpenseDeltaAmount} placeholder="0.00" prefix={currency} />
+                    </div>
+                  </div>
+                </div>
+                <p className="pl2-card-sub" style={{ marginTop: 10, marginBottom: 0 }}>Selling Price Change applies only to Revenue (not Other Income) — Revenue Change applies to everything, so the two can be combined.</p>
               </div>
             )}
           </div>
@@ -438,6 +526,24 @@ export default function ProfitLossCalculator() {
                   </SectionCard>
                 )}
 
+                {whatIfResult.hasResults && (
+                  <SectionCard icon="🧪" title="What-If Simulator">
+                    <p className="pl2-card-sub">Current vs Projected — your actual figures are unchanged</p>
+                    <div className="pl2-table-scroll">
+                      <table className="pl2-table">
+                        <thead><tr><th></th><th>Current</th><th>Projected</th></tr></thead>
+                        <tbody>
+                          <tr><td>Total Revenue</td><td>{formatCurrency(result.totalRevenue, currency)}</td><td className="pl2-projected-cell">{formatCurrency(whatIfResult.totalRevenue, currency)}</td></tr>
+                          <tr><td>Total Costs</td><td>{formatCurrency(result.totalCosts, currency)}</td><td className="pl2-projected-cell">{formatCurrency(whatIfResult.totalCosts, currency)}</td></tr>
+                          <tr><td>Gross Profit</td><td>{formatSignedCurrency(result.grossProfit, currency)}</td><td className="pl2-projected-cell">{formatSignedCurrency(whatIfResult.grossProfit, currency)}</td></tr>
+                          <tr><td>Net Profit</td><td>{formatSignedCurrency(result.netProfit, currency)}</td><td className="pl2-projected-cell">{formatSignedCurrency(whatIfResult.netProfit, currency)}</td></tr>
+                          <tr><td>Net Margin</td><td>{formatPercent(result.netMargin)}</td><td className="pl2-projected-cell">{formatPercent(whatIfResult.netMargin)}</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </SectionCard>
+                )}
+
                 {insights.length > 0 && (
                   <SectionCard icon="⭐" title="Insights">
                     {insights.map((ins) => (
@@ -460,7 +566,7 @@ export default function ProfitLossCalculator() {
               captureRef={summaryRef}
               fileNamePrefix={currency.replace(/[^A-Za-z0-9]/g, '') || 'profit-loss'}
               fileNameSuffix="profit-loss-summary"
-              buildText={() => buildPLSummaryText(result, currency, status, breakdown, breakEven, pricing, comparison, insights)}
+              buildText={() => buildPLSummaryText(result, currency, status, breakdown, breakEven, pricing, comparison, insights, whatIfResult)}
             />
           )}
         </div>
@@ -548,6 +654,7 @@ const PL2_STYLES = `
   .pl2-table td { padding: 10px; border-bottom: 1px solid #F1F5F9; color: #334155; }
   .pl2-improved-cell { color: #059669; font-weight: 700; }
   .pl2-declined-cell { color: #DC2626; font-weight: 700; }
+  .pl2-projected-cell { color: #2563EB; font-weight: 700; background: #EFF6FF; }
   .pl2-change-pct { font-weight: 500; opacity: 0.85; }
   .pl2-change-word { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; opacity: 0.7; }
 

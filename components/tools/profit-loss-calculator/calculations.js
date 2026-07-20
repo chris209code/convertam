@@ -18,7 +18,7 @@ export function safeDiv(numerator, denominator, fallback = 0) {
   return Number.isFinite(result) ? result : fallback;
 }
 
-// The eight named operating-expense slots the formula spec calls out
+// The named operating-expense slots the formula spec calls out
 // individually — fixed slots, not a freely-renameable list (that's what
 // customExpenses is for). Each supports Fixed Amount or % of Revenue,
 // same as the examples (Marketing, Taxes) the spec calls out explicitly.
@@ -27,10 +27,11 @@ export const OPEX_FIELDS = [
   { id: 'rent', label: 'Rent' },
   { id: 'utilities', label: 'Utilities' },
   { id: 'marketing', label: 'Marketing' },
-  { id: 'transport', label: 'Transport / Logistics' },
+  { id: 'transport', label: 'Transport' },
   { id: 'taxes', label: 'Taxes' },
   { id: 'interest', label: 'Loan Interest' },
-  { id: 'otherOpex', label: 'Other Operating Expenses' },
+  { id: 'insurance', label: 'Insurance' },
+  { id: 'otherOpex', label: 'Miscellaneous Expenses' },
 ];
 
 // One line item's own amount, given the revenue base a percentage
@@ -143,8 +144,82 @@ export function buildStatus(result) {
   }
   if (netProfit < 0) return { id: 'loss', label: 'Operating at a Loss', tone: 'red', detail: 'Costs currently exceed revenue.' };
   if (netMargin < 5) return { id: 'low-margin', label: 'Low Margin', tone: 'amber', detail: 'Profitable, but with little room for cost increases.' };
-  if (netMargin < 15) return { id: 'profitable', label: 'Profitable', tone: 'green', detail: 'A healthy, sustainable net margin.' };
-  return { id: 'strong', label: 'Strong Profit', tone: 'green', detail: 'A well above-average net margin.' };
+  if (netMargin < 15) return { id: 'profitable', label: 'Profitable', tone: 'green', detail: 'A solid, sustainable net margin.' };
+  if (netMargin < 25) return { id: 'healthy', label: 'Healthy', tone: 'green', detail: 'A strong net margin with good room to absorb cost increases.' };
+  return { id: 'excellent', label: 'Excellent', tone: 'green', detail: 'An exceptional net margin for a business of this size.' };
+}
+
+// What-If Simulator — projects the effect of up to four independent
+// levers WITHOUT ever touching the actual input state; this is purely a
+// derived calculation over the already-computed `base` result. Levers:
+//   revenueDeltaPct   — scales every revenue line (models overall growth)
+//   priceDeltaPct     — scales Sales Revenue only, not Other Income
+//                       (models a pricing decision, assuming volume holds)
+//   expenseDeltaAmount — a flat amount added to Operating Expenses (use a
+//                        negative number to model a reduction)
+//   cogsDeltaPct      — scales Cost of Goods Sold
+// Returns a result in the same shape buildStatus/StatCard consumers
+// already expect, so "Current" and "Projected" can be rendered with the
+// exact same formatting code.
+export function computeWhatIf(base, { revenueDeltaPct, priceDeltaPct, expenseDeltaAmount, cogsDeltaPct }) {
+  if (!base?.hasResults) return { hasResults: false };
+  const revMult = 1 + num(revenueDeltaPct) / 100;
+  const priceMult = 1 + num(priceDeltaPct) / 100;
+  const cogsMult = 1 + num(cogsDeltaPct) / 100;
+  const expenseDelta = num(expenseDeltaAmount);
+
+  if (base.mode === 'simple') {
+    const totalRevenue = Math.max(0, base.totalRevenue * priceMult * revMult);
+    const totalCosts = Math.max(0, base.totalCosts * cogsMult + expenseDelta);
+    const profit = totalRevenue - totalCosts;
+    return {
+      mode: 'simple', totalRevenue, totalCosts,
+      grossProfit: profit, netProfit: profit,
+      grossMargin: safeDiv(profit, totalRevenue) * 100, netMargin: safeDiv(profit, totalRevenue) * 100,
+      markup: safeDiv(profit, totalCosts) * 100, expenseRatio: safeDiv(totalCosts, totalRevenue) * 100,
+      hasResults: true,
+    };
+  }
+
+  const salesRevenue = Math.max(0, base.salesRevenue * priceMult * revMult);
+  const otherIncome = Math.max(0, base.otherIncome * revMult);
+  const totalRevenue = salesRevenue + otherIncome;
+  const cogs = Math.max(0, base.cogs * cogsMult);
+  const operatingExpensesTotal = Math.max(0, base.operatingExpensesTotal + expenseDelta);
+  const grossProfit = salesRevenue - cogs;
+  const netProfit = totalRevenue - cogs - operatingExpensesTotal;
+
+  return {
+    mode: 'detailed',
+    salesRevenue, otherIncome, totalRevenue, cogs, operatingExpensesTotal,
+    totalCosts: cogs + operatingExpensesTotal,
+    grossProfit, netProfit,
+    grossMargin: safeDiv(grossProfit, salesRevenue) * 100,
+    netMargin: safeDiv(netProfit, totalRevenue) * 100,
+    markup: safeDiv(grossProfit, cogs) * 100,
+    expenseRatio: safeDiv(operatingExpensesTotal, totalRevenue) * 100,
+    hasResults: true,
+  };
+}
+
+// A single deterministic insight describing the simulator's effect,
+// generated only from whichever levers the user actually moved — no
+// invented "what if" framing beyond the exact scenario configured.
+export function buildWhatIfInsight(base, projected, deltas) {
+  if (!projected?.hasResults) return null;
+  const parts = [];
+  if (num(deltas.revenueDeltaPct)) parts.push(`revenue ${num(deltas.revenueDeltaPct) > 0 ? 'up' : 'down'} ${Math.abs(num(deltas.revenueDeltaPct))}%`);
+  if (num(deltas.priceDeltaPct)) parts.push(`selling price ${num(deltas.priceDeltaPct) > 0 ? 'up' : 'down'} ${Math.abs(num(deltas.priceDeltaPct))}%`);
+  if (num(deltas.cogsDeltaPct)) parts.push(`cost of goods ${num(deltas.cogsDeltaPct) > 0 ? 'up' : 'down'} ${Math.abs(num(deltas.cogsDeltaPct))}%`);
+  if (num(deltas.expenseDeltaAmount)) parts.push(`expenses ${num(deltas.expenseDeltaAmount) > 0 ? 'up' : 'down'} by ${Math.abs(num(deltas.expenseDeltaAmount)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`);
+  if (parts.length === 0) return null;
+
+  return {
+    id: 'what-if',
+    icon: 'target',
+    text: `With ${parts.join(' and ')}, your net margin moves to ${projected.netMargin.toFixed(1)}%.`,
+    detail: `Projected net ${projected.netProfit >= 0 ? 'profit' : 'loss'}: ${Math.abs(projected.netProfit).toLocaleString(undefined, { maximumFractionDigits: 0 })} (currently ${Math.abs(base.netProfit).toLocaleString(undefined, { maximumFractionDigits: 0 })}).`,
+  };
 }
 
 // Unit-economics break-even — a separate, more precise calculation from

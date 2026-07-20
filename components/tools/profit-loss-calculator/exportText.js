@@ -1,14 +1,21 @@
 import { formatCurrency, formatPercent } from '../salary-calculator/format';
 
+// formatCurrency() always shows an absolute value — Gross/Net Profit can
+// be genuinely negative in this tool, so anywhere that isn't already
+// paired with an explicit Profit/Loss word needs its own sign.
+function signed(amount, currency) {
+  return `${amount < 0 ? '-' : ''}${formatCurrency(amount, currency)}`;
+}
+
 // Plain-text summary used by both Copy Results and Share — mirrors the
 // other calculators' exportText.js so Copy/Share can never disagree.
-export function buildPLSummaryText(result, currency, status, breakdown, breakEven, pricing, comparison, insights) {
+export function buildPLSummaryText(result, currency, status, breakdown, breakEven, pricing, comparison, insights, whatIf) {
   const lines = [
-    `Profit & Loss Summary (${result.mode === 'simple' ? 'Simple' : 'Detailed'} mode)`,
+    `Profit & Loss Summary (${result.mode === 'simple' ? 'Simple' : 'Business'} mode)`,
     '',
     `Total Revenue: ${formatCurrency(result.totalRevenue, currency)}`,
     `Total Costs: ${formatCurrency(result.totalCosts, currency)}`,
-    `Gross Profit: ${formatCurrency(result.grossProfit, currency)}`,
+    `Gross Profit: ${signed(result.grossProfit, currency)}`,
     `${result.netProfit >= 0 ? 'Net Profit' : 'Net Loss'}: ${formatCurrency(Math.abs(result.netProfit), currency)}`,
     `Gross Margin: ${formatPercent(result.grossMargin)}`,
     `Net Margin: ${formatPercent(result.netMargin)}`,
@@ -50,6 +57,15 @@ export function buildPLSummaryText(result, currency, status, breakdown, breakEve
       const prev = r.isPct ? formatPercent(r.previous) : formatCurrency(r.previous, currency);
       lines.push(`  ${r.label}: ${cur} vs ${prev} (${r.status})`);
     }
+  }
+
+  if (whatIf?.hasResults) {
+    lines.push('', 'What-If Simulator (Current vs Projected):',
+      `  Total Revenue: ${formatCurrency(result.totalRevenue, currency)} vs ${formatCurrency(whatIf.totalRevenue, currency)}`,
+      `  Total Costs: ${formatCurrency(result.totalCosts, currency)} vs ${formatCurrency(whatIf.totalCosts, currency)}`,
+      `  Net Profit: ${signed(result.netProfit, currency)} vs ${signed(whatIf.netProfit, currency)}`,
+      `  Net Margin: ${formatPercent(result.netMargin)} vs ${formatPercent(whatIf.netMargin)}`,
+    );
   }
 
   if (insights.length > 0) {

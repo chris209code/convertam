@@ -11,7 +11,7 @@ const ACTIVE_CALCULATORS = [
   { id: 'salary', href: '/salary-calculator', icon: '💰', title: 'Salary Calculator', desc: 'Calculate gross salary, deductions and take-home pay instantly.', badge: 'POPULAR', category: 'financial' },
   { id: 'loan', href: '/calculators/loan-calculator', icon: '🏦', title: 'Loan Calculator', desc: 'Work out monthly repayments, total interest and total repayment.', category: 'financial' },
   { id: 'vat', href: '/calculators/vat-calculator', icon: '🧾', title: 'VAT Calculator', desc: 'Add VAT to an amount or extract it from a VAT-inclusive price.', category: 'financial' },
-  { id: 'profit-margin', href: '/calculators/profit-margin', icon: '📈', title: 'Profit Margin Calculator', desc: 'Work out profit, margin and markup from cost and selling price.', category: 'financial' },
+  { id: 'profit-margin', href: '/calculators/profit-margin', icon: '📈', title: 'Profit & Loss Calculator', desc: 'Calculate revenue, costs, profit, margins, pricing and break-even performance.', category: 'financial' },
   { id: 'discount', href: '/calculators/discount-calculator', icon: '🏷️', title: 'Discount Calculator', desc: 'Find the final price and total savings on any discounted item.', category: 'financial' },
   { id: 'age', href: '/calculators/age-calculator', icon: '🎂', title: 'Age Calculator', desc: 'Calculate exact age in years, months and days from a date of birth.', category: 'personal' },
   { id: 'expense-budget', href: '/calculators/expense-budget-calculator', icon: '💵', title: 'Expense & Budget Calculator', desc: 'Track income, expenses and savings, and see your remaining balance live.', category: 'financial' },

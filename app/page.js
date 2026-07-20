@@ -148,7 +148,7 @@ const CATEGORIES = [
       { name: 'Salary Calculator', href: '/salary-calculator' },
       { name: 'Loan Calculator', href: '/calculators/loan-calculator' },
       { name: 'VAT Calculator', href: '/calculators/vat-calculator' },
-      { name: 'Profit Margin', href: '/calculators/profit-margin' },
+      { name: 'Profit & Loss', href: '/calculators/profit-margin' },
       { name: 'Discount Calculator', href: '/calculators/discount-calculator' },
       { name: 'Age Calculator', href: '/calculators/age-calculator' },
       { name: 'Expense & Budget Calculator', href: '/calculators/expense-budget-calculator' },

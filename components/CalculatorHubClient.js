@@ -15,21 +15,17 @@ const ACTIVE_CALCULATORS = [
   { id: 'discount', href: '/calculators/discount-calculator', icon: '🏷️', title: 'Discount Calculator', desc: 'Find the final price and total savings on any discounted item.', category: 'financial' },
   { id: 'age', href: '/calculators/age-calculator', icon: '🎂', title: 'Age Calculator', desc: 'Calculate exact age in years, months and days from a date of birth.', category: 'personal' },
   { id: 'expense-budget', href: '/calculators/expense-budget-calculator', icon: '💵', title: 'Expense & Budget Calculator', desc: 'Track income, expenses and savings, and see your remaining balance live.', category: 'financial' },
+  { id: 'break-even', href: '/calculators/break-even-calculator', icon: '⚖️', title: 'Break-even Calculator', desc: 'Find out how many units you need to sell to cover your costs.', category: 'financial' },
+  { id: 'savings-goal', href: '/calculators/savings-goal-calculator', icon: '🎯', title: 'Savings Goal Calculator', desc: 'Plan how much to save regularly to hit a target, interest included.', category: 'financial' },
 ];
 
 const FEATURED_ID = 'salary';
 
-const COMING_SOON = [
-  { icon: '🎯', title: 'Savings Goal Calculator', desc: 'Plan how much to save each month to hit a target.' },
-  { icon: '⚖️', title: 'Break-even Calculator', desc: 'Find out how many sales you need to cover your costs.' },
-];
-
-// "Financial Calculators" renamed to "Business & Finance" — these tools
-// now support running a business, not just financial arithmetic.
+// This was the last pair of calculators on the roadmap — the suite is now
+// complete, so there is no longer a Coming Soon section or category.
 const CATEGORIES = [
   { id: 'financial', label: 'Business & Finance', title: 'Business & Finance' },
   { id: 'personal', label: 'Everyday', title: 'Everyday' },
-  { id: 'coming-soon', label: 'Coming Soon', title: 'Coming Soon' },
 ];
 
 function scrollToSection(id) {
@@ -51,21 +47,6 @@ function CalcCard({ calc }) {
   );
 }
 
-function ComingSoonCard({ item }) {
-  return (
-    <div className="calc-card calc-card-soon" aria-disabled="true">
-      <span className="calc-card-icon" aria-hidden="true">{item.icon}</span>
-      <div className="calc-card-body">
-        <div className="calc-card-title-row">
-          <span className="calc-card-title">{item.title}</span>
-          <span className="calc-badge calc-badge-soon">COMING SOON</span>
-        </div>
-        <p className="calc-card-desc">{item.desc}</p>
-      </div>
-    </div>
-  );
-}
-
 export default function CalculatorHubClient() {
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
@@ -78,15 +59,9 @@ export default function CalculatorHubClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [q]
   );
-  const filteredComingSoon = useMemo(
-    () => (isSearching ? COMING_SOON.filter((c) => matches(c.title, c.desc)) : COMING_SOON),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [q]
-  );
-
   const featured = ACTIVE_CALCULATORS.find((c) => c.id === FEATURED_ID);
   const byCategory = (catId) => filteredActive.filter((c) => c.category === catId);
-  const noResults = isSearching && filteredActive.length === 0 && filteredComingSoon.length === 0;
+  const noResults = isSearching && filteredActive.length === 0;
 
   return (
     <main style={{ width: '100%', minHeight: '100vh', background: 'linear-gradient(180deg, #EFF6FF 0%, #F8FAFF 100%)' }}>
@@ -134,9 +109,6 @@ export default function CalculatorHubClient() {
         .calc-card-desc { font-size: 0.78rem; color: #64748B; line-height: 1.45; margin: 0; }
         .calc-badge { font-size: 0.6rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; white-space: nowrap; letter-spacing: 0.03em; }
         .calc-badge-popular { background: #FEF3C7; color: #92400E; }
-        .calc-badge-soon { background: #E2E8F0; color: #64748B; }
-        .calc-card-soon { cursor: default; opacity: 0.65; }
-        .calc-card-soon:hover { transform: none; box-shadow: 0 2px 8px rgba(15,23,42,0.04); border-color: #E2E8F0; }
 
         .calc-section-title { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; scroll-margin-top: 24px; }
         .calc-empty { text-align: center; padding: 48px 20px; color: #64748B; font-size: 0.9rem; }
@@ -219,15 +191,6 @@ export default function CalculatorHubClient() {
                 <h2 id="personal" className="calc-section-title" style={{ fontSize: '1.05rem', fontWeight: 700, color: '#152238' }}>🙋 Everyday</h2>
                 <div className="calc-grid">
                   {byCategory('personal').map((c) => <CalcCard key={c.id} calc={c} />)}
-                </div>
-              </div>
-            )}
-
-            {filteredComingSoon.length > 0 && (
-              <div>
-                <h2 id="coming-soon" className="calc-section-title" style={{ fontSize: '1.05rem', fontWeight: 700, color: '#152238' }}>🔜 Coming Soon</h2>
-                <div className="calc-grid">
-                  {filteredComingSoon.map((item) => <ComingSoonCard key={item.title} item={item} />)}
                 </div>
               </div>
             )}

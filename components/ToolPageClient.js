@@ -31,6 +31,8 @@ import ProfitMarginCalculatorWorkspace from '@/components/tools/calculators/Prof
 import DiscountCalculatorWorkspace from '@/components/tools/calculators/DiscountCalculatorWorkspace';
 import AgeCalculatorWorkspace from '@/components/tools/calculators/AgeCalculatorWorkspace';
 import ExpenseBudgetCalculator from '@/components/tools/expense-budget-calculator/ExpenseBudgetCalculator';
+import BreakEvenCalculatorWorkspace from '@/components/tools/calculators/BreakEvenCalculatorWorkspace';
+import SavingsGoalCalculatorWorkspace from '@/components/tools/calculators/SavingsGoalCalculatorWorkspace';
 import UtilitiesWorkspace from '@/components/tools/UtilitiesWorkspace';
 import CVImproverWorkspace from '@/components/tools/CVImproverWorkspace';
 import QrCodeStudioWorkspace from '@/components/tools/QrCodeStudioWorkspace';
@@ -59,7 +61,7 @@ const isFree = (mode) =>
    'images-to-pdf', 'extract-pdf-images', 'compare-pdf', 'redact-pdf', 'pdf-overlay', 'convert-image-format', 'meme-generator',
    'remove-pages', 'add-page-numbers', 'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize',
    'fill', 'write-on-pdf', 'quotation', 'salary-calculator', 'loan-calculator', 'vat-calculator', 'profit-margin', 'discount-calculator', 'age-calculator',
-   'expense-budget-calculator',
+   'expense-budget-calculator', 'break-even-calculator', 'savings-goal-calculator',
    'utilities-hub', 'cv-improver', 'resume-builder', 'ask-solve-ai', 'qr-code-generator',
    'cover-letter', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'presentation-generator', 'data-analyst',
    'id-card-generator', 'document-enhancer', 'delivery-note-waybill'].includes(mode);
@@ -146,6 +148,8 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'discount-calculator' && <DiscountCalculatorWorkspace />}
       {tool.mode === 'age-calculator' && <AgeCalculatorWorkspace />}
       {tool.mode === 'expense-budget-calculator' && <ExpenseBudgetCalculator />}
+      {tool.mode === 'break-even-calculator' && <BreakEvenCalculatorWorkspace />}
+      {tool.mode === 'savings-goal-calculator' && <SavingsGoalCalculatorWorkspace />}
       {tool.mode === 'utilities-hub' && <UtilitiesWorkspace />}
       {tool.mode === 'cv-improver' && <CVImproverWorkspace />}
       {tool.mode === 'qr-code-studio' && <QrCodeStudioWorkspace />}

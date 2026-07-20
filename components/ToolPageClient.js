@@ -33,6 +33,7 @@ import ExpenseBudgetCalculator from '@/components/tools/expense-budget-calculato
 import BreakEvenCalculatorWorkspace from '@/components/tools/calculators/BreakEvenCalculatorWorkspace';
 import SavingsGoalCalculatorWorkspace from '@/components/tools/calculators/SavingsGoalCalculatorWorkspace';
 import UtilitiesWorkspace from '@/components/tools/UtilitiesWorkspace';
+import PasswordStudioWorkspace from '@/components/tools/password-studio/PasswordStudioWorkspace';
 import CVImproverWorkspace from '@/components/tools/CVImproverWorkspace';
 import QrCodeStudioWorkspace from '@/components/tools/QrCodeStudioWorkspace';
 import AskSolveAIWorkspace from '@/components/tools/AskSolveAIWorkspace';
@@ -62,7 +63,7 @@ const isFree = (mode) =>
    'expense-budget-calculator', 'break-even-calculator', 'savings-goal-calculator',
    'utilities-hub', 'cv-improver', 'resume-builder', 'ask-solve-ai', 'qr-code-generator',
    'cover-letter', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'presentation-generator', 'data-analyst',
-   'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio'].includes(mode);
+   'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio', 'password-studio'].includes(mode);
 
 function getPriceBadge(mode) {
   if (isFree(mode)) return 'Free';
@@ -150,6 +151,7 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'break-even-calculator' && <BreakEvenCalculatorWorkspace />}
       {tool.mode === 'savings-goal-calculator' && <SavingsGoalCalculatorWorkspace />}
       {tool.mode === 'utilities-hub' && <UtilitiesWorkspace />}
+      {tool.mode === 'password-studio' && <PasswordStudioWorkspace />}
       {tool.mode === 'cv-improver' && <CVImproverWorkspace />}
       {tool.mode === 'qr-code-studio' && <QrCodeStudioWorkspace />}
       {tool.mode === 'ask-solve-ai' && <AskSolveAIWorkspace />}
@@ -168,10 +170,12 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'delivery-note-waybill' && <BusinessDocumentStudioWorkspace initialDocType="delivery-note" />}
       {tool.mode === 'soon' && <ComingSoon title={tool.title} note={tool.note} />}
 
-      <div className="flex items-center gap-2 mt-4 px-4 py-3 rounded-xl text-sm" style={{ background: '#f0f5ff', border: '1px solid #d0dcf5' }}>
-        <span>🔒</span>
-        <span className="text-ink-soft">Your files are automatically deleted after processing and are never shared with third parties.</span>
-      </div>
+      {tool.mode !== 'password-studio' && (
+        <div className="flex items-center gap-2 mt-4 px-4 py-3 rounded-xl text-sm" style={{ background: '#f0f5ff', border: '1px solid #d0dcf5' }}>
+          <span>🔒</span>
+          <span className="text-ink-soft">Your files are automatically deleted after processing and are never shared with third parties.</span>
+        </div>
+      )}
 
       {relatedTools.length > 0 && (
         <div className="mt-8">

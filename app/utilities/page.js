@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 export const metadata = {
   title: 'Utilities — Convertam',
-  description: 'Free utility tools. QR code generator, password generator, word counter and more. No login required.',
+  description: 'Free utility tools. QR code generator, Password Studio, word counter and more. No login required.',
 };
 
 export default function UtilitiesPage() {
@@ -26,15 +26,20 @@ export default function UtilitiesPage() {
       </div>
 
       <div className="page-inner" style={{ padding: '48px 4%', textAlign: 'center' }}>
-        <div style={{ background: 'white', borderRadius: 20, padding: 40, maxWidth: 500, margin: '0 auto', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
+        <div style={{ background: 'white', borderRadius: 20, padding: 40, maxWidth: 560, margin: '0 auto', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
           <div style={{ fontSize: '3rem', marginBottom: 16 }}>⚙️</div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Utilities Hub</h2>
           <p style={{ fontSize: '0.88rem', color: '#64748B', marginBottom: 24, lineHeight: 1.6 }}>
-            QR Code Generator, Password Generator, Word Counter, Lorem Ipsum — all in one place.
+            QR Code Studio, Password Studio, Word Counter, Text Case Converter — all in one place.
           </p>
-          <Link href="/utilities-hub" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', background: '#475569', color: 'white', borderRadius: 12, textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem' }}>
-            Open Utilities Hub →
-          </Link>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Link href="/password-generator" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', background: '#2563EB', color: 'white', borderRadius: 12, textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem' }}>
+              Open Password Studio →
+            </Link>
+            <Link href="/utilities-hub" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', background: '#475569', color: 'white', borderRadius: 12, textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem' }}>
+              Open Utilities Hub →
+            </Link>
+          </div>
         </div>
       </div>
     </main>

@@ -227,7 +227,7 @@ const CATEGORIES = [
     viewAllHref: '/utilities-hub',
     tools: [
       { name: 'QR Code Generator', href: '/qr-code-generator' },
-      { name: 'Password Generator', href: '/utilities-hub' },
+      { name: 'Password Studio', href: '/password-generator' },
       { name: 'Word Counter', href: '/utilities-hub' },
       { name: 'Text Case Converter', href: '/utilities-hub' },
     ],

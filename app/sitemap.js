@@ -36,6 +36,7 @@ export default function sitemap() {
   // [tool] dynamic route, so each one is added here as it's built.
   const dataToolPages = [
     'data-tools/text-cleaner',
+    'data-tools/json-studio',
   ].map((path) => ({
     url: `${BASE_URL}/${path}`,
     lastModified: new Date(),

@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { PdfIcon, BusinessIcon, AiIcon, ImageIcon, CalculatorIcon, UtilitiesIcon } from '../components/categoryVisuals';
 
 // ---------------------------------------------------------------------------
 // Every route below is a REAL, existing Convertam route — verified against
@@ -181,38 +182,12 @@ const TRENDING_TOOLS = [
 ];
 
 const ICONS = {
-  fileText: (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-      <path d="M14.5 2H6.8C6 2 5.3 2.7 5.3 3.5v17c0 .8.7 1.5 1.5 1.5h11.4c.8 0 1.5-.7 1.5-1.5V8z" fill="#fff" />
-      <path d="M14.5 2v5.2c0 .7.6 1.3 1.3 1.3h4.4" fill="none" stroke="#DC2626" strokeWidth="1.3" strokeLinejoin="round" />
-      <text x="12" y="16.5" textAnchor="middle" fontFamily="Arial, sans-serif" fontSize="6.2" fontWeight="800" fill="#DC2626">PDF</text>
-    </svg>
-  ),
-  briefcase: (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-    </svg>
-  ),
-  sparkles: (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3l1.9 4.9L19 9.8l-5.1 1.9L12 16.6l-1.9-4.9L5 9.8l5.1-1.9L12 3z" /><path d="M5 3v3" /><path d="M19 17v3" /><path d="M3.5 5.5h3" /><path d="M17.5 18.5h3" />
-    </svg>
-  ),
-  image: (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" />
-    </svg>
-  ),
-  calculator: (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="4" y="2" width="16" height="20" rx="2" /><line x1="8" y1="6" x2="16" y2="6" /><line x1="8" y1="11" x2="8.01" y2="11" /><line x1="12" y1="11" x2="12.01" y2="11" /><line x1="16" y1="11" x2="16.01" y2="11" /><line x1="8" y1="15" x2="8.01" y2="15" /><line x1="12" y1="15" x2="12.01" y2="15" /><line x1="16" y1="15" x2="16.01" y2="15" /><line x1="8" y1="19" x2="8.01" y2="19" /><line x1="12" y1="19" x2="12.01" y2="19" /><line x1="16" y1="19" x2="16.01" y2="19" />
-    </svg>
-  ),
-  grid: (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
-    </svg>
-  ),
+  fileText: PdfIcon,
+  briefcase: BusinessIcon,
+  sparkles: AiIcon,
+  image: ImageIcon,
+  calculator: CalculatorIcon,
+  grid: UtilitiesIcon,
   shield: (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5z" /></svg>
   ),
@@ -267,6 +242,11 @@ export default function HomePage() {
 
         .cvt-inner { position: relative; max-width: 1160px; margin: 0 auto; }
 
+        .cvt-eyebrow-wrap { display: flex; justify-content: center; margin-bottom: 14px; }
+        .cvt-eyebrow { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: #0F172A; background: #fff; border: 1px solid #DBEAFE; border-radius: 999px; padding: 6px 14px 6px 10px; box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
+        .cvt-eyebrow-dot { width: 6px; height: 6px; border-radius: 50%; background: #10B981; flex-shrink: 0; }
+        @media (max-width: 480px) { .cvt-eyebrow { font-size: 11.5px; text-align: left; } }
+
         .cvt-hero { text-align: center; max-width: 780px; margin: 0 auto; }
         .cvt-hero h1 { font-size: clamp(1.9rem, 3.2vw, 2.75rem); line-height: 1.02; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 8px; color: #0F172A; }
         .cvt-hero-gradient { background: linear-gradient(90deg, #2563EB 0%, #10B981 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
@@ -314,7 +294,7 @@ export default function HomePage() {
         .cvt-cat-card:hover { transform: translateY(-3px); box-shadow: 0 1px 2px rgba(15,23,42,0.05), 0 20px 34px rgba(15,23,42,0.11); }
         .cvt-cat-header { padding: 18px 22px; display: flex; align-items: center; gap: 12px; position: relative; overflow: hidden; }
         .cvt-cat-header::after { content: ''; position: absolute; top: -30%; right: -6%; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,0.08); }
-        .cvt-cat-icon-chip { width: 38px; height: 38px; border-radius: 10px; background: rgba(255,255,255,0.20); display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative; }
+        .cvt-cat-icon-chip { width: 42px; height: 42px; border-radius: 11px; background: linear-gradient(160deg, rgba(255,255,255,0.32), rgba(255,255,255,0.14)); box-shadow: inset 0 1px 1px rgba(255,255,255,0.5), inset 0 -6px 10px rgba(0,0,0,0.08); display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative; }
         .cvt-cat-header h3 { margin: 0; color: #fff; font-size: 19px; font-weight: 700; letter-spacing: -0.01em; position: relative; }
         .cvt-cat-body { padding: 20px 22px 18px; }
         .cvt-cat-eyebrow { font-size: 12.5px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
@@ -326,7 +306,8 @@ export default function HomePage() {
         .cvt-cat-tool-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .cvt-cat-viewall { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; text-decoration: none; }
 
-        .cvt-trust { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-top: 44px; }
+        .cvt-trust-wrap { margin-top: 44px; padding: 26px 28px; background: rgba(255,255,255,0.6); border: 1px solid #E7ECF3; border-radius: 18px; }
+        .cvt-trust { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
         @media (max-width: 900px) { .cvt-trust { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 560px) { .cvt-trust { grid-template-columns: 1fr; } }
         .cvt-trust-item { display: flex; align-items: center; gap: 14px; }
@@ -342,6 +323,10 @@ export default function HomePage() {
       <div className="cvt-dots" />
 
       <div className="cvt-inner">
+        <div className="cvt-eyebrow-wrap">
+          <span className="cvt-eyebrow"><span className="cvt-eyebrow-dot" />45+ free tools · no sign-up · files auto-deleted after use</span>
+        </div>
+
         <div className="cvt-hero">
           <h1>One platform,<br /><span className="cvt-hero-gradient">endless possibilities.</span></h1>
           <p>Convert, edit, scan, generate, calculate and organize documents, images and business essentials in seconds.</p>
@@ -409,16 +394,18 @@ export default function HomePage() {
           ))}
         </div>
 
-        <div className="cvt-trust">
-          {TRUST_ITEMS.map((item) => (
-            <div key={item.title} className="cvt-trust-item">
-              <div className="cvt-trust-icon" style={{ background: item.bg }}>{ICONS[item.icon]}</div>
-              <div>
-                <div className="cvt-trust-title">{item.title}</div>
-                <div className="cvt-trust-sub">{item.subtitle}</div>
+        <div className="cvt-trust-wrap">
+          <div className="cvt-trust">
+            {TRUST_ITEMS.map((item) => (
+              <div key={item.title} className="cvt-trust-item">
+                <div className="cvt-trust-icon" style={{ background: item.bg }}>{ICONS[item.icon]}</div>
+                <div>
+                  <div className="cvt-trust-title">{item.title}</div>
+                  <div className="cvt-trust-sub">{item.subtitle}</div>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </section>

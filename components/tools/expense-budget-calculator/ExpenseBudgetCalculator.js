@@ -9,6 +9,8 @@ import { formatCurrency, formatPercent } from '../salary-calculator/format';
 import IncomeRow from './IncomeRow';
 import ExpenseCategoryRow from './ExpenseCategoryRow';
 import { buildBudgetSummaryText } from './exportText';
+import { buildBudgetReportData } from './reportData';
+import { generateFinancialReportPdf } from '../financial-shared/FinancialReport';
 import {
   PERIODS, computeBudget, buildBudgetStatus, buildIncomeAllocation, build503020Comparison,
   buildRankedExpenses, buildPeriodTable, buildInsights, perPeriod,
@@ -357,7 +359,9 @@ export default function ExpenseBudgetCalculator() {
               captureRef={summaryRef}
               fileNamePrefix={currency.replace(/[^A-Za-z0-9]/g, '') || 'budget'}
               fileNameSuffix="budget-summary"
+              shareTitle="My Budget Summary"
               buildText={() => buildBudgetSummaryText(result, budgetStatus, incomePeriod, periodLabel, currency)}
+              onDownloadPdf={() => generateFinancialReportPdf(buildBudgetReportData({ result, budgetStatus, allocation, ranked, periodTable, incomePeriod, periodLabel, currency, insights }))}
             />
           )}
         </div>

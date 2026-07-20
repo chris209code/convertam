@@ -11,6 +11,8 @@ import { buildLoanSummaryText } from './exportText';
 import {
   FREQUENCIES, computeLoan, buildEarlyRepaymentSavings, buildAffordability, buildInsights, compareLoans,
 } from './calculations';
+import { buildLoanReportData } from './reportData';
+import { generateFinancialReportPdf } from '../financial-shared/FinancialReport';
 
 const INSIGHT_ICONS = { interest: '📊', warning: '⚠️', shield: '🛡️', trending: '📈', percent: '➗' };
 
@@ -48,6 +50,17 @@ export default function LoanCalculator() {
   const [currencyCode, setCurrencyCode] = useState('NGN');
   const currency = symbolForCode(currencyCode);
 
+  // Term mode: 'manual' (Years/Months, the original behavior) | 'calendar'
+  // (Start/End Date, duration derived) | 'running' (the loan already
+  // exists — schedule the remaining balance from here, not from scratch).
+  const [loanMode, setLoanMode] = useState('manual');
+  const [loanStartDate, setLoanStartDate] = useState('');
+  const [loanEndDate, setLoanEndDate] = useState('');
+  const [originalStartDate, setOriginalStartDate] = useState('');
+  const [currentBalance, setCurrentBalance] = useState('');
+  const [nextPaymentDate, setNextPaymentDate] = useState('');
+  const [maturityDate, setMaturityDate] = useState('');
+
   const [downPayment, setDownPayment] = useState('');
   const [processingFee, setProcessingFee] = useState('');
   const [insuranceFee, setInsuranceFee] = useState('');
@@ -67,17 +80,27 @@ export default function LoanCalculator() {
 
   const summaryRef = useRef(null);
 
-  const baseInputs = { principal, downPayment, ratePct, termYears, termMonths, frequency, processingFee, insuranceFee };
+  const baseInputs = {
+    principal, downPayment, ratePct, termYears, termMonths, frequency, processingFee, insuranceFee,
+    termMode: loanMode === 'calendar' ? 'calendar' : 'manual',
+    loanStartDate: loanStartDate ? new Date(loanStartDate) : null,
+    loanEndDate: loanEndDate ? new Date(loanEndDate) : null,
+    runningLoan: loanMode === 'running',
+    currentBalance,
+    nextPaymentDate: nextPaymentDate ? new Date(nextPaymentDate) : null,
+    maturityDate: maturityDate ? new Date(maturityDate) : null,
+  };
+  const termDeps = [principal, downPayment, ratePct, termYears, termMonths, frequency, processingFee, insuranceFee, loanMode, loanStartDate, loanEndDate, currentBalance, nextPaymentDate, maturityDate];
 
   const result = useMemo(
     () => computeLoan({ ...baseInputs, extraPayment }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [principal, downPayment, ratePct, termYears, termMonths, frequency, processingFee, insuranceFee, extraPayment]
+    [...termDeps, extraPayment]
   );
   const baselineResult = useMemo(
     () => (extraPayment && Number(extraPayment) > 0 ? computeLoan({ ...baseInputs, extraPayment: 0 }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [principal, downPayment, ratePct, termYears, termMonths, frequency, processingFee, insuranceFee, extraPayment]
+    [...termDeps, extraPayment]
   );
   const earlyRepayment = useMemo(
     () => (baselineResult ? buildEarlyRepaymentSavings(result, baselineResult) : null),
@@ -124,6 +147,13 @@ export default function LoanCalculator() {
         <div className="ln2-col no-print">
           <SectionCard icon="🏦" title="Loan Details">
             <p className="ln2-card-sub">Enter the loan amount, rate, and term.</p>
+
+            <div role="radiogroup" aria-label="Loan term mode" style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+              <button role="radio" aria-checked={loanMode === 'manual'} className={`ln2-pill ${loanMode === 'manual' ? 'active' : ''}`} onClick={() => setLoanMode('manual')}>Manual Term</button>
+              <button role="radio" aria-checked={loanMode === 'calendar'} className={`ln2-pill ${loanMode === 'calendar' ? 'active' : ''}`} onClick={() => setLoanMode('calendar')}>Calendar Dates</button>
+              <button role="radio" aria-checked={loanMode === 'running'} className={`ln2-pill ${loanMode === 'running' ? 'active' : ''}`} onClick={() => setLoanMode('running')}>Running Loan</button>
+            </div>
+
             <div className="ln2-field-row">
               <div style={{ width: 132, flexShrink: 0 }}>
                 <label className="ln2-label" htmlFor="ln2-currency">Currency</label>
@@ -136,11 +166,21 @@ export default function LoanCalculator() {
                   </optgroup>
                 </select>
               </div>
-              <div style={{ flex: 1 }}>
-                <label className="ln2-label" htmlFor="ln2-principal">Loan Amount</label>
-                <NumberInput id="ln2-principal" ariaLabel="Loan amount" value={principal} onChange={setPrincipal} placeholder="e.g. 5,000,000" prefix={currency} />
-              </div>
+              {loanMode !== 'running' && (
+                <div style={{ flex: 1 }}>
+                  <label className="ln2-label" htmlFor="ln2-principal">Loan Amount</label>
+                  <NumberInput id="ln2-principal" ariaLabel="Loan amount" value={principal} onChange={setPrincipal} placeholder="e.g. 5,000,000" prefix={currency} />
+                </div>
+              )}
             </div>
+
+            {loanMode === 'running' && (
+              <div style={{ marginTop: 12 }}>
+                <label className="ln2-label" htmlFor="ln2-original-start">Original Start Date</label>
+                <input id="ln2-original-start" type="date" className="ln2-select" aria-label="Original loan start date" value={originalStartDate} onChange={(e) => setOriginalStartDate(e.target.value)} />
+                <p className="ln2-card-sub" style={{ marginTop: 4, marginBottom: 0 }}>For your records — the remaining schedule is generated from the balance and dates below, not from this date.</p>
+              </div>
+            )}
 
             <div className="ln2-field-row" style={{ marginTop: 12 }}>
               <div style={{ flex: 1 }}>
@@ -155,16 +195,51 @@ export default function LoanCalculator() {
               </div>
             </div>
 
-            <div className="ln2-field-row" style={{ marginTop: 12 }}>
-              <div style={{ flex: 1 }}>
-                <label className="ln2-label" htmlFor="ln2-term-years">Loan Term — Years</label>
-                <NumberInput id="ln2-term-years" ariaLabel="Loan term years" value={termYears} onChange={setTermYears} placeholder="e.g. 3" />
+            {loanMode === 'manual' && (
+              <div className="ln2-field-row" style={{ marginTop: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label className="ln2-label" htmlFor="ln2-term-years">Loan Term — Years</label>
+                  <NumberInput id="ln2-term-years" ariaLabel="Loan term years" value={termYears} onChange={setTermYears} placeholder="e.g. 3" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label className="ln2-label" htmlFor="ln2-term-months">Loan Term — Months</label>
+                  <NumberInput id="ln2-term-months" ariaLabel="Loan term months" value={termMonths} onChange={setTermMonths} placeholder="e.g. 0" />
+                </div>
               </div>
-              <div style={{ flex: 1 }}>
-                <label className="ln2-label" htmlFor="ln2-term-months">Loan Term — Months</label>
-                <NumberInput id="ln2-term-months" ariaLabel="Loan term months" value={termMonths} onChange={setTermMonths} placeholder="e.g. 0" />
+            )}
+
+            {loanMode === 'calendar' && (
+              <div className="ln2-field-row" style={{ marginTop: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label className="ln2-label" htmlFor="ln2-loan-start">Loan Start Date</label>
+                  <input id="ln2-loan-start" type="date" className="ln2-select" aria-label="Loan start date" value={loanStartDate} onChange={(e) => setLoanStartDate(e.target.value)} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label className="ln2-label" htmlFor="ln2-loan-end">Loan End Date</label>
+                  <input id="ln2-loan-end" type="date" className="ln2-select" aria-label="Loan end date" value={loanEndDate} onChange={(e) => setLoanEndDate(e.target.value)} />
+                </div>
               </div>
-            </div>
+            )}
+
+            {loanMode === 'running' && (
+              <>
+                <div className="ln2-field-row" style={{ marginTop: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <label className="ln2-label" htmlFor="ln2-current-balance">Current Outstanding Balance</label>
+                    <NumberInput id="ln2-current-balance" ariaLabel="Current outstanding balance" value={currentBalance} onChange={setCurrentBalance} placeholder="e.g. 3,200,000" prefix={currency} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label className="ln2-label" htmlFor="ln2-next-payment">Next Payment Date</label>
+                    <input id="ln2-next-payment" type="date" className="ln2-select" aria-label="Next payment date" value={nextPaymentDate} onChange={(e) => setNextPaymentDate(e.target.value)} />
+                  </div>
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  <label className="ln2-label" htmlFor="ln2-maturity">Maturity Date</label>
+                  <input id="ln2-maturity" type="date" className="ln2-select" aria-label="Maturity date" value={maturityDate} onChange={(e) => setMaturityDate(e.target.value)} />
+                  <p className="ln2-card-sub" style={{ marginTop: 4, marginBottom: 0 }}>The remaining schedule runs from your next payment through this date — the payment amount is recalculated from your current balance and the time left, not assumed from the original loan.</p>
+                </div>
+              </>
+            )}
           </SectionCard>
 
           <div className="ln2-card">
@@ -393,7 +468,9 @@ export default function LoanCalculator() {
               captureRef={summaryRef}
               fileNamePrefix={currency.replace(/[^A-Za-z0-9]/g, '') || 'loan'}
               fileNameSuffix="loan-summary"
+              shareTitle="My Loan Summary"
               buildText={() => buildLoanSummaryText(result, currency, freqLabel, earlyRepayment, insights)}
+              onDownloadPdf={() => generateFinancialReportPdf(buildLoanReportData({ result, currency, freqLabel, earlyRepayment, insights }))}
             />
           )}
         </div>
@@ -429,6 +506,8 @@ const LN2_STYLES = `
   .ln2-warning-banner { font-size: 0.72rem; color: #92400E; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 6px 10px; margin-top: 6px; }
 
   .ln2-ghost-btn { font-size: 0.75rem; padding: 6px 12px; border-radius: 8px; border: 1px solid #DDD6FE; background: #F5F3FF; color: #7C3AED; cursor: pointer; font-family: inherit; font-weight: 600; white-space: nowrap; }
+  .ln2-pill { padding: 7px 12px; border-radius: 999px; border: 1px solid #E2E8F0; background: #fff; color: #64748B; font-weight: 600; cursor: pointer; font-family: inherit; font-size: 0.78rem; }
+  .ln2-pill.active { border-color: #2563EB; background: #EFF6FF; color: #2563EB; }
   .ln2-add-btn { margin-top: 4px; font-size: 0.8rem; color: #2563EB; background: #EFF6FF; border: 1px solid #BFDBFE; padding: 8px 14px; border-radius: 10px; cursor: pointer; font-family: inherit; font-weight: 600; }
 
   .ln2-disclaimer { font-size: 0.75rem; color: #64748B; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 10px; padding: 10px 14px; }

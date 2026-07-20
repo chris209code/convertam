@@ -20,14 +20,15 @@ const ACTIVE_CALCULATORS = [
 const FEATURED_ID = 'salary';
 
 const COMING_SOON = [
-  { icon: '📊', title: 'Profit & Loss Calculator', desc: 'Get a full profit and loss breakdown for your business.' },
   { icon: '🎯', title: 'Savings Goal Calculator', desc: 'Plan how much to save each month to hit a target.' },
   { icon: '⚖️', title: 'Break-even Calculator', desc: 'Find out how many sales you need to cover your costs.' },
 ];
 
+// "Financial Calculators" renamed to "Business & Finance" — these tools
+// now support running a business, not just financial arithmetic.
 const CATEGORIES = [
-  { id: 'financial', label: 'Financial', title: 'Financial Calculators' },
-  { id: 'personal', label: 'Personal', title: 'Personal Calculators' },
+  { id: 'financial', label: 'Business & Finance', title: 'Business & Finance' },
+  { id: 'personal', label: 'Everyday', title: 'Everyday' },
   { id: 'coming-soon', label: 'Coming Soon', title: 'Coming Soon' },
 ];
 
@@ -206,7 +207,7 @@ export default function CalculatorHubClient() {
           <>
             {(isSearching ? byCategory('financial').length > 0 : true) && (
               <div style={{ marginBottom: 40 }}>
-                <h2 id="financial" className="calc-section-title" style={{ fontSize: '1.05rem', fontWeight: 700, color: '#152238' }}>💼 Financial Calculators</h2>
+                <h2 id="financial" className="calc-section-title" style={{ fontSize: '1.05rem', fontWeight: 700, color: '#152238' }}>💼 Business & Finance</h2>
                 <div className="calc-grid">
                   {byCategory('financial').map((c) => <CalcCard key={c.id} calc={c} />)}
                 </div>
@@ -215,7 +216,7 @@ export default function CalculatorHubClient() {
 
             {(isSearching ? byCategory('personal').length > 0 : true) && (
               <div style={{ marginBottom: 40 }}>
-                <h2 id="personal" className="calc-section-title" style={{ fontSize: '1.05rem', fontWeight: 700, color: '#152238' }}>🙋 Personal Calculators</h2>
+                <h2 id="personal" className="calc-section-title" style={{ fontSize: '1.05rem', fontWeight: 700, color: '#152238' }}>🙋 Everyday</h2>
                 <div className="calc-grid">
                   {byCategory('personal').map((c) => <CalcCard key={c.id} calc={c} />)}
                 </div>

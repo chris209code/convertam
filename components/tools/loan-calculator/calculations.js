@@ -32,6 +32,27 @@ function addInterval(date, frequencyId) {
   return d;
 }
 
+function subtractInterval(date, frequencyId) {
+  const d = new Date(date);
+  if (frequencyId === 'weekly') d.setDate(d.getDate() - 7);
+  else if (frequencyId === 'biweekly') d.setDate(d.getDate() - 14);
+  else d.setMonth(d.getMonth() - 1);
+  return d;
+}
+
+// Whole calendar months between two dates, floored — e.g. Jan 15 -> Mar 10
+// is 1 full month, not 2, since day 10 hasn't reached day 15 yet in March.
+// Used by Calendar Mode (Start/End Date -> duration) and Running Loan
+// (Next Payment Date -> Maturity Date -> remaining term).
+export function monthsBetween(start, end) {
+  if (!start || !end) return 0;
+  const s = new Date(start);
+  const e = new Date(end);
+  let months = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
+  if (e.getDate() < s.getDate()) months -= 1;
+  return Math.max(0, months);
+}
+
 // Standard amortizing-loan payment formula, written in its numerically
 // stable form: payment = P * r / (1 - (1+r)^-n). The more common
 // P*r*(1+r)^n / ((1+r)^n - 1) is mathematically identical but overflows to
@@ -75,29 +96,73 @@ function buildSchedule({ financedPrincipal, periodicRate, numPayments, payment, 
 // the total cost of borrowing — they do not change the financed principal
 // or the periodic payment itself, only "Total Repayment" and the
 // Principal/Interest/Fees chart.
-export function computeLoan({ principal, downPayment, ratePct, termYears, termMonths, frequency, processingFee, insuranceFee, extraPayment, startDate }) {
+//
+// Term can be provided three ways, selected by `termMode`:
+//   'manual'   (default) — termYears/termMonths, schedule starts today
+//              (or `startDate` if given) — the original behavior, byte
+//              -for-byte unchanged when the new params are simply omitted.
+//   'calendar' — loanStartDate + loanEndDate; duration and schedule start
+//              are both derived from the two dates instead of being
+//              assumed.
+//   'running'  — set `runningLoan: true` instead of a termMode: the loan
+//              already exists. `currentBalance` replaces `principal` as
+//              what's actually financed, and the remaining schedule runs
+//              from `nextPaymentDate` (the first row's own date, not one
+//              interval after it) through `maturityDate` — this is the
+//              "generate amortization for what's left" path, not a fresh
+//              payoff from today.
+export function computeLoan({
+  principal, downPayment, ratePct, termYears, termMonths, frequency, processingFee, insuranceFee, extraPayment, startDate,
+  termMode = 'manual', loanStartDate, loanEndDate,
+  runningLoan = false, currentBalance, nextPaymentDate, maturityDate,
+}) {
   const freqData = freqById(frequency);
-  const principalAmt = Math.max(0, num(principal));
-  const downPaymentAmt = Math.min(Math.max(0, num(downPayment)), principalAmt);
-  const financedPrincipal = principalAmt - downPaymentAmt;
-
-  const totalMonths = Math.max(0, num(termYears) * 12 + num(termMonths));
-  const numPayments = Math.round((totalMonths / 12) * freqData.paymentsPerYear);
   const periodicRate = num(ratePct) / 100 / freqData.paymentsPerYear;
 
+  let principalAmt, downPaymentAmt, financedPrincipal, numPayments, scheduleStart, totalMonths;
+
+  if (runningLoan) {
+    principalAmt = Math.max(0, num(currentBalance));
+    downPaymentAmt = 0;
+    financedPrincipal = principalAmt;
+    totalMonths = monthsBetween(nextPaymentDate, maturityDate);
+    numPayments = Math.round((totalMonths / 12) * freqData.paymentsPerYear);
+    // The first schedule row must land exactly on nextPaymentDate itself
+    // (that IS the next payment) — buildSchedule always advances one
+    // interval before recording its first row, so the seed date has to be
+    // one interval BEFORE nextPaymentDate for that advance to land there.
+    scheduleStart = nextPaymentDate ? subtractInterval(nextPaymentDate, freqData.id) : new Date();
+  } else {
+    principalAmt = Math.max(0, num(principal));
+    downPaymentAmt = Math.min(Math.max(0, num(downPayment)), principalAmt);
+    financedPrincipal = principalAmt - downPaymentAmt;
+
+    if (termMode === 'calendar') {
+      totalMonths = monthsBetween(loanStartDate, loanEndDate);
+      scheduleStart = loanStartDate || new Date();
+    } else {
+      totalMonths = Math.max(0, num(termYears) * 12 + num(termMonths));
+      scheduleStart = startDate || new Date();
+    }
+    numPayments = Math.round((totalMonths / 12) * freqData.paymentsPerYear);
+  }
+
   const payment = computePeriodicPayment(financedPrincipal, periodicRate, numPayments);
-  const base = startDate || new Date();
 
   const schedule = buildSchedule({
     financedPrincipal, periodicRate, numPayments, payment,
-    extraPerPayment: extraPayment, startDate: base, frequencyId: freqData.id,
+    extraPerPayment: extraPayment, startDate: scheduleStart, frequencyId: freqData.id,
   });
 
   const totalInterestPaid = schedule.reduce((sum, r) => sum + r.interestPaid, 0);
   const totalPrincipalPaid = schedule.reduce((sum, r) => sum + r.principalPaid, 0);
   const fees = Math.max(0, num(processingFee)) + Math.max(0, num(insuranceFee));
   const totalRepayment = totalPrincipalPaid + totalInterestPaid + fees;
-  const loanEndDate = schedule.length > 0 ? schedule[schedule.length - 1].date : null;
+  // Named computedPayoffDate locally to avoid colliding with the
+  // `loanEndDate` parameter (Calendar Mode's user-entered end date) — the
+  // return key stays `loanEndDate` for backward compatibility with every
+  // existing caller that reads result.loanEndDate.
+  const computedPayoffDate = schedule.length > 0 ? schedule[schedule.length - 1].date : null;
 
   // "Effective Interest" here means total interest + fees as a percentage
   // of the amount actually financed — a plain, transparent cost-of-borrowing
@@ -113,7 +178,7 @@ export function computeLoan({ principal, downPayment, ratePct, termYears, termMo
     freqData, principalAmt, downPaymentAmt, financedPrincipal,
     totalMonths, numPayments, periodicRate, payment,
     schedule, totalInterestPaid, totalPrincipalPaid, fees, totalRepayment,
-    loanEndDate, effectiveInterestPct, monthlyEquivalentPayment,
+    loanEndDate: computedPayoffDate, effectiveInterestPct, monthlyEquivalentPayment,
     hasResults: financedPrincipal > 0 && numPayments > 0,
   };
 }

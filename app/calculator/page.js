@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 export const metadata = {
   title: 'Calculators — Convertam',
-  description: 'Free online calculators. VAT, loan, salary, BMI, profit margin and more. No login required.',
+  description: 'Free online calculators. VAT, loan, salary, expense, profit and loss and more. No login required.',
 };
 
 export default function CalculatorPage() {
@@ -19,7 +19,7 @@ export default function CalculatorPage() {
             <span style={{ fontSize: '2.5rem' }}>🧮</span>
             <div>
               <h1 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 800, color: '#152238', margin: 0 }}>Calculators</h1>
-              <p style={{ fontSize: '0.9rem', color: '#64748B', margin: '4px 0 0' }}>VAT, loan, salary, BMI and more — all in one place.</p>
+              <p style={{ fontSize: '0.9rem', color: '#64748B', margin: '4px 0 0' }}>VAT, loan, salary, expense and more — all in one place.</p>
             </div>
           </div>
         </div>
@@ -30,7 +30,7 @@ export default function CalculatorPage() {
           <div style={{ fontSize: '3rem', marginBottom: 16 }}>🧮</div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Calculator Hub</h2>
           <p style={{ fontSize: '0.88rem', color: '#64748B', marginBottom: 24, lineHeight: 1.6 }}>
-            VAT, Loan, Salary, BMI, Age, Discount, Profit Margin and Tip calculators — all in one place.
+            VAT, Loan, Salary, Expense &amp; Budget, Age, Discount and Profit &amp; Loss calculators — all in one place.
           </p>
           <Link href="/calculator-hub" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', background: '#DC2626', color: 'white', borderRadius: 12, textDecoration: 'none', fontWeight: 600, fontSize: '0.9rem' }}>
             Open Calculator Hub →

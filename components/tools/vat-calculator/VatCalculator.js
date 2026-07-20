@@ -8,6 +8,8 @@ import { POPULAR_CURRENCIES, OTHER_CURRENCIES, symbolForCode } from '../salary-c
 import { formatCurrency, formatPercent } from '../salary-calculator/format';
 import { VAT_PRESETS, computeVat, computeWorksheet, buildInsights, num } from './calculations';
 import { buildVatSummaryText } from './exportText';
+import { buildVatReportData } from './reportData';
+import { generateFinancialReportPdf } from '../financial-shared/FinancialReport';
 
 const STORAGE_KEY = 'convertam-vat-rate-v1';
 const INSIGHT_ICONS = { shield: '🛡️', percent: '➗', customer: '🧾', wallet: '💼' };
@@ -350,7 +352,9 @@ export default function VatCalculator() {
               captureRef={summaryRef}
               fileNamePrefix={currency.replace(/[^A-Za-z0-9]/g, '') || 'vat'}
               fileNameSuffix="vat-summary"
+              shareTitle="My VAT Summary"
               buildText={() => buildVatSummaryText(result, currency, insights, worksheet.rows.length > 0 ? worksheet : null, reportDetails)}
+              onDownloadPdf={() => generateFinancialReportPdf(buildVatReportData({ result, currency, insights, worksheet: worksheet.rows.length > 0 ? worksheet : null, reportDetails }))}
             />
           )}
         </div>

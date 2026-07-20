@@ -10,6 +10,8 @@ import { buildResultsText } from './exportText';
 import { POPULAR_CURRENCIES, OTHER_CURRENCIES, symbolForCode } from './currencies';
 import { formatCurrency, formatCurrencyCompact, formatPercent } from './format';
 import { FREQUENCIES, computeSalary, buildConversionTable, buildInsights, categorizeDeductions, perPeriod } from './calculations';
+import { buildSalaryReportData } from './reportData';
+import { generateFinancialReportPdf } from '../financial-shared/FinancialReport';
 
 const TEMPLATES = [
   {
@@ -324,6 +326,8 @@ export default function SalaryCalculator() {
               captureRef={summaryRef}
               fileNamePrefix={currency.replace(/[^A-Za-z0-9]/g, '') || 'salary'}
               buildText={() => buildResultsText(result, frequency, freqLabel, currency, result.deductionAmounts)}
+              shareTitle="My Salary Summary"
+              onDownloadPdf={() => generateFinancialReportPdf(buildSalaryReportData({ result, frequency, freqLabel, currency, chartSegments, takeHomePct, conversionRows, insights }))}
             />
           )}
         </div>

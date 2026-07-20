@@ -10,18 +10,28 @@ const btnStyle = {
 
 // All four actions are 100% client-side — nothing here ever sends salary
 // data anywhere, matching the "100% Private, no data is stored" badge.
-// Download PDF reuses the same html2canvas + jsPDF pattern already used
-// elsewhere in this codebase (CertificateGeneratorWorkspace) rather than
-// pulling in a different export approach.
-export default function ExportBar({ captureRef, buildText, fileNamePrefix, fileNameSuffix = 'salary-summary' }) {
+//
+// Download PDF: if the caller passes `onDownloadPdf` (the shared
+// FinancialReport engine — see components/tools/financial-shared/), that
+// runs instead — a real multi-page, paginated A4 document rather than a
+// screenshot. `onDownloadPdf` is optional and additive specifically so
+// this stays backward compatible: any existing caller that doesn't pass
+// it keeps the original html2canvas-screenshot-of-captureRef behavior
+// unchanged, byte-for-byte.
+export default function ExportBar({ captureRef, buildText, fileNamePrefix, fileNameSuffix = 'salary-summary', onDownloadPdf, shareTitle = 'My Salary Summary' }) {
   const [busy, setBusy] = useState(null); // null | 'pdf' | 'copy' | 'share'
   const [copied, setCopied] = useState(false);
   const [shared, setShared] = useState(false);
 
   async function handleDownloadPdf() {
-    if (!captureRef.current || busy) return;
+    if (busy) return;
+    if (!onDownloadPdf && !captureRef.current) return;
     setBusy('pdf');
     try {
+      if (onDownloadPdf) {
+        await onDownloadPdf();
+        return;
+      }
       const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
         import('html2canvas'),
         import('jspdf'),
@@ -43,7 +53,7 @@ export default function ExportBar({ captureRef, buildText, fileNamePrefix, fileN
       pdf.addImage(imgData, 'JPEG', 0, 0, pageWidthMm, pageHeightMm);
       pdf.save(`${fileNamePrefix}-${fileNameSuffix}.pdf`);
     } catch (err) {
-      console.error('Salary PDF export failed:', err);
+      console.error('PDF export failed:', err);
       window.alert('Something went wrong generating the PDF. Please try again.');
     } finally {
       setBusy(null);
@@ -75,7 +85,7 @@ export default function ExportBar({ captureRef, buildText, fileNamePrefix, fileN
     try {
       const text = buildText();
       if (navigator.share) {
-        await navigator.share({ title: 'My Salary Summary', text });
+        await navigator.share({ title: shareTitle, text });
       } else {
         await navigator.clipboard.writeText(text);
         setShared(true);

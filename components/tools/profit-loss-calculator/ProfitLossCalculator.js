@@ -8,6 +8,8 @@ import { POPULAR_CURRENCIES, OTHER_CURRENCIES, symbolForCode } from '../salary-c
 import { formatCurrency, formatPercent } from '../salary-calculator/format';
 import CostRow from './CostRow';
 import { buildPLSummaryText } from './exportText';
+import { buildPLReportData } from './reportData';
+import { generateFinancialReportPdf } from '../financial-shared/FinancialReport';
 import {
   OPEX_FIELDS, computeSimple, computeDetailed, buildExpenseBreakdown, buildStatus,
   computeBreakEven, computePricing, comparePeriods, buildInsights, computeWhatIf, buildWhatIfInsight, num,
@@ -566,7 +568,9 @@ export default function ProfitLossCalculator() {
               captureRef={summaryRef}
               fileNamePrefix={currency.replace(/[^A-Za-z0-9]/g, '') || 'profit-loss'}
               fileNameSuffix="profit-loss-summary"
+              shareTitle="My Profit & Loss Summary"
               buildText={() => buildPLSummaryText(result, currency, status, breakdown, breakEven, pricing, comparison, insights, whatIfResult)}
+              onDownloadPdf={() => generateFinancialReportPdf(buildPLReportData({ result, currency, status, breakdown, breakEven, pricing, comparison, insights, whatIf: whatIfResult, chartSegments, allocation, totalCosts, isLoss }))}
             />
           )}
         </div>

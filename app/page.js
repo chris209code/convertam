@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { PdfIcon, BusinessIcon, AiIcon, ImageIcon, CalculatorIcon, UtilitiesIcon } from '../components/categoryVisuals';
+import { PdfIcon, BusinessIcon, AiIcon, ImageIcon, CalculatorIcon, UtilitiesIcon, DataIcon } from '../components/categoryVisuals';
 
 // ---------------------------------------------------------------------------
 // Every route below is a REAL, existing Convertam route — verified against
@@ -171,6 +171,22 @@ const CATEGORIES = [
       { name: 'Text Case Converter', href: '/utilities-hub' },
     ],
   },
+  {
+    name: 'Data Tools',
+    gradient: 'linear-gradient(120deg, #22D3EE 0%, #0891B2 100%)',
+    bodyTint: '#ECFEFF',
+    borderColor: '#A5F3FC',
+    dotColor: '#22D3EE',
+    accentText: '#0E7490',
+    icon: 'data',
+    viewAllHref: '/data-tools',
+    tools: [
+      { name: 'Text Cleaner', href: '/data-tools' },
+      { name: 'JSON Formatter', href: '/data-tools' },
+      { name: 'CSV Formatter', href: '/data-tools' },
+      { name: 'Email Extractor', href: '/data-tools' },
+    ],
+  },
 ];
 
 const TRENDING_TOOLS = [
@@ -188,6 +204,7 @@ const ICONS = {
   image: ImageIcon,
   calculator: CalculatorIcon,
   grid: UtilitiesIcon,
+  data: DataIcon,
   shield: (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5z" /></svg>
   ),

@@ -23,6 +23,7 @@ export default function sitemap() {
     'ai-tools',
     'image-tools',
     'calculator-hub',
+    'data-tools',
   ].map((slug) => ({
     url: `${BASE_URL}/${slug}`,
     lastModified: new Date(),

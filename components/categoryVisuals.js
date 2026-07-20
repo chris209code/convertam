@@ -50,6 +50,19 @@ export const CalculatorIcon = (
   </svg>
 );
 
+export const DataIcon = (
+  <svg width="30" height="30" viewBox="0 0 24 24">
+    <rect x="6" y="3" width="14" height="15" rx="2" fill="#fff" opacity="0.3" />
+    <rect x="3" y="5" width="14" height="15" rx="2" fill="#fff" />
+    <g stroke="#000" strokeOpacity="0.15" strokeWidth="1">
+      <line x1="3" y1="9.5" x2="17" y2="9.5" />
+      <line x1="3" y1="13" x2="17" y2="13" />
+      <line x1="3" y1="16.5" x2="17" y2="16.5" />
+    </g>
+    <circle cx="14.3" cy="9.5" r="1.6" fill="#0891B2" />
+  </svg>
+);
+
 export const UtilitiesIcon = (
   <svg width="30" height="30" viewBox="0 0 24 24">
     <ellipse cx="12" cy="19.6" rx="8.5" ry="1.5" fill="#fff" opacity="0.2" />
@@ -88,5 +101,12 @@ export const CATEGORY_ACCENTS = {
     borderColor: '#FDE68A', accentText: '#D97706',
     focusRing: 'rgba(217,119,6,0.12)', shadowTint: 'rgba(217,119,6,0.15)',
     badgeFreeBg: '#FEF3C7', badgeFreeText: '#92400E',
+  },
+  data: {
+    gradient: 'linear-gradient(120deg, #22D3EE 0%, #0891B2 100%)',
+    pageBgTop: '#ECFEFF', pageBgBottom: '#CFFAFE',
+    borderColor: '#A5F3FC', accentText: '#0E7490',
+    focusRing: 'rgba(8,145,178,0.12)', shadowTint: 'rgba(8,145,178,0.15)',
+    badgeFreeBg: '#CFFAFE', badgeFreeText: '#155E63',
   },
 };

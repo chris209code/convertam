@@ -10,6 +10,11 @@ import Link from 'next/link';
 // separate hand-rolled pages, without changing any tool's slug, href or
 // copy — presentation only.
 
+// Additive labels only — 'free'/'paid'/'soon' (used by the PDF/Business/
+// AI/Image hubs) keep their exact original text; 'new'/'popular' are new
+// values a hub can opt into (e.g. Data Tools) without touching those.
+const BADGE_LABELS = { paid: 'PAID', soon: 'COMING SOON', new: 'NEW', popular: 'POPULAR' };
+
 function ToolCard({ tool }) {
   const disabled = tool.available === false;
   return (
@@ -18,7 +23,7 @@ function ToolCard({ tool }) {
       <div className="th-card-body">
         <div className="th-card-title-row">
           <span className="th-card-title">{tool.title}</span>
-          {tool.badge && <span className={`th-badge th-badge-${tool.badge}`}>{tool.badge === 'paid' ? 'PAID' : tool.badge === 'soon' ? 'COMING SOON' : 'FREE'}</span>}
+          {tool.badge && <span className={`th-badge th-badge-${tool.badge}`}>{BADGE_LABELS[tool.badge] || 'FREE'}</span>}
         </div>
         <p className="th-card-desc">{tool.desc}</p>
       </div>
@@ -77,6 +82,9 @@ export default function ToolHubClient({ accent, icon, title, subtitle, searchPla
         .th-featured-title { font-size: 1.25rem; font-weight: 800; margin: 0 0 4px; }
         .th-featured-desc { font-size: 0.85rem; opacity: 0.92; margin: 0; }
         .th-featured-cta { margin-left: auto; flex-shrink: 0; font-size: 0.85rem; font-weight: 700; white-space: nowrap; }
+        .th-featured-soon { cursor: default; }
+        .th-featured-soon:hover { transform: none; }
+        .th-featured-badge { margin-left: auto; flex-shrink: 0; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.04em; background: rgba(255,255,255,0.22); border: 1px solid rgba(255,255,255,0.4); border-radius: 999px; padding: 5px 12px; white-space: nowrap; }
 
         .th-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
         .th-card {
@@ -94,6 +102,8 @@ export default function ToolHubClient({ accent, icon, title, subtitle, searchPla
         .th-badge-free { background: ${accent.badgeFreeBg}; color: ${accent.badgeFreeText}; }
         .th-badge-paid { background: #FEF3C7; color: #92400E; }
         .th-badge-soon { background: #E2E8F0; color: #64748B; }
+        .th-badge-new { background: #DBEAFE; color: #1D4ED8; }
+        .th-badge-popular { background: #FEF3C7; color: #92400E; }
         .th-card-soon { cursor: default; opacity: 0.65; }
         .th-card-soon:hover { transform: none; box-shadow: 0 2px 8px rgba(15,23,42,0.04); border-color: #E2E8F0; }
 
@@ -152,15 +162,27 @@ export default function ToolHubClient({ accent, icon, title, subtitle, searchPla
 
       <div className="page-inner" style={{ padding: '40px 4% 64px' }}>
         {!isSearching && featured && (
-          <Link href={featured.href} className="th-featured">
-            <span className="th-featured-icon">{featured.icon}</span>
-            <div>
-              <p className="th-featured-eyebrow">Featured Tool</p>
-              <p className="th-featured-title">{featured.title}</p>
-              <p className="th-featured-desc">{featured.desc}</p>
+          featured.comingSoon ? (
+            <div className="th-featured th-featured-soon" aria-disabled="true">
+              <span className="th-featured-icon">{featured.icon}</span>
+              <div>
+                <p className="th-featured-eyebrow">Featured Tool</p>
+                <p className="th-featured-title">{featured.title}</p>
+                <p className="th-featured-desc">{featured.desc}</p>
+              </div>
+              <span className="th-featured-badge">Coming Soon</span>
             </div>
-            <span className="th-featured-cta">Open Tool →</span>
-          </Link>
+          ) : (
+            <Link href={featured.href} className="th-featured">
+              <span className="th-featured-icon">{featured.icon}</span>
+              <div>
+                <p className="th-featured-eyebrow">Featured Tool</p>
+                <p className="th-featured-title">{featured.title}</p>
+                <p className="th-featured-desc">{featured.desc}</p>
+              </div>
+              <span className="th-featured-cta">Open Tool →</span>
+            </Link>
+          )
         )}
 
         {noResults ? (

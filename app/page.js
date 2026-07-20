@@ -248,7 +248,13 @@ export default function HomePage() {
 
   return (
     <section className="cvt-home">
-      <style>{`
+      {/* dangerouslySetInnerHTML, not a JSX text child: react-dom/server HTML-escapes
+          text children (e.g. ' -> &#x27;) but <style> is a raw-text element per the
+          HTML spec, so the browser never decodes that entity back — a guaranteed
+          hydration mismatch for any rule with a quote character, like the
+          font-family: 'Inter' below or .cvt-cat-header::after's content: ''.
+          dangerouslySetInnerHTML sets raw HTML identically server and client. */}
+      <style dangerouslySetInnerHTML={{ __html: `
         .cvt-home { position: relative; background: linear-gradient(180deg, #FFFFFF 0%, #F4F7FB 55%, #EFF3F8 100%); overflow: hidden; padding: 20px 32px 40px; font-family: 'Inter', Helvetica, Arial, sans-serif; }
         .cvt-blob-1 { position: absolute; top: 30px; left: 40px; width: 90px; height: 90px; border-radius: 50%; background: radial-gradient(circle, rgba(37,99,235,0.10), rgba(37,99,235,0)); }
         .cvt-blob-2 { position: absolute; top: 120px; left: 150px; width: 20px; height: 20px; border-radius: 50%; background: rgba(37,99,235,0.18); }
@@ -331,7 +337,7 @@ export default function HomePage() {
         .cvt-trust-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .cvt-trust-title { font-size: 15px; font-weight: 700; color: #0F172A; margin-bottom: 2px; }
         .cvt-trust-sub { font-size: 13px; color: #64748B; line-height: 1.4; }
-      `}</style>
+      ` }} />
 
       <div className="cvt-blob-1" />
       <div className="cvt-blob-2" />

@@ -33,7 +33,7 @@ const SECTIONS = [
     icon: '🗄️',
     tools: [
       { slug: 'json-studio', title: 'JSON Studio', desc: 'Validate, format, analyse and transform JSON files instantly.', icon: '🧩', badge: 'new', available: true, href: '/data-tools/json-studio' },
-      { slug: 'json-validator', title: 'JSON Validator', desc: 'Now part of JSON Studio — validate, format and analyse JSON in one workspace.', icon: '✅', badge: 'new', available: true, href: '/data-tools/json-studio' },
+      { slug: 'csv-studio', title: 'CSV Studio', desc: 'View, clean, analyse and transform CSV data in one professional workspace.', icon: '📈', badge: 'soon', available: false },
       { slug: 'csv-formatter', title: 'CSV Formatter', desc: 'Clean up and align CSV data into a readable table.', icon: '📊', badge: 'soon', available: false },
       { slug: 'csv-cleaner', title: 'CSV Cleaner', desc: 'Remove empty rows, fix delimiters, and tidy messy CSV files.', icon: '🧼', badge: 'soon', available: false },
       { slug: 'xml-formatter', title: 'XML Formatter', desc: 'Format and indent XML documents for readability.', icon: '🗂️', badge: 'soon', available: false },

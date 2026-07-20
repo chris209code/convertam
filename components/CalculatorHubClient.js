@@ -66,7 +66,10 @@ export default function CalculatorHubClient() {
 
   return (
     <main style={{ width: '100%', minHeight: '100vh', background: '#ffffff' }}>
-      <style>{`
+      {/* dangerouslySetInnerHTML, not a JSX text child — see ToolHubClient.js for why:
+          .calc-badge::before's content: '' triggers an SSR/CSR escaping mismatch
+          inside a <style> tag (a raw-text HTML element) otherwise. */}
+      <style dangerouslySetInnerHTML={{ __html: `
         .page-inner { width: 100%; padding: 0 4%; }
         .calc-search-wrap { position: relative; max-width: 480px; margin-bottom: 16px; }
         .calc-search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #94A3B8; }
@@ -136,7 +139,7 @@ export default function CalculatorHubClient() {
           .calc-featured-cta { margin-left: 0; }
           .calc-search-wrap { max-width: 100%; }
         }
-      `}</style>
+      ` }} />
 
       {/* Header */}
       <div style={{ background: 'white', borderBottom: '1px solid #EEF0F3', padding: '40px 0' }}>

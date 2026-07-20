@@ -53,7 +53,13 @@ export default function ToolHubClient({ accent, icon, title, subtitle, searchPla
 
   return (
     <main style={{ width: '100%', minHeight: '100vh', background: '#ffffff' }}>
-      <style>{`
+      {/* dangerouslySetInnerHTML, not a JSX text child: react-dom/server HTML-escapes
+          text children (e.g. ' -> &#x27;) but <style> is a raw-text element per the
+          HTML spec, so the browser never decodes that entity back — a guaranteed
+          hydration mismatch for any rule here with a quote character, like
+          .th-badge::before's content: ''. dangerouslySetInnerHTML sets raw HTML
+          identically on the server and the client, so there's nothing to mismatch. */}
+      <style dangerouslySetInnerHTML={{ __html: `
         .page-inner { width: 100%; padding: 0 4%; }
 
         .th-search-wrap { position: relative; max-width: 480px; margin-bottom: 16px; }
@@ -139,7 +145,7 @@ export default function ToolHubClient({ accent, icon, title, subtitle, searchPla
           .th-featured-cta { margin-left: 0; }
           .th-search-wrap { max-width: 100%; }
         }
-      `}</style>
+      ` }} />
 
       <div style={{ background: 'white', borderBottom: '1px solid #EEF0F3', padding: '40px 0' }}>
         <div className="page-inner">

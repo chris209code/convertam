@@ -183,8 +183,8 @@ const CATEGORIES = [
     tools: [
       { name: 'Text Cleaner Studio', href: '/data-tools/text-cleaner' },
       { name: 'JSON Studio', href: '/data-tools/json-studio' },
+      { name: 'Extract Studio', href: '/data-tools/extract-studio' },
       { name: 'CSV Formatter', href: '/data-tools' },
-      { name: 'Email Extractor', href: '/data-tools' },
     ],
   },
 ];

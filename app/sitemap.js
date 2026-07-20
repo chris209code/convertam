@@ -37,6 +37,7 @@ export default function sitemap() {
   const dataToolPages = [
     'data-tools/text-cleaner',
     'data-tools/json-studio',
+    'data-tools/extract-studio',
   ].map((path) => ({
     url: `${BASE_URL}/${path}`,
     lastModified: new Date(),

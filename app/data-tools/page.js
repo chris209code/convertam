@@ -45,6 +45,7 @@ const SECTIONS = [
     label: 'Extract & Convert',
     icon: '🔀',
     tools: [
+      { slug: 'extract-studio', title: 'Extract Studio', desc: 'Extract emails, phone numbers, URLs, numbers and more from text instantly.', icon: '🧲', badge: 'new', available: true, href: '/data-tools/extract-studio' },
       { slug: 'email-extractor', title: 'Email Extractor', desc: 'Pull every email address out of a block of text.', icon: '📧', badge: 'soon', available: false },
       { slug: 'phone-number-extractor', title: 'Phone Number Extractor', desc: 'Pull every phone number out of a block of text.', icon: '☎️', badge: 'soon', available: false },
       { slug: 'url-extractor', title: 'URL Extractor', desc: 'Pull every link out of a block of text.', icon: '🔗', badge: 'soon', available: false },

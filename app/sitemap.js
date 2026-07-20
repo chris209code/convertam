@@ -31,6 +31,18 @@ export default function sitemap() {
     priority: 0.85,
   }));
 
+  // Individual Data Tools — these live under their own nested route
+  // (e.g. /data-tools/text-cleaner) rather than through the tools-config
+  // [tool] dynamic route, so each one is added here as it's built.
+  const dataToolPages = [
+    'data-tools/text-cleaner',
+  ].map((path) => ({
+    url: `${BASE_URL}/${path}`,
+    lastModified: new Date(),
+    changeFrequency: 'monthly',
+    priority: 0.8,
+  }));
+
   return [
     {
       url: BASE_URL,
@@ -45,6 +57,7 @@ export default function sitemap() {
       priority: 0.5,
     },
     ...categoryPages,
+    ...dataToolPages,
     ...toolPages,
   ];
 }

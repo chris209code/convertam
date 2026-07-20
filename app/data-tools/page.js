@@ -19,7 +19,7 @@ const SECTIONS = [
     label: 'Text Tools',
     icon: '📝',
     tools: [
-      { slug: 'text-cleaner', title: 'Text Cleaner', desc: 'Strip extra spaces, fix line breaks, and tidy up any block of text.', icon: '🧹', badge: 'soon', available: false },
+      { slug: 'text-cleaner', title: 'Text Cleaner Studio', desc: 'Clean, transform and analyse text instantly — dozens of operations in one workspace.', icon: '🧹', badge: 'new', available: true, href: '/data-tools/text-cleaner' },
       { slug: 'duplicate-line-remover', title: 'Duplicate Line Remover', desc: 'Remove duplicate lines from a list or block of text.', icon: '📑', badge: 'soon', available: false },
       { slug: 'remove-blank-lines', title: 'Remove Blank Lines', desc: 'Delete empty lines from any text instantly.', icon: '🗑️', badge: 'soon', available: false },
       { slug: 'sort-lines', title: 'Sort Lines', desc: 'Sort lines alphabetically, numerically, or in reverse.', icon: '🔤', badge: 'soon', available: false },
@@ -79,7 +79,7 @@ export default function DataToolsPage() {
       title="Data Tools"
       subtitle="Clean, format, validate and convert text and data — all in one place."
       searchPlaceholder="Search data tools…"
-      featured={{ icon: '🧹', title: 'Text Cleaner', desc: "Strip extra spaces, fix line breaks, and tidy up any block of text — the first Data Tool we're building.", comingSoon: true }}
+      featured={{ href: '/data-tools/text-cleaner', icon: '🧹', title: 'Text Cleaner Studio', desc: 'A full text-cleaning workspace — dozens of operations, live stats, and an undoable pipeline, all in your browser.' }}
       sections={SECTIONS_WITH_HREF}
     />
   );

@@ -2,7 +2,7 @@
 
 import { formatMoney } from '@/lib/invoice-studio/moneyFormat';
 import { fontCss } from '@/lib/invoice-studio/styleTokens';
-import { docTypeConfig } from '@/lib/invoice-studio/docTypes';
+import { docTypeConfig, LOGISTICS_FIELD_LABELS, ITEM_COLUMN_DEFS } from '@/lib/invoice-studio/docTypes';
 
 // Every section here is a normal block in document flow — no position,
 // no absolute coordinates, no manually-assigned height. Margin-top spacing
@@ -101,14 +101,53 @@ export function ClientInfoSection({ data, style: tokens, docType }) {
   );
 }
 
+// Only rendered when the active docType's config sets showLogistics
+// (Delivery Note, Waybill) — irrelevant fields are simply blank and get
+// filtered out below rather than shown as empty rows.
+export function LogisticsSection({ data, style: tokens, docType }) {
+  const config = docTypeConfig(docType);
+  if (!data.visible || !config.showLogistics) return null;
+  const body = fontCss(tokens.bodyFont);
+  const fields = config.logisticsFields
+    .map((key) => [key, LOGISTICS_FIELD_LABELS[key], data[key]])
+    .filter(([, , value]) => value);
+  if (fields.length === 0) return null;
+  return (
+    <Section style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px 24px' }}>
+      {fields.map(([key, label, value]) => (
+        <div key={key}>
+          <div style={{ fontFamily: body, fontSize: 10, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
+          <div style={{ fontFamily: body, fontSize: 12.5, fontWeight: 600, color: tokens.textDark, marginTop: 2, wordBreak: 'break-word' }}>{value}</div>
+        </div>
+      ))}
+    </Section>
+  );
+}
+
 // A real <table> with <thead>/<tbody> — the entire point of this rewrite
 // for the items list. Fixed column widths mean Qty/Rate/VAT/Amount cannot
 // physically overlap regardless of content; descriptions wrap naturally
 // inside their own cell; row height is whatever the browser decides a row
 // needs, never a guessed number; borders live on the row itself via
 // border-bottom, so a divider is always exactly as long as its row.
-export function ItemsTableSection({ data, style: tokens, currency }) {
+function itemCellValue(colId, row, currency) {
+  const qty = parseFloat(row.qty) || 0, rate = parseFloat(row.rate) || 0, vat = parseFloat(row.vat) || 0;
+  switch (colId) {
+    case 'qty': return qty;
+    case 'rate': return formatMoney(rate, currency);
+    case 'vat': return `${vat}%`;
+    case 'amount': return formatMoney(qty * rate * (1 + vat / 100), currency);
+    case 'unit': return row.unit || '';
+    case 'weight': return row.weight || '';
+    case 'remarks': return row.remarks || '';
+    default: return '';
+  }
+}
+
+export function ItemsTableSection({ data, style: tokens, currency, docType }) {
   if (!data.visible) return null;
+  const config = docTypeConfig(docType);
+  const columns = config.itemColumns;
   const body = fontCss(tokens.bodyFont);
   const outline = tokens.tableHeaderStyle === 'outline';
   // The image column shows automatically whenever at least one row has an
@@ -129,26 +168,20 @@ export function ItemsTableSection({ data, style: tokens, currency }) {
           <col style={{ width: 28 }} />
           {showImages && <col style={{ width: 44 }} />}
           <col />
-          <col style={{ width: 55 }} />
-          <col style={{ width: 100 }} />
-          <col style={{ width: 60 }} />
-          <col style={{ width: 105 }} />
+          {columns.map((colId) => <col key={colId} style={{ width: ITEM_COLUMN_DEFS[colId].width }} />)}
         </colgroup>
         <thead style={{ background: outline ? '#fff' : tokens.brandPrimary }}>
           <tr>
             <th style={headCellStyle}>#</th>
             {showImages && <th style={headCellStyle}></th>}
             <th style={headCellStyle}>Item / Description</th>
-            <th style={{ ...headCellStyle, textAlign: 'right' }}>Qty</th>
-            <th style={{ ...headCellStyle, textAlign: 'right' }}>Rate</th>
-            <th style={{ ...headCellStyle, textAlign: 'right' }}>VAT</th>
-            <th style={{ ...headCellStyle, textAlign: 'right' }}>Amount</th>
+            {columns.map((colId) => (
+              <th key={colId} style={{ ...headCellStyle, textAlign: ITEM_COLUMN_DEFS[colId].align }}>{ITEM_COLUMN_DEFS[colId].label}</th>
+            ))}
           </tr>
         </thead>
         <tbody>
           {data.rows.map((row, i) => {
-            const qty = parseFloat(row.qty) || 0, rate = parseFloat(row.rate) || 0, vat = parseFloat(row.vat) || 0;
-            const amount = qty * rate * (1 + vat / 100);
             const cellStyle = { padding: '10px 8px', borderBottom: i === data.rows.length - 1 ? 'none' : `1px solid ${tokens.divider}`, verticalAlign: 'top' };
             return (
               <tr key={i}>
@@ -162,10 +195,19 @@ export function ItemsTableSection({ data, style: tokens, currency }) {
                   <div style={{ fontFamily: body, fontSize: 13, fontWeight: 600, color: tokens.textDark, wordBreak: 'break-word' }}>{row.name}</div>
                   {row.desc && <div style={{ fontFamily: body, fontSize: 11, color: tokens.textMuted, marginTop: 2, wordBreak: 'break-word' }}>{row.desc}</div>}
                 </td>
-                <td style={{ ...cellStyle, fontFamily: body, fontSize: 13, color: tokens.textDark, textAlign: 'right' }}>{qty}</td>
-                <td style={{ ...cellStyle, fontFamily: body, fontSize: 13, color: tokens.textDark, textAlign: 'right' }}>{formatMoney(rate, currency)}</td>
-                <td style={{ ...cellStyle, fontFamily: body, fontSize: 12, color: tokens.textMuted, textAlign: 'right' }}>{vat}%</td>
-                <td style={{ ...cellStyle, fontFamily: body, fontSize: 13, fontWeight: 600, color: tokens.textDark, textAlign: 'right' }}>{formatMoney(amount, currency)}</td>
+                {columns.map((colId) => (
+                  <td
+                    key={colId}
+                    style={{
+                      ...cellStyle, fontFamily: body, fontSize: colId === 'vat' ? 12 : 13,
+                      fontWeight: colId === 'amount' ? 600 : 400,
+                      color: colId === 'vat' ? tokens.textMuted : tokens.textDark,
+                      textAlign: ITEM_COLUMN_DEFS[colId].align,
+                    }}
+                  >
+                    {itemCellValue(colId, row, currency)}
+                  </td>
+                ))}
               </tr>
             );
           })}
@@ -225,30 +267,67 @@ export function NotesSection({ data, style: tokens }) {
   );
 }
 
+// One signature block — approval name/title above, mark, underline, name +
+// role below. Shared by both the single-slot (Invoice/Quotation/Delivery
+// Note) and dual-slot (Waybill) layouts below so the visuals stay identical
+// either way.
+function SignatureBlock({ data, label, tokens, anchorRight }) {
+  if (!data?.visible) return null;
+  const head = fontCss(tokens.headingFont), body = fontCss(tokens.bodyFont);
+  const isTyped = data.mode === 'typed' || !data.mode;
+  const size = data.size ?? 40;
+  return (
+    <div style={{ width: 200, flexShrink: 0, marginLeft: anchorRight ? 'auto' : 0, textAlign: 'left' }}>
+      {data.approvedName && (
+        <div style={{ fontFamily: body, fontSize: 10, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>{label}</div>
+      )}
+      <div style={{ minHeight: size, display: 'flex', alignItems: 'flex-end' }}>
+        {isTyped && data.text && <div style={{ fontFamily: "'Caveat', cursive", fontSize: 26, color: tokens.textDark }}>{data.text}</div>}
+        {!isTyped && data.src && (
+          // height (not maxHeight) so the slider always has a visible
+          // effect even on a small/low-res source image, not just
+          // capping large ones — width stays auto with objectFit:
+          // contain so the aspect ratio is preserved either way.
+          <img src={data.src} alt="Signature" style={{ height: size, width: 'auto', maxWidth: '100%', objectFit: 'contain' }} />
+        )}
+      </div>
+      <div style={{ borderTop: '1.5px solid #CBD5E1', marginTop: 4 }} />
+      {data.approvedName && (
+        <>
+          <div style={{ fontFamily: head, fontWeight: 600, fontSize: 13, color: tokens.textDark, marginTop: 8 }}>{data.approvedName}</div>
+          <div style={{ fontFamily: body, fontSize: 11.5, color: tokens.textGray }}>{data.approvedRole}</div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // Bank Details and Signature render as columns of ONE flex row (one
 // <Section>), not separately-stacked sections — that keeps them from ever
 // splitting across a page break from each other during pagination. QR only
 // appears here (filling Bank's spot) when Bank Details is turned off —
 // otherwise it renders up in TotalsSection instead, per the approved
-// layout, so it's never shown in both places at once.
-export function BankSignatureSection({ bank, signature, qr, style: tokens, docType }) {
+// layout, so it's never shown in both places at once. Waybill's dual
+// signature slots (Dispatched By / Received By) render as a pair anchored
+// to the row's right edge instead of the single anchored-right block every
+// other doc type uses.
+export function BankSignatureSection({ bank, signature, signature2, qr, style: tokens, docType }) {
   const config = docTypeConfig(docType);
   const bankVisible = bank.visible && config.showBank;
   const showQrHere = !bankVisible && qr?.visible && qr.src;
-  if (!bankVisible && !signature?.visible && !showQrHere) return null;
-  const head = fontCss(tokens.headingFont), body = fontCss(tokens.bodyFont);
-  const isTyped = signature && (signature.mode === 'typed' || !signature.mode);
-  const signatureSize = signature?.size ?? 40;
-  const signatureLabel = config.signatureSlots[0]?.label || 'Approved By';
+  const dualSignature = config.signatureSlots.length === 2;
+  const sig1Visible = !!signature?.visible;
+  const sig2Visible = dualSignature && !!signature2?.visible;
+  if (!bankVisible && !sig1Visible && !sig2Visible && !showQrHere) return null;
   return (
     <Section style={{ display: 'flex', gap: 32, alignItems: 'flex-start' }}>
       {bankVisible && (
         <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: body, fontSize: 11, fontWeight: 700, letterSpacing: '.05em', color: tokens.brandAccent, marginBottom: 8 }}>BANK DETAILS</div>
+          <div style={{ fontFamily: fontCss(tokens.bodyFont), fontSize: 11, fontWeight: 700, letterSpacing: '.05em', color: tokens.brandAccent, marginBottom: 8 }}>BANK DETAILS</div>
           {bank.rows.map((r, i) => (
             <div key={i} style={{ marginTop: i === 0 ? 0 : 6 }}>
-              <div style={{ fontFamily: body, fontSize: 10, color: tokens.textMuted }}>{r.k}</div>
-              <div style={{ fontFamily: body, fontSize: 12, fontWeight: 600, color: tokens.textDark, wordBreak: 'break-word' }}>{r.v}</div>
+              <div style={{ fontFamily: fontCss(tokens.bodyFont), fontSize: 10, color: tokens.textMuted }}>{r.k}</div>
+              <div style={{ fontFamily: fontCss(tokens.bodyFont), fontSize: 12, fontWeight: 600, color: tokens.textDark, wordBreak: 'break-word' }}>{r.v}</div>
             </div>
           ))}
         </div>
@@ -259,7 +338,7 @@ export function BankSignatureSection({ bank, signature, qr, style: tokens, docTy
           <img src={qr.src} alt="Payment QR code" style={{ width: 72, height: 72, objectFit: 'contain' }} />
         </div>
       )}
-      {signature?.visible && (
+      {!dualSignature && sig1Visible && (
         // Fixed width + marginLeft:auto (not flex:1) so this column is
         // always exactly as wide as the signature area itself and always
         // anchored to the row's right edge — flex:1 previously made it
@@ -267,27 +346,12 @@ export function BankSignatureSection({ bank, signature, qr, style: tokens, docTy
         // whole row alone when Bank Details is off), which is what pushed
         // the underline out toward the middle of the page instead of
         // hugging the signature.
-        <div style={{ width: 200, flexShrink: 0, marginLeft: 'auto', textAlign: 'left' }}>
-          {signature.approvedName && (
-            <div style={{ fontFamily: body, fontSize: 10, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>{signatureLabel}</div>
-          )}
-          <div style={{ minHeight: signatureSize, display: 'flex', alignItems: 'flex-end' }}>
-            {isTyped && signature.text && <div style={{ fontFamily: "'Caveat', cursive", fontSize: 26, color: tokens.textDark }}>{signature.text}</div>}
-            {!isTyped && signature.src && (
-              // height (not maxHeight) so the slider always has a visible
-              // effect even on a small/low-res source image, not just
-              // capping large ones — width stays auto with objectFit:
-              // contain so the aspect ratio is preserved either way.
-              <img src={signature.src} alt="Signature" style={{ height: signatureSize, width: 'auto', maxWidth: '100%', objectFit: 'contain' }} />
-            )}
-          </div>
-          <div style={{ borderTop: '1.5px solid #CBD5E1', marginTop: 4 }} />
-          {signature.approvedName && (
-            <>
-              <div style={{ fontFamily: head, fontWeight: 600, fontSize: 13, color: tokens.textDark, marginTop: 8 }}>{signature.approvedName}</div>
-              <div style={{ fontFamily: body, fontSize: 11.5, color: tokens.textGray }}>{signature.approvedRole}</div>
-            </>
-          )}
+        <SignatureBlock data={signature} label={config.signatureSlots[0]?.label || 'Approved By'} tokens={tokens} anchorRight />
+      )}
+      {dualSignature && (sig1Visible || sig2Visible) && (
+        <div style={{ display: 'flex', gap: 24, marginLeft: 'auto' }}>
+          <SignatureBlock data={signature} label={config.signatureSlots[0]?.label} tokens={tokens} />
+          <SignatureBlock data={signature2} label={config.signatureSlots[1]?.label} tokens={tokens} />
         </div>
       )}
     </Section>

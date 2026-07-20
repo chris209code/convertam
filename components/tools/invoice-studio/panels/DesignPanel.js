@@ -1,6 +1,7 @@
 'use client';
 
 import { TEMPLATE_GALLERY } from '@/lib/invoice-studio/styleTokens';
+import { docTypeConfig } from '@/lib/invoice-studio/docTypes';
 
 const groupTitle = { fontFamily: 'var(--cs-font-poppins), Poppins, sans-serif', fontWeight: 700, fontSize: 14, color: '#0F172A', marginBottom: 4 };
 const groupSub = { fontSize: 11.5, color: '#8891A0', marginBottom: 14, lineHeight: 1.5 };
@@ -25,8 +26,10 @@ export default function DesignPanel({
   templateId, onSelectTemplate,
   colorOverrides, onColorChange,
   docSettings, onDocSettingChange,
-  sections, onToggleSection,
+  sections, onToggleSection, docType,
 }) {
+  const config = docTypeConfig(docType);
+  const dualSignature = config.signatureSlots.length === 2;
   return (
     <div>
       <div style={groupTitle}>Template</div>
@@ -56,23 +59,28 @@ export default function DesignPanel({
         ))}
       </div>
 
-      <div style={sectionTitle}>Document Settings</div>
-      <div style={fieldWrap}>
-        <div style={miniLabel}>Default VAT %</div>
-        <input type="number" value={docSettings.vatRate} onChange={(e) => onDocSettingChange('vatRate', Number(e.target.value))} style={{ width: '100%', height: 34, borderRadius: 7, border: '1px solid #E2E6ED', padding: '0 10px', fontSize: 12.5 }} />
-      </div>
-      <div style={fieldWrap}>
-        <div style={miniLabel}>Discount Amount</div>
-        <input type="number" value={docSettings.discount} onChange={(e) => onDocSettingChange('discount', Number(e.target.value))} style={{ width: '100%', height: 34, borderRadius: 7, border: '1px solid #E2E6ED', padding: '0 10px', fontSize: 12.5 }} />
-      </div>
+      {config.showFinancials && (
+        <>
+          <div style={sectionTitle}>Document Settings</div>
+          <div style={fieldWrap}>
+            <div style={miniLabel}>Default VAT %</div>
+            <input type="number" value={docSettings.vatRate} onChange={(e) => onDocSettingChange('vatRate', Number(e.target.value))} style={{ width: '100%', height: 34, borderRadius: 7, border: '1px solid #E2E6ED', padding: '0 10px', fontSize: 12.5 }} />
+          </div>
+          <div style={fieldWrap}>
+            <div style={miniLabel}>Discount Amount</div>
+            <input type="number" value={docSettings.discount} onChange={(e) => onDocSettingChange('discount', Number(e.target.value))} style={{ width: '100%', height: 34, borderRadius: 7, border: '1px solid #E2E6ED', padding: '0 10px', fontSize: 12.5 }} />
+          </div>
+        </>
+      )}
 
       <div style={sectionTitle}>Display Options</div>
       <ToggleRow label="Notes" on={sections.notes.visible} onClick={() => onToggleSection('notes')} />
-      <ToggleRow label="Show Bank Details" on={sections.bank.visible} onClick={() => onToggleSection('bank')} />
-      <ToggleRow label="Signature Block" on={sections.signature.visible} onClick={() => onToggleSection('signature')} />
+      {config.showBank && <ToggleRow label="Show Bank Details" on={sections.bank.visible} onClick={() => onToggleSection('bank')} />}
+      <ToggleRow label={dualSignature ? config.signatureSlots[0].label : 'Signature Block'} on={sections.signature.visible} onClick={() => onToggleSection('signature')} />
+      {dualSignature && <ToggleRow label={config.signatureSlots[1].label} on={sections.signature2.visible} onClick={() => onToggleSection('signature2')} />}
       <ToggleRow label="Terms & Conditions" on={sections.terms.visible} onClick={() => onToggleSection('terms')} />
       <ToggleRow label="Watermark" on={sections.watermark.visible} onClick={() => onToggleSection('watermark')} />
-      <ToggleRow label="QR Payment Code" on={sections.qr.visible} onClick={() => onToggleSection('qr')} />
+      {config.showBank && <ToggleRow label="QR Payment Code" on={sections.qr.visible} onClick={() => onToggleSection('qr')} />}
     </div>
   );
 }

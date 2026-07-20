@@ -8,13 +8,15 @@ import { computeInvoiceTotals } from '@/lib/invoice-studio/calculations';
 import { amountInWords } from '@/lib/invoice-studio/numberToWords';
 import { validateImageFile, readFileAsDataURL } from '@/lib/invoice-studio/fileUpload';
 import { generateQrDataUrl } from '@/lib/invoice-studio/qrGenerate';
-import { docTypeConfig } from '@/lib/invoice-studio/docTypes';
+import { docTypeConfig, DOC_TYPES } from '@/lib/invoice-studio/docTypes';
+import { convertDocument } from '@/lib/invoice-studio/convertDocType';
 import Gallery from './Gallery';
 import Toolbar from './Toolbar';
 import FlowCanvas from './FlowCanvas';
 import ContentPanel from './panels/ContentPanel';
 import DesignPanel from './panels/DesignPanel';
 import LetterheadCropModal from './LetterheadCropModal';
+import ConversionConfirmModal from './ConversionConfirmModal';
 
 const poppins = Poppins({ subsets: ['latin'], weight: ['500', '600', '700'], variable: '--cs-font-poppins' });
 const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--cs-font-inter' });
@@ -32,13 +34,6 @@ function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
 const ZOOM_MIN = 0.3, ZOOM_MAX = 1.5, ZOOM_STEP = 0.1, ZOOM_DEFAULT = 0.75;
 const HISTORY_LIMIT = 60;
-
-// Phase 1 of the Business Document Studio consolidation: Invoice and
-// Quotation share this one engine. Delivery Note and Waybill are defined in
-// docTypes.js but their editor/renderer support (logistics fields,
-// dual-signature) lands in Phase 2 — deliberately left out of this switcher
-// until that's built, so testing doesn't hit half-finished document types.
-const SUPPORTED_DOC_TYPES = ['invoice', 'quotation'];
 
 export default function BusinessDocumentStudioWorkspace({ initialDocType = 'invoice' }) {
   const [view, setView] = useState('gallery');
@@ -134,20 +129,44 @@ export default function BusinessDocumentStudioWorkspace({ initialDocType = 'invo
     setHistoryIndex(0);
   }, []);
 
-  // Temporary (Phase 1) type switcher: no conversion/data-preservation logic
-  // yet (that's convertDocType.js, Phase 2) — switching here simply starts a
-  // fresh document of the target type on the current template, the same way
-  // opening a brand-new document already does.
-  const switchDocType = useCallback((toType) => {
-    const initial = emptyDoc(templateId, toType);
+  const [pendingConversion, setPendingConversion] = useState(null); // { toType, nextDoc, changes } while the confirmation modal is open
+
+  const applyDocTypeChange = useCallback((toType, nextDoc) => {
     setDocType(toType);
-    docRef.current = initial;
-    setDoc(initial);
+    docRef.current = nextDoc;
+    setDoc(nextDoc);
     setColorOverrides(null);
     historyIndexRef.current = 0;
-    setHistory([initial]);
+    setHistory([nextDoc]);
     setHistoryIndex(0);
-  }, [templateId]);
+  }, []);
+
+  // Entry point for every document-type change — the sidebar quick-switcher,
+  // the toolbar's "Document Type: X ▾" dropdown, and the "Convert to Y →"
+  // action all funnel through here. Runs the shared conversion engine
+  // (preserves company/client/item/branding data, adapts or clears what
+  // doesn't apply) and, if there's actually something to lose, shows the
+  // confirmation dialog before committing — per the requirement that
+  // switching types must never silently drop data. Skipped only when
+  // nothing has been entered yet (still browsing the gallery), since
+  // there's nothing at risk to confirm.
+  const requestDocTypeChange = useCallback((toType) => {
+    if (toType === docRef.current.docType) return;
+    const { nextDoc, changes } = convertDocument(docRef.current, toType);
+    if (view !== 'editor') {
+      applyDocTypeChange(toType, nextDoc);
+      return;
+    }
+    setPendingConversion({ toType, nextDoc, changes });
+  }, [view, applyDocTypeChange]);
+
+  const confirmPendingConversion = useCallback(() => {
+    if (!pendingConversion) return;
+    applyDocTypeChange(pendingConversion.toType, pendingConversion.nextDoc);
+    setPendingConversion(null);
+  }, [pendingConversion, applyDocTypeChange]);
+
+  const cancelPendingConversion = useCallback(() => setPendingConversion(null), []);
 
   const [panelTab, setPanelTab] = useState('content');
   const goToGallery = useCallback(() => setView('gallery'), []);
@@ -171,7 +190,7 @@ export default function BusinessDocumentStudioWorkspace({ initialDocType = 'invo
   const onAddRow = useCallback(() => {
     updateDoc((prev) => ({
       ...prev,
-      sections: { ...prev.sections, itemsTable: { ...prev.sections.itemsTable, rows: [...prev.sections.itemsTable.rows, { name: '', desc: '', qty: 1, rate: 0, vat: prev.vatRate, img: null }] } },
+      sections: { ...prev.sections, itemsTable: { ...prev.sections.itemsTable, rows: [...prev.sections.itemsTable.rows, { name: '', desc: '', qty: 1, rate: 0, vat: prev.vatRate, unit: '', weight: '', remarks: '', img: null }] } },
     }));
   }, [updateDoc]);
 
@@ -239,6 +258,18 @@ export default function BusinessDocumentStudioWorkspace({ initialDocType = 'invo
   const onSignatureDrawSave = useCallback((dataUrl) => onPatchSection('signature', { mode: 'uploaded', src: dataUrl }), [onPatchSection]);
   const onSignatureTypedSave = useCallback((text) => onPatchSection('signature', { mode: 'typed', text }), [onPatchSection]);
 
+  // Waybill's second signature slot (Received By) — same shape/handlers as
+  // the primary one, just patching the `signature2` section instead.
+  const onSignatureUpload2 = useCallback(async (file) => {
+    const err = validateImageFile(file);
+    if (err) return err;
+    const dataUrl = await readFileAsDataURL(file);
+    onPatchSection('signature2', { mode: 'uploaded', src: dataUrl });
+    return null;
+  }, [onPatchSection]);
+  const onSignatureDrawSave2 = useCallback((dataUrl) => onPatchSection('signature2', { mode: 'uploaded', src: dataUrl }), [onPatchSection]);
+  const onSignatureTypedSave2 = useCallback((text) => onPatchSection('signature2', { mode: 'typed', text }), [onPatchSection]);
+
   const onCurrencyChange = useCallback((currency) => updateDoc((prev) => ({ ...prev, currency })), [updateDoc]);
 
   const onDocDateChange = useCallback((iso) => {
@@ -275,6 +306,7 @@ export default function BusinessDocumentStudioWorkspace({ initialDocType = 'invo
   const onColorChange = useCallback((key, value) => setColorOverrides((prev) => ({ ...(prev || baseStyle), [key]: value })), [baseStyle]);
 
   const docConfig = docTypeConfig(doc.docType);
+  const docTypeOptions = useMemo(() => DOC_TYPES.map((t) => ({ id: t, label: docTypeConfig(t).label })), []);
 
   // Single-job export lock: downloadingRef is checked synchronously so a
   // second click landing before React re-renders the disabled button can't
@@ -391,14 +423,14 @@ export default function BusinessDocumentStudioWorkspace({ initialDocType = 'invo
       <div style={{ width: 88, flexShrink: 0, background: '#FFFFFF', borderRight: '1px solid #E7EAF0', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0', gap: 18 }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#2563EB,#10B981)' }} />
         <button onClick={goToGallery} style={{ width: 44, height: 44, borderRadius: 12, border: 'none', background: view === 'gallery' ? '#EFF6FF' : 'transparent', cursor: 'pointer' }} title="Templates" />
-        {/* Temporary Phase-1 document-type switcher for manual testing — the
-            real "Document Type: Invoice ▾" switcher with conversion-aware
-            confirmation lands in Phase 2/3. */}
+        {/* Quick document-type switcher — same requestDocTypeChange path as
+            the toolbar's "Document Type: X ▾" dropdown, so both show the
+            same confirmation before committing when editing is underway. */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 'auto' }}>
-          {SUPPORTED_DOC_TYPES.map((t) => (
+          {DOC_TYPES.map((t) => (
             <button
               key={t} type="button" title={docTypeConfig(t).label}
-              onClick={() => switchDocType(t)}
+              onClick={() => requestDocTypeChange(t)}
               style={{
                 width: 44, height: 28, borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700,
                 border: docType === t ? '1.5px solid #2563EB' : '1px solid #E2E6ED',
@@ -428,6 +460,11 @@ export default function BusinessDocumentStudioWorkspace({ initialDocType = 'invo
             onDownload={handleDownload}
             isDownloading={isDownloading}
             onBack={goToGallery}
+            docType={docType}
+            docTypeOptions={docTypeOptions}
+            onSwitchDocType={requestDocTypeChange}
+            convertTargetLabel={docConfig.nextInFlow ? docTypeConfig(docConfig.nextInFlow).label : null}
+            onConvert={() => docConfig.nextInFlow && requestDocTypeChange(docConfig.nextInFlow)}
           />
           <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
             <div className="cs-flow-pages" style={{ flex: 1, display: 'flex', minHeight: 0, minWidth: 0, overflow: 'hidden' }}>
@@ -457,13 +494,14 @@ export default function BusinessDocumentStudioWorkspace({ initialDocType = 'invo
                     onImageUpload={onImageUpload} onImageRemove={onImageRemove}
                     onOpenCrop={() => setCropModalOpen(true)} onLetterheadRemove={onLetterheadRemove}
                     onSignatureUpload={onSignatureUpload} onSignatureDrawSave={onSignatureDrawSave} onSignatureTypedSave={onSignatureTypedSave}
+                    onSignatureUpload2={onSignatureUpload2} onSignatureDrawSave2={onSignatureDrawSave2} onSignatureTypedSave2={onSignatureTypedSave2}
                   />
                 ) : (
                   <DesignPanel
                     templateId={templateId} onSelectTemplate={openTemplate}
                     colorOverrides={style} onColorChange={onColorChange}
                     docSettings={{ discount: doc.discount, vatRate: doc.vatRate }} onDocSettingChange={onDocSettingChange}
-                    sections={doc.sections} onToggleSection={onToggleSection}
+                    sections={doc.sections} onToggleSection={onToggleSection} docType={docType}
                   />
                 )}
               </div>
@@ -476,6 +514,16 @@ export default function BusinessDocumentStudioWorkspace({ initialDocType = 'invo
         <LetterheadCropModal
           onClose={() => setCropModalOpen(false)}
           onSave={onLetterheadSave}
+        />
+      )}
+
+      {pendingConversion && (
+        <ConversionConfirmModal
+          fromLabel={docConfig.label}
+          toLabel={docTypeConfig(pendingConversion.toType).label}
+          changes={pendingConversion.changes}
+          onConfirm={confirmPendingConversion}
+          onCancel={cancelPendingConversion}
         />
       )}
 

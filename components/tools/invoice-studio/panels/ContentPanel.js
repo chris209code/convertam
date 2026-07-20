@@ -1,10 +1,23 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Plus, X, ChevronUp, ChevronDown, ImagePlus } from 'lucide-react';
 import SignatureDraw from '../SignatureDraw';
 import { CURRENCIES } from '@/lib/invoice-studio/sectionsModel';
-import { docTypeConfig } from '@/lib/invoice-studio/docTypes';
+import { docTypeConfig, LOGISTICS_FIELD_LABELS } from '@/lib/invoice-studio/docTypes';
+
+// Editing-form metadata for item-table columns — label/input-type only;
+// visual column widths/labels for the rendered table live in docTypes.js's
+// ITEM_COLUMN_DEFS. Kept separate because "VAT %" reads better as a form
+// label than the table header's plain "VAT".
+const ITEM_FIELD_META = {
+  qty: { label: 'Qty', type: 'number' },
+  rate: { label: 'Rate', type: 'number' },
+  vat: { label: 'VAT %', type: 'number' },
+  unit: { label: 'Unit', type: 'text' },
+  weight: { label: 'Weight', type: 'number' },
+  remarks: { label: 'Remarks', type: 'text' },
+};
 
 const sectionTitle = { fontSize: 11, fontWeight: 700, letterSpacing: '.05em', color: '#8891A0', textTransform: 'uppercase', marginBottom: 10, marginTop: 22 };
 const groupTitle = { fontFamily: 'var(--cs-font-poppins), Poppins, sans-serif', fontWeight: 700, fontSize: 14, color: '#0F172A', marginBottom: 4 };
@@ -53,6 +66,13 @@ function Field({ label, value, onChange, onBlur, placeholder, type = 'text', tex
 // this panel uses.
 function useFieldState(initialValue, commit) {
   const [value, setValue] = useState(initialValue ?? '');
+  // Re-sync when the underlying doc value changes from OUTSIDE this field's
+  // own onBlur commit — e.g. a docType conversion generating a fresh
+  // document number, zeroing a price, or resetting a signature's name.
+  // Safe during normal typing: initialValue only changes once the parent's
+  // doc state actually changes, which for a field's own edits happens on
+  // blur (after which this just re-sets the same value, a no-op).
+  useEffect(() => { setValue(initialValue ?? ''); }, [initialValue]);
   return { value, onChange: setValue, onBlur: () => commit(value) };
 }
 
@@ -189,12 +209,19 @@ function ItemImageControl({ row, idx, onRowImageUpload, onRowImageRemove }) {
   );
 }
 
-function ItemRow({ row, idx, isFirst, isLast, rowCount, onRowField, onMoveRow, onRemoveRow, onRowImageUpload, onRowImageRemove }) {
+function ItemRow({ row, idx, isFirst, isLast, rowCount, onRowField, onMoveRow, onRemoveRow, onRowImageUpload, onRowImageRemove, itemColumns }) {
   const desc = useFieldState(row.name, (v) => onRowField(idx, 'name', v));
   const details = useFieldState(row.desc, (v) => onRowField(idx, 'desc', v));
   const qty = useFieldState(row.qty, (v) => onRowField(idx, 'qty', v));
   const rate = useFieldState(row.rate, (v) => onRowField(idx, 'rate', v));
   const vat = useFieldState(row.vat, (v) => onRowField(idx, 'vat', v));
+  const unit = useFieldState(row.unit, (v) => onRowField(idx, 'unit', v));
+  const weight = useFieldState(row.weight, (v) => onRowField(idx, 'weight', v));
+  const remarks = useFieldState(row.remarks, (v) => onRowField(idx, 'remarks', v));
+  const fieldStateByCol = { qty, rate, vat, unit, weight, remarks };
+  // Amount is always computed (qty × rate × (1+vat)), never directly
+  // editable, so it's excluded here even though it's a real display column.
+  const gridCols = itemColumns.filter((c) => c !== 'remarks' && c !== 'amount');
 
   return (
     <div style={{ border: '1px solid #E7EAF0', borderRadius: 10, padding: 12, marginBottom: 10 }}>
@@ -208,17 +235,18 @@ function ItemRow({ row, idx, isFirst, isLast, rowCount, onRowField, onMoveRow, o
       </div>
       <Field label="Description" {...desc} placeholder="Item name" />
       <Field label="Details (optional)" {...details} placeholder="Short detail line" />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-        <Field label="Qty" {...qty} type="number" />
-        <Field label="Rate" {...rate} type="number" />
-        <Field label="VAT %" {...vat} type="number" />
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${gridCols.length}, 1fr)`, gap: 8 }}>
+        {gridCols.map((colId) => (
+          <Field key={colId} label={ITEM_FIELD_META[colId].label} {...fieldStateByCol[colId]} type={ITEM_FIELD_META[colId].type} />
+        ))}
       </div>
+      {itemColumns.includes('remarks') && <Field label="Remarks" {...remarks} placeholder="e.g. Handle with care" />}
       <ItemImageControl row={row} idx={idx} onRowImageUpload={onRowImageUpload} onRowImageRemove={onRowImageRemove} />
     </div>
   );
 }
 
-function ItemsSection({ itemsTable, onRowField, onAddRow, onRemoveRow, onMoveRow, onRowImageUpload, onRowImageRemove }) {
+function ItemsSection({ itemsTable, onRowField, onAddRow, onRemoveRow, onMoveRow, onRowImageUpload, onRowImageRemove, itemColumns }) {
   return (
     <div>
       <div style={groupTitle}>Items</div>
@@ -227,12 +255,45 @@ function ItemsSection({ itemsTable, onRowField, onAddRow, onRemoveRow, onMoveRow
         <ItemRow
           key={i} row={row} idx={i} isFirst={i === 0} isLast={i === itemsTable.rows.length - 1} rowCount={itemsTable.rows.length}
           onRowField={onRowField} onMoveRow={onMoveRow} onRemoveRow={onRemoveRow}
-          onRowImageUpload={onRowImageUpload} onRowImageRemove={onRowImageRemove}
+          onRowImageUpload={onRowImageUpload} onRowImageRemove={onRowImageRemove} itemColumns={itemColumns}
         />
       ))}
       <button type="button" onClick={onAddRow} style={{ ...smallBtnGhost, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
         <Plus size={14} /> Add Line Item
       </button>
+    </div>
+  );
+}
+
+// Only rendered when the active docType's config sets showLogistics
+// (Delivery Note, Waybill) — irrelevant fields for a given type are simply
+// never in config.logisticsFields, so they're never shown here either.
+function LogisticsSection({ logistics, onPatch, docType }) {
+  const config = docTypeConfig(docType);
+  const pickupAddress = useFieldState(logistics.pickupAddress, (v) => onPatch('logistics', { pickupAddress: v }));
+  const deliveryAddress = useFieldState(logistics.deliveryAddress, (v) => onPatch('logistics', { deliveryAddress: v }));
+  const driverName = useFieldState(logistics.driverName, (v) => onPatch('logistics', { driverName: v }));
+  const driverPhone = useFieldState(logistics.driverPhone, (v) => onPatch('logistics', { driverPhone: v }));
+  const vehicleNumber = useFieldState(logistics.vehicleNumber, (v) => onPatch('logistics', { vehicleNumber: v }));
+  const transportCompany = useFieldState(logistics.transportCompany, (v) => onPatch('logistics', { transportCompany: v }));
+  const deliveryInstructions = useFieldState(logistics.deliveryInstructions, (v) => onPatch('logistics', { deliveryInstructions: v }));
+  const relatedInvoiceNo = useFieldState(logistics.relatedInvoiceNo, (v) => onPatch('logistics', { relatedInvoiceNo: v }));
+  const purchaseOrderNo = useFieldState(logistics.purchaseOrderNo, (v) => onPatch('logistics', { purchaseOrderNo: v }));
+  const fieldStateByKey = { pickupAddress, deliveryAddress, driverName, driverPhone, vehicleNumber, transportCompany, deliveryInstructions, relatedInvoiceNo, purchaseOrderNo };
+
+  if (!config.showLogistics) return null;
+
+  return (
+    <div>
+      <div style={groupTitle}>{config.id === 'waybill' ? 'Logistics Details' : 'Delivery Details'}</div>
+      <div style={groupSub}>{config.id === 'waybill' ? 'Driver, vehicle, and delivery information.' : 'Delivery address and reference numbers.'}</div>
+      {config.logisticsFields.map((key) => (
+        <Field
+          key={key} label={LOGISTICS_FIELD_LABELS[key]} {...fieldStateByKey[key]}
+          textarea={key === 'deliveryAddress' || key === 'pickupAddress' || key === 'deliveryInstructions'}
+          rows={2}
+        />
+      ))}
     </div>
   );
 }
@@ -340,14 +401,14 @@ function SignatureControls({ signature, onSignatureUpload, onSignatureDrawSave, 
   );
 }
 
-function SignatureSizeControl({ signature, onPatch }) {
+function SignatureSizeControl({ signature, onPatch, sectionKey = 'signature' }) {
   if (!signature.src) return null;
   return (
     <div style={fieldWrap}>
       <div style={miniLabel}>Signature Size</div>
       <input
         type="range" min="24" max="90" step="2" value={signature.size ?? 40}
-        onChange={(e) => onPatch('signature', { size: Number(e.target.value) })}
+        onChange={(e) => onPatch(sectionKey, { size: Number(e.target.value) })}
         style={{ width: '100%' }}
       />
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: '#8891A0', marginTop: 2 }}>
@@ -357,21 +418,49 @@ function SignatureSizeControl({ signature, onPatch }) {
   );
 }
 
-function SignatureSectionPanel({ signature, onPatch, onSignatureUpload, onSignatureDrawSave, onSignatureTypedSave, onToggleSection, docType }) {
+// One signature slot's editing form — shared by the single-slot (Invoice/
+// Quotation/Delivery Note) and dual-slot (Waybill) layouts below.
+function SignatureSlotForm({ signature, sectionKey, label, onPatch, onSignatureUpload, onSignatureDrawSave, onSignatureTypedSave, onToggleSection }) {
+  const name = useFieldState(signature.approvedName, (v) => onPatch(sectionKey, { approvedName: v }));
+  const role = useFieldState(signature.approvedRole, (v) => onPatch(sectionKey, { approvedRole: v }));
+  return (
+    <div>
+      <InlineToggle label={`Show ${label}`} on={signature.visible} onClick={() => onToggleSection(sectionKey)} />
+      <Field label={`${label} (name)`} {...name} placeholder="Full name" />
+      <Field label="Title" {...role} placeholder="e.g. Finance Officer" />
+      <SignatureControls signature={signature} onSignatureUpload={onSignatureUpload} onSignatureDrawSave={onSignatureDrawSave} onSignatureTypedSave={onSignatureTypedSave} />
+      <SignatureSizeControl signature={signature} onPatch={onPatch} sectionKey={sectionKey} />
+    </div>
+  );
+}
+
+function SignatureSectionPanel({
+  signature, signature2, onPatch, onToggleSection, docType,
+  onSignatureUpload, onSignatureDrawSave, onSignatureTypedSave,
+  onSignatureUpload2, onSignatureDrawSave2, onSignatureTypedSave2,
+}) {
   const config = docTypeConfig(docType);
-  const signatureLabel = config.signatureSlots[0]?.label || 'Approved By';
-  const name = useFieldState(signature.approvedName, (v) => onPatch('signature', { approvedName: v }));
-  const role = useFieldState(signature.approvedRole, (v) => onPatch('signature', { approvedRole: v }));
+  const dual = config.signatureSlots.length === 2;
+  const label1 = config.signatureSlots[0]?.label || 'Approved By';
+  const label2 = config.signatureSlots[1]?.label || 'Received By';
 
   return (
     <div>
-      <div style={groupTitle}>Signature</div>
-      <div style={groupSub}>{signatureLabel} name/title and signature.</div>
-      <InlineToggle label="Show Approval and Signature" on={signature.visible} onClick={() => onToggleSection('signature')} />
-      <Field label={`${signatureLabel} (name)`} {...name} placeholder="Full name" />
-      <Field label="Title" {...role} placeholder="e.g. Finance Officer" />
-      <SignatureControls signature={signature} onSignatureUpload={onSignatureUpload} onSignatureDrawSave={onSignatureDrawSave} onSignatureTypedSave={onSignatureTypedSave} />
-      <SignatureSizeControl signature={signature} onPatch={onPatch} />
+      <div style={groupTitle}>{dual ? 'Signatures' : 'Signature'}</div>
+      <div style={groupSub}>{dual ? `${label1} and ${label2}` : label1} name/title and signature.</div>
+      <SignatureSlotForm
+        signature={signature} sectionKey="signature" label={label1} onPatch={onPatch} onToggleSection={onToggleSection}
+        onSignatureUpload={onSignatureUpload} onSignatureDrawSave={onSignatureDrawSave} onSignatureTypedSave={onSignatureTypedSave}
+      />
+      {dual && (
+        <>
+          <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
+          <SignatureSlotForm
+            signature={signature2} sectionKey="signature2" label={label2} onPatch={onPatch} onToggleSection={onToggleSection}
+            onSignatureUpload={onSignatureUpload2} onSignatureDrawSave={onSignatureDrawSave2} onSignatureTypedSave={onSignatureTypedSave2}
+          />
+        </>
+      )}
     </div>
   );
 }
@@ -382,7 +471,9 @@ export default function ContentPanel({
   onBankRowField, onPatchQr, onToggleSection,
   onImageUpload, onImageRemove, onOpenCrop, onLetterheadRemove,
   onSignatureUpload, onSignatureDrawSave, onSignatureTypedSave,
+  onSignatureUpload2, onSignatureDrawSave2, onSignatureTypedSave2,
 }) {
+  const config = docTypeConfig(docType);
   return (
     <div>
       <BusinessSection header={sections.header} onPatch={onPatchSection} onImageUpload={onImageUpload} onImageRemove={onImageRemove} letterhead={sections.letterhead} onOpenCrop={onOpenCrop} onLetterheadRemove={onLetterheadRemove} />
@@ -390,16 +481,27 @@ export default function ContentPanel({
       <ClientSection clientInfo={sections.clientInfo} onPatch={onPatchSection} docType={docType} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
       <DocumentDetailsSection clientInfo={sections.clientInfo} onPatch={onPatchSection} currency={currency} onCurrencyChange={onCurrencyChange} onDocDateChange={onDocDateChange} onSecondaryDateChange={onSecondaryDateChange} docType={docType} />
+      {config.showLogistics && (
+        <>
+          <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
+          <LogisticsSection logistics={sections.logistics} onPatch={onPatchSection} docType={docType} />
+        </>
+      )}
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
-      <ItemsSection itemsTable={sections.itemsTable} onRowField={onRowField} onAddRow={onAddRow} onRemoveRow={onRemoveRow} onMoveRow={onMoveRow} onRowImageUpload={onRowImageUpload} onRowImageRemove={onRowImageRemove} />
-      <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
-      <BankQrSection bank={sections.bank} qr={sections.qr} onBankRowField={onBankRowField} onPatchQr={onPatchQr} onToggleSection={onToggleSection} docType={docType} />
+      <ItemsSection itemsTable={sections.itemsTable} onRowField={onRowField} onAddRow={onAddRow} onRemoveRow={onRemoveRow} onMoveRow={onMoveRow} onRowImageUpload={onRowImageUpload} onRowImageRemove={onRowImageRemove} itemColumns={config.itemColumns} />
+      {config.showBank && (
+        <>
+          <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
+          <BankQrSection bank={sections.bank} qr={sections.qr} onBankRowField={onBankRowField} onPatchQr={onPatchQr} onToggleSection={onToggleSection} docType={docType} />
+        </>
+      )}
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
       <NotesTermsSection notes={sections.notes} terms={sections.terms} watermark={sections.watermark} onPatch={onPatchSection} onToggleSection={onToggleSection} docType={docType} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
       <SignatureSectionPanel
-        signature={sections.signature} onPatch={onPatchSection}
+        signature={sections.signature} signature2={sections.signature2} onPatch={onPatchSection}
         onSignatureUpload={onSignatureUpload} onSignatureDrawSave={onSignatureDrawSave} onSignatureTypedSave={onSignatureTypedSave}
+        onSignatureUpload2={onSignatureUpload2} onSignatureDrawSave2={onSignatureDrawSave2} onSignatureTypedSave2={onSignatureTypedSave2}
         onToggleSection={onToggleSection} docType={docType}
       />
     </div>

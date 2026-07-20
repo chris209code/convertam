@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { Plus, X, ChevronUp, ChevronDown, ImagePlus } from 'lucide-react';
 import SignatureDraw from '../SignatureDraw';
 import { CURRENCIES } from '@/lib/invoice-studio/sectionsModel';
+import { docTypeConfig } from '@/lib/invoice-studio/docTypes';
 
 const sectionTitle = { fontSize: 11, fontWeight: 700, letterSpacing: '.05em', color: '#8891A0', textTransform: 'uppercase', marginBottom: 10, marginTop: 22 };
 const groupTitle = { fontFamily: 'var(--cs-font-poppins), Poppins, sans-serif', fontWeight: 700, fontSize: 14, color: '#0F172A', marginBottom: 4 };
@@ -107,40 +108,48 @@ function BusinessSection({ header, onPatch, onImageUpload, onImageRemove, letter
   );
 }
 
-function ClientSection({ clientInfo, onPatch }) {
+function ClientSection({ clientInfo, onPatch, docType }) {
+  const config = docTypeConfig(docType);
   const name = useFieldState(clientInfo.clientName, (v) => onPatch('clientInfo', { clientName: v }));
   const address = useFieldState(clientInfo.clientAddress, (v) => onPatch('clientInfo', { clientAddress: v }));
   const phone = useFieldState(clientInfo.clientPhone, (v) => onPatch('clientInfo', { clientPhone: v }));
 
   return (
     <div>
-      <div style={groupTitle}>Client Information</div>
-      <div style={groupSub}>Who this invoice is billed to.</div>
-      <Field label="Client Name" {...name} placeholder="Client or company name" />
+      <div style={groupTitle}>{config.partyLabel} Information</div>
+      <div style={groupSub}>Who this {config.documentTitle.toLowerCase()} is for.</div>
+      <Field label={`${config.partyLabel} Name`} {...name} placeholder="Client or company name" />
       <Field label="Address" {...address} textarea rows={2} placeholder="Client's address" />
       <Field label="Phone" {...phone} placeholder="+234 800 000 0000" />
     </div>
   );
 }
 
-function InvoiceDetailsSection({ clientInfo, onPatch, currency, onCurrencyChange, onInvoiceDateChange, onDueDateChange }) {
-  const no = useFieldState(clientInfo.invoiceNo, (v) => onPatch('clientInfo', { invoiceNo: v }));
+function DocumentDetailsSection({ clientInfo, onPatch, currency, onCurrencyChange, onDocDateChange, onSecondaryDateChange, docType }) {
+  const config = docTypeConfig(docType);
+  const no = useFieldState(clientInfo.docNo, (v) => onPatch('clientInfo', { docNo: v }));
   const status = useFieldState(clientInfo.status, (v) => onPatch('clientInfo', { status: v }));
 
   return (
     <div>
-      <div style={groupTitle}>Invoice Details</div>
-      <div style={groupSub}>Invoice number, dates, status, and currency.</div>
-      <Field label="Invoice Number" {...no} placeholder="INV-2026-0001" />
+      <div style={groupTitle}>{config.label} Details</div>
+      <div style={groupSub}>{config.numberLabel}, dates{config.statusLabel ? ', status,' : ''} and currency.</div>
+      <Field label={config.numberLabel} {...no} placeholder={`${config.numberPrefix}0001`} />
       <div style={fieldWrap}>
-        <div style={miniLabel}>Invoice Date</div>
-        <input type="date" value={clientInfo.invoiceDate || ''} onChange={(e) => onInvoiceDateChange(e.target.value)} style={textInput} />
+        <div style={miniLabel}>{config.dateLabel}</div>
+        <input type="date" value={clientInfo.docDate || ''} onChange={(e) => onDocDateChange(e.target.value)} style={textInput} />
       </div>
-      <div style={fieldWrap}>
-        <div style={miniLabel}>Due Date {!clientInfo.dueDateManual && <span style={{ color: '#94A3B8', fontWeight: 400 }}>(auto: 30 days after invoice date)</span>}</div>
-        <input type="date" value={clientInfo.dueDate || ''} onChange={(e) => onDueDateChange(e.target.value)} style={textInput} />
-      </div>
-      <Field label="Status" {...status} placeholder="Unpaid / Paid / Overdue" />
+      {config.secondaryDateLabel && (
+        <div style={fieldWrap}>
+          <div style={miniLabel}>
+            {config.secondaryDateLabel} {!clientInfo.secondaryDateManual && (
+              <span style={{ color: '#94A3B8', fontWeight: 400 }}>(auto: {config.secondaryDateAutoDays} days after {config.dateLabel.toLowerCase()})</span>
+            )}
+          </div>
+          <input type="date" value={clientInfo.secondaryDate || ''} onChange={(e) => onSecondaryDateChange(e.target.value)} style={textInput} />
+        </div>
+      )}
+      {config.statusLabel && <Field label={config.statusLabel} {...status} placeholder="Unpaid / Paid / Overdue" />}
       <div style={fieldWrap}>
         <div style={miniLabel}>Currency</div>
         <select value={currency} onChange={(e) => onCurrencyChange(e.target.value)} style={textInput}>
@@ -249,35 +258,39 @@ function BankRow({ row, idx, onBankRowField }) {
   return <Field label={row.k} {...field} />;
 }
 
-function BankQrSection({ bank, qr, onBankRowField, onPatchQr, onToggleSection }) {
+function BankQrSection({ bank, qr, onBankRowField, onPatchQr, onToggleSection, docType }) {
+  const config = docTypeConfig(docType);
+  const docLabel = config.documentTitle.toLowerCase();
   return (
     <div>
       <div style={groupTitle}>Payment Details</div>
       <div style={groupSub}>Bank details and payment QR code.</div>
 
       <div style={fieldWrap}>
-        <InlineToggle label="Show Bank Details on invoice" on={bank.visible} onClick={() => onToggleSection('bank')} />
+        <InlineToggle label={`Show Bank Details on ${docLabel}`} on={bank.visible} onClick={() => onToggleSection('bank')} />
         <div style={miniLabel}>Bank Details</div>
         {bank.rows.map((r, i) => <BankRow key={i} row={r} idx={i} onBankRowField={onBankRowField} />)}
       </div>
 
-      <InlineToggle label="Show QR code on invoice" on={qr.visible} onClick={() => onToggleSection('qr')} />
+      <InlineToggle label={`Show QR code on ${docLabel}`} on={qr.visible} onClick={() => onToggleSection('qr')} />
       <QrControls qr={qr} onPatchQr={onPatchQr} />
     </div>
   );
 }
 
-function NotesTermsSection({ notes, terms, watermark, onPatch, onToggleSection }) {
+function NotesTermsSection({ notes, terms, watermark, onPatch, onToggleSection, docType }) {
+  const config = docTypeConfig(docType);
+  const docLabel = config.documentTitle.toLowerCase();
   const notesField = useFieldState(notes.content, (v) => onPatch('notes', { content: v }));
   const termsField = useFieldState(terms.content, (v) => onPatch('terms', { content: v }));
   const watermarkField = useFieldState(watermark.content, (v) => onPatch('watermark', { content: v }));
   return (
     <div>
       <div style={groupTitle}>Notes & Terms</div>
-      <div style={groupSub}>Shown below the totals on the invoice.</div>
-      <InlineToggle label="Show Notes on invoice" on={notes.visible} onClick={() => onToggleSection('notes')} />
+      <div style={groupSub}>Shown below the totals on the {docLabel}.</div>
+      <InlineToggle label={`Show Notes on ${docLabel}`} on={notes.visible} onClick={() => onToggleSection('notes')} />
       <Field label="Notes" {...notesField} textarea placeholder="Thank you for your business." />
-      <InlineToggle label="Show Terms & Conditions on invoice" on={terms.visible} onClick={() => onToggleSection('terms')} />
+      <InlineToggle label={`Show Terms & Conditions on ${docLabel}`} on={terms.visible} onClick={() => onToggleSection('terms')} />
       <Field label="Terms & Conditions" {...termsField} textarea placeholder="Payment terms, late fees, etc." />
       <Field label="Watermark Text (e.g. UNPAID, PAID, DRAFT)" {...watermarkField} placeholder="UNPAID" />
     </div>
@@ -344,16 +357,18 @@ function SignatureSizeControl({ signature, onPatch }) {
   );
 }
 
-function SignatureSectionPanel({ signature, onPatch, onSignatureUpload, onSignatureDrawSave, onSignatureTypedSave, onToggleSection }) {
+function SignatureSectionPanel({ signature, onPatch, onSignatureUpload, onSignatureDrawSave, onSignatureTypedSave, onToggleSection, docType }) {
+  const config = docTypeConfig(docType);
+  const signatureLabel = config.signatureSlots[0]?.label || 'Approved By';
   const name = useFieldState(signature.approvedName, (v) => onPatch('signature', { approvedName: v }));
   const role = useFieldState(signature.approvedRole, (v) => onPatch('signature', { approvedRole: v }));
 
   return (
     <div>
       <div style={groupTitle}>Signature</div>
-      <div style={groupSub}>Approval name/title and signature.</div>
+      <div style={groupSub}>{signatureLabel} name/title and signature.</div>
       <InlineToggle label="Show Approval and Signature" on={signature.visible} onClick={() => onToggleSection('signature')} />
-      <Field label="Approved By (name)" {...name} placeholder="Full name" />
+      <Field label={`${signatureLabel} (name)`} {...name} placeholder="Full name" />
       <Field label="Title" {...role} placeholder="e.g. Finance Officer" />
       <SignatureControls signature={signature} onSignatureUpload={onSignatureUpload} onSignatureDrawSave={onSignatureDrawSave} onSignatureTypedSave={onSignatureTypedSave} />
       <SignatureSizeControl signature={signature} onPatch={onPatch} />
@@ -362,7 +377,7 @@ function SignatureSectionPanel({ signature, onPatch, onSignatureUpload, onSignat
 }
 
 export default function ContentPanel({
-  sections, currency, onPatchSection, onCurrencyChange, onInvoiceDateChange, onDueDateChange,
+  sections, currency, docType, onPatchSection, onCurrencyChange, onDocDateChange, onSecondaryDateChange,
   onRowField, onAddRow, onRemoveRow, onMoveRow, onRowImageUpload, onRowImageRemove,
   onBankRowField, onPatchQr, onToggleSection,
   onImageUpload, onImageRemove, onOpenCrop, onLetterheadRemove,
@@ -372,20 +387,20 @@ export default function ContentPanel({
     <div>
       <BusinessSection header={sections.header} onPatch={onPatchSection} onImageUpload={onImageUpload} onImageRemove={onImageRemove} letterhead={sections.letterhead} onOpenCrop={onOpenCrop} onLetterheadRemove={onLetterheadRemove} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
-      <ClientSection clientInfo={sections.clientInfo} onPatch={onPatchSection} />
+      <ClientSection clientInfo={sections.clientInfo} onPatch={onPatchSection} docType={docType} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
-      <InvoiceDetailsSection clientInfo={sections.clientInfo} onPatch={onPatchSection} currency={currency} onCurrencyChange={onCurrencyChange} onInvoiceDateChange={onInvoiceDateChange} onDueDateChange={onDueDateChange} />
+      <DocumentDetailsSection clientInfo={sections.clientInfo} onPatch={onPatchSection} currency={currency} onCurrencyChange={onCurrencyChange} onDocDateChange={onDocDateChange} onSecondaryDateChange={onSecondaryDateChange} docType={docType} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
       <ItemsSection itemsTable={sections.itemsTable} onRowField={onRowField} onAddRow={onAddRow} onRemoveRow={onRemoveRow} onMoveRow={onMoveRow} onRowImageUpload={onRowImageUpload} onRowImageRemove={onRowImageRemove} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
-      <BankQrSection bank={sections.bank} qr={sections.qr} onBankRowField={onBankRowField} onPatchQr={onPatchQr} onToggleSection={onToggleSection} />
+      <BankQrSection bank={sections.bank} qr={sections.qr} onBankRowField={onBankRowField} onPatchQr={onPatchQr} onToggleSection={onToggleSection} docType={docType} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
-      <NotesTermsSection notes={sections.notes} terms={sections.terms} watermark={sections.watermark} onPatch={onPatchSection} onToggleSection={onToggleSection} />
+      <NotesTermsSection notes={sections.notes} terms={sections.terms} watermark={sections.watermark} onPatch={onPatchSection} onToggleSection={onToggleSection} docType={docType} />
       <div style={{ borderTop: '1px solid #F0F1F3', margin: '18px 0' }} />
       <SignatureSectionPanel
         signature={sections.signature} onPatch={onPatchSection}
         onSignatureUpload={onSignatureUpload} onSignatureDrawSave={onSignatureDrawSave} onSignatureTypedSave={onSignatureTypedSave}
-        onToggleSection={onToggleSection}
+        onToggleSection={onToggleSection} docType={docType}
       />
     </div>
   );

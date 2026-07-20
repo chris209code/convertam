@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Poppins, Inter, Caveat } from 'next/font/google';
-import { emptyDoc, buildDefaultSections, addDaysIso } from '@/lib/invoice-studio/sectionsModel';
+import { emptyDoc, addDaysIso } from '@/lib/invoice-studio/sectionsModel';
 import { stylesFor, TEMPLATE_GALLERY } from '@/lib/invoice-studio/styleTokens';
 import { computeInvoiceTotals } from '@/lib/invoice-studio/calculations';
 import { amountInWords } from '@/lib/invoice-studio/numberToWords';
 import { validateImageFile, readFileAsDataURL } from '@/lib/invoice-studio/fileUpload';
 import { generateQrDataUrl } from '@/lib/invoice-studio/qrGenerate';
+import { docTypeConfig } from '@/lib/invoice-studio/docTypes';
 import Gallery from './Gallery';
 import Toolbar from './Toolbar';
 import FlowCanvas from './FlowCanvas';
@@ -32,10 +33,18 @@ function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 const ZOOM_MIN = 0.3, ZOOM_MAX = 1.5, ZOOM_STEP = 0.1, ZOOM_DEFAULT = 0.75;
 const HISTORY_LIMIT = 60;
 
-export default function InvoiceStudioWorkspace() {
+// Phase 1 of the Business Document Studio consolidation: Invoice and
+// Quotation share this one engine. Delivery Note and Waybill are defined in
+// docTypes.js but their editor/renderer support (logistics fields,
+// dual-signature) lands in Phase 2 — deliberately left out of this switcher
+// until that's built, so testing doesn't hit half-finished document types.
+const SUPPORTED_DOC_TYPES = ['invoice', 'quotation'];
+
+export default function BusinessDocumentStudioWorkspace({ initialDocType = 'invoice' }) {
   const [view, setView] = useState('gallery');
+  const [docType, setDocType] = useState(initialDocType);
   const [templateId, setTemplateId] = useState('modern');
-  const [doc, setDoc] = useState(emptyDoc());
+  const [doc, setDoc] = useState(() => emptyDoc('modern', initialDocType));
   const [colorOverrides, setColorOverrides] = useState(null); // null = use template defaults untouched
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -112,7 +121,7 @@ export default function InvoiceStudioWorkspace() {
   // own. Only the style tokens (read separately, below) change.
   const openTemplate = useCallback((id) => {
     const hasExistingDoc = docRef.current.sections.itemsTable.rows.some((r) => r.name);
-    const initial = hasExistingDoc ? { ...docRef.current, templateId: id } : { ...emptyDoc(id) };
+    const initial = hasExistingDoc ? { ...docRef.current, templateId: id } : { ...emptyDoc(id, docRef.current.docType) };
     setTemplateId(id);
     docRef.current = initial;
     setDoc(initial);
@@ -124,6 +133,21 @@ export default function InvoiceStudioWorkspace() {
     setHistory([initial]);
     setHistoryIndex(0);
   }, []);
+
+  // Temporary (Phase 1) type switcher: no conversion/data-preservation logic
+  // yet (that's convertDocType.js, Phase 2) — switching here simply starts a
+  // fresh document of the target type on the current template, the same way
+  // opening a brand-new document already does.
+  const switchDocType = useCallback((toType) => {
+    const initial = emptyDoc(templateId, toType);
+    setDocType(toType);
+    docRef.current = initial;
+    setDoc(initial);
+    setColorOverrides(null);
+    historyIndexRef.current = 0;
+    setHistory([initial]);
+    setHistoryIndex(0);
+  }, [templateId]);
 
   const [panelTab, setPanelTab] = useState('content');
   const goToGallery = useCallback(() => setView('gallery'), []);
@@ -217,19 +241,22 @@ export default function InvoiceStudioWorkspace() {
 
   const onCurrencyChange = useCallback((currency) => updateDoc((prev) => ({ ...prev, currency })), [updateDoc]);
 
-  const onInvoiceDateChange = useCallback((iso) => {
+  const onDocDateChange = useCallback((iso) => {
     updateDoc((prev) => {
       const ci = prev.sections.clientInfo;
-      // Recalculate due date to stay 30 days out UNLESS the person has
-      // already edited due date themselves - once they have, their choice
-      // is respected and this stops touching it automatically.
-      const dueDate = ci.dueDateManual ? ci.dueDate : addDaysIso(iso, 30);
-      return { ...prev, sections: { ...prev.sections, clientInfo: { ...ci, invoiceDate: iso, dueDate } } };
+      const config = docTypeConfig(prev.docType);
+      // Recalculate the secondary date to stay N days out UNLESS the person
+      // has already edited it themselves - once they have, their choice is
+      // respected and this stops touching it automatically.
+      const secondaryDate = ci.secondaryDateManual || !config.secondaryDateAutoDays
+        ? ci.secondaryDate
+        : addDaysIso(iso, config.secondaryDateAutoDays);
+      return { ...prev, sections: { ...prev.sections, clientInfo: { ...ci, docDate: iso, secondaryDate } } };
     });
   }, [updateDoc]);
 
-  const onDueDateChange = useCallback((iso) => {
-    onPatchSection('clientInfo', { dueDate: iso, dueDateManual: true });
+  const onSecondaryDateChange = useCallback((iso) => {
+    onPatchSection('clientInfo', { secondaryDate: iso, secondaryDateManual: true });
   }, [onPatchSection]);
   const onDocSettingChange = useCallback((key, value) => updateDoc((prev) => ({ ...prev, [key]: value })), [updateDoc]);
 
@@ -246,6 +273,8 @@ export default function InvoiceStudioWorkspace() {
   const baseStyle = useMemo(() => stylesFor(doc.templateId), [doc.templateId]);
   const style = useMemo(() => (colorOverrides ? { ...baseStyle, ...colorOverrides } : baseStyle), [baseStyle, colorOverrides]);
   const onColorChange = useCallback((key, value) => setColorOverrides((prev) => ({ ...(prev || baseStyle), [key]: value })), [baseStyle]);
+
+  const docConfig = docTypeConfig(doc.docType);
 
   // Single-job export lock: downloadingRef is checked synchronously so a
   // second click landing before React re-renders the disabled button can't
@@ -266,7 +295,7 @@ export default function InvoiceStudioWorkspace() {
     const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const log = (stage) => {
       const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-      console.log(`[invoice-download] job #${mySeq} ${stage} at ${(now - t0).toFixed(0)}ms`);
+      console.log(`[business-doc-download] job #${mySeq} ${stage} at ${(now - t0).toFixed(0)}ms`);
     };
 
     const controller = new AbortController();
@@ -279,9 +308,9 @@ export default function InvoiceStudioWorkspace() {
     const CLIENT_TIMEOUT_MS = 55000;
     const timeoutId = setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
 
-    const filename = `Invoice-${doc.templateId}-${Date.now()}`;
-    log('preparing invoice');
-    showToast('Preparing invoice…');
+    const filename = `${docConfig.label.replace(/\s+/g, '-')}-${doc.templateId}-${Date.now()}`;
+    log(`preparing ${docConfig.label.toLowerCase()}`);
+    showToast(`Preparing ${docConfig.label.toLowerCase()}…`);
 
     try {
       if (format === 'pdf') {
@@ -352,9 +381,9 @@ export default function InvoiceStudioWorkspace() {
       downloadingRef.current = false;
       setIsDownloading(false);
     }
-  }, [doc, style, totals, wordsText, showToast]);
+  }, [doc, style, totals, wordsText, showToast, docConfig]);
 
-  const templateName = (TEMPLATE_GALLERY.find((t) => t.id === templateId)?.name || 'Invoice') + ' Template';
+  const templateName = (TEMPLATE_GALLERY.find((t) => t.id === templateId)?.name || docConfig.label) + ' Template';
   const letterhead = doc.sections.letterhead;
 
   return (
@@ -362,9 +391,27 @@ export default function InvoiceStudioWorkspace() {
       <div style={{ width: 88, flexShrink: 0, background: '#FFFFFF', borderRight: '1px solid #E7EAF0', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0', gap: 18 }}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#2563EB,#10B981)' }} />
         <button onClick={goToGallery} style={{ width: 44, height: 44, borderRadius: 12, border: 'none', background: view === 'gallery' ? '#EFF6FF' : 'transparent', cursor: 'pointer' }} title="Templates" />
+        {/* Temporary Phase-1 document-type switcher for manual testing — the
+            real "Document Type: Invoice ▾" switcher with conversion-aware
+            confirmation lands in Phase 2/3. */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 'auto' }}>
+          {SUPPORTED_DOC_TYPES.map((t) => (
+            <button
+              key={t} type="button" title={docTypeConfig(t).label}
+              onClick={() => switchDocType(t)}
+              style={{
+                width: 44, height: 28, borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700,
+                border: docType === t ? '1.5px solid #2563EB' : '1px solid #E2E6ED',
+                background: docType === t ? '#EFF6FF' : '#fff', color: docType === t ? '#2563EB' : '#8891A0',
+              }}
+            >
+              {docTypeConfig(t).label.slice(0, 4).toUpperCase()}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {view === 'gallery' && <Gallery onSelectTemplate={openTemplate} />}
+      {view === 'gallery' && <Gallery onSelectTemplate={openTemplate} docType={docType} />}
 
       {view === 'editor' && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
@@ -401,9 +448,9 @@ export default function InvoiceStudioWorkspace() {
               <div style={{ flex: 1, overflow: 'auto', padding: 18 }}>
                 {panelTab === 'content' ? (
                   <ContentPanel
-                    sections={doc.sections} currency={doc.currency}
+                    sections={doc.sections} currency={doc.currency} docType={doc.docType}
                     onPatchSection={onPatchSection} onCurrencyChange={onCurrencyChange}
-                    onInvoiceDateChange={onInvoiceDateChange} onDueDateChange={onDueDateChange}
+                    onDocDateChange={onDocDateChange} onSecondaryDateChange={onSecondaryDateChange}
                     onRowField={onRowField} onAddRow={onAddRow} onRemoveRow={onRemoveRow} onMoveRow={onMoveRow}
                     onRowImageUpload={onRowImageUpload} onRowImageRemove={onRowImageRemove}
                     onBankRowField={onBankRowField} onPatchQr={onPatchQr} onToggleSection={onToggleSection}

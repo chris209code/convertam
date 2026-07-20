@@ -32,14 +32,15 @@ const LOWER_GROUP = ['notes', 'bankSignature', 'terms'];
 
 function SectionByKey({ sectionKey, doc, style, totals, wordsText }) {
   const s = doc.sections;
+  const docType = doc.docType;
   switch (sectionKey) {
     case 'letterhead': return <LetterheadSection data={s.letterhead} />;
     case 'header': return <HeaderSection data={s.header} style={style} />;
-    case 'clientInfo': return <ClientInfoSection data={s.clientInfo} style={style} />;
+    case 'clientInfo': return <ClientInfoSection data={s.clientInfo} style={style} docType={docType} />;
     case 'itemsTable': return <ItemsTableSection data={s.itemsTable} style={style} currency={doc.currency} />;
-    case 'totals': return <TotalsSection data={s.totals} style={style} currency={doc.currency} totals={totals} wordsText={wordsText} qr={s.qr} bank={s.bank} />;
+    case 'totals': return <TotalsSection data={s.totals} style={style} currency={doc.currency} totals={totals} wordsText={wordsText} qr={s.qr} bank={s.bank} docType={docType} />;
     case 'notes': return <NotesSection data={s.notes} style={style} />;
-    case 'bankSignature': return <BankSignatureSection bank={s.bank} signature={s.signature} qr={s.qr} style={style} />;
+    case 'bankSignature': return <BankSignatureSection bank={s.bank} signature={s.signature} qr={s.qr} style={style} docType={docType} />;
     case 'terms': return <TermsSection data={s.terms} style={style} />;
     default: return null;
   }
@@ -146,7 +147,7 @@ export default function FlowCanvas({ doc, style, totals, wordsText, zoom, onFitZ
             transform:scale() wrapper above, and html2canvas is known to
             render incorrectly when its snapshot target has a transform on
             an ancestor. It produced doubled, offset text. The
-            .cs-flow-pages container one level up in InvoiceStudioWorkspace
+            .cs-flow-pages container one level up in BusinessDocumentStudioWorkspace
             — outside the transform — is the correct, working target and
             is what PNG/JPG export still uses.) */}
         {(() => {

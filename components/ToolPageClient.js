@@ -16,7 +16,7 @@ import SignPdfWorkspace from '@/components/tools/SignPdfWorkspace';
 import FillPdfWorkspace from '@/components/tools/FillPdfWorkspace';
 import ReorderPdfWorkspace from '@/components/tools/ReorderPdfWorkspace';
 import WatermarkPdfWorkspace from '@/components/tools/WatermarkPdfWorkspace';
-import InvoiceStudioWorkspace from '@/components/tools/invoice-studio/InvoiceStudioWorkspace';
+import BusinessDocumentStudioWorkspace from '@/components/tools/invoice-studio/BusinessDocumentStudioWorkspace';
 import RemovePagesWorkspace from '@/components/tools/RemovePagesWorkspace';
 import AddPageNumbersWorkspace from '@/components/tools/AddPageNumbersWorkspace';
 import ProtectPdfWorkspace from '@/components/tools/ProtectPdfWorkspace';
@@ -134,7 +134,7 @@ export default function ToolPageClient({ tool }) {
       {tool.mode === 'sign' && <SignPdfWorkspace />}
       {tool.mode === 'reorder' && <ReorderPdfWorkspace />}
       {tool.mode === 'watermark' && <WatermarkPdfWorkspace />}
-      {tool.mode === 'invoice' && <InvoiceStudioWorkspace />}
+      {tool.mode === 'invoice' && <BusinessDocumentStudioWorkspace initialDocType="invoice" />}
       {tool.mode === 'remove-pages' && <RemovePagesWorkspace />}
       {tool.mode === 'add-page-numbers' && <AddPageNumbersWorkspace />}
       {tool.mode === 'protect-pdf' && <ProtectPdfWorkspace />}

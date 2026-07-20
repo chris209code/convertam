@@ -2,6 +2,7 @@
 
 import { formatMoney } from '@/lib/invoice-studio/moneyFormat';
 import { fontCss } from '@/lib/invoice-studio/styleTokens';
+import { docTypeConfig } from '@/lib/invoice-studio/docTypes';
 
 // Every section here is a normal block in document flow — no position,
 // no absolute coordinates, no manually-assigned height. Margin-top spacing
@@ -69,20 +70,27 @@ export function HeaderSection({ data, style: tokens }) {
   );
 }
 
-export function ClientInfoSection({ data, style: tokens }) {
+export function ClientInfoSection({ data, style: tokens, docType }) {
   if (!data.visible) return null;
+  const config = docTypeConfig(docType);
   const head = fontCss(tokens.headingFont), body = fontCss(tokens.bodyFont);
+  const metaRows = [
+    [config.numberLabel, data.docNo],
+    [config.dateLabel, data.docDate],
+    config.secondaryDateLabel ? [config.secondaryDateLabel, data.secondaryDate] : null,
+    config.statusLabel ? [config.statusLabel, data.status] : null,
+  ].filter(Boolean);
   return (
     <Section style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20 }}>
       <div>
-        <div style={{ fontFamily: body, fontSize: 11, fontWeight: 700, letterSpacing: '.06em', color: tokens.brandAccent, marginBottom: 6 }}>BILLED TO</div>
+        <div style={{ fontFamily: body, fontSize: 11, fontWeight: 700, letterSpacing: '.06em', color: tokens.brandAccent, marginBottom: 6, textTransform: 'uppercase' }}>{config.partyLabel}</div>
         <div style={{ fontFamily: head, fontWeight: 600, fontSize: 16, color: tokens.textDark }}>{data.clientName}</div>
         {data.clientAddress && <div style={{ fontFamily: body, fontSize: 12, color: tokens.textGray, marginTop: 4, maxWidth: 260 }}>{data.clientAddress}</div>}
         {data.clientPhone && <div style={{ fontFamily: body, fontSize: 12, color: tokens.textGray }}>{data.clientPhone}</div>}
       </div>
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <div style={{ fontFamily: head, fontWeight: 700, fontSize: 24, color: tokens.textDark, marginBottom: 8 }}>INVOICE</div>
-        {[['Invoice No.', data.invoiceNo], ['Invoice Date', data.invoiceDate], ['Due Date', data.dueDate], ['Status', data.status]].map(([label, value]) => (
+        <div style={{ fontFamily: head, fontWeight: 700, fontSize: 24, color: tokens.textDark, marginBottom: 8 }}>{config.documentTitle}</div>
+        {metaRows.map(([label, value]) => (
           <div key={label} style={{ display: 'flex', justifyContent: 'flex-end', gap: 14, marginTop: 4 }}>
             <span style={{ fontFamily: body, fontSize: 11.5, color: tokens.textMuted }}>{label}</span>
             <span style={{ fontFamily: body, fontSize: 12.5, fontWeight: 600, color: tokens.textDark, minWidth: 90, textAlign: 'right' }}>{value}</span>
@@ -175,8 +183,9 @@ export function ItemsTableSection({ data, style: tokens, currency }) {
 // When Bank Details is off, QR moves down into BankSignatureSection
 // instead so this space stays clean rather than showing QR with nothing
 // next to it.
-export function TotalsSection({ data, style: tokens, currency, totals, wordsText, qr, bank }) {
-  if (!data.visible) return null;
+export function TotalsSection({ data, style: tokens, currency, totals, wordsText, qr, bank, docType }) {
+  const config = docTypeConfig(docType);
+  if (!data.visible || !config.showFinancials) return null;
   const body = fontCss(tokens.bodyFont), head = fontCss(tokens.headingFont);
   const bg = tokens.totalsBg === 'tan' ? '#FBF3E3' : tokens.totalsBg === 'plain' ? 'transparent' : '#F7F8FA';
   const showQrHere = bank?.visible && qr?.visible && qr.src;
@@ -199,7 +208,7 @@ export function TotalsSection({ data, style: tokens, currency, totals, wordsText
         {line('Subtotal', formatMoney(totals.subtotal, currency))}
         {line('VAT', formatMoney(totals.vat, currency))}
         {totals.discount > 0 && line('Discount', `-${formatMoney(totals.discount, currency)}`)}
-        {line('Total Due', formatMoney(totals.total, currency), true)}
+        {line(config.totalLabel, formatMoney(totals.total, currency), true)}
       </div>
     </Section>
   );
@@ -222,15 +231,18 @@ export function NotesSection({ data, style: tokens }) {
 // appears here (filling Bank's spot) when Bank Details is turned off —
 // otherwise it renders up in TotalsSection instead, per the approved
 // layout, so it's never shown in both places at once.
-export function BankSignatureSection({ bank, signature, qr, style: tokens }) {
-  const showQrHere = !bank.visible && qr?.visible && qr.src;
-  if (!bank.visible && !signature?.visible && !showQrHere) return null;
+export function BankSignatureSection({ bank, signature, qr, style: tokens, docType }) {
+  const config = docTypeConfig(docType);
+  const bankVisible = bank.visible && config.showBank;
+  const showQrHere = !bankVisible && qr?.visible && qr.src;
+  if (!bankVisible && !signature?.visible && !showQrHere) return null;
   const head = fontCss(tokens.headingFont), body = fontCss(tokens.bodyFont);
   const isTyped = signature && (signature.mode === 'typed' || !signature.mode);
   const signatureSize = signature?.size ?? 40;
+  const signatureLabel = config.signatureSlots[0]?.label || 'Approved By';
   return (
     <Section style={{ display: 'flex', gap: 32, alignItems: 'flex-start' }}>
-      {bank.visible && (
+      {bankVisible && (
         <div style={{ flex: 1 }}>
           <div style={{ fontFamily: body, fontSize: 11, fontWeight: 700, letterSpacing: '.05em', color: tokens.brandAccent, marginBottom: 8 }}>BANK DETAILS</div>
           {bank.rows.map((r, i) => (
@@ -257,7 +269,7 @@ export function BankSignatureSection({ bank, signature, qr, style: tokens }) {
         // hugging the signature.
         <div style={{ width: 200, flexShrink: 0, marginLeft: 'auto', textAlign: 'left' }}>
           {signature.approvedName && (
-            <div style={{ fontFamily: body, fontSize: 10, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>Approved By</div>
+            <div style={{ fontFamily: body, fontSize: 10, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>{signatureLabel}</div>
           )}
           <div style={{ minHeight: signatureSize, display: 'flex', alignItems: 'flex-end' }}>
             {isTyped && signature.text && <div style={{ fontFamily: "'Caveat', cursive", fontSize: 26, color: tokens.textDark }}>{signature.text}</div>}

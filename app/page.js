@@ -330,10 +330,10 @@ export default function HomePage() {
 
         .cvt-inner { position: relative; max-width: 1160px; margin: 0 auto; }
 
-        .cvt-eyebrow-wrap { display: flex; justify-content: center; margin-bottom: 14px; }
-        .cvt-eyebrow { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: #0F172A; background: #fff; border: 1px solid #DBEAFE; border-radius: 999px; padding: 6px 14px 6px 10px; box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
-        .cvt-eyebrow-dot { width: 6px; height: 6px; border-radius: 50%; background: #10B981; flex-shrink: 0; }
-        @media (max-width: 480px) { .cvt-eyebrow { font-size: 11.5px; text-align: left; } }
+        .cvt-eyebrow-wrap { display: flex; justify-content: center; margin-bottom: 10px; }
+        .cvt-eyebrow { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 600; color: #64748B; background: #fff; border: 1px solid #E2E8F0; border-radius: 999px; padding: 4px 10px 4px 8px; box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
+        .cvt-eyebrow-dot { width: 5px; height: 5px; border-radius: 50%; background: #10B981; flex-shrink: 0; }
+        @media (max-width: 480px) { .cvt-eyebrow { font-size: 9.5px; text-align: left; } }
 
         .cvt-hero { text-align: center; max-width: 780px; margin: 0 auto; }
         .cvt-hero h1 { font-size: clamp(1.9rem, 3.2vw, 2.75rem); line-height: 1.02; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 8px; color: #0F172A; }
@@ -356,7 +356,8 @@ export default function HomePage() {
         .cvt-chip { font-size: 13px; font-weight: 500; color: #334155; background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 999px; padding: 5px 13px; text-decoration: none; transition: all 160ms ease; white-space: nowrap; }
         .cvt-chip:hover { background: #E2E8F0; border-color: #CBD5E1; }
 
-        .cvt-cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+        .cvt-cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        @media (max-width: 1180px) { .cvt-cat-grid { grid-template-columns: repeat(3, 1fr); } }
         @media (max-width: 879px) { .cvt-cat-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 639px) { .cvt-cat-grid { grid-template-columns: 1fr; } }
 
@@ -380,19 +381,19 @@ export default function HomePage() {
 
         .cvt-cat-card { border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 12px 24px rgba(15,23,42,0.06); transition: transform 200ms ease, box-shadow 200ms ease; }
         .cvt-cat-card:hover { transform: translateY(-3px); box-shadow: 0 1px 2px rgba(15,23,42,0.05), 0 20px 34px rgba(15,23,42,0.11); }
-        .cvt-cat-header { padding: 18px 22px; display: flex; align-items: center; gap: 12px; position: relative; overflow: hidden; }
+        .cvt-cat-header { padding: 15px 18px; display: flex; align-items: center; gap: 10px; position: relative; overflow: hidden; }
         .cvt-cat-header::after { content: ''; position: absolute; top: -30%; right: -6%; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,0.08); }
-        .cvt-cat-icon-chip { width: 42px; height: 42px; border-radius: 11px; background: linear-gradient(160deg, rgba(255,255,255,0.32), rgba(255,255,255,0.14)); box-shadow: inset 0 1px 1px rgba(255,255,255,0.5), inset 0 -6px 10px rgba(0,0,0,0.08); display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative; }
-        .cvt-cat-header h3 { margin: 0; color: #fff; font-size: 19px; font-weight: 700; letter-spacing: -0.01em; position: relative; }
-        .cvt-cat-body { padding: 20px 22px 18px; }
-        .cvt-cat-eyebrow { font-size: 12.5px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
-        .cvt-cat-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; margin-bottom: 14px; min-width: 0; }
+        .cvt-cat-icon-chip { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(160deg, rgba(255,255,255,0.32), rgba(255,255,255,0.14)); box-shadow: inset 0 1px 1px rgba(255,255,255,0.5), inset 0 -6px 10px rgba(0,0,0,0.08); display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative; }
+        .cvt-cat-header h3 { margin: 0; color: #fff; font-size: 16px; font-weight: 700; letter-spacing: -0.01em; position: relative; }
+        .cvt-cat-body { padding: 16px 18px 15px; }
+        .cvt-cat-eyebrow { font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+        .cvt-cat-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; margin-bottom: 12px; min-width: 0; }
         @media (max-width: 420px) { .cvt-cat-tools { grid-template-columns: 1fr; } }
-        .cvt-cat-tool-link { display: flex; align-items: center; gap: 7px; text-decoration: none; color: #334155; font-size: 14px; font-weight: 500; padding: 4px; margin: -4px; border-radius: 7px; min-width: 0; transition: background 150ms ease, color 150ms ease; }
+        .cvt-cat-tool-link { display: flex; align-items: center; gap: 6px; text-decoration: none; color: #334155; font-size: 12.5px; font-weight: 500; padding: 3px; margin: -3px; border-radius: 7px; min-width: 0; transition: background 150ms ease, color 150ms ease; }
         .cvt-cat-tool-link:hover { background: var(--hover-bg); color: var(--hover-color); }
-        .cvt-cat-tool-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+        .cvt-cat-tool-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
         .cvt-cat-tool-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .cvt-cat-viewall { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; text-decoration: none; }
+        .cvt-cat-viewall { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; text-decoration: none; }
 
         .cvt-trust-wrap { margin-top: 44px; padding: 26px 28px; background: rgba(255,255,255,0.6); border: 1px solid #E7ECF3; border-radius: 18px; }
         .cvt-trust { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
@@ -411,13 +412,13 @@ export default function HomePage() {
       <div className="cvt-dots" />
 
       <div className="cvt-inner">
-        <div className="cvt-eyebrow-wrap">
-          <span className="cvt-eyebrow"><span className="cvt-eyebrow-dot" />45+ free tools · no sign-up · files auto-deleted after use</span>
-        </div>
-
         <div className="cvt-hero">
           <h1>One platform,<br /><span className="cvt-hero-gradient">endless possibilities.</span></h1>
           <p>Convert, edit, scan, generate, calculate and organize documents, images and business essentials in seconds.</p>
+        </div>
+
+        <div className="cvt-eyebrow-wrap">
+          <span className="cvt-eyebrow"><span className="cvt-eyebrow-dot" />45+ free tools · no sign-up · files auto-deleted after use</span>
         </div>
 
         <div className="cvt-search-wrap">

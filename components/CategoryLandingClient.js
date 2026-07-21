@@ -59,7 +59,12 @@ function ToolCard({ tool, accent }) {
       <div className="th-card-body">
         <div className="th-card-title-row">
           <span className="th-card-title">{tool.title}</span>
-          {tool.badge && <span className={`th-badge th-badge-${tool.badge}`}>{{ paid: 'PAID', soon: 'COMING SOON', new: 'NEW', popular: 'POPULAR' }[tool.badge] || 'FREE'}</span>}
+          {/* Pricing (free/paid) is deliberately never shown here — only inside
+              the tool itself — so the category grid stays about discovery,
+              not evaluation. Functional/discovery badges still show. */}
+          {tool.badge && tool.badge !== 'free' && tool.badge !== 'paid' && (
+            <span className={`th-badge th-badge-${tool.badge}`}>{{ soon: 'COMING SOON', new: 'NEW', popular: 'POPULAR' }[tool.badge]}</span>
+          )}
         </div>
         <p className="th-card-desc">{tool.desc}</p>
       </div>
@@ -89,7 +94,7 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, w
   }
 
   return (
-    <main style={{ width: '100%', minHeight: '100vh', background: '#ffffff' }}>
+    <main style={{ width: '100%', minHeight: '100vh', background: '#F8FAFC' }}>
       {/* dangerouslySetInnerHTML, not a JSX text child: react-dom/server HTML-escapes
           text children (e.g. ' -> &#x27;) but <style> is a raw-text element per the
           HTML spec, so the browser never decodes that entity back — a guaranteed
@@ -111,8 +116,14 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, w
 
         .cl-workflow-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
         .cl-workflow-card {
-          border: 1.5px solid #EEF0F3; border-radius: 12px; padding: 12px; background: white;
-          box-shadow: 0 1px 2px rgba(15,23,42,0.03); display: flex; flex-direction: column; gap: 7px;
+          border: 1px solid #EEF1F5; border-radius: 12px; padding: 12px; background: #FEFEFE;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 2px rgba(15,23,42,0.04), 0 6px 16px rgba(15,23,42,0.05);
+          display: flex; flex-direction: column; gap: 7px;
+          transition: transform 0.25s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s ease, background 0.25s ease;
+        }
+        .cl-workflow-card:hover {
+          transform: translateY(-2px); background: #FFFFFF;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 4px rgba(15,23,42,0.05), 0 12px 24px rgba(15,23,42,0.08);
         }
         .cl-workflow-title { font-size: 0.8rem; font-weight: 700; color: #0F172A; margin: 0; line-height: 1.25; }
         .cl-workflow-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 3px; }
@@ -130,10 +141,14 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, w
         .th-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
         .th-card {
           position: relative; display: flex; align-items: flex-start; gap: 14px; padding: 18px; border-radius: 16px;
-          border: 1.5px solid #EEF0F3; background: white; text-decoration: none;
-          box-shadow: 0 1px 2px rgba(15,23,42,0.03); transition: all 0.18s ease;
+          border: 1px solid #EEF1F5; background: #FEFEFE; text-decoration: none;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 2px rgba(15,23,42,0.04), 0 8px 20px rgba(15,23,42,0.06);
+          transition: transform 0.25s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s ease, background 0.25s ease, border-color 0.25s ease;
         }
-        .th-card:hover { transform: translateY(-3px); box-shadow: 0 12px 24px rgba(15,23,42,0.08); border-color: ${accent.borderColor}; }
+        .th-card:hover {
+          transform: translateY(-3px); background: #FFFFFF; border-color: ${accent.borderColor};
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 6px rgba(15,23,42,0.06), 0 18px 36px rgba(15,23,42,0.10);
+        }
         .th-card:hover .th-card-arrow { opacity: 1; transform: translateX(0); }
         .th-card-icon {
           font-size: 1.3rem; flex-shrink: 0; line-height: 1; width: 40px; height: 40px; border-radius: 11px;
@@ -155,7 +170,10 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, w
         .th-card-soon .th-card-icon { background: #F1F5F9; filter: grayscale(0.4); opacity: 0.7; }
         .th-card-soon .th-card-title { color: #94A3B8; }
         .th-card-soon .th-card-desc { color: #B0B8C4; }
-        .th-card-soon:hover { transform: none; box-shadow: 0 1px 2px rgba(15,23,42,0.03); border-color: #EEF0F3; }
+        .th-card-soon:hover {
+          transform: none; background: #FEFEFE; border-color: #EEF1F5;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 2px rgba(15,23,42,0.04), 0 8px 20px rgba(15,23,42,0.06);
+        }
 
         .th-section-title { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; scroll-margin-top: 24px; font-size: 1.05rem; font-weight: 700; color: #152238; }
 
@@ -172,10 +190,15 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, w
 
         .cl-related-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
         .cl-related-card {
-          border: 1.5px solid #EEF0F3; border-radius: 14px; padding: 16px; background: white;
-          text-decoration: none; transition: all 0.18s ease; display: flex; flex-direction: column; gap: 8px;
+          border: 1px solid #EEF1F5; border-radius: 14px; padding: 16px; background: #FEFEFE;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 2px rgba(15,23,42,0.04), 0 6px 16px rgba(15,23,42,0.05);
+          text-decoration: none; transition: transform 0.25s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s ease, background 0.25s ease;
+          display: flex; flex-direction: column; gap: 8px;
         }
-        .cl-related-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(15,23,42,0.06); }
+        .cl-related-card:hover {
+          transform: translateY(-3px); background: #FFFFFF;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 6px rgba(15,23,42,0.06), 0 16px 32px rgba(15,23,42,0.09);
+        }
         .cl-related-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
         .cl-related-title { font-size: 0.86rem; font-weight: 700; color: #0F172A; margin: 0; }
         .cl-related-desc { font-size: 0.76rem; color: #64748B; margin: 0; line-height: 1.4; }

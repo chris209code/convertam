@@ -27,15 +27,23 @@ export default function QuickGuidePanel({ guide, onClose }) {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-6 py-6 flex flex-col gap-7 bg-paper">
-        {/* Intro */}
+        {/* What this tool does */}
         {guide.what && (
           <p className="text-[14px] text-ink leading-relaxed">{guide.what}</p>
         )}
 
-        {/* Step-by-step guide */}
+        {/* When to use it */}
+        {guide.whenToUse && (
+          <div>
+            <p className={H3}>When to use this</p>
+            <p className="text-[13.5px] text-ink-soft leading-relaxed">{guide.whenToUse}</p>
+          </div>
+        )}
+
+        {/* Step-by-step workflow */}
         {guide.steps && guide.steps.length > 0 && (
           <div>
-            <p className={H3}>Step-by-step guide</p>
+            <p className={H3}>Step-by-step workflow</p>
             <ol className="flex flex-col gap-4">
               {guide.steps.map((step, i) => {
                 const title = typeof step === 'string' ? step : step.title;
@@ -56,12 +64,14 @@ export default function QuickGuidePanel({ guide, onClose }) {
           </div>
         )}
 
-        {/* What kind of files convert best */}
-        {guide.pdfTypes && guide.pdfTypes.length > 0 && (
+        {/* Optional extra section for tools that need a third axis beyond
+            steps/tips (e.g. PDF to Word's "what kind of files convert
+            best") — most guides won't set this. */}
+        {guide.extraSection && guide.extraSection.items?.length > 0 && (
           <div>
-            <p className={H3}>What kind of files convert best</p>
+            <p className={H3}>{guide.extraSection.title}</p>
             <ul className="flex flex-col gap-3">
-              {guide.pdfTypes.map((item, i) => (
+              {guide.extraSection.items.map((item, i) => (
                 <li key={i} className="flex items-start gap-2.5 text-[13.5px] text-ink leading-relaxed">
                   <span className="text-stamp-blue flex-shrink-0 mt-0.5">●</span>
                   <span>
@@ -74,7 +84,7 @@ export default function QuickGuidePanel({ guide, onClose }) {
           </div>
         )}
 
-        {/* Tips — only shown for tools using the simpler string-list shape */}
+        {/* Tips for best results */}
         {guide.tips && guide.tips.length > 0 && (
           <div>
             <p className={H3}>Tips for best results</p>
@@ -89,19 +99,26 @@ export default function QuickGuidePanel({ guide, onClose }) {
           </div>
         )}
 
-        {/* Common Questions */}
-        {guide.quickFaqs && guide.quickFaqs.length > 0 && (
+        {/* Common mistakes to avoid */}
+        {guide.mistakes && guide.mistakes.length > 0 && (
           <div>
-            <p className={H3}>Common questions</p>
-            <FaqAccordion items={guide.quickFaqs} />
+            <p className="text-[15px] font-bold mb-3" style={{ color: '#B45309' }}>Common mistakes to avoid</p>
+            <ul className="flex flex-col gap-2">
+              {guide.mistakes.map((m, i) => (
+                <li key={i} className="flex items-start gap-2 text-[13.5px] text-ink leading-relaxed">
+                  <span className="flex-shrink-0" style={{ color: '#D97706' }}>⚠</span>
+                  <span>{m}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
-        {/* When to use this tool */}
-        {guide.whenToUse && (
+        {/* Quick FAQs */}
+        {guide.quickFaqs && guide.quickFaqs.length > 0 && (
           <div>
-            <p className={H3}>When to use this tool</p>
-            <p className="text-[13.5px] text-ink-soft leading-relaxed">{guide.whenToUse}</p>
+            <p className={H3}>Quick FAQs</p>
+            <FaqAccordion items={guide.quickFaqs} />
           </div>
         )}
 

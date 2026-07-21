@@ -6,35 +6,23 @@ export const metadata = {
   description: 'Complete PDF toolkit. Convert, edit, merge, split, compress, sign, watermark and secure your PDFs. Free, no login required.',
 };
 
-// Each workflow is a real, accurate sequence of Convertam tools (verified
-// against what each tool actually accepts/outputs — e.g. Smart AI Converter
-// is used here instead of OCR PDF for "Scan to Editable Document" because
-// OCR PDF's output is plain text, not a Word file, while Smart AI Converter
-// genuinely outputs an editable .docx/.xlsx directly from a photo). Steps
-// without a Convertam tool behind them (taking the photo, editing in Word,
-// sharing the file) are included for a complete real-world picture but
-// carry no link.
+// Steps without a Convertam tool behind them (taking the photo, editing in
+// Word, downloading/sharing the file) are included for a complete
+// real-world picture but carry no link. The one deliberate substitution:
+// "Optimize PDF" isn't a real, separate Convertam tool (Optimization only
+// has Compress PDF and OCR PDF), so that workflow is kept to the two real
+// steps rather than inventing a tool that doesn't exist.
 const WORKFLOWS = [
   {
-    id: 'scan-to-document',
-    title: 'Scan to Editable Document',
+    id: 'scan-to-word',
+    title: 'Scan to Editable Word',
     steps: [
       { label: 'Scan Document', icon: '📷' },
       { label: 'Document Enhancer', icon: '✨', slug: 'document-enhancer' },
-      { label: 'Smart AI Converter', icon: '📸', slug: 'smart-converter' },
+      { label: 'OCR PDF', icon: '🔎', slug: 'ocr-pdf' },
+      { label: 'PDF to Word', icon: '📝', slug: 'pdf-to-word' },
     ],
     href: '/document-enhancer',
-  },
-  {
-    id: 'merge-protect',
-    title: 'Merge & Protect',
-    steps: [
-      { label: 'Merge PDF', icon: '🔗', slug: 'merge-pdf' },
-      { label: 'Watermark PDF', icon: '💧', slug: 'watermark-pdf' },
-      { label: 'Protect PDF', icon: '🔒', slug: 'protect-pdf' },
-      { label: 'Share Securely', icon: '📤' },
-    ],
-    href: '/merge-pdf',
   },
   {
     id: 'edit-convert',
@@ -48,14 +36,24 @@ const WORKFLOWS = [
     href: '/pdf-to-word',
   },
   {
-    id: 'redact-secure',
-    title: 'Redact & Secure',
+    id: 'merge-share',
+    title: 'Merge & Share',
     steps: [
-      { label: 'Redact & Edit PDF', icon: '⬛', slug: 'redact-pdf' },
+      { label: 'Merge PDF', icon: '🔗', slug: 'merge-pdf' },
+      { label: 'Watermark PDF', icon: '💧', slug: 'watermark-pdf' },
       { label: 'Protect PDF', icon: '🔒', slug: 'protect-pdf' },
       { label: 'Share Securely', icon: '📤' },
     ],
-    href: '/redact-pdf',
+    href: '/merge-pdf',
+  },
+  {
+    id: 'compress-optimize',
+    title: 'Compress & Optimize',
+    steps: [
+      { label: 'Compress PDF', icon: '🗜️', slug: 'compress-pdf' },
+      { label: 'Download', icon: '⬇️' },
+    ],
+    href: '/compress-pdf',
   },
 ];
 

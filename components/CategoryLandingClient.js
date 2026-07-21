@@ -107,24 +107,24 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, w
 
         .th-header-icon { width: 46px; height: 46px; border-radius: 14px; background: ${accent.gradient}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 8px 20px ${accent.shadowTint}; font-size: 1.3rem; }
 
-        .cl-section-label { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #94A3B8; margin: 0 0 12px; }
+        .cl-section-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #94A3B8; margin: 0 0 8px; }
 
-        .cl-workflow-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+        .cl-workflow-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
         .cl-workflow-card {
-          border: 1.5px solid #EEF0F3; border-radius: 16px; padding: 18px; background: white;
-          box-shadow: 0 1px 2px rgba(15,23,42,0.03); display: flex; flex-direction: column; gap: 12px;
+          border: 1.5px solid #EEF0F3; border-radius: 12px; padding: 12px; background: white;
+          box-shadow: 0 1px 2px rgba(15,23,42,0.03); display: flex; flex-direction: column; gap: 7px;
         }
-        .cl-workflow-title { font-size: 0.92rem; font-weight: 700; color: #0F172A; margin: 0; }
-        .cl-workflow-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
-        .cl-workflow-chip-wrap { display: flex; align-items: center; gap: 4px; }
+        .cl-workflow-title { font-size: 0.8rem; font-weight: 700; color: #0F172A; margin: 0; line-height: 1.25; }
+        .cl-workflow-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 3px; }
+        .cl-workflow-chip-wrap { display: flex; align-items: center; gap: 3px; }
         .cl-workflow-chip {
-          width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center;
-          justify-content: center; font-size: 1rem; flex-shrink: 0;
+          width: 22px; height: 22px; border-radius: 7px; display: flex; align-items: center;
+          justify-content: center; font-size: 0.72rem; flex-shrink: 0;
         }
-        .cl-workflow-arrow { color: #CBD5E1; font-size: 0.8rem; }
-        .cl-workflow-steps { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
-        .cl-workflow-steps li { font-size: 0.78rem; color: #64748B; line-height: 1.4; }
-        .cl-workflow-link { font-size: 0.82rem; font-weight: 700; text-decoration: none; margin-top: auto; }
+        .cl-workflow-arrow { color: #CBD5E1; font-size: 0.68rem; }
+        .cl-workflow-steps { margin: 0; padding-left: 15px; display: flex; flex-direction: column; gap: 1px; }
+        .cl-workflow-steps li { font-size: 0.68rem; color: #64748B; line-height: 1.3; }
+        .cl-workflow-link { font-size: 0.72rem; font-weight: 700; text-decoration: none; margin-top: auto; }
         .cl-workflow-link:hover { text-decoration: underline; }
 
         .th-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
@@ -218,10 +218,10 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, w
         </div>
       </div>
 
-      <div className="page-inner" style={{ padding: '18px 4% 56px' }}>
+      <div className="page-inner" style={{ padding: '14px 4% 56px' }}>
 
         {workflows && workflows.length > 0 && (
-          <div style={{ marginBottom: 32 }}>
+          <div style={{ marginBottom: 18 }}>
             <p className="cl-section-label">Popular Workflows</p>
             <div className="cl-workflow-grid">
               {workflows.map((w) => <WorkflowCard key={w.id} workflow={w} accent={accent} />)}

@@ -86,7 +86,7 @@ export default function ToolPageClient({ tool }) {
   const guide = toolGuides[tool.slug];
 
   return (
-    <QuickGuideTab guide={guide}>
+    <QuickGuideTab guide={guide} toolSlug={tool.slug}>
       <main className="max-w-5xl mx-auto px-5 md:px-10 py-10">
         <p className="font-mono text-xs text-stamp-amber tracking-wide mb-2">{tool.category.toUpperCase()}</p>
         <h1 className="font-display text-3xl md:text-4xl font-bold mb-2">{tool.title}</h1>

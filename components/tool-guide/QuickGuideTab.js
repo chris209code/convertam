@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import QuickGuidePanel from './QuickGuidePanel';
+
+const seenKey = (toolSlug) => `convertam:guide-seen:${toolSlug}`;
 
 // Wraps a tool page's content and adds the "Quick Guide" assistant.
 //
@@ -16,17 +18,47 @@ import QuickGuidePanel from './QuickGuidePanel';
 // The trigger is a small horizontal pill fixed near the top of the viewport
 // — deliberately not sharing FeedbackWidget's vertical-tab-at-mid-viewport
 // position/shape, so the two can never visually collide.
-export default function QuickGuideTab({ guide, children }) {
+//
+// First-visit discovery: the guide auto-opens once per tool per browser (a
+// short beat after mount, so it doesn't slam open before the page has even
+// painted), tracked in localStorage keyed by toolSlug. The moment it's
+// closed — however it was opened — that key is set, so it never auto-opens
+// again on that tool for that visitor. Every other tool with its own guide
+// gets its own independent first-visit moment.
+export default function QuickGuideTab({ guide, toolSlug, children }) {
   const [open, setOpen] = useState(false);
+  const autoOpenTimer = useRef(null);
 
   useEffect(() => {
     if (!open) return;
     function onKeyDown(e) {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') close();
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [open]);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!guide || !toolSlug) return;
+    try {
+      if (localStorage.getItem(seenKey(toolSlug))) return;
+    } catch {
+      return;
+    }
+    autoOpenTimer.current = setTimeout(() => {
+      try {
+        if (!localStorage.getItem(seenKey(toolSlug))) setOpen(true);
+      } catch {}
+    }, 900);
+    return () => clearTimeout(autoOpenTimer.current);
+  }, [guide, toolSlug]);
+
+  function close() {
+    setOpen(false);
+    if (toolSlug) {
+      try { localStorage.setItem(seenKey(toolSlug), '1'); } catch {}
+    }
+  }
 
   if (!guide) return children;
 
@@ -56,7 +88,7 @@ export default function QuickGuideTab({ guide, children }) {
           top:0 spot and covering it while scrolling. */}
       {open && (
         <div className="hidden md:block md:sticky md:z-[1001] md:flex-shrink-0 md:w-[420px] md:border-l md:border-[#E2E6ED] md:top-16 md:self-start md:h-[calc(100vh-64px)]">
-          <QuickGuidePanel guide={guide} onClose={() => setOpen(false)} />
+          <QuickGuidePanel guide={guide} onClose={close} />
         </div>
       )}
 
@@ -64,7 +96,7 @@ export default function QuickGuideTab({ guide, children }) {
       <div className={`md:hidden fixed inset-0 z-[1001] ${open ? '' : 'pointer-events-none'}`}>
         <div
           className={`absolute inset-0 bg-black/30 transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0'}`}
-          onClick={() => setOpen(false)}
+          onClick={close}
           aria-hidden="true"
         />
         <div
@@ -72,7 +104,7 @@ export default function QuickGuideTab({ guide, children }) {
             ${open ? 'translate-y-0' : 'translate-y-full'}`}
           style={{ background: '#fffefb' }}
         >
-          <QuickGuidePanel guide={guide} onClose={() => setOpen(false)} />
+          <QuickGuidePanel guide={guide} onClose={close} />
         </div>
       </div>
     </div>

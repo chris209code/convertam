@@ -1863,9 +1863,13 @@ export default function DataAnalystWorkspace() {
           </div>
         )}
 
-        {usageInfo && (
+        {usageInfo ? (
           <p style={{ fontSize: '0.76rem', color: usageInfo.isOwner ? '#059669' : usageInfo.remaining === 0 ? '#DC2626' : '#64748B', fontWeight: usageInfo.isOwner ? 700 : 400, marginBottom: 12 }}>
             {usageInfo.isOwner ? 'Owner Testing Mode — Convertam limit disabled' : `AI reports remaining today: ${usageInfo.remaining} of ${usageInfo.limit}`}
+          </p>
+        ) : (
+          <p style={{ fontSize: '0.76rem', color: '#64748B', marginBottom: 12 }}>
+            AI narrative reports are limited to 2 per day — the charts, statistics, and dataset health checks above have no limit.
           </p>
         )}
 

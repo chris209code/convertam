@@ -80,6 +80,11 @@ export default function SignPdfWorkspace() {
   async function handlePdfUpload(e) {
     const file = e.target.files[0];
     if (!file || !window.pdfjsLib) return;
+    if (file.size > 100 * 1024 * 1024) {
+      setError('That file is larger than the 100MB limit. Please choose a smaller PDF.');
+      e.target.value = '';
+      return;
+    }
     setPdfFile(file);
     setError('');
     setStatus('Loading PDF…');

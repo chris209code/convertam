@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { runCloudConvertJob, downloadBlob } from '@/lib/cloudconvert-client';
 
 function getStrength(pw) {
   let score = 0;
@@ -21,7 +22,7 @@ function getStrength(pw) {
 }
 
 export default function ProtectPdfWorkspace() {
-  const [pdfBytes, setPdfBytes] = useState(null);
+  const [file, setFile] = useState(null);
   const [fileInfo, setFileInfo] = useState(null);
   const [pw1, setPw1] = useState('');
   const [pw2, setPw2] = useState('');
@@ -31,42 +32,48 @@ export default function ProtectPdfWorkspace() {
   const [status, setStatus] = useState('');
   const fileRef = useRef();
 
-  async function handleFile(file) {
-    if (!file || file.type !== 'application/pdf') return;
-    const buffer = await file.arrayBuffer();
-    setPdfBytes(new Uint8Array(buffer));
-    const { PDFDocument } = await import('pdf-lib');
-    const doc = await PDFDocument.load(buffer);
-    setFileInfo({ name: file.name, pages: doc.getPageCount(), size: (file.size / 1024).toFixed(0) });
+  async function handleFile(f) {
+    if (!f || f.type !== 'application/pdf') return;
+    setFile(f);
+    try {
+      const { PDFDocument } = await import('pdf-lib');
+      const doc = await PDFDocument.load(await f.arrayBuffer());
+      setFileInfo({ name: f.name, pages: doc.getPageCount(), size: (f.size / 1024).toFixed(0) });
+    } catch {
+      setFileInfo({ name: f.name, pages: '?', size: (f.size / 1024).toFixed(0) });
+    }
     setStatus('');
   }
 
   async function protect() {
     if (!pw1) { setStatus('Please enter a password.'); return; }
     if (pw1 !== pw2) { setStatus('Passwords do not match.'); return; }
-    setLoading(true); setStatus('');
+    setLoading(true); setStatus('Encrypting…');
     try {
-      const { PDFDocument, EncryptionAlgorithm } = await import('pdf-lib');
-      const pdfDoc = await PDFDocument.load(pdfBytes);
-      const saveOptions = { userPassword: pw1, ownerPassword: pw1 + '_owner_convertam', permissions: { printing: 'highResolution', copying: false, modifying: false, annotating: false } };
-      if (EncryptionAlgorithm?.AES_256) saveOptions.encryptionAlgorithm = EncryptionAlgorithm.AES_256;
-      const newBytes = await pdfDoc.save(saveOptions);
-      const blob = new Blob([newBytes], { type: 'application/pdf' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'convertam-protected.pdf';
-      a.click();
+      // Real password protection requires CloudConvert — the pdf-lib
+      // version this app uses has no encryption support at all, so this
+      // can't be done client-side (see convert-route.js / start/route.js
+      // for the 'encrypt' operation this calls).
+      const { blob, filename } = await runCloudConvertJob({
+        file,
+        operation: 'encrypt',
+        password: pw1,
+        onStatus: setStatus,
+      });
+      downloadBlob(blob, filename || 'convertam-protected.pdf');
       setStatus('✅ PDF protected! Your download should start.');
-    } catch { setStatus('Encryption failed. This PDF may already be protected.'); }
+    } catch (err) {
+      setStatus(err.message || 'Encryption failed. Please try again.');
+    }
     setLoading(false);
   }
 
-  function reset() { setPdfBytes(null); setFileInfo(null); setPw1(''); setPw2(''); setStatus(''); }
+  function reset() { setFile(null); setFileInfo(null); setPw1(''); setPw2(''); setStatus(''); }
 
   const strength = getStrength(pw1);
   const strengthIndex = ['', 'Weak', 'Fair', 'Good', 'Strong', 'Very strong'].indexOf(strength.label);
 
-  if (!pdfBytes) {
+  if (!file) {
     return (
       <div>
         <div onClick={() => fileRef.current.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); }} className="border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer" style={{ borderColor: '#e2dcc9', background: '#fffefb' }}>
@@ -88,6 +95,7 @@ export default function ProtectPdfWorkspace() {
       <div className="px-4 py-3 rounded-xl text-sm" style={{ background: '#FFFBE8', border: '1px solid #F0D070', color: '#7A6000' }}>
         ⚠️ <strong>Remember this password.</strong> Forgotten passwords cannot be recovered.
       </div>
+      <p className="privacy-note">Your file is sent securely to encrypt it with a real password and deleted automatically afterward — genuine PDF encryption isn't something a browser can do on its own.</p>
       <div>
         <label className="block text-sm font-semibold text-ink mb-1">Password</label>
         <div className="relative">
@@ -112,9 +120,11 @@ export default function ProtectPdfWorkspace() {
         {pw2 && pw2 !== pw1 && <p className="text-xs mt-1 text-red-600">Passwords do not match</p>}
       </div>
       <button onClick={protect} disabled={loading || !pw1 || pw1 !== pw2} className="w-full py-3 rounded-xl font-semibold text-white text-sm disabled:opacity-50" style={{ background: '#D95F2B' }}>
-        {loading ? 'Encrypting…' : 'Protect & Download PDF'}
+        {loading ? (status || 'Encrypting…') : 'Protect & Download PDF'}
       </button>
-      {status && <p className={`text-sm font-medium ${status.startsWith('✅') ? 'text-green-700' : 'text-red-600'}`}>{status}</p>}
+      {status && !loading && (
+        <p className={`text-sm font-medium ${status.startsWith('✅') ? 'text-green-700' : 'text-red-600'}`}>{status}</p>
+      )}
     </div>
   );
 }

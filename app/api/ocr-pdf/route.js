@@ -28,7 +28,7 @@ export async function POST(request) {
       contents: [{
         parts: [
           { inline_data: { mime_type: mimeType, data: base64 } },
-          { text: 'Extract ALL text from this document exactly as it appears. Preserve the original structure, paragraphs, and line breaks. Return only the extracted text with no additional commentary.' }
+          { text: 'Extract ALL text from this document exactly as it appears, including handwritten text. Preserve the original structure, paragraphs, and line breaks. If a word or phrase is illegible or you are not confident in the reading, do not guess or invent plausible text — replace it with [UNREADABLE] instead. Accuracy matters more than completeness. Return only the extracted text with no additional commentary.' }
         ]
       }],
       generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }

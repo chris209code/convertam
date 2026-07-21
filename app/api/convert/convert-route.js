@@ -19,12 +19,16 @@ export async function POST(request) {
     const operation = formData.get('operation') || 'convert';
     const outputFormat = formData.get('to');
     const profile = formData.get('profile') || 'web';
+    const password = formData.get('password');
 
     if (!file) {
       return Response.json({ error: 'Missing file.' }, { status: 400 });
     }
     if (operation === 'convert' && !outputFormat) {
       return Response.json({ error: 'Missing target format.' }, { status: 400 });
+    }
+    if (operation === 'encrypt' && !password) {
+      return Response.json({ error: 'Missing password.' }, { status: 400 });
     }
 
     if (file.size > 100 * 1024 * 1024) {
@@ -38,6 +42,17 @@ export async function POST(request) {
             input: 'upload-file',
             input_format: 'pdf',
             profile,
+          }
+        : operation === 'encrypt'
+        ? {
+            // CloudConvert's dedicated PDF encryption task — genuinely sets a
+            // user password required to open the file (not something
+            // achievable client-side: the pdf-lib version this app uses has
+            // no encryption support at all).
+            operation: 'encrypt',
+            input: 'upload-file',
+            input_format: 'pdf',
+            set_password: password,
           }
         : {
             operation: 'convert',

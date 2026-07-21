@@ -15,15 +15,30 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const { operation = 'convert', to, profile = 'web' } = body;
+    const { operation = 'convert', to, profile = 'web', password } = body;
 
     if (operation === 'convert' && !to) {
       return Response.json({ error: 'Missing target format.' }, { status: 400 });
+    }
+    if (operation === 'encrypt' && !password) {
+      return Response.json({ error: 'Missing password.' }, { status: 400 });
     }
 
     const processTask =
       operation === 'optimize'
         ? { operation: 'optimize', input: 'upload-file', input_format: 'pdf', profile }
+        : operation === 'encrypt'
+        ? {
+            // CloudConvert's dedicated PDF encryption task — genuinely sets a
+            // user password required to open the file. This can't be done
+            // client-side: the pdf-lib version this app uses has no
+            // encryption support at all, despite the old implementation
+            // silently claiming success.
+            operation: 'encrypt',
+            input: 'upload-file',
+            input_format: 'pdf',
+            set_password: password,
+          }
         : { operation: 'convert', input: 'upload-file', output_format: to };
 
     const jobRes = await fetch(`${CLOUDCONVERT_BASE}/jobs`, {

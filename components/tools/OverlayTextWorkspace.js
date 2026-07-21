@@ -45,6 +45,7 @@ export default function OverlayTextWorkspace() {
   async function handleFile(f) {
     if (!f) return;
     if (!pdfjsReady) { setError('Still loading, try again in a second.'); return; }
+    if (f.size > 100 * 1024 * 1024) { setError('That file is larger than the 100MB limit. Please choose a smaller PDF.'); return; }
     setFile(f);
     setError(''); setStatus('Loading PDF…'); setBusy(true);
     try {
@@ -167,7 +168,7 @@ export default function OverlayTextWorkspace() {
             <input type="file" accept="application/pdf" onChange={e => handleFile(e.target.files[0])} hidden />
             <div className="dz-icon">[ PDF ]</div>
             <div className="dz-main">Click to choose a PDF, or drag it here</div>
-            <div className="dz-sub">Works on scanned PDFs, printed forms, bank forms — any PDF.</div>
+            <div className="dz-sub">Works on scanned PDFs, printed forms, bank forms — any PDF. Max 100MB.</div>
           </label>
           {!pdfjsReady && <p className="text-xs text-ink-soft mt-2">Loading PDF viewer…</p>}
           {status && <div className="status">{status}</div>}

@@ -19,6 +19,45 @@ function applyBrightnessContrast(data, brightness, contrast) {
   }
 }
 
+// Estimates the smooth background illumination (the shadow/lighting
+// gradient, not the sharp text) by downscaling the current canvas to a
+// tiny size — which blurs away fine detail — then scaling it back up to
+// full size with smoothing. That's the "background"; dividing the real
+// pixels by it flattens uneven lighting the same way flat-field
+// correction does in document scanners.
+function estimateBackground(sourceCanvas, w, h) {
+  const small = document.createElement('canvas');
+  const factor = Math.max(1, Math.floor(Math.min(w, h) / 24));
+  small.width = Math.max(1, Math.round(w / factor));
+  small.height = Math.max(1, Math.round(h / factor));
+  small.getContext('2d').drawImage(sourceCanvas, 0, 0, small.width, small.height);
+
+  const bg = document.createElement('canvas');
+  bg.width = w;
+  bg.height = h;
+  const bctx = bg.getContext('2d');
+  bctx.imageSmoothingEnabled = true;
+  bctx.imageSmoothingQuality = 'high';
+  bctx.drawImage(small, 0, 0, w, h);
+  return bctx.getImageData(0, 0, w, h).data;
+}
+
+// Shadow/uneven-lighting reduction — blended by `strength` (0-100) so it
+// can be dialed in rather than all-or-nothing.
+function applyShadowReduction(imageData, w, h, sourceCanvas, strength) {
+  if (strength <= 0) return;
+  const bgData = estimateBackground(sourceCanvas, w, h);
+  const data = imageData.data;
+  const s = strength / 100;
+  for (let i = 0; i < data.length; i += 4) {
+    for (let c = 0; c < 3; c++) {
+      const bg = Math.max(bgData[i + c], 30); // floor avoids blowing out already-dark regions
+      const corrected = clamp((data[i + c] / bg) * 255, 0, 255);
+      data[i + c] = data[i + c] * (1 - s) + corrected * s;
+    }
+  }
+}
+
 function applyGrayscale(data) {
   for (let i = 0; i < data.length; i += 4) {
     const g = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
@@ -61,7 +100,7 @@ function applySharpen(imageData, w, h, amount) {
 }
 
 // Renders the full pipeline (crop -> rotate -> pixel adjustments) into targetCanvas
-function renderPipeline(targetCanvas, img, cropRectPct, rotationDeg, mode, brightness, contrast, sharpen, threshold, maxDim) {
+function renderPipeline(targetCanvas, img, cropRectPct, rotationDeg, mode, brightness, contrast, sharpen, threshold, shadowReduction, maxDim) {
   const iw = img.naturalWidth, ih = img.naturalHeight;
   const cropX = cropRectPct.x * iw, cropY = cropRectPct.y * ih;
   const cropW = cropRectPct.w * iw, cropH = cropRectPct.h * ih;
@@ -93,8 +132,16 @@ function renderPipeline(targetCanvas, img, cropRectPct, rotationDeg, mode, brigh
   ctx.drawImage(cropCanvas, -cropCanvas.width / 2, -cropCanvas.height / 2);
   ctx.restore();
 
-  // Pixel-level adjustments
-  const imageData = ctx.getImageData(0, 0, targetCanvas.width, targetCanvas.height);
+  // Pixel-level adjustments. Shadow reduction runs first, on the raw
+  // cropped/rotated image, so it flattens lighting before grayscale/
+  // threshold/brightness decisions are made from it — a B&W scan of an
+  // unevenly-lit photo thresholds far more reliably this way.
+  let imageData = ctx.getImageData(0, 0, targetCanvas.width, targetCanvas.height);
+  if (shadowReduction > 0) {
+    applyShadowReduction(imageData, targetCanvas.width, targetCanvas.height, targetCanvas, shadowReduction);
+    ctx.putImageData(imageData, 0, 0);
+    imageData = ctx.getImageData(0, 0, targetCanvas.width, targetCanvas.height);
+  }
   if (mode === 'grayscale') applyGrayscale(imageData.data);
   if (mode === 'bw') applyThreshold(imageData.data, threshold);
   if (mode !== 'bw') applyBrightnessContrast(imageData.data, brightness, contrast);
@@ -114,6 +161,7 @@ export default function DocumentEnhancerWorkspace() {
   const [contrast, setContrast] = useState(0);
   const [sharpen, setSharpen] = useState(0);
   const [threshold, setThreshold] = useState(128);
+  const [shadowReduction, setShadowReduction] = useState(0);
 
   const previewCanvasRef = useRef(null);
   const cropContainerRef = useRef(null);
@@ -133,6 +181,7 @@ export default function DocumentEnhancerWorkspace() {
         setBrightness(0);
         setContrast(0);
         setSharpen(0);
+        setShadowReduction(0);
         setStep('crop');
       };
       image.src = reader.result;
@@ -172,8 +221,8 @@ export default function DocumentEnhancerWorkspace() {
 
   const render = useCallback((maxDim) => {
     if (!img || !previewCanvasRef.current) return;
-    renderPipeline(previewCanvasRef.current, img, cropRect, rotation, mode, brightness, contrast, sharpen, threshold, maxDim);
-  }, [img, cropRect, rotation, mode, brightness, contrast, sharpen, threshold]);
+    renderPipeline(previewCanvasRef.current, img, cropRect, rotation, mode, brightness, contrast, sharpen, threshold, shadowReduction, maxDim);
+  }, [img, cropRect, rotation, mode, brightness, contrast, sharpen, threshold, shadowReduction]);
 
   useEffect(() => {
     if (step === 'enhance') render(PROCESS_MAX);
@@ -184,12 +233,13 @@ export default function DocumentEnhancerWorkspace() {
     setBrightness(12);
     setContrast(28);
     setSharpen(35);
+    setShadowReduction(55);
   }
 
   function download() {
     if (!previewCanvasRef.current) return;
     // Re-render at full processing resolution to ensure the download isn't capped by preview sizing
-    renderPipeline(previewCanvasRef.current, img, cropRect, rotation, mode, brightness, contrast, sharpen, threshold, PROCESS_MAX);
+    renderPipeline(previewCanvasRef.current, img, cropRect, rotation, mode, brightness, contrast, sharpen, threshold, shadowReduction, PROCESS_MAX);
     const link = document.createElement('a');
     link.download = 'enhanced-document.png';
     link.href = previewCanvasRef.current.toDataURL('image/png');
@@ -278,6 +328,11 @@ export default function DocumentEnhancerWorkspace() {
           <div style={sliderRow}>
             <label style={labelStyle}>Straighten (°)</label>
             <input type="range" min="-15" max="15" step="0.5" value={rotation} onChange={(e) => setRotation(Number(e.target.value))} style={{ width: '100%' }} />
+          </div>
+
+          <div style={sliderRow}>
+            <label style={labelStyle}>Reduce Shadows</label>
+            <input type="range" min="0" max="100" step="1" value={shadowReduction} onChange={(e) => setShadowReduction(Number(e.target.value))} style={{ width: '100%' }} />
           </div>
 
           <div style={sliderRow}>

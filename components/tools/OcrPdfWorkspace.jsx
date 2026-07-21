@@ -66,7 +66,7 @@ export default function OcrPdfWorkspace() {
           >
             <div className="text-4xl mb-3">📄</div>
             <p className="font-medium text-ink mb-1">Drop your PDF or image here</p>
-            <p className="text-sm text-ink-soft">Supports PDF, JPG, PNG — works on scans & handwriting</p>
+            <p className="text-sm text-ink-soft">Supports PDF, JPG, PNG — works on scans, typed text, and handwriting. Unclear words are marked, never guessed.</p>
           </div>
           <input ref={fileRef} type="file" accept=".pdf,image/*" className="hidden" onChange={e => handleFile(e.target.files[0])} />
         </div>

@@ -20,17 +20,52 @@ function applyBrightnessContrast(data, brightness, contrast) {
 }
 
 // Estimates the smooth background illumination (the shadow/lighting
-// gradient, not the sharp text) by downscaling the current canvas to a
-// tiny size — which blurs away fine detail — then scaling it back up to
+// gradient, not the sharp text or ink) by downscaling the current canvas to
+// a tiny size — which blurs away fine detail — then scaling it back up to
 // full size with smoothing. That's the "background"; dividing the real
 // pixels by it flattens uneven lighting the same way flat-field
 // correction does in document scanners.
+//
+// A naive average-downscale drags the estimate down wherever there's thin
+// dark content (a signature stroke, a line of text) — dividing that content
+// by its own artificially-low "background" pushes it toward white and can
+// erase it entirely. A max-filter (dilation) pass on the tiny sample fixes
+// this: a real lighting gradient is broad and survives a small-radius max
+// filter almost unchanged, but a thin dark stroke smaller than the kernel
+// gets replaced by a brighter neighboring sample, so the estimate reflects
+// the paper, not the ink.
 function estimateBackground(sourceCanvas, w, h) {
-  const small = document.createElement('canvas');
   const factor = Math.max(1, Math.floor(Math.min(w, h) / 24));
-  small.width = Math.max(1, Math.round(w / factor));
-  small.height = Math.max(1, Math.round(h / factor));
-  small.getContext('2d').drawImage(sourceCanvas, 0, 0, small.width, small.height);
+  const sw = Math.max(1, Math.round(w / factor));
+  const sh = Math.max(1, Math.round(h / factor));
+
+  const small = document.createElement('canvas');
+  small.width = sw;
+  small.height = sh;
+  const sctx = small.getContext('2d');
+  sctx.drawImage(sourceCanvas, 0, 0, sw, sh);
+
+  const srcData = sctx.getImageData(0, 0, sw, sh).data;
+  const dilated = new Uint8ClampedArray(srcData.length);
+  const radius = 1;
+  for (let y = 0; y < sh; y++) {
+    for (let x = 0; x < sw; x++) {
+      for (let c = 0; c < 3; c++) {
+        let maxV = 0;
+        for (let dy = -radius; dy <= radius; dy++) {
+          for (let dx = -radius; dx <= radius; dx++) {
+            const nx = clamp(x + dx, 0, sw - 1);
+            const ny = clamp(y + dy, 0, sh - 1);
+            const v = srcData[(ny * sw + nx) * 4 + c];
+            if (v > maxV) maxV = v;
+          }
+        }
+        dilated[(y * sw + x) * 4 + c] = maxV;
+      }
+      dilated[(y * sw + x) * 4 + 3] = 255;
+    }
+  }
+  sctx.putImageData(new ImageData(dilated, sw, sh), 0, 0);
 
   const bg = document.createElement('canvas');
   bg.width = w;
@@ -39,16 +74,38 @@ function estimateBackground(sourceCanvas, w, h) {
   bctx.imageSmoothingEnabled = true;
   bctx.imageSmoothingQuality = 'high';
   bctx.drawImage(small, 0, 0, w, h);
-  return bctx.getImageData(0, 0, w, h).data;
+  const bgImageData = bctx.getImageData(0, 0, w, h);
+
+  // Shadow-presence score: how much the (now ink-robust) background
+  // luminance actually varies across the page. A clean, evenly-lit photo
+  // has a small range here — paper is paper everywhere. A real shadow or
+  // uneven lighting shows a wide range. Below LOW, treat it as no shadow
+  // at all; above HIGH, treat it as a fully pronounced shadow.
+  let minLum = 255, maxLum = 0;
+  const bd = bgImageData.data;
+  for (let i = 0; i < bd.length; i += 4) {
+    const lum = (bd[i] + bd[i + 1] + bd[i + 2]) / 3;
+    if (lum < minLum) minLum = lum;
+    if (lum > maxLum) maxLum = lum;
+  }
+  const LOW = 12, HIGH = 60;
+  const shadowPresence = clamp((maxLum - minLum - LOW) / (HIGH - LOW), 0, 1);
+
+  return { data: bd, shadowPresence };
 }
 
 // Shadow/uneven-lighting reduction — blended by `strength` (0-100) so it
-// can be dialed in rather than all-or-nothing.
+// can be dialed in rather than all-or-nothing. The effective strength is
+// also scaled by how much real shadow was actually detected, so a clean,
+// evenly-lit photo (a signature on plain paper, say) is left alone even if
+// the slider is turned all the way up.
 function applyShadowReduction(imageData, w, h, sourceCanvas, strength) {
   if (strength <= 0) return;
-  const bgData = estimateBackground(sourceCanvas, w, h);
+  const { data: bgData, shadowPresence } = estimateBackground(sourceCanvas, w, h);
+  const effectiveStrength = strength * shadowPresence;
+  if (effectiveStrength <= 0.5) return;
   const data = imageData.data;
-  const s = strength / 100;
+  const s = effectiveStrength / 100;
   for (let i = 0; i < data.length; i += 4) {
     for (let c = 0; c < 3; c++) {
       const bg = Math.max(bgData[i + c], 30); // floor avoids blowing out already-dark regions

@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import Script from 'next/script';
 import { PDFDocument } from 'pdf-lib';
 
+function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
+
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -15,10 +17,107 @@ function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
+function loadImage(dataUrl) {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.src = dataUrl;
+  });
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
+}
+
+// Makes near-white pixels transparent so only the dark ink remains — the
+// first pass of turning a photo of a signature into a placeable overlay.
+function removeWhiteBackground(ctx, w, h) {
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const brightness = (r + g + b) / 3;
+    if (brightness > 180) {
+      const alpha = Math.max(0, 255 - (brightness - 180) * 8);
+      data[i + 3] = alpha;
+    }
+  }
+  ctx.putImageData(imageData, 0, 0);
+}
+
+// Finds the bounding box of the remaining (non-transparent) ink pixels —
+// this is what lets us automatically isolate just the signature instead of
+// keeping the entire photographed page around it.
+function findInkBoundingBox(imageData, w, h) {
+  const data = imageData.data;
+  const ALPHA_THRESHOLD = 40;
+  let minX = w, minY = h, maxX = -1, maxY = -1, inkCount = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const a = data[(y * w + x) * 4 + 3];
+      if (a > ALPHA_THRESHOLD) {
+        inkCount++;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0) return null;
+  return { minX, minY, maxX, maxY, inkCount };
+}
+
+// Decides whether the automatic extraction can be trusted, rather than
+// assuming it always worked. A reliable extraction found a modest amount of
+// ink, in a bounding box that's meaningfully smaller than the whole photo,
+// and isn't just a dense dark blob (which usually means poor lighting or a
+// non-white background rather than a clean signature).
+function evaluateExtraction(box, w, h) {
+  if (!box) return { reliable: false };
+  const totalPixels = w * h;
+  const bboxW = box.maxX - box.minX + 1;
+  const bboxH = box.maxY - box.minY + 1;
+  const bboxAreaRatio = (bboxW * bboxH) / totalPixels;
+  const inkRatio = box.inkCount / totalPixels;
+  if (box.inkCount < 120) return { reliable: false };
+  if (bboxAreaRatio > 0.92) return { reliable: false };
+  if (inkRatio / bboxAreaRatio > 0.55) return { reliable: false };
+  return { reliable: true };
+}
+
+function cropCanvasToBox(canvas, box, padRatio = 0.14) {
+  const w = canvas.width, h = canvas.height;
+  const bboxW = box.maxX - box.minX + 1;
+  const bboxH = box.maxY - box.minY + 1;
+  const padX = Math.max(6, bboxW * padRatio);
+  const padY = Math.max(6, bboxH * padRatio);
+  const x0 = clamp(box.minX - padX, 0, w);
+  const y0 = clamp(box.minY - padY, 0, h);
+  const x1 = clamp(box.maxX + padX, 0, w);
+  const y1 = clamp(box.maxY + padY, 0, h);
+  const cw = Math.max(1, Math.round(x1 - x0));
+  const ch = Math.max(1, Math.round(y1 - y0));
+  const out = document.createElement('canvas');
+  out.width = cw;
+  out.height = ch;
+  out.getContext('2d').drawImage(canvas, x0, y0, cw, ch, 0, 0, cw, ch);
+  return out;
+}
+
+const defaultCropRect = { x: 0, y: 0, w: 1, h: 1 };
+
 export default function SignPdfWorkspace() {
   const [step, setStep] = useState(1); // 1=upload sig, 2=upload pdf, 3=place sig
+  const [sigStage, setSigStage] = useState('select'); // select | analyzing | manual-crop | needs-enhancer-hint
+  const [sourceImg, setSourceImg] = useState(null); // the originally uploaded photo, for the crop fallback
+  const [cropRect, setCropRect] = useState(defaultCropRect);
   const [sigFile, setSigFile] = useState(null);
-  const [sigDataUrl, setSigDataUrl] = useState(null); // cleaned transparent signature
+  const [sigDataUrl, setSigDataUrl] = useState(null); // cleaned, isolated signature
   const [pdfFile, setPdfFile] = useState(null);
   const [pdfPages, setPdfPages] = useState([]); // rendered page canvases as dataURLs
   const [selectedPage, setSelectedPage] = useState(0);
@@ -31,49 +130,121 @@ export default function SignPdfWorkspace() {
   const sigRef = useRef(null);
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
+  const cropContainerRef = useRef(null);
+  const cropDragRef = useRef(null);
 
-  // Step 1: Remove white background from signature photo
+  // Step 1: try to automatically isolate just the signature from the photo.
   async function handleSigUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
     setSigFile(file);
     setError('');
-    setStatus('Removing background…');
+    setStatus('Analyzing your signature…');
     setBusy(true);
+    setSigStage('analyzing');
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
+    const dataUrl = await readFileAsDataUrl(file);
+    const img = await loadImage(dataUrl);
+    setSourceImg(img);
 
-        // Make near-white pixels transparent
-        for (let i = 0; i < data.length; i += 4) {
-          const r = data[i], g = data[i + 1], b = data[i + 2];
-          const brightness = (r + g + b) / 3;
-          if (brightness > 180) {
-            // Smooth fade near the threshold
-            const alpha = Math.max(0, 255 - (brightness - 180) * 8);
-            data[i + 3] = alpha;
-          }
-        }
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    removeWhiteBackground(ctx, canvas.width, canvas.height);
 
-        ctx.putImageData(imageData, 0, 0);
-        const cleaned = canvas.toDataURL('image/png');
-        setSigDataUrl(cleaned);
-        setStatus('');
-        setBusy(false);
-        setStep(2);
-      };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const box = findInkBoundingBox(imageData, canvas.width, canvas.height);
+    const result = evaluateExtraction(box, canvas.width, canvas.height);
+
+    if (result.reliable) {
+      const cropped = cropCanvasToBox(canvas, box);
+      setSigDataUrl(cropped.toDataURL('image/png'));
+      setStatus('');
+      setBusy(false);
+      setSigStage('select');
+      setStep(2);
+    } else {
+      // Automatic extraction wasn't reliable — fall back to letting the
+      // user crop the photo down to just the signature themselves.
+      setCropRect(defaultCropRect);
+      setStatus('');
+      setBusy(false);
+      setSigStage('manual-crop');
+    }
+  }
+
+  // Fallback crop: drag corner handles over the original photo.
+  function onCropHandlePointerDown(corner, e) {
+    e.preventDefault();
+    e.stopPropagation();
+    cropDragRef.current = { corner, startRect: { ...cropRect } };
+    window.addEventListener('pointermove', onCropPointerMove);
+    window.addEventListener('pointerup', onCropPointerUp);
+  }
+  function onCropPointerMove(e) {
+    if (!cropDragRef.current || !cropContainerRef.current) return;
+    const rect = cropContainerRef.current.getBoundingClientRect();
+    const px = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+    const py = clamp((e.clientY - rect.top) / rect.height, 0, 1);
+    const { corner, startRect } = cropDragRef.current;
+    setCropRect(() => {
+      let { x, y, w, h } = startRect;
+      const x2 = x + w, y2 = y + h;
+      if (corner === 'tl') { x = Math.min(px, x2 - 0.05); y = Math.min(py, y2 - 0.05); w = x2 - x; h = y2 - y; }
+      if (corner === 'tr') { const nx2 = Math.max(px, x + 0.05); y = Math.min(py, y2 - 0.05); w = nx2 - x; h = y2 - y; }
+      if (corner === 'bl') { x = Math.min(px, x2 - 0.05); const ny2 = Math.max(py, y + 0.05); w = x2 - x; h = ny2 - y; }
+      if (corner === 'br') { const nx2 = Math.max(px, x + 0.05); const ny2 = Math.max(py, y + 0.05); w = nx2 - x; h = ny2 - y; }
+      return { x: clamp(x, 0, 1), y: clamp(y, 0, 1), w: clamp(w, 0.05, 1), h: clamp(h, 0.05, 1) };
+    });
+  }
+  function onCropPointerUp() {
+    cropDragRef.current = null;
+    window.removeEventListener('pointermove', onCropPointerMove);
+    window.removeEventListener('pointerup', onCropPointerUp);
+  }
+
+  // After the user confirms their manual crop, retry background removal +
+  // automatic bounding-box tightening on just that region.
+  function confirmManualCrop() {
+    const img = sourceImg;
+    const cropX = cropRect.x * img.width, cropY = cropRect.y * img.height;
+    const cropW = cropRect.w * img.width, cropH = cropRect.h * img.height;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(cropW));
+    canvas.height = Math.max(1, Math.round(cropH));
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+    removeWhiteBackground(ctx, canvas.width, canvas.height);
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const box = findInkBoundingBox(imageData, canvas.width, canvas.height);
+    const result = evaluateExtraction(box, canvas.width, canvas.height);
+
+    if (result.reliable) {
+      const cropped = cropCanvasToBox(canvas, box, 0.08);
+      setSigDataUrl(cropped.toDataURL('image/png'));
+      setSigStage('select');
+      setStep(2);
+    } else {
+      // Still not clean — use the best-effort result but let the user know
+      // Document Enhancer can likely do better, without blocking them.
+      setSigDataUrl(canvas.toDataURL('image/png'));
+      setSigStage('needs-enhancer-hint');
+    }
+  }
+
+  function retrySignature() {
+    setSigStage('select');
+    setSigFile(null);
+    setSourceImg(null);
+    setCropRect(defaultCropRect);
+  }
+
+  function useHintResultAnyway() {
+    setSigStage('select');
+    setStep(2);
   }
 
   // Step 2: Render PDF pages as images for preview
@@ -217,6 +388,9 @@ export default function SignPdfWorkspace() {
 
   function reset() {
     setStep(1);
+    setSigStage('select');
+    setSourceImg(null);
+    setCropRect(defaultCropRect);
     setSigFile(null);
     setSigDataUrl(null);
     setPdfFile(null);
@@ -254,10 +428,10 @@ export default function SignPdfWorkspace() {
       </div>
 
       {/* STEP 1: Upload signature */}
-      {step === 1 && (
+      {step === 1 && sigStage === 'select' && (
         <div>
           <p className="text-sm text-ink-soft mb-4">
-            Sign your name on <strong>white paper</strong> with a <strong>dark pen</strong>, then take a clear photo of it and upload below.
+            Sign your name on <strong>white paper</strong> with a <strong>dark pen</strong>, then take a clear photo of it and upload below. Convertam will try to automatically isolate just your signature.
           </p>
           <label
             className="dropzone block cursor-pointer"
@@ -268,8 +442,80 @@ export default function SignPdfWorkspace() {
             <div className="dz-main">Click to upload your signature photo</div>
             <div className="dz-sub">Your signature never leaves your device.</div>
           </label>
+          <p className="text-xs text-ink-soft mt-3">
+            Photo has poor lighting, shadows, or faded ink? {' '}
+            <a href="/document-enhancer" className="text-stamp-blue underline">Open Document Enhancer first</a> to clean it up, then come back here.
+          </p>
           {busy && <div className="status">{status}</div>}
           {error && <div className="status error">{error}</div>}
+        </div>
+      )}
+
+      {/* STEP 1 fallback: automatic extraction wasn't reliable — manual crop */}
+      {step === 1 && sigStage === 'manual-crop' && sourceImg && (
+        <div>
+          <p className="text-sm font-semibold text-ink mb-1">We couldn't automatically isolate your signature</p>
+          <p className="text-sm text-ink-soft mb-4">Drag the corner handles so only your signature is inside the box, then continue.</p>
+
+          <div
+            ref={cropContainerRef}
+            style={{
+              position: 'relative', width: '100%', maxWidth: 420, margin: '0 auto',
+              aspectRatio: `${sourceImg.naturalWidth} / ${sourceImg.naturalHeight}`,
+              background: '#0F172A10', borderRadius: 8, overflow: 'hidden', touchAction: 'none',
+            }}
+          >
+            <img src={sourceImg.src} alt="" style={{ width: '100%', height: '100%', display: 'block', userSelect: 'none', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.45)', clipPath: `polygon(0 0, 0 100%, ${cropRect.x * 100}% 100%, ${cropRect.x * 100}% ${cropRect.y * 100}%, ${(cropRect.x + cropRect.w) * 100}% ${cropRect.y * 100}%, ${(cropRect.x + cropRect.w) * 100}% ${(cropRect.y + cropRect.h) * 100}%, ${cropRect.x * 100}% ${(cropRect.y + cropRect.h) * 100}%, ${cropRect.x * 100}% 100%, 100% 100%, 100% 0)` }} />
+            <div style={{
+              position: 'absolute', left: `${cropRect.x * 100}%`, top: `${cropRect.y * 100}%`,
+              width: `${cropRect.w * 100}%`, height: `${cropRect.h * 100}%`, border: '2px solid #FBBF24', boxSizing: 'border-box',
+            }}>
+              {['tl', 'tr', 'bl', 'br'].map((corner) => (
+                <div
+                  key={corner}
+                  onPointerDown={(e) => onCropHandlePointerDown(corner, e)}
+                  style={{
+                    position: 'absolute', width: 18, height: 18, background: '#FBBF24', border: '2px solid white', borderRadius: '50%',
+                    cursor: corner === 'tl' || corner === 'br' ? 'nwse-resize' : 'nesw-resize',
+                    top: corner.includes('t') ? -9 : undefined, bottom: corner.includes('b') ? -9 : undefined,
+                    left: corner.includes('l') ? -9 : undefined, right: corner.includes('r') ? -9 : undefined,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
+          <p className="text-xs text-ink-soft mt-3">
+            If the photo itself has poor lighting, shadows, or faded ink, cropping alone may not help much —{' '}
+            <a href="/document-enhancer" className="text-stamp-blue underline">try Document Enhancer</a> first, then re-upload here.
+          </p>
+
+          <div className="actions mt-4">
+            <button className="btn btn-primary" onClick={confirmManualCrop}>Use this crop</button>
+            <button className="btn btn-ghost" onClick={retrySignature}>Choose a different photo</button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 1 fallback: even after manual crop, extraction is still weak */}
+      {step === 1 && sigStage === 'needs-enhancer-hint' && (
+        <div>
+          <div className="mb-4 p-3 rounded-xl flex items-center gap-3" style={{ background: '#FFFBE8', border: '1px solid #F0D070' }}>
+            <img src={sigDataUrl} alt="Your signature" style={{ height: '48px', maxWidth: '140px', objectFit: 'contain', background: '#fff', borderRadius: 6 }} />
+            <div className="text-xs" style={{ color: '#7A6000' }}>
+              <strong>This will still work</strong>, but the background couldn't be fully removed — likely due to lighting, shadows, or contrast in the photo.
+            </div>
+          </div>
+          <p className="text-sm text-ink-soft mb-4">
+            For the cleanest result, {' '}
+            <a href="/document-enhancer" className="text-stamp-blue underline font-semibold">open Document Enhancer</a>{' '}
+            to improve the photo, then come back and re-upload it here.
+          </p>
+          <div className="actions">
+            <button className="btn btn-primary" onClick={useHintResultAnyway}>Continue anyway</button>
+            <button className="btn btn-ghost" onClick={retrySignature}>Choose a different photo</button>
+          </div>
         </div>
       )}
 
@@ -280,7 +526,7 @@ export default function SignPdfWorkspace() {
             <img src={sigDataUrl} alt="Your signature" style={{ height: '40px', maxWidth: '120px', objectFit: 'contain' }} />
             <div>
               <div className="text-xs font-semibold text-ink">Signature ready</div>
-              <button onClick={() => setStep(1)} className="text-xs text-stamp-blue underline">Change</button>
+              <button onClick={() => { setStep(1); setSigStage('select'); }} className="text-xs text-stamp-blue underline">Change</button>
             </div>
           </div>
           <p className="text-sm text-ink-soft mb-4">Now upload the PDF you want to sign.</p>

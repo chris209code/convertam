@@ -62,7 +62,7 @@ export default function ToolHubClient({ accent, icon, title, subtitle, searchPla
       <style dangerouslySetInnerHTML={{ __html: `
         .page-inner { width: 100%; padding: 0 4%; }
 
-        .th-search-wrap { position: relative; max-width: 480px; margin-bottom: 16px; }
+        .th-search-wrap { position: relative; max-width: 480px; margin-bottom: 12px; }
         .th-search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #94A3B8; }
         .th-search {
           width: 100%; padding: 12px 16px 12px 42px; border-radius: 12px;
@@ -80,9 +80,9 @@ export default function ToolHubClient({ accent, icon, title, subtitle, searchPla
         .th-nav-btn:hover { color: ${accent.accentText}; border-color: ${accent.borderColor}; background: ${accent.pageBgTop}; }
 
         .th-featured {
-          display: flex; align-items: center; gap: 18px; padding: 18px 22px; border-radius: 16px;
+          display: flex; align-items: center; gap: 18px; padding: 15px 20px; border-radius: 16px;
           background: white; border: 1.5px solid #EEF0F3; text-decoration: none;
-          box-shadow: 0 2px 10px rgba(15,23,42,0.04); margin-bottom: 40px; transition: all 0.2s ease;
+          box-shadow: 0 2px 10px rgba(15,23,42,0.04); margin-bottom: 22px; transition: all 0.2s ease;
         }
         .th-featured:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(15,23,42,0.08); border-color: ${accent.borderColor}; }
         .th-featured-icon {
@@ -130,10 +130,10 @@ export default function ToolHubClient({ accent, icon, title, subtitle, searchPla
         .th-card-soon .th-card-desc { color: #B0B8C4; }
         .th-card-soon:hover { transform: none; box-shadow: 0 1px 2px rgba(15,23,42,0.03); border-color: #EEF0F3; }
 
-        .th-section-title { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; scroll-margin-top: 24px; font-size: 1.05rem; font-weight: 700; color: #152238; }
+        .th-section-title { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; scroll-margin-top: 24px; font-size: 1.05rem; font-weight: 700; color: #152238; }
         .th-empty { text-align: center; padding: 48px 20px; color: #64748B; font-size: 0.9rem; }
 
-        .th-header-icon { width: 56px; height: 56px; border-radius: 16px; background: ${accent.gradient}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 8px 20px ${accent.shadowTint}; }
+        .th-header-icon { width: 46px; height: 46px; border-radius: 14px; background: ${accent.gradient}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 8px 20px ${accent.shadowTint}; font-size: 1.3rem; }
 
         @media (max-width: 860px) {
           .th-grid { grid-template-columns: repeat(2, 1fr); }
@@ -147,14 +147,14 @@ export default function ToolHubClient({ accent, icon, title, subtitle, searchPla
         }
       ` }} />
 
-      <div style={{ background: 'white', borderBottom: '1px solid #EEF0F3', padding: '40px 0' }}>
+      <div style={{ background: 'white', borderBottom: '1px solid #EEF0F3', padding: '22px 0 18px' }}>
         <div className="page-inner">
-          <Link href="/" style={{ fontSize: '0.8rem', color: accent.accentText, textDecoration: 'none', marginBottom: 12, display: 'inline-block' }}>← Back to Home</Link>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+          <Link href="/" style={{ fontSize: '0.78rem', color: accent.accentText, textDecoration: 'none', marginBottom: 8, display: 'inline-block' }}>← Back to Home</Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14, flexWrap: 'wrap' }}>
             <span className="th-header-icon" aria-hidden="true">{icon}</span>
             <div>
-              <h1 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 800, color: '#152238', margin: 0 }}>{title}</h1>
-              <p style={{ fontSize: '0.9rem', color: '#64748B', margin: '4px 0 0' }}>{subtitle}</p>
+              <h1 style={{ fontSize: 'clamp(1.3rem, 2.6vw, 1.7rem)', fontWeight: 800, color: '#152238', margin: 0 }}>{title}</h1>
+              <p style={{ fontSize: '0.86rem', color: '#64748B', margin: '2px 0 0' }}>{subtitle}</p>
             </div>
           </div>
 
@@ -183,7 +183,7 @@ export default function ToolHubClient({ accent, icon, title, subtitle, searchPla
         </div>
       </div>
 
-      <div className="page-inner" style={{ padding: '40px 4% 64px' }}>
+      <div className="page-inner" style={{ padding: '20px 4% 56px' }}>
         {!isSearching && featured && (
           featured.comingSoon ? (
             <div className="th-featured th-featured-soon" aria-disabled="true">
@@ -213,7 +213,7 @@ export default function ToolHubClient({ accent, icon, title, subtitle, searchPla
         ) : (
           filteredSections.map((s) => (
             (isSearching ? s.tools.length > 0 : true) && (
-              <div key={s.id} style={{ marginBottom: 40 }}>
+              <div key={s.id} style={{ marginBottom: 28 }}>
                 <h2 id={s.id} className="th-section-title">{s.icon} {s.label}</h2>
                 <div className="th-grid">
                   {s.tools.map((tool) => <ToolCard key={tool.slug} tool={tool} accent={accent} />)}

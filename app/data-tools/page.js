@@ -4,6 +4,11 @@ import { DataIcon, CATEGORY_ACCENTS } from '../../components/categoryVisuals';
 export const metadata = {
   title: 'Data Tools — Convertam',
   description: 'Clean, format, validate and convert text and data — JSON, CSV, XML, SQL and more. Free, no login required.',
+  // Category temporarily hidden from navigation and the homepage while the
+  // remaining studios are still under active development — noindex keeps
+  // it out of search results until it's ready to be surfaced. Remove this
+  // together with the nav/homepage/sitemap reveal once production-ready.
+  robots: { index: false, follow: false },
 };
 
 // Architecture-only phase: every tool here is a planned route (slug/href

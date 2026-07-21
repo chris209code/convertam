@@ -50,6 +50,7 @@ export default function Footer() {
           {[
             { label: 'Our Story', href: '/about', internal: true },
             { label: 'Privacy Policy', href: '/about#privacy', internal: true },
+            { label: 'Terms of Service', href: '/terms', internal: true },
             { label: 'Contact', href: 'mailto:okekechris24@yahoo.com', internal: false },
             { label: '𝕏 @chrisndz', href: 'https://x.com/chrisndz', internal: false },
           ].map(({ label, href, internal }, i) => (

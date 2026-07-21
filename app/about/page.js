@@ -126,6 +126,8 @@ export default function AboutPage() {
           <a href="mailto:okekechris24@yahoo.com" className="underline text-stamp-blue">
             okekechris24@yahoo.com
           </a>
+          . See also our{' '}
+          <a href="/terms" className="underline text-stamp-blue">Terms of Service</a>.
         </p>
       </section>
 

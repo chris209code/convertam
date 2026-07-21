@@ -54,6 +54,10 @@ import ComingSoon from '@/components/tools/ComingSoon';
 import Link from 'next/link';
 import { getTool } from '@/lib/tools-config';
 import { toolMeta } from '@/lib/tool-meta';
+import { toolGuides } from '@/lib/toolGuides';
+import QuickGuideTab from '@/components/tool-guide/QuickGuideTab';
+import FullFaqSection from '@/components/tool-guide/FullFaqSection';
+import RelatedToolsCard from '@/components/tool-guide/RelatedToolsCard';
 
 const isFree = (mode) =>
   ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice',
@@ -75,6 +79,11 @@ function getPriceBadge(mode) {
 export default function ToolPageClient({ tool }) {
   const meta = toolMeta[tool.slug] || {};
   const relatedTools = (meta.related || []).map((slug) => getTool(slug)).filter(Boolean);
+  // Tools with a lib/toolGuides.js entry get the premium Quick Guide
+  // slide-out + Full FAQ / Related Tools cards instead of the plain
+  // tips box / related-chips row below — scoped per-tool via that data,
+  // so every other tool's page renders exactly as it did before.
+  const guide = toolGuides[tool.slug];
 
   return (
     <main className="max-w-5xl mx-auto px-5 md:px-10 py-10">
@@ -101,8 +110,9 @@ export default function ToolPageClient({ tool }) {
         </div>
       )}
 
-      {/* Tips before workspace */}
-      {meta.tips && (
+      {/* Tips before workspace — superseded by the Quick Guide panel for
+          tools that have one, so it isn't shown twice. */}
+      {meta.tips && !guide && (
         <div className="mb-6 p-4 rounded-xl" style={{ background: '#ECFDF5', border: '1px solid #A7F3D0' }}>
           <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: '#065F46' }}>💡 Tips for best results</p>
           <div className="flex flex-col gap-1.5">
@@ -177,7 +187,9 @@ export default function ToolPageClient({ tool }) {
         </div>
       )}
 
-      {relatedTools.length > 0 && (
+      {/* Plain related-tools chip row — superseded by the richer
+          RelatedToolsCard below for tools that have a guide. */}
+      {relatedTools.length > 0 && !guide && (
         <div className="mt-8">
           <p className="text-xs font-semibold text-ink-soft uppercase tracking-widest mb-3">Related Tools</p>
           <div className="flex flex-wrap gap-2">
@@ -189,6 +201,14 @@ export default function ToolPageClient({ tool }) {
           </div>
         </div>
       )}
+
+      {guide && (
+        <div className="mt-10 grid gap-5 md:grid-cols-2 items-start">
+          <FullFaqSection items={guide.fullFaqs} />
+          <RelatedToolsCard tools={guide.relatedTools} />
+        </div>
+      )}
+      {guide && <QuickGuideTab guide={guide} />}
     </main>
   );
 }

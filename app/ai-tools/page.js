@@ -36,8 +36,6 @@ export default function AIToolsPage() {
       icon={AiIcon}
       title="AI Tools"
       subtitle="Powered by Google Gemini AI — smart tools that read, extract and improve your documents."
-      searchPlaceholder="Search AI tools…"
-      featured={{ slug: 'data-analyst', href: '/data-analyst', icon: '📊', title: 'AI Data Analyst', desc: 'Upload any dataset and get charts, insights and an executive report — no spreadsheet skills needed.' }}
       sections={SECTIONS_WITH_HREF}
     />
   );

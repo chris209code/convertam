@@ -80,8 +80,6 @@ export default function PdfToolsPage() {
       icon={PdfIcon}
       title="PDF Tools"
       subtitle="Everything you need to work with PDFs — all in one place."
-      searchPlaceholder="Search PDF tools…"
-      featured={{ slug: 'pdf-to-word', href: '/pdf-to-word', icon: '📝', title: 'PDF to Word', desc: 'The most-used PDF tool — turn any PDF into an editable Word document in seconds.' }}
       sections={SECTIONS_WITH_HREF}
     />
   );

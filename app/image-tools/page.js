@@ -34,8 +34,6 @@ export default function ImageToolsPage() {
       icon={ImageIcon}
       title="Image Tools"
       subtitle="Convert, compress, resize and edit images — all free, all in your browser."
-      searchPlaceholder="Search image tools…"
-      featured={{ slug: 'image-compressor', href: '/image-compressor', icon: '🗜️', title: 'Image Compressor', desc: 'The fastest way to shrink a photo for the web or email without losing visible quality.' }}
       sections={SECTIONS_WITH_HREF}
     />
   );

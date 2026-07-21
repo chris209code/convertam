@@ -79,8 +79,6 @@ export default function DataToolsPage() {
       icon={DataIcon}
       title="Data Tools"
       subtitle="Clean, format, validate and convert text and data — all in one place."
-      searchPlaceholder="Search data tools…"
-      featured={{ href: '/data-tools/text-cleaner', icon: '🧹', title: 'Text Cleaner Studio', desc: 'A full text-cleaning workspace — dozens of operations, live stats, and an undoable pipeline, all in your browser.' }}
       sections={SECTIONS_WITH_HREF}
     />
   );

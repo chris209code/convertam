@@ -27,8 +27,6 @@ export default function BusinessPage() {
       icon={BusinessIcon}
       title="Business Tools"
       subtitle="Professional business documents — invoices, quotations, receipts and more."
-      searchPlaceholder="Search business tools…"
-      featured={{ slug: 'business-document-studio', href: '/business-document-studio', icon: '🧾', title: 'Business Document Studio', desc: 'Create invoices, quotations, delivery notes and waybills from one professional workspace.' }}
       sections={SECTIONS_WITH_HREF}
     />
   );

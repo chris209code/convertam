@@ -111,6 +111,14 @@ function cropCanvasToBox(canvas, box, padRatio = 0.14) {
 
 const defaultCropRect = { x: 0, y: 0, w: 1, h: 1 };
 
+// Handoff keys shared with DocumentEnhancerWorkspace.js — must match exactly
+// on both sides. A one-time localStorage pass-off (same pattern as the CV
+// Improver <-> Resume Builder handoff) lets this tool send an in-progress
+// signature photo there for cleanup, and lets Document Enhancer send the
+// enhanced result back here to retry automatic extraction.
+const SIGN_TO_ENHANCER_KEY = 'convertam_sign_to_enhancer';
+const ENHANCER_TO_SIGN_KEY = 'convertam_enhancer_to_sign';
+
 export default function SignPdfWorkspace() {
   const [step, setStep] = useState(1); // 1=upload sig, 2=upload pdf, 3=place sig
   const [sigStage, setSigStage] = useState('select'); // select | analyzing | manual-crop | needs-enhancer-hint
@@ -126,6 +134,7 @@ export default function SignPdfWorkspace() {
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [pdfjsReady, setPdfjsReady] = useState(false);
+  const [importedFromEnhancer, setImportedFromEnhancer] = useState(false);
   const previewRef = useRef(null);
   const sigRef = useRef(null);
   const isDragging = useRef(false);
@@ -133,18 +142,11 @@ export default function SignPdfWorkspace() {
   const cropContainerRef = useRef(null);
   const cropDragRef = useRef(null);
 
-  // Step 1: try to automatically isolate just the signature from the photo.
-  async function handleSigUpload(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    setSigFile(file);
-    setError('');
-    setStatus('Analyzing your signature…');
-    setBusy(true);
-    setSigStage('analyzing');
-
-    const dataUrl = await readFileAsDataUrl(file);
-    const img = await loadImage(dataUrl);
+  // Shared extraction pipeline: given an already-loaded photo, try to
+  // automatically isolate just the signature, falling back to manual crop
+  // when the result can't be trusted. Used both for a fresh upload and for
+  // a photo handed back from Document Enhancer.
+  async function processSignatureImage(img) {
     setSourceImg(img);
 
     const canvas = document.createElement('canvas');
@@ -173,6 +175,54 @@ export default function SignPdfWorkspace() {
       setBusy(false);
       setSigStage('manual-crop');
     }
+  }
+
+  // Step 1: try to automatically isolate just the signature from the photo.
+  async function handleSigUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setSigFile(file);
+    setError('');
+    setStatus('Analyzing your signature…');
+    setBusy(true);
+    setSigStage('analyzing');
+    setImportedFromEnhancer(false);
+
+    const dataUrl = await readFileAsDataUrl(file);
+    const img = await loadImage(dataUrl);
+    await processSignatureImage(img);
+  }
+
+  // One-time pickup of a photo sent back from Document Enhancer's "Continue
+  // to Sign PDF" — re-attempts automatic extraction on the improved image.
+  useEffect(() => {
+    let raw;
+    try { raw = localStorage.getItem(ENHANCER_TO_SIGN_KEY); } catch { return; }
+    if (!raw) return;
+    try { localStorage.removeItem(ENHANCER_TO_SIGN_KEY); } catch { /* ignore */ }
+    setError('');
+    setStatus('Analyzing your signature…');
+    setBusy(true);
+    setSigStage('analyzing');
+    setImportedFromEnhancer(true);
+    loadImage(raw).then((img) => processSignatureImage(img));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sends the photo (cropped to whatever region is currently selected, if
+  // any) to Document Enhancer for cleanup, as a continuation of this flow
+  // rather than a cold start — Document Enhancer lands straight in its crop
+  // step with this image already loaded.
+  function goToDocumentEnhancer() {
+    if (!sourceImg) { window.location.href = '/document-enhancer'; return; }
+    const cropX = cropRect.x * sourceImg.width, cropY = cropRect.y * sourceImg.height;
+    const cropW = cropRect.w * sourceImg.width, cropH = cropRect.h * sourceImg.height;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(cropW));
+    canvas.height = Math.max(1, Math.round(cropH));
+    canvas.getContext('2d').drawImage(sourceImg, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+    try { localStorage.setItem(SIGN_TO_ENHANCER_KEY, canvas.toDataURL('image/png')); } catch { /* ignore */ }
+    window.location.href = '/document-enhancer';
   }
 
   // Fallback crop: drag corner handles over the original photo.
@@ -488,7 +538,7 @@ export default function SignPdfWorkspace() {
 
           <p className="text-xs text-ink-soft mt-3">
             If the photo itself has poor lighting, shadows, or faded ink, cropping alone may not help much —{' '}
-            <a href="/document-enhancer" className="text-stamp-blue underline">try Document Enhancer</a> first, then re-upload here.
+            <button type="button" onClick={goToDocumentEnhancer} className="text-stamp-blue underline" style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer' }}>try Document Enhancer</button> with this photo, then continue back here.
           </p>
 
           <div className="actions mt-4">
@@ -509,8 +559,8 @@ export default function SignPdfWorkspace() {
           </div>
           <p className="text-sm text-ink-soft mb-4">
             For the cleanest result, {' '}
-            <a href="/document-enhancer" className="text-stamp-blue underline font-semibold">open Document Enhancer</a>{' '}
-            to improve the photo, then come back and re-upload it here.
+            <button type="button" onClick={goToDocumentEnhancer} className="text-stamp-blue underline font-semibold" style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer' }}>open Document Enhancer</button>{' '}
+            with this photo, then continue straight back here when you're done.
           </p>
           <div className="actions">
             <button className="btn btn-primary" onClick={useHintResultAnyway}>Continue anyway</button>
@@ -522,11 +572,16 @@ export default function SignPdfWorkspace() {
       {/* STEP 2: Upload PDF */}
       {step === 2 && (
         <div>
+          {importedFromEnhancer && (
+            <div className="mb-3 px-3 py-2 rounded-lg text-xs" style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', color: '#065F46' }}>
+              ✨ Re-processed from your enhanced photo.
+            </div>
+          )}
           <div className="mb-4 p-3 rounded-xl flex items-center gap-3" style={{ background: '#f0f5ff', border: '1px solid #3a63b8' }}>
             <img src={sigDataUrl} alt="Your signature" style={{ height: '40px', maxWidth: '120px', objectFit: 'contain' }} />
             <div>
               <div className="text-xs font-semibold text-ink">Signature ready</div>
-              <button onClick={() => { setStep(1); setSigStage('select'); }} className="text-xs text-stamp-blue underline">Change</button>
+              <button onClick={() => { setStep(1); setSigStage('select'); setImportedFromEnhancer(false); }} className="text-xs text-stamp-blue underline">Change</button>
             </div>
           </div>
           <p className="text-sm text-ink-soft mb-4">Now upload the PDF you want to sign.</p>

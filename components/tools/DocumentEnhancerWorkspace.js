@@ -208,6 +208,15 @@ function renderPipeline(targetCanvas, img, cropRectPct, rotationDeg, mode, brigh
 
 const defaultCrop = { x: 0, y: 0, w: 1, h: 1 };
 
+// Handoff keys shared with SignPdfWorkspace.js — must match exactly on both
+// sides. A one-time localStorage pass-off (same pattern as the CV Improver
+// <-> Resume Builder handoff) lets Sign PDF send an in-progress signature
+// photo here for cleanup, and lets this tool send the enhanced result back
+// to Sign PDF to retry automatic extraction, without the two tools
+// importing from each other.
+const SIGN_TO_ENHANCER_KEY = 'convertam_sign_to_enhancer';
+const ENHANCER_TO_SIGN_KEY = 'convertam_enhancer_to_sign';
+
 export default function DocumentEnhancerWorkspace() {
   const [img, setImg] = useState(null);
   const [step, setStep] = useState('upload'); // upload -> crop -> enhance
@@ -219,31 +228,55 @@ export default function DocumentEnhancerWorkspace() {
   const [sharpen, setSharpen] = useState(0);
   const [threshold, setThreshold] = useState(128);
   const [shadowReduction, setShadowReduction] = useState(0);
+  const [cameFromSignPdf, setCameFromSignPdf] = useState(false);
 
   const previewCanvasRef = useRef(null);
   const cropContainerRef = useRef(null);
   const dragRef = useRef(null); // { corner: 'tl'|'tr'|'bl'|'br'|'move', startRect, startX, startY }
 
+  function loadImageIntoEditor(dataUrl) {
+    const image = new window.Image();
+    image.onload = () => {
+      setImg(image);
+      setCropRect(defaultCrop);
+      setRotation(0);
+      setMode('color');
+      setBrightness(0);
+      setContrast(0);
+      setSharpen(0);
+      setShadowReduction(0);
+      setStep('crop');
+    };
+    image.src = dataUrl;
+  }
+
   function handleUpload(e) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
-      const image = new window.Image();
-      image.onload = () => {
-        setImg(image);
-        setCropRect(defaultCrop);
-        setRotation(0);
-        setMode('color');
-        setBrightness(0);
-        setContrast(0);
-        setSharpen(0);
-        setShadowReduction(0);
-        setStep('crop');
-      };
-      image.src = reader.result;
-    };
+    reader.onload = () => loadImageIntoEditor(reader.result);
     reader.readAsDataURL(file);
+  }
+
+  // One-time pre-fill from Sign PDF's "try Document Enhancer" handoff.
+  useEffect(() => {
+    let raw;
+    try { raw = localStorage.getItem(SIGN_TO_ENHANCER_KEY); } catch { return; }
+    if (!raw) return;
+    try { localStorage.removeItem(SIGN_TO_ENHANCER_KEY); } catch { /* ignore */ }
+    setCameFromSignPdf(true);
+    loadImageIntoEditor(raw);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sends the current enhanced result back to Sign PDF, which retries
+  // automatic signature extraction on it.
+  function continueToSignPdf() {
+    if (!previewCanvasRef.current || !img) return;
+    renderPipeline(previewCanvasRef.current, img, cropRect, rotation, mode, brightness, contrast, sharpen, threshold, shadowReduction, PROCESS_MAX);
+    const dataUrl = previewCanvasRef.current.toDataURL('image/png');
+    try { localStorage.setItem(ENHANCER_TO_SIGN_KEY, dataUrl); } catch { /* ignore */ }
+    window.location.href = '/sign-pdf';
   }
 
   // ---- Crop handle dragging (pointer events cover mouse + touch) ----
@@ -325,6 +358,11 @@ export default function DocumentEnhancerWorkspace() {
   if (step === 'crop') {
     return (
       <div className="panel">
+        {cameFromSignPdf && (
+          <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 10, background: '#EFF6FF', border: '1px solid #BFDBFE', fontSize: '0.8rem', color: '#1E3A8A' }}>
+            📥 Imported from Sign PDF — crop tightly around just the signature, enhance it, then continue back.
+          </div>
+        )}
         <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Crop to just the document</p>
         <p style={{ fontSize: '0.78rem', color: '#64748B', marginBottom: 16 }}>Drag the corner handles, or skip if the photo's already tight.</p>
 
@@ -436,6 +474,12 @@ export default function DocumentEnhancerWorkspace() {
           <button onClick={download} style={{ width: '100%', marginTop: 8, padding: '12px 16px', borderRadius: 10, border: 'none', cursor: 'pointer', background: '#1E3A8A', color: 'white', fontWeight: 700, fontSize: '0.9rem' }}>
             ⬇ Download Enhanced Image
           </button>
+
+          {cameFromSignPdf && (
+            <button onClick={continueToSignPdf} style={{ width: '100%', marginTop: 10, padding: '12px 16px', borderRadius: 10, border: '1.5px solid #1E3A8A', cursor: 'pointer', background: 'white', color: '#1E3A8A', fontWeight: 700, fontSize: '0.9rem' }}>
+              ✍️ Continue to Sign PDF
+            </button>
+          )}
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: '#F8FAFC', borderRadius: 16, padding: 20 }}>

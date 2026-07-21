@@ -1,10 +1,98 @@
-import ToolHubClient from '../../components/ToolHubClient';
+import CategoryLandingClient from '../../components/CategoryLandingClient';
 import { PdfIcon, CATEGORY_ACCENTS } from '../../components/categoryVisuals';
 
 export const metadata = {
   title: 'PDF Tools — Convertam',
   description: 'Complete PDF toolkit. Convert, edit, merge, split, compress, sign, watermark and secure your PDFs. Free, no login required.',
 };
+
+// Each workflow is a real, accurate sequence of Convertam tools (verified
+// against what each tool actually accepts/outputs — e.g. Smart AI Converter
+// is used here instead of OCR PDF for "Scan to Editable Document" because
+// OCR PDF's output is plain text, not a Word file, while Smart AI Converter
+// genuinely outputs an editable .docx/.xlsx directly from a photo). Steps
+// without a Convertam tool behind them (taking the photo, editing in Word,
+// sharing the file) are included for a complete real-world picture but
+// carry no link.
+const WORKFLOWS = [
+  {
+    id: 'scan-to-document',
+    title: 'Scan to Editable Document',
+    steps: [
+      { label: 'Scan Document', icon: '📷' },
+      { label: 'Document Enhancer', icon: '✨', slug: 'document-enhancer' },
+      { label: 'Smart AI Converter', icon: '📸', slug: 'smart-converter' },
+    ],
+    href: '/document-enhancer',
+  },
+  {
+    id: 'merge-protect',
+    title: 'Merge & Protect',
+    steps: [
+      { label: 'Merge PDF', icon: '🔗', slug: 'merge-pdf' },
+      { label: 'Watermark PDF', icon: '💧', slug: 'watermark-pdf' },
+      { label: 'Protect PDF', icon: '🔒', slug: 'protect-pdf' },
+      { label: 'Share Securely', icon: '📤' },
+    ],
+    href: '/merge-pdf',
+  },
+  {
+    id: 'edit-convert',
+    title: 'Edit & Convert',
+    steps: [
+      { label: 'PDF to Word', icon: '📝', slug: 'pdf-to-word' },
+      { label: 'Edit in Word', icon: '✏️' },
+      { label: 'Word to PDF', icon: '📄', slug: 'word-to-pdf' },
+      { label: 'Compress PDF', icon: '🗜️', slug: 'compress-pdf' },
+    ],
+    href: '/pdf-to-word',
+  },
+  {
+    id: 'redact-secure',
+    title: 'Redact & Secure',
+    steps: [
+      { label: 'Redact & Edit PDF', icon: '⬛', slug: 'redact-pdf' },
+      { label: 'Protect PDF', icon: '🔒', slug: 'protect-pdf' },
+      { label: 'Share Securely', icon: '📤' },
+    ],
+    href: '/redact-pdf',
+  },
+];
+
+const FAQS = [
+  {
+    q: 'Is Convertam\'s PDF tools really free?',
+    a: 'Yes — most PDF tools (merging, splitting, signing, watermarking, redacting, reordering, and more) are completely free with no limits. A small per-use fee applies only to tools that need a paid conversion engine: PDF to Word/Excel/PowerPoint and Compress PDF.',
+  },
+  {
+    q: 'Do I need to create an account?',
+    a: 'No. Every PDF tool works without signing up, logging in, or providing an email address — upload your file and get started immediately.',
+  },
+  {
+    q: 'Are my files secure?',
+    a: 'Browser-based tools (Merge PDF, Split PDF, Sign PDF, and most others) process everything locally on your device — your file never leaves your browser. Tools that require server-side processing use encrypted transfer and delete your file immediately after the job completes.',
+  },
+  {
+    q: 'What\'s the maximum file size?',
+    a: 'Most PDF tools support files up to 100MB, whether they\'re free or paid.',
+  },
+  {
+    q: 'Can I combine multiple PDF tools for one task?',
+    a: 'Yes — that\'s exactly what the Popular Workflows above show. Each one is a real sequence of Convertam tools for a common task, like turning a phone photo into an editable Word document or merging, watermarking, and password-protecting a document before sending it.',
+  },
+  {
+    q: 'Which file formats can I convert to and from?',
+    a: 'PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), JPG, and PNG, with more formats added over time.',
+  },
+];
+
+const RELATED_CATEGORIES = [
+  { slug: 'business', href: '/business', icon: '🧾', title: 'Business Documents', desc: 'Invoices, quotations, delivery notes and ID cards.', badgeBg: CATEGORY_ACCENTS.business.badgeFreeBg, accentText: CATEGORY_ACCENTS.business.accentText },
+  { slug: 'ai-tools', href: '/ai-tools', icon: '🤖', title: 'AI Workspace', desc: 'AI tools that read, extract and improve your documents.', badgeBg: CATEGORY_ACCENTS.ai.badgeFreeBg, accentText: CATEGORY_ACCENTS.ai.accentText },
+  { slug: 'image-tools', href: '/image-tools', icon: '🖼️', title: 'Image Studio', desc: 'Convert, compress, resize and edit images.', badgeBg: CATEGORY_ACCENTS.image.badgeFreeBg, accentText: CATEGORY_ACCENTS.image.accentText },
+  { slug: 'calculator-hub', href: '/calculator-hub', icon: '🧮', title: 'Calculators', desc: 'VAT, loan, salary, and other business calculators.', badgeBg: CATEGORY_ACCENTS.calculator.badgeFreeBg, accentText: CATEGORY_ACCENTS.calculator.accentText },
+  { slug: 'utilities', href: '/utilities', icon: '⚙️', title: 'Utilities', desc: 'QR codes, passwords, word counter and more.', badgeBg: CATEGORY_ACCENTS.utilities.badgeFreeBg, accentText: CATEGORY_ACCENTS.utilities.accentText },
+];
 
 const SECTIONS = [
   {
@@ -75,12 +163,15 @@ const SECTIONS_WITH_HREF = SECTIONS.map((s) => ({ ...s, tools: s.tools.map((t) =
 
 export default function PdfToolsPage() {
   return (
-    <ToolHubClient
+    <CategoryLandingClient
       accent={CATEGORY_ACCENTS.pdf}
       icon={PdfIcon}
       title="PDF Tools"
-      subtitle="Everything you need to work with PDFs — all in one place."
+      subtitle="Convert, edit, organize, secure and optimize PDF files — all free, all in one place."
+      workflows={WORKFLOWS}
       sections={SECTIONS_WITH_HREF}
+      faqs={FAQS}
+      relatedCategories={RELATED_CATEGORIES}
     />
   );
 }

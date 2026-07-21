@@ -109,4 +109,18 @@ export const CATEGORY_ACCENTS = {
     focusRing: 'rgba(8,145,178,0.12)', shadowTint: 'rgba(8,145,178,0.15)',
     badgeFreeBg: '#CFFAFE', badgeFreeText: '#155E63',
   },
+  calculator: {
+    gradient: 'linear-gradient(120deg, #2563EB 0%, #1D4ED8 100%)',
+    pageBgTop: '#EFF6FF', pageBgBottom: '#DBEAFE',
+    borderColor: '#BFDBFE', accentText: '#1D4ED8',
+    focusRing: 'rgba(37,99,235,0.12)', shadowTint: 'rgba(37,99,235,0.25)',
+    badgeFreeBg: '#DBEAFE', badgeFreeText: '#1E40AF',
+  },
+  utilities: {
+    gradient: 'linear-gradient(120deg, #64748B 0%, #475569 100%)',
+    pageBgTop: '#F8FAFC', pageBgBottom: '#F1F5F9',
+    borderColor: '#E2E8F0', accentText: '#475569',
+    focusRing: 'rgba(71,85,105,0.12)', shadowTint: 'rgba(71,85,105,0.15)',
+    badgeFreeBg: '#E2E8F0', badgeFreeText: '#334155',
+  },
 };

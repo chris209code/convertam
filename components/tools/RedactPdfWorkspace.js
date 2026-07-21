@@ -7,6 +7,9 @@ import { FONT_OPTIONS, DEFAULT_TEXT_STYLE } from './redact-edit/constants';
 import { sampleStyleNear, sampleColorAt } from './redact-edit/fontMatch';
 import { drawTextObjectToCanvas } from './redact-edit/renderText';
 import { clamp, handleSize, pointInRect, handleAt, resizeRect } from './redact-edit/geometry';
+import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
+import WorkspaceStatusPanel from '@/components/workspace/WorkspaceStatusPanel';
 
 const RENDER_SCALE = 1.5;
 
@@ -43,12 +46,14 @@ function smallBtn(active, danger) {
 }
 
 export default function RedactPdfWorkspace() {
+  const { session, startSession, updateDocument, endSession, getDocumentAsFile, restoreOriginal } = useDocumentSession();
   const [file, setFile] = useState(null);
   const [pages, setPages] = useState([]); // { canvas, width, height, textContent } — immutable after load
   const [activePage, setActivePage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [resultBytes, setResultBytes] = useState(null); // set once "Apply Changes" runs; cleared by any further edit
 
   const [activeTool, setActiveTool] = useState('redact'); // 'redact' | 'text'
   const [mode, setMode] = useState('black'); // redaction sub-style, default Black per spec
@@ -74,8 +79,11 @@ export default function RedactPdfWorkspace() {
   const rects = currentObjects.filter((o) => o.type === 'rect');
   const texts = currentObjects.filter((o) => o.type === 'text');
 
-  async function handleFile(e) {
-    const f = e.target.files?.[0];
+  // Shared loader: a fresh upload and a document pulled from an active
+  // Document Session both land here. `fromSession` skips re-registering the
+  // session (it's already the source of truth) and confirms before
+  // replacing an active session that has undownloaded work behind it.
+  async function loadPdfIntoWorkspace(f, { fromSession = false } = {}) {
     if (!f) return;
     if (!window.pdfjsLib) {
       setError('Still loading — please wait a moment and try again.');
@@ -108,12 +116,46 @@ export default function RedactPdfWorkspace() {
       setEditingTextId(null);
       setActiveTool('redact');
       setMode('black');
+      setResultBytes(null);
+      if (!fromSession) {
+        const hasUndownloadedWork = session.status === 'active' && session.history.length > 0;
+        if (!hasUndownloadedWork || window.confirm('Starting with this document will replace the document currently in your session. Continue?')) {
+          startSession(f, { toolSlug: 'redact-pdf' });
+        }
+      }
     } catch (err) {
       console.error(err);
       setError('Could not read this PDF. Please try another file.');
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleFile(e) {
+    const f = e.target.files?.[0];
+    await loadPdfIntoWorkspace(f);
+  }
+
+  async function continueWithSessionDocument() {
+    const f = getDocumentAsFile();
+    await loadPdfIntoWorkspace(f, { fromSession: true });
+  }
+
+  async function handleRestoreOriginal() {
+    const f = await restoreOriginal();
+    if (f) await loadPdfIntoWorkspace(f, { fromSession: true });
+  }
+
+  function handleCloseWorkspace() {
+    endSession();
+    setFile(null);
+    setPages([]);
+    setHistory({ stack: [[]], index: 0 });
+    setActivePage(0);
+    setSelected(null);
+    setEditingTextId(null);
+    setResultBytes(null);
+    setError('');
   }
 
   function newId() {
@@ -128,17 +170,22 @@ export default function RedactPdfWorkspace() {
       const trimmed = h.stack.slice(0, h.index + 1);
       return { stack: [...trimmed, allPages], index: trimmed.length };
     });
+    // Any further edit invalidates a previously-applied result, so the
+    // Continue Working panel can't hand off stale bytes.
+    setResultBytes(null);
   }
 
   function undo() {
     setHistory((h) => (h.index > 0 ? { ...h, index: h.index - 1 } : h));
     setSelected(null);
     setEditingTextId(null);
+    setResultBytes(null);
   }
   function redo() {
     setHistory((h) => (h.index < h.stack.length - 1 ? { ...h, index: h.index + 1 } : h));
     setSelected(null);
     setEditingTextId(null);
+    setResultBytes(null);
   }
   function clearPage() {
     commitObjects([]);
@@ -429,7 +476,12 @@ export default function RedactPdfWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, activePage, history]);
 
-  async function handleDownload() {
+  // Rasterizes every page (redactions + text) into a fresh PDF, then hands
+  // the result to the Document Session instead of downloading immediately —
+  // Continue Working or Download becomes an explicit choice (see
+  // ContinueWorkingPanel below). Redaction rasterizes the page, so the
+  // resulting document no longer has a real text layer.
+  async function handleApply() {
     setBusy(true);
     try {
       const { PDFDocument } = await import('pdf-lib');
@@ -463,16 +515,25 @@ export default function RedactPdfWorkspace() {
       }
 
       const bytes = await pdfDoc.save();
-      const blob = new Blob([bytes], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = (file?.name || 'document').replace(/\.pdf$/i, '') + '-edited.pdf';
-      link.click();
-      URL.revokeObjectURL(url);
+      setResultBytes(bytes);
+      await updateDocument(bytes, { toolSlug: 'redact-pdf', label: 'Redacted / Edited', hasTextLayer: false });
     } finally {
       setBusy(false);
     }
+  }
+
+  // Downloading exports the current document but does not end the
+  // workspace — the session stays active until the user closes it, starts a
+  // new document, or discards it (see WorkspaceStatusPanel's Close Workspace).
+  function downloadResult() {
+    if (!resultBytes) return;
+    const blob = new Blob([resultBytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = (file?.name || 'document').replace(/\.pdf$/i, '') + '-edited.pdf';
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   const totalObjects = history.stack[history.index].reduce((sum, arr) => sum + arr.length, 0);
@@ -484,6 +545,20 @@ export default function RedactPdfWorkspace() {
       <div className="panel">
         <div style={{ border: '2px dashed #CBD5E1', borderRadius: 14, padding: '40px 20px', textAlign: 'center' }}>
           <Script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" />
+          {session.status === 'active' && session.document && (
+            <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12, padding: '14px 16px', marginBottom: 18, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: '1.4rem' }} aria-hidden="true">📄</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>Continue with {session.document.name}</div>
+                <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                  {session.document.pageCount ? `${session.document.pageCount} pages · ` : ''}already in this session — no need to re-upload.
+                </div>
+              </div>
+              <button onClick={continueWithSessionDocument} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+                Continue
+              </button>
+            </div>
+          )}
           <p style={{ fontSize: '0.95rem', fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Upload a PDF to redact or correct</p>
           <p style={{ fontSize: '0.82rem', color: '#64748B', marginBottom: 16 }}>Black out anything sensitive to permanently remove it, or whiteout a mistake and type the correction right on the page. It's genuinely removed, not just covered up.</p>
           <input type="file" accept="application/pdf" onChange={handleFile} />
@@ -501,6 +576,7 @@ export default function RedactPdfWorkspace() {
 
   return (
     <div className="panel">
+      <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} onClose={handleCloseWorkspace} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button onClick={() => goToPage(Math.max(0, activePage - 1))} disabled={activePage === 0} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>←</button>
@@ -654,9 +730,18 @@ export default function RedactPdfWorkspace() {
         </div>
       </div>
 
-      <button onClick={handleDownload} disabled={busy || totalObjects === 0} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', background: (busy || totalObjects === 0) ? '#94A3B8' : '#DC2626', color: 'white', fontWeight: 700, fontSize: '0.9rem', cursor: (busy || totalObjects === 0) ? 'default' : 'pointer' }}>
-        {busy ? 'Applying changes…' : `⬇ Download Edited PDF (${totalObjects} item${totalObjects === 1 ? '' : 's'} across all pages)`}
-      </button>
+      {!resultBytes ? (
+        <button onClick={handleApply} disabled={busy || totalObjects === 0} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', background: (busy || totalObjects === 0) ? '#94A3B8' : '#DC2626', color: 'white', fontWeight: 700, fontSize: '0.9rem', cursor: (busy || totalObjects === 0) ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+          {busy ? 'Applying changes…' : `Apply Changes (${totalObjects} item${totalObjects === 1 ? '' : 's'} across all pages)`}
+        </button>
+      ) : (
+        <>
+          <ContinueWorkingPanel toolSlug="redact-pdf" documentName={file?.name || 'document.pdf'} onDownload={downloadResult} downloading={busy} />
+          <button onClick={() => setResultBytes(null)} style={{ marginTop: 10, background: 'none', border: 'none', color: '#64748B', fontSize: '0.78rem', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+            ← Keep editing
+          </button>
+        </>
+      )}
 
       <p className="privacy-note">Your document is processed entirely in your browser — never uploaded to a server.</p>
     </div>

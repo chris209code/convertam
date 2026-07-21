@@ -3,6 +3,9 @@
 import { useState, useRef, useEffect } from 'react';
 import Script from 'next/script';
 import { PDFDocument } from 'pdf-lib';
+import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
+import WorkspaceStatusPanel from '@/components/workspace/WorkspaceStatusPanel';
 
 function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
 
@@ -120,7 +123,9 @@ const SIGN_TO_ENHANCER_KEY = 'convertam_sign_to_enhancer';
 const ENHANCER_TO_SIGN_KEY = 'convertam_enhancer_to_sign';
 
 export default function SignPdfWorkspace() {
+  const { session, startSession, updateDocument, endSession, getDocumentAsFile, restoreOriginal } = useDocumentSession();
   const [step, setStep] = useState(1); // 1=upload sig, 2=upload pdf, 3=place sig
+  const [resultBytes, setResultBytes] = useState(null); // set once a signature is applied; cleared by any further change
   const [sigStage, setSigStage] = useState('select'); // select | analyzing | manual-crop | needs-enhancer-hint
   const [sourceImg, setSourceImg] = useState(null); // the originally uploaded photo, for the crop fallback
   const [cropRect, setCropRect] = useState(defaultCropRect);
@@ -297,13 +302,12 @@ export default function SignPdfWorkspace() {
     setStep(2);
   }
 
-  // Step 2: Render PDF pages as images for preview
-  async function handlePdfUpload(e) {
-    const file = e.target.files[0];
+  // Step 2: Render PDF pages as images for preview. Shared by a fresh
+  // upload and a document pulled from an active Document Session.
+  async function loadPdfFile(file, { fromSession = false } = {}) {
     if (!file || !window.pdfjsLib) return;
     if (file.size > 100 * 1024 * 1024) {
       setError('That file is larger than the 100MB limit. Please choose a smaller PDF.');
-      e.target.value = '';
       return;
     }
     setPdfFile(file);
@@ -332,11 +336,38 @@ export default function SignPdfWorkspace() {
       setStatus('');
       setBusy(false);
       setStep(3);
+      setResultBytes(null);
+      if (!fromSession) {
+        const hasUndownloadedWork = session.status === 'active' && session.history.length > 0;
+        if (!hasUndownloadedWork || window.confirm('Starting with this document will replace the document currently in your session. Continue?')) {
+          startSession(file, { toolSlug: 'sign-pdf' });
+        }
+      }
     } catch (err) {
       setError('Could not read that PDF. Make sure it is not password-protected.');
       setStatus('');
       setBusy(false);
     }
+  }
+
+  async function handlePdfUpload(e) {
+    const file = e.target.files[0];
+    await loadPdfFile(file);
+  }
+
+  async function continueWithSessionPdf() {
+    const file = getDocumentAsFile();
+    await loadPdfFile(file, { fromSession: true });
+  }
+
+  async function handleRestoreOriginal() {
+    const file = await restoreOriginal();
+    if (file) await loadPdfFile(file, { fromSession: true });
+  }
+
+  function handleCloseWorkspace() {
+    endSession();
+    reset();
   }
 
   // Drag signature on preview
@@ -357,6 +388,7 @@ export default function SignPdfWorkspace() {
       const x = e.clientX - rect.left - dragStart.current.x;
       const y = e.clientY - rect.top - dragStart.current.y;
       setSigPos((p) => ({ ...p, x: Math.max(0, x), y: Math.max(0, y) }));
+      setResultBytes(null);
     }
     function onMouseUp() { isDragging.current = false; }
     window.addEventListener('mousemove', onMouseMove);
@@ -386,10 +418,13 @@ export default function SignPdfWorkspace() {
     const x = touch.clientX - rect.left - dragStart.current.x;
     const y = touch.clientY - rect.top - dragStart.current.y;
     setSigPos((p) => ({ ...p, x: Math.max(0, x), y: Math.max(0, y) }));
+    setResultBytes(null);
   }
 
-  // Embed signature into PDF and download
-  async function handleDownload() {
+  // Embeds the signature into the PDF and hands the result to the Document
+  // Session instead of downloading immediately — Continue Working or
+  // Download becomes an explicit choice (see ContinueWorkingPanel below).
+  async function handleApplySignature() {
     if (!pdfFile || !sigDataUrl) return;
     setBusy(true);
     setStatus('Embedding signature…');
@@ -424,9 +459,9 @@ export default function SignPdfWorkspace() {
       });
 
       const signed = await pdfDoc.save();
-      const baseName = pdfFile.name.replace('.pdf', '');
-      downloadBlob(new Blob([signed], { type: 'application/pdf' }), `${baseName}-signed.pdf`);
-      setStatus('Done — your signed PDF has downloaded.');
+      setResultBytes(signed);
+      await updateDocument(signed, { toolSlug: 'sign-pdf', label: 'Signed' });
+      setStatus('Signature placed — choose what to do next.');
     } catch (err) {
       console.error(err);
       setError('Could not embed the signature. Please try again.');
@@ -434,6 +469,16 @@ export default function SignPdfWorkspace() {
     } finally {
       setBusy(false);
     }
+  }
+
+  // Downloading exports the current document but does not end the
+  // workspace — the session stays active until the user closes it, starts a
+  // new document, or discards it (see WorkspaceStatusPanel's Close Workspace).
+  function downloadResult() {
+    if (!resultBytes || !pdfFile) return;
+    const baseName = pdfFile.name.replace('.pdf', '');
+    downloadBlob(new Blob([resultBytes], { type: 'application/pdf' }), `${baseName}-signed.pdf`);
+    setStatus('Done — your signed PDF has downloaded.');
   }
 
   function reset() {
@@ -449,6 +494,7 @@ export default function SignPdfWorkspace() {
     setSigPos({ x: 50, y: 50, w: 180, h: 60 });
     setStatus('');
     setError('');
+    setResultBytes(null);
   }
 
   return (
@@ -457,6 +503,8 @@ export default function SignPdfWorkspace() {
         src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
         onLoad={() => setPdfjsReady(true)}
       />
+
+      <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} onClose={handleCloseWorkspace} />
 
       {/* Step indicators */}
       <div className="flex gap-3 mb-6">
@@ -584,6 +632,20 @@ export default function SignPdfWorkspace() {
               <button onClick={() => { setStep(1); setSigStage('select'); setImportedFromEnhancer(false); }} className="text-xs text-stamp-blue underline">Change</button>
             </div>
           </div>
+          {session.status === 'active' && session.document && (
+            <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12, padding: '14px 16px', marginBottom: 14, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: '1.4rem' }} aria-hidden="true">📄</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>Continue with {session.document.name}</div>
+                <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                  {session.document.pageCount ? `${session.document.pageCount} pages · ` : ''}already in this session — no need to re-upload.
+                </div>
+              </div>
+              <button onClick={continueWithSessionPdf} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+                Continue
+              </button>
+            </div>
+          )}
           <p className="text-sm text-ink-soft mb-4">Now upload the PDF you want to sign.</p>
           <label className="dropzone block cursor-pointer" style={{ borderColor: '#e2dcc9' }}>
             <input type="file" accept="application/pdf" onChange={handlePdfUpload} disabled={!pdfjsReady} hidden />
@@ -609,7 +671,7 @@ export default function SignPdfWorkspace() {
               {pdfPages.map((_, i) => (
                 <button
                   key={i}
-                  onClick={() => setSelectedPage(i)}
+                  onClick={() => { setSelectedPage(i); setResultBytes(null); }}
                   className={`btn-ghost-sm ${selectedPage === i ? 'active-choice' : ''}`}
                 >
                   Page {i + 1}
@@ -664,17 +726,27 @@ export default function SignPdfWorkspace() {
               onChange={(e) => {
                 const w = Number(e.target.value);
                 setSigPos((p) => ({ ...p, w, h: Math.round(w / 3) }));
+                setResultBytes(null);
               }}
               className="flex-1"
             />
           </div>
 
-          <div className="actions mt-4">
-            <button className="btn btn-primary" disabled={busy} onClick={handleDownload}>
-              {busy ? 'Embedding…' : 'Download signed PDF'}
-            </button>
-            <button className="btn btn-ghost" onClick={reset}>Start over</button>
-          </div>
+          {!resultBytes ? (
+            <div className="actions mt-4">
+              <button className="btn btn-primary" disabled={busy} onClick={handleApplySignature}>
+                {busy ? 'Embedding…' : 'Apply signature'}
+              </button>
+              <button className="btn btn-ghost" onClick={reset}>Start over</button>
+            </div>
+          ) : (
+            <>
+              <ContinueWorkingPanel toolSlug="sign-pdf" documentName={pdfFile?.name || 'document.pdf'} onDownload={downloadResult} downloading={busy} />
+              <div className="mt-3">
+                <button className="btn btn-ghost" onClick={() => setResultBytes(null)}>← Place signature again</button>
+              </div>
+            </>
+          )}
 
           {status && <div className="status success">{status}</div>}
           {error && <div className="status error">{error}</div>}

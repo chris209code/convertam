@@ -4,6 +4,7 @@ import Script from 'next/script';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import FeedbackWidget from '@/components/FeedbackWidget';
+import { DocumentSessionProvider } from '@/components/document-session/DocumentSessionProvider';
 
 const GA_ID = 'G-1GVMCT8YX3';
 
@@ -88,10 +89,12 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body className="text-ink font-body min-h-screen">
-        <Header />
-        {children}
-        <Footer />
-        <FeedbackWidget />
+        <DocumentSessionProvider>
+          <Header />
+          {children}
+          <Footer />
+          <FeedbackWidget />
+        </DocumentSessionProvider>
       </body>
     </html>
   );

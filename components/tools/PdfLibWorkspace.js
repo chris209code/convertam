@@ -71,7 +71,7 @@ export default function PdfLibWorkspace({ mode, accept: acceptProp }) {
   const [files, setFiles] = useState([]);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
-  const [rotation, setRotation] = useState(90);
+  const [rotation, setRotation] = useState(0);
   const [range, setRange] = useState('');
   const [pageCount, setPageCount] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -306,13 +306,13 @@ export default function PdfLibWorkspace({ mode, accept: acceptProp }) {
         <div className="mt-4">
           <label className="text-sm font-medium block mb-2">Rotate by</label>
           <div className="flex gap-2">
-            {[90, 180, 270].map((d) => (
+            {[0, 90, 180, 270].map((d) => (
               <button
                 key={d}
                 onClick={() => { setRotation(d); setResultBytes(null); }}
                 className={`btn-ghost-sm ${rotation === d ? 'active-choice' : ''}`}
               >
-                {d}°
+                {d === 0 ? 'None' : `${d}°`}
               </button>
             ))}
           </div>
@@ -336,8 +336,8 @@ export default function PdfLibWorkspace({ mode, accept: acceptProp }) {
 
       {(!PUSH_MODES.has(mode) || !resultBytes) ? (
         <div className="actions">
-          <button className="btn btn-primary" disabled={files.length === 0 || busy} onClick={handleRun}>
-            {busy ? 'Working…' : actionLabel(mode)}
+          <button className="btn btn-primary" disabled={files.length === 0 || busy || (mode === 'rotate' && rotation === 0)} onClick={handleRun}>
+            {busy ? 'Working…' : mode === 'rotate' && rotation === 0 ? 'Choose a rotation' : actionLabel(mode)}
           </button>
           {files.length > 0 && (
             <button className="btn btn-ghost" onClick={clearAll}>

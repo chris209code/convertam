@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 const MAX_SIZE_MB = 100;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 
-export default function UploadBox({ accept, multiple, onFiles, label }) {
+export default function UploadBox({ accept, multiple, onFiles, label, compact }) {
   const inputRef = useRef(null);
   const [drag, setDrag] = useState(false);
   const [sizeError, setSizeError] = useState('');
@@ -42,6 +42,32 @@ export default function UploadBox({ accept, multiple, onFiles, label }) {
     ? 'JPG · PNG'
     : accept || 'any file';
 
+  const input = (
+    <input
+      ref={inputRef}
+      type="file"
+      accept={accept}
+      multiple={multiple}
+      onChange={handleChange}
+      hidden
+    />
+  );
+
+  // Once a document is already loaded, the full dropzone would dominate the
+  // interface for no reason — the workspace already knows which document is
+  // active, so replacing it is a small affordance, not the primary action.
+  if (compact) {
+    return (
+      <div>
+        {input}
+        <button type="button" onClick={pick} className="text-xs text-ink-soft underline" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}>
+          ⇄ Replace file
+        </button>
+        {sizeError && <div className="status error mt-2">{sizeError}</div>}
+      </div>
+    );
+  }
+
   return (
     <div>
       <div
@@ -54,14 +80,7 @@ export default function UploadBox({ accept, multiple, onFiles, label }) {
         onDragLeave={() => setDrag(false)}
         onDrop={handleDrop}
       >
-        <input
-          ref={inputRef}
-          type="file"
-          accept={accept}
-          multiple={multiple}
-          onChange={handleChange}
-          hidden
-        />
+        {input}
         <div className="dz-icon">[ {hint} ]</div>
         <div className="dz-main">{label || 'Click to choose a file, or drag it here'}</div>
         <div className="dz-sub">Max {MAX_SIZE_MB}MB per file.</div>

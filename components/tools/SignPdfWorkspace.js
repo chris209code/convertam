@@ -5,7 +5,6 @@ import Script from 'next/script';
 import { PDFDocument } from 'pdf-lib';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
-import WorkspaceStatusPanel from '@/components/workspace/WorkspaceStatusPanel';
 
 function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
 
@@ -123,7 +122,7 @@ const SIGN_TO_ENHANCER_KEY = 'convertam_sign_to_enhancer';
 const ENHANCER_TO_SIGN_KEY = 'convertam_enhancer_to_sign';
 
 export default function SignPdfWorkspace() {
-  const { session, startSession, updateDocument, getDocumentAsFile, restoreOriginal } = useDocumentSession();
+  const { session, startSession, updateDocument, getDocumentAsFile } = useDocumentSession();
   const [step, setStep] = useState(1); // 1=upload sig, 2=upload pdf, 3=place sig
   const [resultBytes, setResultBytes] = useState(null); // set once a signature is applied; cleared by any further change
   const [sigStage, setSigStage] = useState('select'); // select | analyzing | manual-crop | needs-enhancer-hint
@@ -359,12 +358,6 @@ export default function SignPdfWorkspace() {
     const file = getDocumentAsFile();
     await loadPdfFile(file, { fromSession: true });
   }
-
-  async function handleRestoreOriginal() {
-    const file = await restoreOriginal();
-    if (file) await loadPdfFile(file, { fromSession: true });
-  }
-
   // Drag signature on preview
   function onMouseDown(e) {
     e.preventDefault();
@@ -498,8 +491,6 @@ export default function SignPdfWorkspace() {
         src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
         onLoad={() => setPdfjsReady(true)}
       />
-
-      <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} />
 
       {/* Step indicators */}
       <div className="flex gap-3 mb-6">

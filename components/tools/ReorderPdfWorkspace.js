@@ -5,7 +5,6 @@ import Script from 'next/script';
 import { PDFDocument } from 'pdf-lib';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
-import WorkspaceStatusPanel from '@/components/workspace/WorkspaceStatusPanel';
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -19,7 +18,7 @@ function downloadBlob(blob, filename) {
 }
 
 export default function ReorderPdfWorkspace() {
-  const { session, startSession, updateDocument, getDocumentAsFile, restoreOriginal } = useDocumentSession();
+  const { session, startSession, updateDocument, getDocumentAsFile } = useDocumentSession();
   const [file, setFile] = useState(null);
   const [pages, setPages] = useState([]); // { index: original index, dataUrl }
   const [busy, setBusy] = useState(false);
@@ -81,12 +80,6 @@ export default function ReorderPdfWorkspace() {
     const f = getDocumentAsFile();
     await loadPdfFile(f, { fromSession: true });
   }
-
-  async function handleRestoreOriginal() {
-    const f = await restoreOriginal();
-    if (f) await loadPdfFile(f, { fromSession: true });
-  }
-
   // Drag and drop reordering
   function onDragStart(i) {
     dragItem.current = i;
@@ -184,8 +177,6 @@ export default function ReorderPdfWorkspace() {
         src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
         onLoad={() => setPdfjsReady(true)}
       />
-      <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} />
-
       {!file && session.status === 'active' && session.document && (
         <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12, padding: '14px 16px', marginBottom: 14, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: '1.4rem' }} aria-hidden="true">📄</span>

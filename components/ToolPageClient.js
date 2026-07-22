@@ -59,6 +59,7 @@ import QuickGuideTab from '@/components/tool-guide/QuickGuideTab';
 import FullFaqSection from '@/components/tool-guide/FullFaqSection';
 import RelatedToolsCard from '@/components/tool-guide/RelatedToolsCard';
 import WorkspaceLayoutShell from '@/components/workspace/WorkspaceLayoutShell';
+import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 
 const isFree = (mode) =>
   ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice',
@@ -85,6 +86,13 @@ export default function ToolPageClient({ tool }) {
   // tips box / related-chips row below — scoped per-tool via that data,
   // so every other tool's page renders exactly as it did before.
   const guide = toolGuides[tool.slug];
+  const { session } = useDocumentSession();
+  // Price/speed badges, the steps breadcrumb, and the tips box are
+  // acquisition chrome aimed at a cold visitor deciding whether to use this
+  // tool at all — mid-session, the sidebar already orients you (active tool,
+  // grouped navigation), so repeating that chrome on every navigation just
+  // reads as "a new page" instead of "still the same workspace."
+  const inSession = session.status === 'active';
 
   return (
     <WorkspaceLayoutShell>
@@ -92,17 +100,19 @@ export default function ToolPageClient({ tool }) {
       <main className="max-w-5xl mx-auto px-5 md:px-10 py-10">
         <p className="font-mono text-xs text-stamp-amber tracking-wide mb-2">{tool.category.toUpperCase()}</p>
         <h1 className="font-display text-3xl md:text-4xl font-bold mb-2">{tool.title}</h1>
-        <p className="text-ink-soft mb-4 max-w-xl">{tool.description}</p>
+        {!inSession && <p className="text-ink-soft mb-4 max-w-xl">{tool.description}</p>}
 
-        <div className="flex flex-wrap gap-2 mb-6">
-          {[{ icon: '⭐', label: getPriceBadge(tool.mode) }, { icon: '⚡', label: 'Fast' }, { icon: '🔒', label: 'Secure' }, { icon: '🚫', label: 'No Login Required' }].map(({ icon, label }) => (
-            <span key={label} className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full" style={{ background: '#fffefb', border: '1px solid #e2dcc9', color: '#1c2333' }}>
-              {icon} {label}
-            </span>
-          ))}
-        </div>
+        {!inSession && (
+          <div className="flex flex-wrap gap-2 mb-6">
+            {[{ icon: '⭐', label: getPriceBadge(tool.mode) }, { icon: '⚡', label: 'Fast' }, { icon: '🔒', label: 'Secure' }, { icon: '🚫', label: 'No Login Required' }].map(({ icon, label }) => (
+              <span key={label} className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full" style={{ background: '#fffefb', border: '1px solid #e2dcc9', color: '#1c2333' }}>
+                {icon} {label}
+              </span>
+            ))}
+          </div>
+        )}
 
-        {meta.steps && (
+        {meta.steps && !inSession && (
           <div className="flex items-center gap-2 flex-wrap mb-6">
             {meta.steps.map((step, i, arr) => (
               <div key={i} className="flex items-center gap-2">
@@ -115,7 +125,7 @@ export default function ToolPageClient({ tool }) {
 
         {/* Tips before workspace — superseded by the Quick Guide panel for
             tools that have one, so it isn't shown twice. */}
-        {meta.tips && !guide && (
+        {meta.tips && !guide && !inSession && (
           <div className="mb-6 p-4 rounded-xl" style={{ background: '#ECFDF5', border: '1px solid #A7F3D0' }}>
             <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: '#065F46' }}>💡 Tips for best results</p>
             <div className="flex flex-col gap-1.5">

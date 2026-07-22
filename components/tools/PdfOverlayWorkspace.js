@@ -3,10 +3,9 @@
 import { useState } from 'react';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
-import WorkspaceStatusPanel from '@/components/workspace/WorkspaceStatusPanel';
 
 export default function PdfOverlayWorkspace() {
-  const { session, startSession, updateDocument, getDocumentAsFile, restoreOriginal } = useDocumentSession();
+  const { session, startSession, updateDocument, getDocumentAsFile } = useDocumentSession();
   const [baseFile, setBaseFile] = useState(null);
   const [overlayFile, setOverlayFile] = useState(null);
   const [opacity, setOpacity] = useState(1);
@@ -29,12 +28,6 @@ export default function PdfOverlayWorkspace() {
       }
     }
   }
-
-  async function handleRestoreOriginal() {
-    const f = await restoreOriginal();
-    if (f) setBase(f, true);
-  }
-
   async function handleApply() {
     if (!baseFile || !overlayFile) return;
     setBusy(true);
@@ -89,8 +82,6 @@ export default function PdfOverlayWorkspace() {
 
   return (
     <div className="panel">
-      <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} />
-
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
         <div style={{ border: '2px dashed #CBD5E1', borderRadius: 12, padding: 24, textAlign: 'center' }}>
           <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Base document</p>

@@ -3,8 +3,13 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
-import { tools } from '@/lib/tools-config';
+import { tools, getTool } from '@/lib/tools-config';
 import { canPullSessionDocument, isDestinationOnly } from '@/lib/workspace/toolCompatibility';
+
+function toolLabel(slug) {
+  if (!slug) return null;
+  return getTool(slug)?.title || slug;
+}
 
 const GROUPS = [
   { id: 'edit', label: 'Edit', icon: '✏️' },
@@ -61,9 +66,11 @@ function ToolLink({ tool, active, onNavigate }) {
   );
 }
 
-function SidebarContent({ session, onNavigate, onClose }) {
+function SidebarContent({ session, onNavigate, onClose, onRestoreOriginal }) {
   const doc = session.document;
   const groups = groupedTools();
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const { history } = session;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -79,6 +86,37 @@ function SidebarContent({ session, onNavigate, onClose }) {
           {doc?.pageCount != null ? `${doc.pageCount} page${doc.pageCount === 1 ? '' : 's'} · ` : ''}{formatBytes(doc?.sizeBytes)}
         </div>
       </div>
+
+      {/* The one place operation history + Restore Original live — kept out
+          of every tool page itself so document status isn't asserted twice. */}
+      {history.length > 0 && (
+        <div style={{ padding: '10px 16px', borderBottom: '1px solid #EEF1F5' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={() => setHistoryOpen((v) => !v)}
+              style={{ background: 'none', border: 'none', padding: 0, fontSize: '0.72rem', color: '#64748B', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}
+            >
+              {history.length} operation{history.length === 1 ? '' : 's'} {historyOpen ? '▾' : '▸'}
+            </button>
+            <button
+              onClick={onRestoreOriginal}
+              style={{ marginLeft: 'auto', padding: '4px 8px', borderRadius: 6, border: '1px solid #E2E8F0', background: 'white', color: '#334155', fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+            >
+              ↺ Restore
+            </button>
+          </div>
+          {historyOpen && (
+            <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <li style={{ fontSize: '0.72rem', color: '#334155' }}>✓ Uploaded</li>
+              {history.map((entry) => (
+                <li key={entry.id} style={{ fontSize: '0.72rem', color: '#334155' }}>
+                  ✓ {entry.label || toolLabel(entry.toolSlug) || 'Edited'}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '10px 10px' }}>
         {groups.map((g) => (
@@ -121,7 +159,7 @@ function SidebarContent({ session, onNavigate, onClose }) {
 // positioned bottom-left so it never collides with the Quick Guide trigger
 // (top-right) or the Feedback tab (mid-right).
 export default function WorkspaceSidebar() {
-  const { session, endSession } = useDocumentSession();
+  const { session, endSession, restoreOriginal } = useDocumentSession();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   if (session.status !== 'active' || !session.document) return null;
@@ -135,13 +173,21 @@ export default function WorkspaceSidebar() {
     window.location.reload();
   }
 
+  // Same reasoning as Close: restoring reverts the session document, and a
+  // reload is the simplest reliable way for whichever tool is on screen to
+  // pick that up — the same recovery path already proven for hard refresh.
+  function handleRestoreOriginal() {
+    if (!window.confirm('Restore the original uploaded document? Changes made in this workspace will no longer be applied.')) return;
+    restoreOriginal().then(() => window.location.reload());
+  }
+
   return (
     <>
       <div
         className="hidden md:block md:sticky md:z-[1001] md:flex-shrink-0 md:w-[248px] md:border-r md:border-[#E2E6ED] md:top-16 md:self-start md:h-[calc(100vh-64px)]"
         style={{ background: '#FAFBFC' }}
       >
-        <SidebarContent session={session} onClose={handleClose} />
+        <SidebarContent session={session} onClose={handleClose} onRestoreOriginal={handleRestoreOriginal} />
       </div>
 
       {/* Mobile trigger pill — z-index kept above QuickGuideTab's (999/1001)
@@ -172,7 +218,7 @@ export default function WorkspaceSidebar() {
               spec — a max-height-only clamp doesn't count, which otherwise
               let content overflow the sheet and pushed the footer buttons
               off-screen. */}
-          <SidebarContent session={session} onNavigate={() => setMobileOpen(false)} onClose={handleClose} />
+          <SidebarContent session={session} onNavigate={() => setMobileOpen(false)} onClose={handleClose} onRestoreOriginal={handleRestoreOriginal} />
         </div>
       </div>
     </>

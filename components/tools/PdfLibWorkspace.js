@@ -13,7 +13,25 @@ import {
 } from '@/lib/pdf-tools';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
-import WorkspaceStatusPanel from '@/components/workspace/WorkspaceStatusPanel';
+
+async function loadPdfjs() {
+  let pdfjs = window.pdfjsLib;
+  if (pdfjs) return pdfjs;
+  await new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[src*="pdf.min.js"]');
+    if (existing) { resolve(); return; }
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    script.onload = resolve;
+    script.onerror = reject;
+    document.body.appendChild(script);
+  });
+  pdfjs = window.pdfjsLib;
+  if (pdfjs) {
+    pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+  return pdfjs;
+}
 
 // Which of this shared component's modes participate in the Document
 // Session, and how. merge/rotate/extract are full round-trip (pull the
@@ -49,7 +67,7 @@ function actionLabel(mode) {
 }
 
 export default function PdfLibWorkspace({ mode, accept: acceptProp }) {
-  const { session, startSession, updateDocument, getDocumentAsFile, restoreOriginal } = useDocumentSession();
+  const { session, startSession, updateDocument, getDocumentAsFile } = useDocumentSession();
   const [files, setFiles] = useState([]);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
@@ -59,6 +77,8 @@ export default function PdfLibWorkspace({ mode, accept: acceptProp }) {
   const [busy, setBusy] = useState(false);
   const [resultBytes, setResultBytes] = useState(null);
   const [usingSessionDoc, setUsingSessionDoc] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const multiple = mode === 'merge' || mode === 'image-to-pdf';
   const accept = acceptProp || (mode === 'image-to-pdf' ? 'image/*' : 'application/pdf');
@@ -90,6 +110,26 @@ export default function PdfLibWorkspace({ mode, accept: acceptProp }) {
         }
       }
     }
+    if (mode === 'rotate' && list[0]) {
+      setPreviewUrl(null);
+      setPreviewLoading(true);
+      try {
+        const pdfjs = await loadPdfjs();
+        const buf = await list[0].arrayBuffer();
+        const pdf = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 1.5 });
+        const c = document.createElement('canvas');
+        c.width = viewport.width;
+        c.height = viewport.height;
+        await page.render({ canvasContext: c.getContext('2d'), viewport }).promise;
+        setPreviewUrl(c.toDataURL());
+      } catch (err) {
+        console.error('Preview error:', err);
+      } finally {
+        setPreviewLoading(false);
+      }
+    }
   }
 
   async function continueWithSessionDocument() {
@@ -109,14 +149,10 @@ export default function PdfLibWorkspace({ mode, accept: acceptProp }) {
     setResultBytes(null);
   }
 
-  async function handleRestoreOriginal() {
-    const f = await restoreOriginal();
-    if (f) await handleFiles([f], { fromSession: true });
-  }
-
   function removeFile(i) {
     setFiles(files.filter((_, idx) => idx !== i));
     setResultBytes(null);
+    if (i === 0) setPreviewUrl(null);
   }
 
   function clearAll() {
@@ -127,6 +163,7 @@ export default function PdfLibWorkspace({ mode, accept: acceptProp }) {
     setRange('');
     setResultBytes(null);
     setUsingSessionDoc(false);
+    setPreviewUrl(null);
   }
 
   async function handleRun() {
@@ -197,8 +234,6 @@ export default function PdfLibWorkspace({ mode, accept: acceptProp }) {
 
   return (
     <div className="panel">
-      {PULL_MODES.has(mode) && <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} />}
-
       {PULL_MODES.has(mode) && mode !== 'merge' && files.length === 0 && session.status === 'active' && session.document && (
         <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12, padding: '14px 16px', marginBottom: 14, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: '1.4rem' }} aria-hidden="true">📄</span>
@@ -227,7 +262,7 @@ export default function PdfLibWorkspace({ mode, accept: acceptProp }) {
         </div>
       )}
 
-      <UploadBox accept={accept} multiple={multiple} onFiles={handleFiles} />
+      <UploadBox accept={accept} multiple={multiple} onFiles={handleFiles} compact={!multiple && files.length > 0} />
 
       {files.length > 0 && (
         <div className="file-list">
@@ -240,6 +275,30 @@ export default function PdfLibWorkspace({ mode, accept: acceptProp }) {
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {mode === 'rotate' && files.length > 0 && (
+        <div
+          style={{
+            display: 'flex', justifyContent: 'center', alignItems: 'center',
+            minHeight: 300, padding: '28px 16px', marginTop: 14, borderRadius: 12,
+            background: '#F1F5F9', overflow: 'visible',
+          }}
+        >
+          {previewLoading && <p className="text-sm text-ink-soft">Loading preview…</p>}
+          {!previewLoading && previewUrl && (
+            <img
+              src={previewUrl}
+              alt="Document preview"
+              style={{
+                maxWidth: '85%', maxHeight: 260, width: 'auto', height: 'auto',
+                borderRadius: 4, boxShadow: '0 4px 16px rgba(15,23,42,0.18)',
+                transform: `rotate(${rotation}deg)`, transition: 'transform 0.25s ease',
+              }}
+            />
+          )}
+          {!previewLoading && !previewUrl && <p className="text-sm text-ink-soft">Preview unavailable — rotation will still apply on download.</p>}
         </div>
       )}
 

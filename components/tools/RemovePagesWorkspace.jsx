@@ -3,10 +3,9 @@
 import { useState, useRef } from 'react';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
-import WorkspaceStatusPanel from '@/components/workspace/WorkspaceStatusPanel';
 
 export default function RemovePagesWorkspace() {
-  const { session, startSession, updateDocument, getDocumentAsFile, restoreOriginal } = useDocumentSession();
+  const { session, startSession, updateDocument, getDocumentAsFile } = useDocumentSession();
   const [pdfBytes, setPdfBytes] = useState(null);
   const [fileName, setFileName] = useState('document.pdf');
   const [thumbs, setThumbs] = useState([]);
@@ -40,12 +39,6 @@ export default function RemovePagesWorkspace() {
     const f = getDocumentAsFile();
     await handleFile(f, { fromSession: true });
   }
-
-  async function handleRestoreOriginal() {
-    const f = await restoreOriginal();
-    if (f) await handleFile(f, { fromSession: true });
-  }
-
   async function renderThumbs(buffer) {
     const pdfjsLib = await import('pdfjs-dist');
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
@@ -110,7 +103,6 @@ export default function RemovePagesWorkspace() {
   if (!thumbs.length) {
     return (
       <div>
-        <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} />
         {session.status === 'active' && session.document && (
           <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12, padding: '14px 16px', marginBottom: 14, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ fontSize: '1.4rem' }} aria-hidden="true">📄</span>
@@ -144,7 +136,6 @@ export default function RemovePagesWorkspace() {
 
   return (
     <div>
-      <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} />
       <p className="text-sm text-ink-soft mb-4">
         Click pages to mark for removal.
         {marked.size > 0 && <span className="ml-2 font-semibold" style={{ color: '#e53e3e' }}>{marked.size} page{marked.size > 1 ? 's' : ''} selected</span>}

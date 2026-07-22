@@ -9,7 +9,6 @@ import { drawTextObjectToCanvas } from './redact-edit/renderText';
 import { clamp, handleSize, pointInRect, handleAt, resizeRect } from './redact-edit/geometry';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
-import WorkspaceStatusPanel from '@/components/workspace/WorkspaceStatusPanel';
 
 const RENDER_SCALE = 1.5;
 
@@ -46,7 +45,7 @@ function smallBtn(active, danger) {
 }
 
 export default function RedactPdfWorkspace() {
-  const { session, startSession, updateDocument, getDocumentAsFile, restoreOriginal } = useDocumentSession();
+  const { session, startSession, updateDocument, getDocumentAsFile } = useDocumentSession();
   const [file, setFile] = useState(null);
   const [pages, setPages] = useState([]); // { canvas, width, height, textContent } — immutable after load
   const [activePage, setActivePage] = useState(0);
@@ -140,12 +139,6 @@ export default function RedactPdfWorkspace() {
     const f = getDocumentAsFile();
     await loadPdfIntoWorkspace(f, { fromSession: true });
   }
-
-  async function handleRestoreOriginal() {
-    const f = await restoreOriginal();
-    if (f) await loadPdfIntoWorkspace(f, { fromSession: true });
-  }
-
 
   function newId() {
     return nextIdRef.current++;
@@ -565,7 +558,6 @@ export default function RedactPdfWorkspace() {
 
   return (
     <div className="panel">
-      <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button onClick={() => goToPage(Math.max(0, activePage - 1))} disabled={activePage === 0} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>←</button>

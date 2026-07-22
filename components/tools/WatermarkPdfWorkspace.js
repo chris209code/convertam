@@ -5,7 +5,6 @@ import { PDFDocument, rgb, degrees } from 'pdf-lib';
 import UploadBox from '@/components/UploadBox';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
-import WorkspaceStatusPanel from '@/components/workspace/WorkspaceStatusPanel';
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -40,7 +39,7 @@ const COLORS = [
 ];
 
 export default function WatermarkPdfWorkspace() {
-  const { session, startSession, updateDocument, getDocumentAsFile, restoreOriginal } = useDocumentSession();
+  const { session, startSession, updateDocument, getDocumentAsFile } = useDocumentSession();
   const [file, setFile] = useState(null);
   const [resultBytes, setResultBytes] = useState(null);
   const [text, setText] = useState('CONFIDENTIAL');
@@ -158,12 +157,6 @@ export default function WatermarkPdfWorkspace() {
     const f = getDocumentAsFile();
     if (f) await handleFiles([f], { fromSession: true });
   }
-
-  async function handleRestoreOriginal() {
-    const f = await restoreOriginal();
-    if (f) await handleFiles([f], { fromSession: true });
-  }
-
   function getCanvasPos(e) {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
@@ -276,8 +269,6 @@ export default function WatermarkPdfWorkspace() {
 
   return (
     <div className="panel">
-      <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} />
-
       {!file && session.status === 'active' && session.document && (
         <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12, padding: '14px 16px', marginBottom: 14, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: '1.4rem' }} aria-hidden="true">📄</span>

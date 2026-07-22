@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
-import WorkspaceStatusPanel from '@/components/workspace/WorkspaceStatusPanel';
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -18,7 +17,7 @@ function downloadBlob(blob, filename) {
 }
 
 export default function OverlayTextWorkspace() {
-  const { session, startSession, updateDocument, getDocumentAsFile, restoreOriginal } = useDocumentSession();
+  const { session, startSession, updateDocument, getDocumentAsFile } = useDocumentSession();
   const [file, setFile] = useState(null);
   const [resultBytes, setResultBytes] = useState(null);
   const [pages, setPages] = useState([]);
@@ -94,12 +93,6 @@ export default function OverlayTextWorkspace() {
     const f = getDocumentAsFile();
     await handleFile(f, { fromSession: true });
   }
-
-  async function handleRestoreOriginal() {
-    const f = await restoreOriginal();
-    if (f) await handleFile(f, { fromSession: true });
-  }
-
   function handleWrapperClick(e) {
     if (!addMode) return;
     const wrapper = wrapperRef.current;
@@ -187,8 +180,6 @@ export default function OverlayTextWorkspace() {
 
   return (
     <div className="panel">
-      <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} />
-
       {step === 1 && (
         <div>
           {session.status === 'active' && session.document && (

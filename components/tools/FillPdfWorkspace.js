@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { PDFDocument } from 'pdf-lib';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
-import WorkspaceStatusPanel from '@/components/workspace/WorkspaceStatusPanel';
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -18,7 +17,7 @@ function downloadBlob(blob, filename) {
 }
 
 export default function FillPdfWorkspace() {
-  const { session, startSession, updateDocument, getDocumentAsFile, restoreOriginal } = useDocumentSession();
+  const { session, startSession, updateDocument, getDocumentAsFile } = useDocumentSession();
   const [file, setFile] = useState(null);
   const [fields, setFields] = useState([]);
   const [values, setValues] = useState({});
@@ -89,11 +88,6 @@ export default function FillPdfWorkspace() {
     await loadFile(f, { fromSession: true });
   }
 
-  async function handleRestoreOriginal() {
-    const f = await restoreOriginal();
-    if (f) await loadFile(f, { fromSession: true });
-  }
-
   async function handleApply() {
     if (!file) return;
     setBusy(true);
@@ -156,8 +150,6 @@ export default function FillPdfWorkspace() {
 
   return (
     <div className="panel">
-      <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} />
-
       {/* Explainer */}
       <div className="mb-5 p-4 rounded-xl text-sm" style={{ background: '#f0f5ff', border: '1px solid #d0dcf5' }}>
         <p className="font-semibold text-ink mb-1">📋 What is a digital fillable PDF?</p>

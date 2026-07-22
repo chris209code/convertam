@@ -15,7 +15,7 @@ const DEPTH_INSTRUCTION = {
   detailed: 'Give a thorough, detailed explanation — show every step, explain why each step is taken, and note any relevant general principle the problem illustrates.',
 };
 
-function buildPrompt({ mode, question, targetLanguage, hasImage, depth }) {
+function buildPrompt({ mode, question, hasImage, depth }) {
   const imageNote = hasImage ? 'The question is shown in the attached image — read it carefully first, then answer based on what it actually says.' : '';
   const depthInstruction = DEPTH_INSTRUCTION[depth] || DEPTH_INSTRUCTION['step-by-step'];
 
@@ -36,15 +36,6 @@ Explanation:
 Always put "Final answer: ..." first, before any explanation — this must appear even if you have to shorten the explanation to fit. If the question is ambiguous or you're not fully certain of the intended problem, say so briefly within the explanation, not before the final answer line.`;
   }
 
-  if (mode === 'translate') {
-    return `You are a translation assistant. ${imageNote}
-
-Text to translate: ${question || '(see attached image)'}
-Target language: ${targetLanguage || 'English'}
-
-First detect the source language, then provide an accurate, natural-sounding translation into ${targetLanguage || 'English'}. Return the translation clearly. If helpful, briefly note the detected source language at the top, then give the translation on its own line.`;
-  }
-
   // general
   return `You are a helpful, knowledgeable assistant. ${imageNote}
 
@@ -53,11 +44,10 @@ Question: ${question || '(see attached image)'}
 Give a clear, accurate, direct answer first, then explain your reasoning. ${depthInstruction}`;
 }
 
-function buildContinuePrompt({ mode, question, partialAnswer, targetLanguage }) {
+function buildContinuePrompt({ question, partialAnswer }) {
   return `You were answering this question and your response was cut off before finishing. Continue EXACTLY from where you left off — do not repeat anything already written, do not restart, do not re-state the final answer if it was already given. Just continue the sentence/explanation naturally from the exact cutoff point.
 
 Original question: ${question}
-${mode === 'translate' ? `Target language: ${targetLanguage || 'English'}` : ''}
 
 What was already written (cut off mid-way):
 """
@@ -93,20 +83,19 @@ export async function POST(request) {
 
   try {
     const contentType = request.headers.get('content-type') || '';
-    let mode, question, targetLanguage, depth, continueFrom, parts, hasImage = false;
+    let mode, question, depth, continueFrom, parts, hasImage = false;
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await request.formData();
       mode = formData.get('mode') || 'general';
       question = formData.get('question') || '';
-      targetLanguage = formData.get('targetLanguage') || '';
       depth = formData.get('depth') || 'step-by-step';
       const image = formData.get('image');
       if (!image) {
         return Response.json({ error: 'No image received.' }, { status: 400 });
       }
       const buf = Buffer.from(await image.arrayBuffer());
-      const prompt = buildPrompt({ mode, question, targetLanguage, hasImage: true, depth });
+      const prompt = buildPrompt({ mode, question, hasImage: true, depth });
       hasImage = true;
       parts = [
         { text: prompt },
@@ -116,19 +105,18 @@ export async function POST(request) {
       const body = await request.json();
       mode = body.mode || 'general';
       question = body.question || '';
-      targetLanguage = body.targetLanguage || '';
       depth = body.depth || 'step-by-step';
       continueFrom = body.continueFrom || null;
 
       if (continueFrom) {
         // Continuation request — build from the partial answer, not a fresh question.
-        const prompt = buildContinuePrompt({ mode, question, partialAnswer: continueFrom, targetLanguage });
+        const prompt = buildContinuePrompt({ question, partialAnswer: continueFrom });
         parts = [{ text: prompt }];
       } else {
         if (!question.trim()) {
           return Response.json({ error: 'Please type a question first.' }, { status: 400 });
         }
-        const prompt = buildPrompt({ mode, question, targetLanguage, hasImage: false, depth });
+        const prompt = buildPrompt({ mode, question, hasImage: false, depth });
         parts = [{ text: prompt }];
       }
     }

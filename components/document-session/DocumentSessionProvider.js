@@ -24,7 +24,11 @@ function uuid() {
 // Bytes, not a File, are already in hand at every call site here — PDFDocument
 // happily loads from either, so this stays a thin local helper rather than
 // forcing a round trip through lib/pdf-tools.js's File-shaped getPdfPageCount.
-async function getPdfPageCount(bytes) {
+// Only ever attempted for actual PDFs — Document Translator is the first
+// tool to hold a non-PDF file in the session, and there's no point handing
+// DOCX/PPTX/TXT bytes to pdf-lib just to watch it fail and swallow the error.
+async function getPageCount(bytes, mimeType) {
+  if (mimeType !== 'application/pdf') return null;
   try {
     const { PDFDocument } = await import('pdf-lib');
     const doc = await PDFDocument.load(bytes, { updateMetadata: false });
@@ -32,6 +36,19 @@ async function getPdfPageCount(bytes) {
   } catch {
     return null;
   }
+}
+
+const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const PPTX_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+
+// Session document `type` — used by the sidebar/pull-card UI to describe
+// what's active without every caller re-deriving it from a raw mimeType.
+function mimeTypeToType(mimeType) {
+  if (mimeType === 'application/pdf') return 'pdf';
+  if (mimeType === DOCX_MIME) return 'docx';
+  if (mimeType === PPTX_MIME) return 'pptx';
+  if (mimeType === 'text/plain') return 'txt';
+  return 'unknown';
 }
 
 function idleState() {
@@ -92,7 +109,8 @@ export function DocumentSessionProvider({ children }) {
 
   const startSession = useCallback(async (file, { toolSlug } = {}) => {
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const pageCount = await getPdfPageCount(bytes);
+    const mimeType = file.type || 'application/pdf';
+    const pageCount = await getPageCount(bytes, mimeType);
     const now = Date.now();
     setSession({
       sessionId: uuid(),
@@ -105,8 +123,8 @@ export function DocumentSessionProvider({ children }) {
         originalBytes: bytes,
         originalPageCount: pageCount,
         name: file.name,
-        type: 'pdf',
-        mimeType: file.type || 'application/pdf',
+        type: mimeTypeToType(mimeType),
+        mimeType,
         pageCount,
         sizeBytes: bytes.byteLength,
         hasTextLayer: true,
@@ -118,12 +136,18 @@ export function DocumentSessionProvider({ children }) {
     });
   }, []);
 
-  const updateDocument = useCallback(async (newBytes, { toolSlug, label, hasTextLayer } = {}) => {
+  const updateDocument = useCallback(async (newBytes, { toolSlug, label, hasTextLayer, mimeType: newMimeType, name: newName } = {}) => {
     const bytes = newBytes instanceof Uint8Array ? newBytes : new Uint8Array(newBytes);
-    const pageCount = await getPdfPageCount(bytes);
+    // Most tools produce a same-format result (PDF in, PDF out) and never
+    // pass mimeType/name — Document Translator is the one caller that can
+    // genuinely change format (e.g. DOCX in, translated DOCX out with a
+    // renamed file), so both are optional overrides layered onto whatever
+    // the session already holds.
+    const pageCount = await getPageCount(bytes, newMimeType || 'application/pdf');
     const now = Date.now();
     setSession((prev) => {
       if (prev.status !== 'active' || !prev.document) return prev;
+      const mimeType = newMimeType || prev.document.mimeType;
       const entry = {
         id: uuid(), toolSlug, label, timestamp: now,
         resultSizeBytes: bytes.byteLength, resultPageCount: pageCount,
@@ -134,6 +158,9 @@ export function DocumentSessionProvider({ children }) {
         document: {
           ...prev.document,
           bytes,
+          name: newName || prev.document.name,
+          type: newMimeType ? mimeTypeToType(mimeType) : prev.document.type,
+          mimeType,
           pageCount,
           sizeBytes: bytes.byteLength,
           hasTextLayer: hasTextLayer === undefined ? prev.document.hasTextLayer : hasTextLayer,

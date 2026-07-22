@@ -19,6 +19,7 @@ const SECTIONS = [
       { slug: 'cv-improver', title: 'CV Improver', desc: 'Upload your CV and AI rewrites and improves it', icon: '📄', badge: 'free' },
       { slug: 'resume-builder', title: 'Resume Builder', desc: 'A guided, AI-assisted CV builder for starting from scratch', icon: '🛠️', badge: 'free' },
       { slug: 'ask-solve-ai', title: 'Ask & Solve AI', desc: 'Scan, type or upload a question and get clear answers instantly', icon: '💡', badge: 'free' },
+      { slug: 'document-translator', title: 'Document Translator', desc: 'Translate a PDF, Word, PowerPoint or text file with layout preserved', icon: '🌐', badge: 'free' },
       { slug: 'cover-letter', title: 'Cover Letter Writer', desc: 'Generate a professional cover letter with AI', icon: '✉️', badge: 'free' },
       { slug: 'contract-summarizer', title: 'Contract Summarizer', desc: 'Upload a contract and AI highlights key points', icon: '📜', badge: 'free' },
       { slug: 'presentation-generator', title: 'AI Presentation Generator', desc: 'Turn documents into an editable PowerPoint presentation', icon: '🎞️', badge: 'free' },

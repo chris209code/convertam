@@ -5,7 +5,6 @@ import { useState, useRef } from 'react';
 const MODES = [
   { id: 'math', label: 'Math', icon: '√x', color: '#059669' },
   { id: 'general', label: 'General', icon: '💬', color: '#2563EB' },
-  { id: 'translate', label: 'Translate', icon: '🌐', color: '#7C3AED' },
 ];
 
 const DEPTHS = [
@@ -14,12 +13,9 @@ const DEPTHS = [
   { id: 'detailed', label: 'Detailed' },
 ];
 
-const LANGUAGES = ['English', 'French', 'Spanish', 'Portuguese', 'German', 'Arabic', 'Hausa', 'Yoruba', 'Igbo', 'Swahili', 'Chinese', 'Pidgin English'];
-
 export default function AskSolveAIWorkspace() {
   const [mode, setMode] = useState('general');
   const [depth, setDepth] = useState('step-by-step');
-  const [targetLanguage, setTargetLanguage] = useState('English');
   const [question, setQuestion] = useState('');
   const [image, setImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -46,7 +42,6 @@ export default function AskSolveAIWorkspace() {
       const formData = new FormData();
       formData.append('mode', askedMode);
       formData.append('question', askedQuestion);
-      formData.append('targetLanguage', targetLanguage);
       formData.append('depth', askedDepth);
       formData.append('image', askedImage);
       return fetch('/api/ask-solve-ai', { method: 'POST', body: formData });
@@ -54,7 +49,7 @@ export default function AskSolveAIWorkspace() {
     return fetch('/api/ask-solve-ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: askedMode, question: askedQuestion, targetLanguage, depth: askedDepth, continueFrom }),
+      body: JSON.stringify({ mode: askedMode, question: askedQuestion, depth: askedDepth, continueFrom }),
     });
   }
 
@@ -212,22 +207,11 @@ export default function AskSolveAIWorkspace() {
         ))}
       </div>
 
-      {mode === 'translate' && (
-        <div style={{ marginBottom: 14 }}>
-          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 }}>Translate into</label>
-          <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.85rem', fontFamily: 'inherit' }}>
-            {LANGUAGES.map((l) => <option key={l}>{l}</option>)}
-          </select>
-          <p style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: 4 }}>Source language is detected automatically.</p>
-        </div>
-      )}
-
       <div style={{ minHeight: 260, maxHeight: 440, overflowY: 'auto', background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0', padding: 16, marginBottom: 12 }}>
         {messages.length === 0 && (
           <div style={{ textAlign: 'center', color: '#94A3B8', fontSize: '0.85rem', padding: '40px 20px' }}>
             {activeMode.label === 'Math' && 'Type a math problem, or upload/scan a photo of one, and get a clear step-by-step solution.'}
             {activeMode.label === 'General' && 'Ask anything — type your question below, or scan a photo of it.'}
-            {activeMode.label === 'Translate' && 'Type or scan text, pick a target language above, and get an accurate translation.'}
           </div>
         )}
         {messages.map((msg, i) => (

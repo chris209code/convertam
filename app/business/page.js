@@ -10,10 +10,9 @@ const SECTIONS = [
   {
     id: 'all',
     label: 'All Business Tools',
-    icon: '🧾',
     tools: [
-      { slug: 'business-document-studio', title: 'Business Document Studio', desc: 'Create invoices, quotations, delivery notes and waybills from one professional workspace', icon: '🧾', badge: 'new', available: true },
-      { slug: 'id-card-generator', title: 'ID Card Generator', desc: 'Design and print professional ID cards', icon: '🪪', badge: 'free' },
+      { slug: 'business-document-studio', title: 'Business Document Studio', desc: 'Create invoices, quotations, delivery notes and waybills from one professional workspace', badge: 'new', available: true },
+      { slug: 'id-card-generator', title: 'ID Card Generator', desc: 'Design and print professional ID cards', badge: 'free' },
     ],
   },
 ];

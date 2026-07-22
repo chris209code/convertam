@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { ToolIcon, SectionIcon } from './icons/ToolIconSystem';
 
 // Generic premium "category hub" template — same pattern as the Calculator
 // Hub (quick-nav pills, sectioned grid of cards with icon/title/desc/badge).
@@ -23,7 +24,7 @@ function ToolCard({ tool, accent }) {
   const disabled = tool.available === false;
   return (
     <Link href={disabled ? '#' : tool.href} className={`th-card${disabled ? ' th-card-soon' : ''}`} aria-disabled={disabled}>
-      <span className="th-card-icon" aria-hidden="true" style={disabled ? undefined : { background: accent.badgeFreeBg }}>{tool.icon}</span>
+      <span className="th-card-icon" aria-hidden="true"><ToolIcon slug={tool.slug} suite={accent.key} size={40} /></span>
       <div className="th-card-body">
         <div className="th-card-title-row">
           <span className="th-card-title">{tool.title}</span>
@@ -80,8 +81,8 @@ export default function ToolHubClient({ accent, icon, title, subtitle, sections 
         }
         .th-card:hover .th-card-arrow { opacity: 1; transform: translateX(0); }
         .th-card-icon {
-          font-size: 1.3rem; flex-shrink: 0; line-height: 1; width: 40px; height: 40px; border-radius: 11px;
-          display: flex; align-items: center; justify-content: center; background: #F1F5F9;
+          flex-shrink: 0; line-height: 1; width: 40px; height: 40px; border-radius: 11px;
+          display: flex; align-items: center; justify-content: center; overflow: hidden;
         }
         .th-card-body { flex: 1; min-width: 0; padding-right: 14px; }
         .th-card-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
@@ -96,7 +97,7 @@ export default function ToolHubClient({ accent, icon, title, subtitle, sections 
         .th-badge-new { color: #2563EB; }
         .th-badge-popular { color: #B45309; }
         .th-card-soon { cursor: default; }
-        .th-card-soon .th-card-icon { background: #F1F5F9; filter: grayscale(0.4); opacity: 0.7; }
+        .th-card-soon .th-card-icon { filter: grayscale(0.4); opacity: 0.7; }
         .th-card-soon .th-card-title { color: #94A3B8; }
         .th-card-soon .th-card-desc { color: #B0B8C4; }
         .th-card-soon:hover {
@@ -141,7 +142,7 @@ export default function ToolHubClient({ accent, icon, title, subtitle, sections 
       <div className="page-inner" style={{ padding: '18px 4% 56px' }}>
         {sections.map((s) => (
           <div key={s.id} style={{ marginBottom: 28 }}>
-            <h2 id={s.id} className="th-section-title">{s.icon} {s.label}</h2>
+            <h2 id={s.id} className="th-section-title"><SectionIcon id={s.id} suite={accent.key} size={22} /> {s.label}</h2>
             <div className="th-grid">
               {s.tools.map((tool) => <ToolCard key={tool.slug} tool={tool} accent={accent} />)}
             </div>

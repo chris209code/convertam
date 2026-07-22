@@ -1,14 +1,15 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
+import { CategoryIcon } from './icons/ToolIconSystem';
 
 const CATEGORIES = [
-  { slug: 'pdf-tools', icon: '📄', title: 'PDF Tools' },
-  { slug: 'business', icon: '🧾', title: 'Business Tools' },
-  { slug: 'ai-tools', icon: '🤖', title: 'AI Tools' },
-  { slug: 'image-tools', icon: '🖼️', title: 'Image Tools' },
-  { slug: 'calculator', icon: '🧮', title: 'Calculators' },
-  { slug: 'utilities', icon: '⚙️', title: 'Utilities' },
+  { slug: 'pdf-tools', suite: 'pdf', title: 'PDF Tools' },
+  { slug: 'business', suite: 'business', title: 'Business Tools' },
+  { slug: 'ai-tools', suite: 'ai', title: 'AI Tools' },
+  { slug: 'image-tools', suite: 'image', title: 'Image Tools' },
+  { slug: 'calculator', suite: 'calculator', title: 'Calculators' },
+  { slug: 'utilities', suite: 'utilities', title: 'Utilities' },
 ];
 
 export default function Header() {
@@ -123,10 +124,10 @@ export default function Header() {
             </button>
             {toolsOpen && (
               <div className="dropdown-menu">
-                {CATEGORIES.map(({ slug, icon, title }) => (
+                {CATEGORIES.map(({ slug, suite, title }) => (
                   <Link key={slug} href={`/${slug}`} className="dropdown-item"
                     onClick={() => setToolsOpen(false)}>
-                    <span>{icon}</span>
+                    <CategoryIcon suite={suite} size={20} />
                     <span>{title}</span>
                   </Link>
                 ))}
@@ -135,7 +136,7 @@ export default function Header() {
           </div>
 
           <Link href="/about" className="nav-link">Our Story</Link>
-          <Link href="/" className="nav-cta">🚀 Start Free</Link>
+          <Link href="/" className="nav-cta">Start Free</Link>
         </div>
 
         {/* Mobile menu button */}
@@ -147,10 +148,10 @@ export default function Header() {
       {/* Mobile dropdown */}
       <div className={`mobile-menu ${menuOpen ? 'open' : ''}`}>
         <div className="mobile-section-title">Categories</div>
-        {CATEGORIES.map(({ slug, icon, title }) => (
+        {CATEGORIES.map(({ slug, suite, title }) => (
           <Link key={slug} href={`/${slug}`} className="mobile-nav-link"
             onClick={() => setMenuOpen(false)}>
-            <span>{icon}</span>
+            <CategoryIcon suite={suite} size={20} />
             <span>{title}</span>
           </Link>
         ))}
@@ -159,7 +160,7 @@ export default function Header() {
           Our Story
         </Link>
         <Link href="/" className="mobile-cta" onClick={() => setMenuOpen(false)}>
-          🚀 Start Free
+          Start Free
         </Link>
       </div>
     </header>

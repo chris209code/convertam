@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { ToolIcon, SectionIcon, CategoryIcon } from './icons/ToolIconSystem';
 
 // Reusable Category Landing Page framework — one layout, driven entirely by
 // props, meant to power every category hub (PDF Tools, Business Documents,
@@ -55,7 +56,7 @@ function ToolCard({ tool, accent }) {
   const disabled = tool.available === false;
   return (
     <Link href={disabled ? '#' : tool.href} className={`th-card${disabled ? ' th-card-soon' : ''}`} aria-disabled={disabled}>
-      <span className="th-card-icon" aria-hidden="true" style={disabled ? undefined : { background: accent.badgeFreeBg }}>{tool.icon}</span>
+      <span className="th-card-icon" aria-hidden="true"><ToolIcon slug={tool.slug} suite={accent.key} size={40} /></span>
       <div className="th-card-body">
         <div className="th-card-title-row">
           <span className="th-card-title">{tool.title}</span>
@@ -151,8 +152,8 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, w
         }
         .th-card:hover .th-card-arrow { opacity: 1; transform: translateX(0); }
         .th-card-icon {
-          font-size: 1.3rem; flex-shrink: 0; line-height: 1; width: 40px; height: 40px; border-radius: 11px;
-          display: flex; align-items: center; justify-content: center; background: #F1F5F9;
+          flex-shrink: 0; line-height: 1; width: 40px; height: 40px; border-radius: 11px;
+          display: flex; align-items: center; justify-content: center; overflow: hidden;
         }
         .th-card-body { flex: 1; min-width: 0; padding-right: 14px; }
         .th-card-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
@@ -167,7 +168,7 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, w
         .th-badge-new { color: #2563EB; }
         .th-badge-popular { color: #B45309; }
         .th-card-soon { cursor: default; }
-        .th-card-soon .th-card-icon { background: #F1F5F9; filter: grayscale(0.4); opacity: 0.7; }
+        .th-card-soon .th-card-icon { filter: grayscale(0.4); opacity: 0.7; }
         .th-card-soon .th-card-title { color: #94A3B8; }
         .th-card-soon .th-card-desc { color: #B0B8C4; }
         .th-card-soon:hover {
@@ -199,7 +200,7 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, w
           transform: translateY(-3px); background: #FFFFFF;
           box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 6px rgba(15,23,42,0.06), 0 16px 32px rgba(15,23,42,0.09);
         }
-        .cl-related-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+        .cl-related-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
         .cl-related-title { font-size: 0.86rem; font-weight: 700; color: #0F172A; margin: 0; }
         .cl-related-desc { font-size: 0.76rem; color: #64748B; margin: 0; line-height: 1.4; }
         .cl-related-cta { font-size: 0.76rem; font-weight: 700; margin-top: auto; }
@@ -255,7 +256,7 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, w
         <p className="cl-section-label">All {title}</p>
         {sections.map((s) => (
           <div key={s.id} style={{ marginBottom: 28 }}>
-            <h2 id={s.id} className="th-section-title">{s.icon} {s.label}</h2>
+            <h2 id={s.id} className="th-section-title"><SectionIcon id={s.id} suite={accent.key} size={22} /> {s.label}</h2>
             <div className="th-grid">
               {s.tools.map((tool) => <ToolCard key={tool.slug} tool={tool} accent={accent} />)}
             </div>
@@ -277,7 +278,7 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, w
             <div className="cl-related-grid">
               {relatedCategories.map((c) => (
                 <Link key={c.slug} href={c.href} className="cl-related-card">
-                  <span className="cl-related-icon" style={{ background: c.badgeBg }}>{c.icon}</span>
+                  <span className="cl-related-icon"><CategoryIcon suite={c.suite} size={36} /></span>
                   <p className="cl-related-title">{c.title}</p>
                   <p className="cl-related-desc">{c.desc}</p>
                   <span className="cl-related-cta" style={{ color: c.accentText }}>Explore →</span>

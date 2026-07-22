@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CategoryIcon } from '@/components/icons/ToolIconSystem';
 
 export const metadata = {
   title: 'Utilities — Convertam',
@@ -16,7 +17,7 @@ export default function UtilitiesPage() {
         <div className="page-inner">
           <Link href="/" style={{ fontSize: '0.8rem', color: '#475569', textDecoration: 'none', marginBottom: '12px', display: 'inline-block' }}>← Back to Home</Link>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <span style={{ fontSize: '2.5rem' }}>⚙️</span>
+            <CategoryIcon suite="utilities" size={46} />
             <div>
               <h1 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 800, color: '#152238', margin: 0 }}>Utilities</h1>
               <p style={{ fontSize: '0.9rem', color: '#64748B', margin: '4px 0 0' }}>Handy tools for everyday tasks.</p>
@@ -27,7 +28,9 @@ export default function UtilitiesPage() {
 
       <div className="page-inner" style={{ padding: '48px 4%', textAlign: 'center' }}>
         <div style={{ background: 'white', borderRadius: 20, padding: 40, maxWidth: 560, margin: '0 auto', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
-          <div style={{ fontSize: '3rem', marginBottom: 16 }}>⚙️</div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+            <CategoryIcon suite="utilities" size={56} />
+          </div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Utilities Hub</h2>
           <p style={{ fontSize: '0.88rem', color: '#64748B', marginBottom: 24, lineHeight: 1.6 }}>
             QR Code Studio, Password Studio, Word Counter, Text Case Converter — all in one place.

@@ -58,6 +58,7 @@ import { toolGuides } from '@/lib/toolGuides';
 import QuickGuideTab from '@/components/tool-guide/QuickGuideTab';
 import FullFaqSection from '@/components/tool-guide/FullFaqSection';
 import RelatedToolsCard from '@/components/tool-guide/RelatedToolsCard';
+import WorkspaceLayoutShell from '@/components/workspace/WorkspaceLayoutShell';
 
 const isFree = (mode) =>
   ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice',
@@ -86,6 +87,7 @@ export default function ToolPageClient({ tool }) {
   const guide = toolGuides[tool.slug];
 
   return (
+    <WorkspaceLayoutShell>
     <QuickGuideTab guide={guide} toolSlug={tool.slug}>
       <main className="max-w-5xl mx-auto px-5 md:px-10 py-10">
         <p className="font-mono text-xs text-stamp-amber tracking-wide mb-2">{tool.category.toUpperCase()}</p>
@@ -211,5 +213,6 @@ export default function ToolPageClient({ tool }) {
         )}
       </main>
     </QuickGuideTab>
+    </WorkspaceLayoutShell>
   );
 }

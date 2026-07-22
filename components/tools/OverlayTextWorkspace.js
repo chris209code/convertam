@@ -2,6 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
+import WorkspaceStatusPanel from '@/components/workspace/WorkspaceStatusPanel';
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -15,7 +18,9 @@ function downloadBlob(blob, filename) {
 }
 
 export default function OverlayTextWorkspace() {
+  const { session, startSession, updateDocument, getDocumentAsFile, restoreOriginal } = useDocumentSession();
   const [file, setFile] = useState(null);
+  const [resultBytes, setResultBytes] = useState(null);
   const [pages, setPages] = useState([]);
   const [currentPage, setCurrentPage] = useState(0);
   const [textItems, setTextItems] = useState([]);
@@ -42,7 +47,7 @@ export default function OverlayTextWorkspace() {
     document.body.appendChild(script);
   }, []);
 
-  async function handleFile(f) {
+  async function handleFile(f, { fromSession = false } = {}) {
     if (!f) return;
     if (!pdfjsReady) { setError('Still loading, try again in a second.'); return; }
     if (f.size > 100 * 1024 * 1024) { setError('That file is larger than the 100MB limit. Please choose a smaller PDF.'); return; }
@@ -71,11 +76,28 @@ export default function OverlayTextWorkspace() {
       setCurrentPage(0);
       setStep(2);
       setStatus('');
+      setResultBytes(null);
+      if (!fromSession) {
+        const hasUndownloadedWork = session.status === 'active' && session.history.length > 0;
+        if (!hasUndownloadedWork || window.confirm('Starting with this document will replace the document currently in your session. Continue?')) {
+          startSession(f, { toolSlug: 'write-on-pdf' });
+        }
+      }
     } catch {
       setError('Could not read this PDF.');
     } finally {
       setBusy(false);
     }
+  }
+
+  async function continueWithSessionDocument() {
+    const f = getDocumentAsFile();
+    await handleFile(f, { fromSession: true });
+  }
+
+  async function handleRestoreOriginal() {
+    const f = await restoreOriginal();
+    if (f) await handleFile(f, { fromSession: true });
   }
 
   function handleWrapperClick(e) {
@@ -93,14 +115,16 @@ export default function OverlayTextWorkspace() {
     }]);
     setActiveId(id);
     setAddMode(false);
+    setResultBytes(null);
   }
 
   function removeItem(id) {
     setTextItems(prev => prev.filter(i => i.id !== id));
     if (activeId === id) setActiveId(null);
+    setResultBytes(null);
   }
 
-  async function handleDownload() {
+  async function handleApply() {
     if (!file) return;
     setBusy(true); setStatus('Generating PDF…');
     try {
@@ -134,9 +158,9 @@ export default function OverlayTextWorkspace() {
       }
 
       const bytes = await pdfDoc.save();
-      downloadBlob(new Blob([bytes], { type: 'application/pdf' }), file.name.replace('.pdf', '') + '-filled.pdf');
-      setStatus('Done — your PDF has downloaded.');
-      setStep(3);
+      setResultBytes(bytes);
+      await updateDocument(bytes, { toolSlug: 'write-on-pdf', label: 'Text added' });
+      setStatus('Text added — choose what to do next.');
     } catch (err) {
       console.error(err);
       setError('Could not generate PDF. Please try again.');
@@ -145,10 +169,17 @@ export default function OverlayTextWorkspace() {
     }
   }
 
+  // Downloading exports the current document but does not end the
+  // workspace — see WorkspaceSidebar for Close Workspace.
+  function downloadResult() {
+    if (!resultBytes || !file) return;
+    downloadBlob(new Blob([resultBytes], { type: 'application/pdf' }), file.name.replace('.pdf', '') + '-filled.pdf');
+  }
+
   function reset() {
     setFile(null); setPages([]); setTextItems([]);
     setActiveId(null); setStep(1); setStatus('');
-    setError(''); setCurrentPage(0); setAddMode(false);
+    setError(''); setCurrentPage(0); setAddMode(false); setResultBytes(null);
   }
 
   const currentItems = textItems.filter(i => i.page === currentPage);
@@ -156,9 +187,24 @@ export default function OverlayTextWorkspace() {
 
   return (
     <div className="panel">
+      <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} />
 
       {step === 1 && (
         <div>
+          {session.status === 'active' && session.document && (
+            <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12, padding: '14px 16px', marginBottom: 14, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: '1.4rem' }} aria-hidden="true">📄</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>Continue with {session.document.name}</div>
+                <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                  {session.document.pageCount ? `${session.document.pageCount} pages · ` : ''}already in this session — no need to re-upload.
+                </div>
+              </div>
+              <button onClick={continueWithSessionDocument} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+                Continue
+              </button>
+            </div>
+          )}
           <p className="text-sm text-ink-soft mb-4">
             Upload any PDF — scanned bank forms, government documents, printed forms — and type text directly onto it anywhere you want.
           </p>
@@ -265,7 +311,7 @@ export default function OverlayTextWorkspace() {
                   autoFocus={activeId === item.id}
                   type="text"
                   value={item.text}
-                  onChange={e => setTextItems(prev => prev.map(i => i.id === item.id ? { ...i, text: e.target.value } : i))}
+                  onChange={e => { setTextItems(prev => prev.map(i => i.id === item.id ? { ...i, text: e.target.value } : i)); setResultBytes(null); }}
                   onFocus={() => setActiveId(item.id)}
                   onKeyDown={e => {
                     e.stopPropagation();
@@ -307,25 +353,23 @@ export default function OverlayTextWorkspace() {
 
           {error && <div className="status error mb-3">{error}</div>}
 
-          <div className="actions">
-            <button className="btn btn-primary" disabled={busy || filledItems.length === 0} onClick={handleDownload}>
-              {busy ? 'Generating…' : 'Download Filled PDF'}
-            </button>
-            <button className="btn btn-ghost" onClick={reset}>Start over</button>
-          </div>
+          {!resultBytes ? (
+            <div className="actions">
+              <button className="btn btn-primary" disabled={busy || filledItems.length === 0} onClick={handleApply}>
+                {busy ? 'Generating…' : 'Apply Text'}
+              </button>
+              <button className="btn btn-ghost" onClick={reset}>Start over</button>
+            </div>
+          ) : (
+            <>
+              <ContinueWorkingPanel toolSlug="write-on-pdf" documentName={file?.name || 'document.pdf'} onDownload={downloadResult} downloading={busy} />
+              <button onClick={() => setResultBytes(null)} style={{ marginTop: 10, background: 'none', border: 'none', color: '#64748B', fontSize: '0.78rem', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+                ← Edit more text
+              </button>
+            </>
+          )}
 
           {status && <div className="status success">{status}</div>}
-        </div>
-      )}
-
-      {step === 3 && (
-        <div className="text-center py-8">
-          <div className="text-4xl mb-3">✅</div>
-          <h3 className="font-semibold text-ink text-lg mb-2">PDF filled successfully!</h3>
-          <p className="text-sm text-ink-soft mb-6">Your filled PDF has downloaded to your device.</p>
-          <div className="actions justify-center">
-            <button className="btn btn-primary" onClick={reset}>Fill another PDF</button>
-          </div>
         </div>
       )}
 

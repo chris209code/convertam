@@ -4,30 +4,26 @@ import { useState } from 'react';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 import { getTool } from '@/lib/tools-config';
 
-function formatBytes(bytes) {
-  if (!bytes && bytes !== 0) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 function toolLabel(slug) {
   if (!slug) return null;
   return getTool(slug)?.title || slug;
 }
 
-// Compact "you're inside an active workspace" status strip — document
-// identity, size, current tool, and a visible history of completed
-// operations, plus Restore Original / Close Workspace controls. Renders
-// nothing outside an active session. `onRestoreOriginal`/`onClose` are
-// supplied by the calling tool so it can reload its own local editor state
-// after either action (the session itself only tracks the document bytes).
-export default function WorkspaceStatusPanel({ onRestoreOriginal, onClose }) {
+// Compact "you're inside an active workspace" indicator — just the active
+// state, the visible operation history, and Restore Original. Document
+// identity, current tool, grouped navigation and Close Workspace all live
+// in WorkspaceSidebar now (Phase 2) so this panel doesn't repeat them; it
+// stays deliberately small and keeps working exactly the same on mobile,
+// where the sidebar is tucked behind a drawer trigger instead of always
+// visible. `onRestoreOriginal` is supplied by the calling tool so it can
+// reload its own local editor state afterward.
+export default function WorkspaceStatusPanel({ onRestoreOriginal }) {
   const { session } = useDocumentSession();
   const [busy, setBusy] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   if (session.status !== 'active' || !session.document) return null;
-  const { document: doc, history, currentTool } = session;
+  const { history } = session;
 
   async function handleRestore() {
     if (busy) return;
@@ -40,32 +36,32 @@ export default function WorkspaceStatusPanel({ onRestoreOriginal, onClose }) {
     }
   }
 
-  function handleClose() {
-    if (!window.confirm('Close this workspace? Your document will no longer be carried between tools.')) return;
-    onClose?.();
-  }
-
   return (
-    <div style={{ border: '1px solid #E2E8F0', borderRadius: 14, background: '#F8FAFC', padding: '14px 16px', marginBottom: 18 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+    <div style={{ border: '1px solid #E2E8F0', borderRadius: 12, background: '#F8FAFC', padding: '10px 14px', marginBottom: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.03em', color: '#059669', textTransform: 'uppercase' }}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981', display: 'inline-block' }} />
           Workspace Active
         </span>
-        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {doc.name}
-        </span>
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          style={{ background: 'none', border: 'none', padding: 0, fontSize: '0.74rem', color: '#64748B', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}
+        >
+          {history.length} operation{history.length === 1 ? '' : 's'} completed {expanded ? '▾' : '▸'}
+        </button>
+        {history.length > 0 && (
+          <button
+            onClick={handleRestore}
+            disabled={busy}
+            style={{ marginLeft: 'auto', padding: '5px 10px', borderRadius: 7, border: '1px solid #E2E8F0', background: 'white', color: '#334155', fontSize: '0.72rem', fontWeight: 600, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit' }}
+          >
+            ↺ Restore Original
+          </button>
+        )}
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', fontSize: '0.74rem', color: '#64748B', marginBottom: 10 }}>
-        {doc.pageCount != null && <span>{doc.pageCount} page{doc.pageCount === 1 ? '' : 's'}</span>}
-        <span>{formatBytes(doc.sizeBytes)}</span>
-        {currentTool && <span>Current tool: <strong style={{ color: '#334155' }}>{toolLabel(currentTool)}</strong></span>}
-        <span>{history.length} operation{history.length === 1 ? '' : 's'} completed</span>
-      </div>
-
-      {history.length > 0 && (
-        <ul style={{ listStyle: 'none', margin: '0 0 10px', padding: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+      {expanded && (
+        <ul style={{ listStyle: 'none', margin: '8px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
           <li style={{ fontSize: '0.75rem', color: '#334155' }}>✓ Uploaded</li>
           {history.map((entry) => (
             <li key={entry.id} style={{ fontSize: '0.75rem', color: '#334155' }}>
@@ -74,24 +70,6 @@ export default function WorkspaceStatusPanel({ onRestoreOriginal, onClose }) {
           ))}
         </ul>
       )}
-
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {history.length > 0 && (
-          <button
-            onClick={handleRestore}
-            disabled={busy}
-            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', color: '#334155', fontSize: '0.74rem', fontWeight: 600, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit' }}
-          >
-            ↺ Restore Original
-          </button>
-        )}
-        <button
-          onClick={handleClose}
-          style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #FECACA', background: '#FEF2F2', color: '#DC2626', fontSize: '0.74rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
-        >
-          Close Workspace
-        </button>
-      </div>
     </div>
   );
 }

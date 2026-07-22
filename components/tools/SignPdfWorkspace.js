@@ -123,7 +123,7 @@ const SIGN_TO_ENHANCER_KEY = 'convertam_sign_to_enhancer';
 const ENHANCER_TO_SIGN_KEY = 'convertam_enhancer_to_sign';
 
 export default function SignPdfWorkspace() {
-  const { session, startSession, updateDocument, endSession, getDocumentAsFile, restoreOriginal } = useDocumentSession();
+  const { session, startSession, updateDocument, getDocumentAsFile, restoreOriginal } = useDocumentSession();
   const [step, setStep] = useState(1); // 1=upload sig, 2=upload pdf, 3=place sig
   const [resultBytes, setResultBytes] = useState(null); // set once a signature is applied; cleared by any further change
   const [sigStage, setSigStage] = useState('select'); // select | analyzing | manual-crop | needs-enhancer-hint
@@ -365,11 +365,6 @@ export default function SignPdfWorkspace() {
     if (file) await loadPdfFile(file, { fromSession: true });
   }
 
-  function handleCloseWorkspace() {
-    endSession();
-    reset();
-  }
-
   // Drag signature on preview
   function onMouseDown(e) {
     e.preventDefault();
@@ -472,8 +467,8 @@ export default function SignPdfWorkspace() {
   }
 
   // Downloading exports the current document but does not end the
-  // workspace — the session stays active until the user closes it, starts a
-  // new document, or discards it (see WorkspaceStatusPanel's Close Workspace).
+  // workspace — the session stays active until the user closes it (see
+  // WorkspaceSidebar) or starts a new document.
   function downloadResult() {
     if (!resultBytes || !pdfFile) return;
     const baseName = pdfFile.name.replace('.pdf', '');
@@ -504,7 +499,7 @@ export default function SignPdfWorkspace() {
         onLoad={() => setPdfjsReady(true)}
       />
 
-      <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} onClose={handleCloseWorkspace} />
+      <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} />
 
       {/* Step indicators */}
       <div className="flex gap-3 mb-6">

@@ -3,6 +3,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { PDFDocument, rgb, degrees } from 'pdf-lib';
 import UploadBox from '@/components/UploadBox';
+import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
+import WorkspaceStatusPanel from '@/components/workspace/WorkspaceStatusPanel';
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -37,7 +40,9 @@ const COLORS = [
 ];
 
 export default function WatermarkPdfWorkspace() {
+  const { session, startSession, updateDocument, getDocumentAsFile, restoreOriginal } = useDocumentSession();
   const [file, setFile] = useState(null);
+  const [resultBytes, setResultBytes] = useState(null);
   const [text, setText] = useState('CONFIDENTIAL');
   const [fontSize, setFontSize] = useState(48);
   const [opacity, setOpacity] = useState(0.35);
@@ -94,13 +99,25 @@ export default function WatermarkPdfWorkspace() {
 
   useEffect(() => { draw(); }, [draw]);
 
-  async function handleFiles(files) {
+  // Any change to the watermark settings after an Apply invalidates the
+  // previously-applied result, so the Continue Working panel can't hand off
+  // stale bytes — mirrors the invalidation pattern used in Redact/Sign PDF.
+  useEffect(() => { setResultBytes(null); }, [text, fontSize, opacity, color, customColor, useCustomColor, angle, posX, posY, pages, pageRange]);
+
+  async function handleFiles(files, { fromSession = false } = {}) {
     const f = files[0];
     if (!f) return;
     setFile(f);
     setError(''); setStatus(''); setPageCanvas(null);
     setPosX(0.5); setPosY(0.5);
     setPreviewing(true);
+    setResultBytes(null);
+    if (!fromSession) {
+      const hasUndownloadedWork = session.status === 'active' && session.history.length > 0;
+      if (!hasUndownloadedWork || window.confirm('Starting with this document will replace the document currently in your session. Continue?')) {
+        startSession(f, { toolSlug: 'watermark-pdf' });
+      }
+    }
 
     try {
       let pdfjs = window.pdfjsLib;
@@ -135,6 +152,16 @@ export default function WatermarkPdfWorkspace() {
     } finally {
       setPreviewing(false);
     }
+  }
+
+  async function continueWithSessionDocument() {
+    const f = getDocumentAsFile();
+    if (f) await handleFiles([f], { fromSession: true });
+  }
+
+  async function handleRestoreOriginal() {
+    const f = await restoreOriginal();
+    if (f) await handleFiles([f], { fromSession: true });
   }
 
   function getCanvasPos(e) {
@@ -227,9 +254,9 @@ export default function WatermarkPdfWorkspace() {
       }
 
       const signed = await doc.save();
-      const baseName = file.name.replace('.pdf', '');
-      downloadBlob(new Blob([signed], { type: 'application/pdf' }), `${baseName}-watermarked.pdf`);
-      setStatus(`Done — watermark applied to ${targetIndices.length} page${targetIndices.length !== 1 ? 's' : ''}.`);
+      setResultBytes(signed);
+      await updateDocument(signed, { toolSlug: 'watermark-pdf', label: 'Watermarked' });
+      setStatus(`Watermark applied to ${targetIndices.length} page${targetIndices.length !== 1 ? 's' : ''} — choose what to do next.`);
     } catch (err) {
       console.error(err);
       setError('Could not apply watermark. Make sure the PDF is not password-protected.');
@@ -239,8 +266,32 @@ export default function WatermarkPdfWorkspace() {
     }
   }
 
+  // Downloading exports the current document but does not end the
+  // workspace — see WorkspaceSidebar for Close Workspace.
+  function downloadResult() {
+    if (!resultBytes || !file) return;
+    const baseName = file.name.replace('.pdf', '');
+    downloadBlob(new Blob([resultBytes], { type: 'application/pdf' }), `${baseName}-watermarked.pdf`);
+  }
+
   return (
     <div className="panel">
+      <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} />
+
+      {!file && session.status === 'active' && session.document && (
+        <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12, padding: '14px 16px', marginBottom: 14, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: '1.4rem' }} aria-hidden="true">📄</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>Continue with {session.document.name}</div>
+            <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
+              {session.document.pageCount ? `${session.document.pageCount} pages · ` : ''}already in this session — no need to re-upload.
+            </div>
+          </div>
+          <button onClick={continueWithSessionDocument} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+            Continue
+          </button>
+        </div>
+      )}
 
       {!file && (
         <UploadBox accept="application/pdf" multiple={false} onFiles={handleFiles}
@@ -370,16 +421,20 @@ export default function WatermarkPdfWorkspace() {
         )}
       </div>
 
-      <div className="actions">
-        <button className="btn btn-primary" disabled={!file || !text.trim() || busy} onClick={handleApply}>
-          {busy ? 'Applying…' : 'Apply Watermark & Download'}
-        </button>
-        {file && (
-          <button className="btn btn-ghost" onClick={() => { setFile(null); setStatus(''); setError(''); setPageCanvas(null); }}>
-            Clear
+      {!resultBytes ? (
+        <div className="actions">
+          <button className="btn btn-primary" disabled={!file || !text.trim() || busy} onClick={handleApply}>
+            {busy ? 'Applying…' : 'Apply Watermark'}
           </button>
-        )}
-      </div>
+          {file && (
+            <button className="btn btn-ghost" onClick={() => { setFile(null); setStatus(''); setError(''); setPageCanvas(null); setResultBytes(null); }}>
+              Clear
+            </button>
+          )}
+        </div>
+      ) : (
+        <ContinueWorkingPanel toolSlug="watermark-pdf" documentName={file?.name || 'document.pdf'} onDownload={downloadResult} downloading={busy} />
+      )}
 
       {status && <div className="status success">{status}</div>}
       {error && <div className="status error">{error}</div>}

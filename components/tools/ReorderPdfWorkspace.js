@@ -3,6 +3,9 @@
 import { useState, useRef } from 'react';
 import Script from 'next/script';
 import { PDFDocument } from 'pdf-lib';
+import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
+import WorkspaceStatusPanel from '@/components/workspace/WorkspaceStatusPanel';
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -16,17 +19,18 @@ function downloadBlob(blob, filename) {
 }
 
 export default function ReorderPdfWorkspace() {
+  const { session, startSession, updateDocument, getDocumentAsFile, restoreOriginal } = useDocumentSession();
   const [file, setFile] = useState(null);
   const [pages, setPages] = useState([]); // { index: original index, dataUrl }
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [pdfjsReady, setPdfjsReady] = useState(false);
+  const [resultBytes, setResultBytes] = useState(null);
   const dragItem = useRef(null);
   const dragOver = useRef(null);
 
-  async function handleFile(e) {
-    const f = e.target.files[0];
+  async function loadPdfFile(f, { fromSession = false } = {}) {
     if (!f || !window.pdfjsLib) return;
     setFile(f);
     setError('');
@@ -53,12 +57,34 @@ export default function ReorderPdfWorkspace() {
 
       setPages(rendered);
       setStatus('');
+      setResultBytes(null);
+      if (!fromSession) {
+        const hasUndownloadedWork = session.status === 'active' && session.history.length > 0;
+        if (!hasUndownloadedWork || window.confirm('Starting with this document will replace the document currently in your session. Continue?')) {
+          startSession(f, { toolSlug: 'reorder-pdf' });
+        }
+      }
     } catch (err) {
       setError('Could not read that PDF. Make sure it is not password-protected.');
       setStatus('');
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleFile(e) {
+    const f = e.target.files[0];
+    await loadPdfFile(f);
+  }
+
+  async function continueWithSessionDocument() {
+    const f = getDocumentAsFile();
+    await loadPdfFile(f, { fromSession: true });
+  }
+
+  async function handleRestoreOriginal() {
+    const f = await restoreOriginal();
+    if (f) await loadPdfFile(f, { fromSession: true });
   }
 
   // Drag and drop reordering
@@ -78,6 +104,7 @@ export default function ReorderPdfWorkspace() {
     const dragged = reordered.splice(dragItem.current, 1)[0];
     reordered.splice(dragOver.current, 0, dragged);
     setPages(reordered);
+    setResultBytes(null);
     dragItem.current = null;
     dragOver.current = null;
   }
@@ -105,10 +132,11 @@ export default function ReorderPdfWorkspace() {
     const dragged = reordered.splice(from, 1)[0];
     reordered.splice(to, 0, dragged);
     setPages(reordered);
+    setResultBytes(null);
     touchDragItem.current = null;
   }
 
-  async function handleDownload() {
+  async function handleApply() {
     if (!file || pages.length === 0) return;
     setBusy(true);
     setStatus('Building your reordered PDF…');
@@ -122,9 +150,9 @@ export default function ReorderPdfWorkspace() {
       copied.forEach((page) => newDoc.addPage(page));
 
       const bytes = await newDoc.save();
-      const baseName = file.name.replace('.pdf', '');
-      downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${baseName}-reordered.pdf`);
-      setStatus('Done — your reordered PDF has downloaded.');
+      setResultBytes(bytes);
+      await updateDocument(bytes, { toolSlug: 'reorder-pdf', label: 'Reordered' });
+      setStatus('Pages reordered — choose what to do next.');
     } catch (err) {
       console.error(err);
       setError('Could not build the PDF. Please try again.');
@@ -134,11 +162,20 @@ export default function ReorderPdfWorkspace() {
     }
   }
 
+  // Downloading exports the current document but does not end the
+  // workspace — see WorkspaceSidebar for Close Workspace.
+  function downloadResult() {
+    if (!resultBytes || !file) return;
+    const baseName = file.name.replace('.pdf', '');
+    downloadBlob(new Blob([resultBytes], { type: 'application/pdf' }), `${baseName}-reordered.pdf`);
+  }
+
   function reset() {
     setFile(null);
     setPages([]);
     setStatus('');
     setError('');
+    setResultBytes(null);
   }
 
   return (
@@ -147,6 +184,22 @@ export default function ReorderPdfWorkspace() {
         src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
         onLoad={() => setPdfjsReady(true)}
       />
+      <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} />
+
+      {!file && session.status === 'active' && session.document && (
+        <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12, padding: '14px 16px', marginBottom: 14, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: '1.4rem' }} aria-hidden="true">📄</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>Continue with {session.document.name}</div>
+            <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
+              {session.document.pageCount ? `${session.document.pageCount} pages · ` : ''}already in this session — no need to re-upload.
+            </div>
+          </div>
+          <button onClick={continueWithSessionDocument} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+            Continue
+          </button>
+        </div>
+      )}
 
       {!file && (
         <div>
@@ -212,14 +265,20 @@ export default function ReorderPdfWorkspace() {
             ))}
           </div>
 
-          <div className="actions mt-5">
-            <button className="btn btn-primary" disabled={busy} onClick={handleDownload}>
-              {busy ? 'Building…' : 'Download reordered PDF'}
-            </button>
-            <button className="btn btn-ghost" onClick={reset}>
-              Start over
-            </button>
-          </div>
+          {!resultBytes ? (
+            <div className="actions mt-5">
+              <button className="btn btn-primary" disabled={busy} onClick={handleApply}>
+                {busy ? 'Building…' : 'Apply Reorder'}
+              </button>
+              <button className="btn btn-ghost" onClick={reset}>
+                Start over
+              </button>
+            </div>
+          ) : (
+            <div className="mt-5">
+              <ContinueWorkingPanel toolSlug="reorder-pdf" documentName={file?.name || 'document.pdf'} onDownload={downloadResult} downloading={busy} />
+            </div>
+          )}
 
           {status && <div className="status success">{status}</div>}
           {error && <div className="status error">{error}</div>}

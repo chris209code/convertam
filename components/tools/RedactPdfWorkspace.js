@@ -46,7 +46,7 @@ function smallBtn(active, danger) {
 }
 
 export default function RedactPdfWorkspace() {
-  const { session, startSession, updateDocument, endSession, getDocumentAsFile, restoreOriginal } = useDocumentSession();
+  const { session, startSession, updateDocument, getDocumentAsFile, restoreOriginal } = useDocumentSession();
   const [file, setFile] = useState(null);
   const [pages, setPages] = useState([]); // { canvas, width, height, textContent } — immutable after load
   const [activePage, setActivePage] = useState(0);
@@ -146,17 +146,6 @@ export default function RedactPdfWorkspace() {
     if (f) await loadPdfIntoWorkspace(f, { fromSession: true });
   }
 
-  function handleCloseWorkspace() {
-    endSession();
-    setFile(null);
-    setPages([]);
-    setHistory({ stack: [[]], index: 0 });
-    setActivePage(0);
-    setSelected(null);
-    setEditingTextId(null);
-    setResultBytes(null);
-    setError('');
-  }
 
   function newId() {
     return nextIdRef.current++;
@@ -523,8 +512,8 @@ export default function RedactPdfWorkspace() {
   }
 
   // Downloading exports the current document but does not end the
-  // workspace — the session stays active until the user closes it, starts a
-  // new document, or discards it (see WorkspaceStatusPanel's Close Workspace).
+  // workspace — the session stays active until the user closes it (see
+  // WorkspaceSidebar) or starts a new document.
   function downloadResult() {
     if (!resultBytes) return;
     const blob = new Blob([resultBytes], { type: 'application/pdf' });
@@ -576,7 +565,7 @@ export default function RedactPdfWorkspace() {
 
   return (
     <div className="panel">
-      <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} onClose={handleCloseWorkspace} />
+      <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button onClick={() => goToPage(Math.max(0, activePage - 1))} disabled={activePage === 0} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>←</button>

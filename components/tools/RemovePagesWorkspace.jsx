@@ -1,25 +1,49 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
+import WorkspaceStatusPanel from '@/components/workspace/WorkspaceStatusPanel';
 
 export default function RemovePagesWorkspace() {
+  const { session, startSession, updateDocument, getDocumentAsFile, restoreOriginal } = useDocumentSession();
   const [pdfBytes, setPdfBytes] = useState(null);
+  const [fileName, setFileName] = useState('document.pdf');
   const [thumbs, setThumbs] = useState([]);
   const [marked, setMarked] = useState(new Set());
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
   const [rendering, setRendering] = useState(false);
+  const [resultBytes, setResultBytes] = useState(null);
   const fileRef = useRef();
 
-  async function handleFile(file) {
+  async function handleFile(file, { fromSession = false } = {}) {
     if (!file || file.type !== 'application/pdf') return;
     setRendering(true);
     setMarked(new Set());
     setStatus('');
+    setResultBytes(null);
+    setFileName(file.name);
     const buffer = await file.arrayBuffer();
     setPdfBytes(new Uint8Array(buffer));
     await renderThumbs(buffer);
     setRendering(false);
+    if (!fromSession) {
+      const hasUndownloadedWork = session.status === 'active' && session.history.length > 0;
+      if (!hasUndownloadedWork || window.confirm('Starting with this document will replace the document currently in your session. Continue?')) {
+        startSession(file, { toolSlug: 'remove-pdf-pages' });
+      }
+    }
+  }
+
+  async function continueWithSessionDocument() {
+    const f = getDocumentAsFile();
+    await handleFile(f, { fromSession: true });
+  }
+
+  async function handleRestoreOriginal() {
+    const f = await restoreOriginal();
+    if (f) await handleFile(f, { fromSession: true });
   }
 
   async function renderThumbs(buffer) {
@@ -45,9 +69,10 @@ export default function RemovePagesWorkspace() {
       next.has(num) ? next.delete(num) : next.add(num);
       return next;
     });
+    setResultBytes(null);
   }
 
-  async function removeAndDownload() {
+  async function applyRemoval() {
     if (marked.size === 0) { setStatus('No pages selected.'); return; }
     if (marked.size === thumbs.length) { setStatus('You must keep at least one page.'); return; }
     setLoading(true);
@@ -58,25 +83,48 @@ export default function RemovePagesWorkspace() {
       const indices = [...marked].map(n => n - 1).sort((a, b) => b - a);
       for (const idx of indices) pdfDoc.removePage(idx);
       const newBytes = await pdfDoc.save();
-      const blob = new Blob([newBytes], { type: 'application/pdf' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'convertam-removed-pages.pdf';
-      a.click();
-      setStatus('✅ Done! Removed ' + marked.size + ' page(s).');
+      setResultBytes(newBytes);
+      await updateDocument(newBytes, { toolSlug: 'remove-pdf-pages', label: 'Pages removed' });
+      setStatus('✅ Removed ' + marked.size + ' page(s) — choose what to do next.');
     } catch {
       setStatus('Something went wrong. Please try another PDF.');
     }
     setLoading(false);
   }
 
+  // Downloading exports the current document but does not end the
+  // workspace — see WorkspaceSidebar for Close Workspace.
+  function downloadResult() {
+    if (!resultBytes) return;
+    const blob = new Blob([resultBytes], { type: 'application/pdf' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'convertam-removed-pages.pdf';
+    a.click();
+  }
+
   function reset() {
-    setPdfBytes(null); setThumbs([]); setMarked(new Set()); setStatus('');
+    setPdfBytes(null); setThumbs([]); setMarked(new Set()); setStatus(''); setResultBytes(null);
   }
 
   if (!thumbs.length) {
     return (
       <div>
+        <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} />
+        {session.status === 'active' && session.document && (
+          <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12, padding: '14px 16px', marginBottom: 14, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: '1.4rem' }} aria-hidden="true">📄</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>Continue with {session.document.name}</div>
+              <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                {session.document.pageCount ? `${session.document.pageCount} pages · ` : ''}already in this session — no need to re-upload.
+              </div>
+            </div>
+            <button onClick={continueWithSessionDocument} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+              Continue
+            </button>
+          </div>
+        )}
         <div
           onClick={() => fileRef.current.click()}
           onDragOver={e => e.preventDefault()}
@@ -96,6 +144,7 @@ export default function RemovePagesWorkspace() {
 
   return (
     <div>
+      <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} />
       <p className="text-sm text-ink-soft mb-4">
         Click pages to mark for removal.
         {marked.size > 0 && <span className="ml-2 font-semibold" style={{ color: '#e53e3e' }}>{marked.size} page{marked.size > 1 ? 's' : ''} selected</span>}
@@ -112,14 +161,18 @@ export default function RemovePagesWorkspace() {
           );
         })}
       </div>
-      <div className="flex flex-wrap gap-3 items-center">
-        <button onClick={removeAndDownload} disabled={loading || marked.size === 0} className="px-6 py-3 rounded-xl font-semibold text-white text-sm disabled:opacity-50" style={{ background: '#D95F2B' }}>
-          {loading ? 'Processing…' : 'Remove & Download PDF'}
-        </button>
-        <button onClick={reset} className="px-5 py-3 rounded-xl font-semibold text-sm" style={{ background: '#f0f0ec', color: '#555', border: '1px solid #e2dcc9' }}>
-          Start over
-        </button>
-      </div>
+      {!resultBytes ? (
+        <div className="flex flex-wrap gap-3 items-center">
+          <button onClick={applyRemoval} disabled={loading || marked.size === 0} className="px-6 py-3 rounded-xl font-semibold text-white text-sm disabled:opacity-50" style={{ background: '#D95F2B' }}>
+            {loading ? 'Processing…' : 'Remove Pages'}
+          </button>
+          <button onClick={reset} className="px-5 py-3 rounded-xl font-semibold text-sm" style={{ background: '#f0f0ec', color: '#555', border: '1px solid #e2dcc9' }}>
+            Start over
+          </button>
+        </div>
+      ) : (
+        <ContinueWorkingPanel toolSlug="remove-pdf-pages" documentName={fileName} onDownload={downloadResult} downloading={loading} />
+      )}
       {status && <p className={`mt-3 text-sm font-medium ${status.startsWith('✅') ? 'text-green-700' : 'text-red-600'}`}>{status}</p>}
     </div>
   );

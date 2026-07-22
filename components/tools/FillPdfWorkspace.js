@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 import { PDFDocument } from 'pdf-lib';
+import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
+import WorkspaceStatusPanel from '@/components/workspace/WorkspaceStatusPanel';
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -15,6 +18,7 @@ function downloadBlob(blob, filename) {
 }
 
 export default function FillPdfWorkspace() {
+  const { session, startSession, updateDocument, getDocumentAsFile, restoreOriginal } = useDocumentSession();
   const [file, setFile] = useState(null);
   const [fields, setFields] = useState([]);
   const [values, setValues] = useState({});
@@ -22,9 +26,9 @@ export default function FillPdfWorkspace() {
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [step, setStep] = useState(1);
+  const [resultBytes, setResultBytes] = useState(null);
 
-  async function handleFile(e) {
-    const f = e.target.files[0];
+  async function loadFile(f, { fromSession = false } = {}) {
     if (!f) return;
     setFile(f);
     setError('');
@@ -59,6 +63,13 @@ export default function FillPdfWorkspace() {
       setValues(initial);
       setStep(2);
       setStatus('');
+      setResultBytes(null);
+      if (!fromSession) {
+        const hasUndownloadedWork = session.status === 'active' && session.history.length > 0;
+        if (!hasUndownloadedWork || window.confirm('Starting with this document will replace the document currently in your session. Continue?')) {
+          startSession(f, { toolSlug: 'fill-pdf' });
+        }
+      }
     } catch (err) {
       console.error(err);
       setError('Could not read this PDF. Make sure it is not password-protected.');
@@ -68,7 +79,22 @@ export default function FillPdfWorkspace() {
     }
   }
 
-  async function handleDownload() {
+  async function handleFile(e) {
+    const f = e.target.files[0];
+    await loadFile(f);
+  }
+
+  async function continueWithSessionDocument() {
+    const f = getDocumentAsFile();
+    await loadFile(f, { fromSession: true });
+  }
+
+  async function handleRestoreOriginal() {
+    const f = await restoreOriginal();
+    if (f) await loadFile(f, { fromSession: true });
+  }
+
+  async function handleApply() {
     if (!file) return;
     setBusy(true);
     setStatus('Filling form…');
@@ -98,10 +124,9 @@ export default function FillPdfWorkspace() {
 
       form.flatten();
       const bytes = await pdfDoc.save();
-      const baseName = file.name.replace('.pdf', '');
-      downloadBlob(new Blob([bytes], { type: 'application/pdf' }), `${baseName}-filled.pdf`);
-      setStatus('Done — your filled PDF has downloaded.');
-      setStep(3);
+      setResultBytes(bytes);
+      await updateDocument(bytes, { toolSlug: 'fill-pdf', label: 'Form filled' });
+      setStatus('Form filled — choose what to do next.');
     } catch (err) {
       console.error(err);
       setError('Could not fill the form. Please try again.');
@@ -111,6 +136,14 @@ export default function FillPdfWorkspace() {
     }
   }
 
+  // Downloading exports the current document but does not end the
+  // workspace — see WorkspaceSidebar for Close Workspace.
+  function downloadResult() {
+    if (!resultBytes || !file) return;
+    const baseName = file.name.replace('.pdf', '');
+    downloadBlob(new Blob([resultBytes], { type: 'application/pdf' }), `${baseName}-filled.pdf`);
+  }
+
   function reset() {
     setFile(null);
     setFields([]);
@@ -118,10 +151,12 @@ export default function FillPdfWorkspace() {
     setStep(1);
     setStatus('');
     setError('');
+    setResultBytes(null);
   }
 
   return (
     <div className="panel">
+      <WorkspaceStatusPanel onRestoreOriginal={handleRestoreOriginal} />
 
       {/* Explainer */}
       <div className="mb-5 p-4 rounded-xl text-sm" style={{ background: '#f0f5ff', border: '1px solid #d0dcf5' }}>
@@ -141,6 +176,20 @@ export default function FillPdfWorkspace() {
       {/* Step 1 — Upload */}
       {step === 1 && (
         <div>
+          {session.status === 'active' && session.document && (
+            <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12, padding: '14px 16px', marginBottom: 14, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: '1.4rem' }} aria-hidden="true">📄</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>Continue with {session.document.name}</div>
+                <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                  {session.document.pageCount ? `${session.document.pageCount} pages · ` : ''}already in this session — no need to re-upload.
+                </div>
+              </div>
+              <button onClick={continueWithSessionDocument} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+                Continue
+              </button>
+            </div>
+          )}
           <label className="dropzone block cursor-pointer">
             <input type="file" accept="application/pdf" onChange={handleFile} hidden />
             <div className="dz-icon">[ PDF ]</div>
@@ -177,7 +226,7 @@ export default function FillPdfWorkspace() {
                     className="w-full border rounded-lg px-3 py-2 text-sm"
                     style={{ borderColor: '#e2dcc9', background: '#fffefb' }}
                     value={values[field.name] || ''}
-                    onChange={e => setValues({ ...values, [field.name]: e.target.value })}
+                    onChange={e => { setValues({ ...values, [field.name]: e.target.value }); setResultBytes(null); }}
                   >
                     <option value="">— not selected —</option>
                     <option value="true">✓ Checked</option>
@@ -199,26 +248,23 @@ export default function FillPdfWorkspace() {
 
           {error && <div className="status error mb-3">{error}</div>}
 
-          <div className="actions">
-            <button className="btn btn-primary" disabled={busy} onClick={handleDownload}>
-              {busy ? 'Filling…' : 'Download Filled PDF'}
-            </button>
-            <button className="btn btn-ghost" onClick={reset}>Start over</button>
-          </div>
+          {!resultBytes ? (
+            <div className="actions">
+              <button className="btn btn-primary" disabled={busy} onClick={handleApply}>
+                {busy ? 'Filling…' : 'Fill Form'}
+              </button>
+              <button className="btn btn-ghost" onClick={reset}>Start over</button>
+            </div>
+          ) : (
+            <>
+              <ContinueWorkingPanel toolSlug="fill-pdf" documentName={file?.name || 'document.pdf'} onDownload={downloadResult} downloading={busy} />
+              <button onClick={() => setResultBytes(null)} style={{ marginTop: 10, background: 'none', border: 'none', color: '#64748B', fontSize: '0.78rem', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+                ← Edit fields again
+              </button>
+            </>
+          )}
 
           {status && <div className="status success">{status}</div>}
-        </div>
-      )}
-
-      {/* Step 3 — Done */}
-      {step === 3 && (
-        <div className="text-center py-8">
-          <div className="text-4xl mb-3">✅</div>
-          <h3 className="font-semibold text-ink text-lg mb-2">Form filled successfully!</h3>
-          <p className="text-sm text-ink-soft mb-6">Your filled PDF has downloaded to your device.</p>
-          <div className="actions justify-center">
-            <button className="btn btn-primary" onClick={reset}>Fill another form</button>
-          </div>
         </div>
       )}
 

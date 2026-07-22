@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
 
 function loadImage(src) {
   return new Promise((resolve) => {
@@ -18,9 +20,13 @@ function fileToDataUrl(file) {
 }
 
 export default function ImagesToPdfWorkspace() {
+  const { session, startSession } = useDocumentSession();
   const [items, setItems] = useState([]); // { file, name, img }
   const [busy, setBusy] = useState(false);
   const [pageSize, setPageSize] = useState('fit'); // fit = page matches image, a4 = standard A4
+  const [resultBytes, setResultBytes] = useState(null);
+
+  useEffect(() => { setResultBytes(null); }, [items, pageSize]);
 
   async function handleFiles(e) {
     const files = Array.from(e.target.files || []);
@@ -46,7 +52,7 @@ export default function ImagesToPdfWorkspace() {
     setItems((prev) => prev.filter((_, idx) => idx !== i));
   }
 
-  async function handleDownload() {
+  async function handleApply() {
     if (!items.length) return;
     setBusy(true);
     try {
@@ -82,16 +88,31 @@ export default function ImagesToPdfWorkspace() {
       }
 
       const bytes = await pdfDoc.save();
-      const blob = new Blob([bytes], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'images.pdf';
-      link.click();
-      URL.revokeObjectURL(url);
+      setResultBytes(bytes);
+
+      // Push-only: this tool takes images, not the session's PDF, as input —
+      // there's nothing to pull. Its output can still become (or replace)
+      // the session document, same as any other tool's terminal step.
+      const hasUndownloadedWork = session.status === 'active' && session.history.length > 0;
+      if (!hasUndownloadedWork || window.confirm('Starting with this document will replace the document currently in your session. Continue?')) {
+        await startSession(new File([bytes], 'images.pdf', { type: 'application/pdf' }), { toolSlug: 'images-to-pdf' });
+      }
     } finally {
       setBusy(false);
     }
+  }
+
+  // Downloading exports the current document but does not end the
+  // workspace — see WorkspaceSidebar for Close Workspace.
+  function downloadResult() {
+    if (!resultBytes) return;
+    const blob = new Blob([resultBytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'images.pdf';
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -131,9 +152,13 @@ export default function ImagesToPdfWorkspace() {
             ))}
           </div>
 
-          <button onClick={handleDownload} disabled={busy} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: busy ? '#94A3B8' : '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.9rem', cursor: busy ? 'default' : 'pointer' }}>
-            {busy ? 'Building PDF…' : `⬇ Download PDF (${items.length} page${items.length > 1 ? 's' : ''})`}
-          </button>
+          {!resultBytes ? (
+            <button onClick={handleApply} disabled={busy} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', background: busy ? '#94A3B8' : '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.9rem', cursor: busy ? 'default' : 'pointer' }}>
+              {busy ? 'Building PDF…' : `Build PDF (${items.length} page${items.length > 1 ? 's' : ''})`}
+            </button>
+          ) : (
+            <ContinueWorkingPanel toolSlug="images-to-pdf" documentName="images.pdf" onDownload={downloadResult} downloading={busy} />
+          )}
         </>
       )}
       <p className="privacy-note">Everything happens in your browser — your images are never uploaded to a server.</p>

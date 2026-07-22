@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import UploadBox from '@/components/UploadBox';
 import { runCloudConvertJob, downloadBlob } from '@/lib/cloudconvert-client';
+import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 
 const PROFILES = [
   { id: 'web', label: 'Smaller file (web/sharing)' },
@@ -11,6 +12,7 @@ const PROFILES = [
 ];
 
 export default function CompressPdfWorkspace() {
+  const { session, startSession, getDocumentAsFile } = useDocumentSession();
   const [file, setFile] = useState(null);
   const [profile, setProfile] = useState('web');
   const [status, setStatus] = useState('');
@@ -18,11 +20,23 @@ export default function CompressPdfWorkspace() {
   const [busy, setBusy] = useState(false);
   const [savings, setSavings] = useState(null);
 
-  function handleFiles(files) {
+  function handleFiles(files, { fromSession = false } = {}) {
     setError('');
     setStatus('');
     setSavings(null);
-    setFile(files[0] || null);
+    const f = files[0] || null;
+    setFile(f);
+    if (!fromSession && f) {
+      const hasUndownloadedWork = session.status === 'active' && session.history.length > 0;
+      if (!hasUndownloadedWork || window.confirm('Starting with this document will replace the document currently in your session. Continue?')) {
+        startSession(f, { toolSlug: 'compress-pdf' });
+      }
+    }
+  }
+
+  function continueWithSessionDocument() {
+    const f = getDocumentAsFile();
+    if (f) handleFiles([f], { fromSession: true });
   }
 
   async function handleCompress() {
@@ -56,7 +70,22 @@ export default function CompressPdfWorkspace() {
 
   return (
     <div className="panel">
-      <UploadBox accept="application/pdf" multiple={false} onFiles={handleFiles} />
+      {!file && session.status === 'active' && session.document && (
+        <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12, padding: '14px 16px', marginBottom: 14, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: '1.4rem' }} aria-hidden="true">📄</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>Continue with {session.document.name}</div>
+            <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
+              {session.document.pageCount ? `${session.document.pageCount} pages · ` : ''}already in this session — no need to re-upload.
+            </div>
+          </div>
+          <button onClick={continueWithSessionDocument} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+            Continue
+          </button>
+        </div>
+      )}
+
+      <UploadBox accept="application/pdf" multiple={false} onFiles={handleFiles} compact={!!file} />
 
       {file && (
         <div className="file-list">

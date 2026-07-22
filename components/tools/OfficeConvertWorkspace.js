@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import UploadBox from '@/components/UploadBox';
 import { runCloudConvertJob, downloadBlob } from '@/lib/cloudconvert-client';
+import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 
 function calcPrice(pages, fileSizeMB, isScanned, currency) {
   let ngn = 500;
@@ -82,7 +83,14 @@ function loadPaystack() {
   });
 }
 
+// Slug for startSession registration — only the PDF-input conversions
+// (pdf-to-word/excel/powerpoint) are part of the workspace groups; the
+// reverse-direction ones (word-to-pdf etc.) don't accept a PDF at all, so
+// there's nothing to pull and they're left as plain standalone tools.
+const PDF_INPUT_TOOL_SLUG = { docx: 'pdf-to-word', xlsx: 'pdf-to-excel', pptx: 'pdf-to-powerpoint' };
+
 export default function OfficeConvertWorkspace({ accept, toFormat, toLabel }) {
+  const { session, startSession, getDocumentAsFile } = useDocumentSession();
   const [file, setFile] = useState(null);
   const [analysis, setAnalysis] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -94,8 +102,9 @@ export default function OfficeConvertWorkspace({ accept, toFormat, toLabel }) {
   const [payLoading, setPayLoading] = useState(false);
 
   const currency = typeof window !== 'undefined' ? detectCurrency() : 'NGN';
+  const pullEnabled = accept === 'application/pdf';
 
-  async function handleFiles(files) {
+  async function handleFiles(files, { fromSession = false } = {}) {
     const f = files[0];
     if (!f) return;
     setFile(f);
@@ -116,6 +125,17 @@ export default function OfficeConvertWorkspace({ accept, toFormat, toLabel }) {
       setAnalysis({ pages: 0, isScanned: false, fileSizeMB: f.size / (1024 * 1024) });
     }
     loadPaystack();
+    if (pullEnabled && !fromSession) {
+      const hasUndownloadedWork = session.status === 'active' && session.history.length > 0;
+      if (!hasUndownloadedWork || window.confirm('Starting with this document will replace the document currently in your session. Continue?')) {
+        startSession(f, { toolSlug: PDF_INPUT_TOOL_SLUG[toFormat] });
+      }
+    }
+  }
+
+  function continueWithSessionDocument() {
+    const f = getDocumentAsFile();
+    if (f) handleFiles([f], { fromSession: true });
   }
 
   async function handlePay() {
@@ -196,6 +216,20 @@ export default function OfficeConvertWorkspace({ accept, toFormat, toLabel }) {
   if (!file) {
     return (
       <div className="panel">
+        {pullEnabled && session.status === 'active' && session.document && (
+          <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12, padding: '14px 16px', marginBottom: 14, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: '1.4rem' }} aria-hidden="true">📄</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>Continue with {session.document.name}</div>
+              <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                {session.document.pageCount ? `${session.document.pageCount} pages · ` : ''}already in this session — no need to re-upload.
+              </div>
+            </div>
+            <button onClick={continueWithSessionDocument} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+              Continue
+            </button>
+          </div>
+        )}
         <UploadBox accept={accept} multiple={false} onFiles={handleFiles} />
         <p className="privacy-note">Your file is analyzed locally — nothing is uploaded until you pay.</p>
       </div>

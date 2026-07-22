@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { runCloudConvertJob, downloadBlob } from '@/lib/cloudconvert-client';
+import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 
 function getStrength(pw) {
   let score = 0;
@@ -22,6 +23,7 @@ function getStrength(pw) {
 }
 
 export default function ProtectPdfWorkspace() {
+  const { session, startSession, getDocumentAsFile } = useDocumentSession();
   const [file, setFile] = useState(null);
   const [fileInfo, setFileInfo] = useState(null);
   const [pw1, setPw1] = useState('');
@@ -32,7 +34,7 @@ export default function ProtectPdfWorkspace() {
   const [status, setStatus] = useState('');
   const fileRef = useRef();
 
-  async function handleFile(f) {
+  async function handleFile(f, { fromSession = false } = {}) {
     if (!f || f.type !== 'application/pdf') return;
     setFile(f);
     try {
@@ -43,6 +45,17 @@ export default function ProtectPdfWorkspace() {
       setFileInfo({ name: f.name, pages: '?', size: (f.size / 1024).toFixed(0) });
     }
     setStatus('');
+    if (!fromSession) {
+      const hasUndownloadedWork = session.status === 'active' && session.history.length > 0;
+      if (!hasUndownloadedWork || window.confirm('Starting with this document will replace the document currently in your session. Continue?')) {
+        startSession(f, { toolSlug: 'protect-pdf' });
+      }
+    }
+  }
+
+  function continueWithSessionDocument() {
+    const f = getDocumentAsFile();
+    if (f) handleFile(f, { fromSession: true });
   }
 
   async function protect() {
@@ -73,9 +86,28 @@ export default function ProtectPdfWorkspace() {
   const strength = getStrength(pw1);
   const strengthIndex = ['', 'Weak', 'Fair', 'Good', 'Strong', 'Very strong'].indexOf(strength.label);
 
-  if (!file) {
+  // Gated on fileInfo, not file: setFile(f) commits synchronously but
+  // fileInfo is set after an await (pdf-lib's dynamic import + parse), so a
+  // gate on file alone rendered the "loaded" view mid-async-gap and crashed
+  // reading fileInfo.name on a still-null fileInfo — pre-existing, just
+  // never hit until Continue made this a fast, real, repeatable path.
+  if (!file || !fileInfo) {
     return (
       <div>
+        {session.status === 'active' && session.document && (
+          <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12, padding: '14px 16px', marginBottom: 14, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: '1.4rem' }} aria-hidden="true">📄</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>Continue with {session.document.name}</div>
+              <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                {session.document.pageCount ? `${session.document.pageCount} pages · ` : ''}already in this session — no need to re-upload.
+              </div>
+            </div>
+            <button onClick={continueWithSessionDocument} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+              Continue
+            </button>
+          </div>
+        )}
         <div onClick={() => fileRef.current.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); }} className="border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer" style={{ borderColor: '#e2dcc9', background: '#fffefb' }}>
           <div className="text-4xl mb-3">📄</div>
           <p className="font-medium text-ink mb-1">Drop your PDF here</p>

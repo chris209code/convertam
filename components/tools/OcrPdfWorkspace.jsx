@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 
 export default function OcrPdfWorkspace() {
+  const { session, startSession, getDocumentAsFile } = useDocumentSession();
   const [file, setFile] = useState(null);
   const [fileInfo, setFileInfo] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -10,11 +12,22 @@ export default function OcrPdfWorkspace() {
   const [status, setStatus] = useState('');
   const fileRef = useRef();
 
-  function handleFile(f) {
+  function handleFile(f, { fromSession = false } = {}) {
     if (!f) return;
     setFile(f);
     setFileInfo({ name: f.name, size: (f.size / 1024).toFixed(0) });
     setResult(''); setStatus('');
+    if (!fromSession && f.type === 'application/pdf') {
+      const hasUndownloadedWork = session.status === 'active' && session.history.length > 0;
+      if (!hasUndownloadedWork || window.confirm('Starting with this document will replace the document currently in your session. Continue?')) {
+        startSession(f, { toolSlug: 'ocr-pdf' });
+      }
+    }
+  }
+
+  function continueWithSessionDocument() {
+    const f = getDocumentAsFile();
+    if (f) handleFile(f, { fromSession: true });
   }
 
   async function runOCR() {
@@ -57,6 +70,20 @@ export default function OcrPdfWorkspace() {
     <div className="flex flex-col gap-5">
       {!fileInfo ? (
         <div>
+          {session.status === 'active' && session.document && (
+            <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12, padding: '14px 16px', marginBottom: 14, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: '1.4rem' }} aria-hidden="true">📄</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>Continue with {session.document.name}</div>
+                <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                  {session.document.pageCount ? `${session.document.pageCount} pages · ` : ''}already in this session — no need to re-upload.
+                </div>
+              </div>
+              <button onClick={continueWithSessionDocument} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+                Continue
+              </button>
+            </div>
+          )}
           <div
             onClick={() => fileRef.current.click()}
             onDragOver={e => e.preventDefault()}

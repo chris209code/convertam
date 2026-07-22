@@ -2,27 +2,72 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { CategoryIcon, ToolIcon } from '@/components/icons/ToolIconSystem';
 
-// Maps each category's `icon` key (used to look up its header CategoryIcon)
-// to the same suite key ToolIcon expects, so each "Popular Tools" row can
-// show its own small icon instead of a plain colored dot.
-const ICON_TO_SUITE = { fileText: 'pdf', briefcase: 'business', sparkles: 'ai', image: 'image', calculator: 'calculator', grid: 'utilities', data: 'data' };
-
-function toolSlugFromHref(href) {
-  return href.replace(/^\//, '').split('/').pop();
-}
-
-// Category card icons now come from the shared icon system (one
-// illustration style everywhere) instead of a homepage-only SVG set — see
-// components/icons/ToolIconSystem.js.
-const PdfSuiteIcon = <CategoryIcon suite="pdf" size={22} />;
-const BusinessSuiteIcon = <CategoryIcon suite="business" size={22} />;
-const AiWorkspaceIcon = <CategoryIcon suite="ai" size={22} />;
-const ImageStudioIcon = <CategoryIcon suite="image" size={22} />;
-const DataWorkspaceIcon = <CategoryIcon suite="data" size={22} />;
-const CalculatorsIcon = <CategoryIcon suite="calculator" size={22} />;
-const UtilitiesIconV2 = <CategoryIcon suite="utilities" size={22} />;
+// A newer, more professional icon set for the homepage category cards only —
+// categoryVisuals.js's icons are shared with the 5 hub pages (via
+// CATEGORY_ACCENTS + ToolHubClient), which weren't part of this redesign, so
+// this set lives here rather than replacing those and silently changing
+// pages nobody asked to change.
+const PdfSuiteIcon = (
+  <svg width="22" height="22" viewBox="0 0 24 24">
+    <path d="M5 3.8A1.8 1.8 0 0 1 6.8 2h7.4L19 6.8v13.4A1.8 1.8 0 0 1 17.2 22H6.8A1.8 1.8 0 0 1 5 20.2z" fill="#fff" />
+    <path d="M14.2 2v3.6c0 .77.63 1.4 1.4 1.4H19" fill="none" stroke="#F1F5F9" strokeWidth="1" />
+    <rect x="4" y="13.4" width="11.5" height="6.6" rx="1.4" fill="#DC2626" />
+    <text x="9.7" y="18.3" fontFamily="Arial, sans-serif" fontSize="5.3" fontWeight="800" fill="#fff" textAnchor="middle">PDF</text>
+  </svg>
+);
+const BusinessSuiteIcon = (
+  <svg width="22" height="22" viewBox="0 0 24 24">
+    <rect x="2.5" y="8" width="19" height="12" rx="2.5" fill="#fff" />
+    <path d="M9 8V6.5A2.5 2.5 0 0 1 11.5 4h1A2.5 2.5 0 0 1 15 6.5V8" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
+    <rect x="10.3" y="12.4" width="3.4" height="2.6" rx="0.6" fill="#059669" />
+  </svg>
+);
+const AiWorkspaceIcon = (
+  <svg width="22" height="22" viewBox="0 0 24 24">
+    <rect x="11" y="2.6" width="2" height="4" rx="1" fill="#fff" />
+    <circle cx="12" cy="2.6" r="1.5" fill="#fff" />
+    <rect x="4" y="8" width="16" height="12.5" rx="4" fill="#fff" />
+    <circle cx="9.2" cy="14.2" r="1.6" fill="#7C3AED" />
+    <circle cx="14.8" cy="14.2" r="1.6" fill="#7C3AED" />
+    <rect x="9" y="17.2" width="6" height="1.5" rx="0.75" fill="#7C3AED" opacity="0.55" />
+  </svg>
+);
+const ImageStudioIcon = (
+  <svg width="22" height="22" viewBox="0 0 24 24">
+    <rect x="2.5" y="4" width="19" height="16" rx="2.5" fill="#fff" />
+    <circle cx="8.3" cy="9.6" r="2" fill="#F97316" />
+    <path d="M3.8 17.8l5.4-6.3 4 4.1 3.4-4.1 4.9 6.3" fill="none" stroke="#F97316" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+const DataWorkspaceIcon = (
+  <svg width="22" height="22" viewBox="0 0 24 24">
+    <path d="M4 5.5v13c0 1.66 3.58 3 8 3s8-1.34 8-3v-13" fill="#fff" opacity="0.92" />
+    <ellipse cx="12" cy="5.5" rx="8" ry="3" fill="#fff" />
+    <path d="M4 11c0 1.66 3.58 3 8 3s8-1.34 8-3" fill="none" stroke="#0891B2" strokeWidth="1.3" opacity="0.55" />
+    <path d="M4 16c0 1.66 3.58 3 8 3s8-1.34 8-3" fill="none" stroke="#0891B2" strokeWidth="1.3" opacity="0.55" />
+  </svg>
+);
+const CalculatorsIcon = (
+  <svg width="22" height="22" viewBox="0 0 24 24">
+    <rect x="5" y="2" width="14" height="20" rx="2.5" fill="#fff" />
+    <rect x="7" y="4.2" width="10" height="4" rx="1" fill="#2563EB" />
+    <g fill="#2563EB" opacity="0.55">
+      <circle cx="8.6" cy="11.6" r="1.1" /><circle cx="12" cy="11.6" r="1.1" /><circle cx="15.4" cy="11.6" r="1.1" />
+      <circle cx="8.6" cy="15.1" r="1.1" /><circle cx="12" cy="15.1" r="1.1" /><circle cx="15.4" cy="15.1" r="1.1" />
+    </g>
+    <rect x="7" y="18" width="10" height="2" rx="1" fill="#2563EB" opacity="0.55" />
+  </svg>
+);
+const UtilitiesIconV2 = (
+  <svg width="22" height="22" viewBox="0 0 24 24">
+    <g transform="rotate(45 12 12)">
+      <rect x="10.5" y="3" width="3" height="18" rx="1.5" fill="#fff" />
+      <circle cx="12" cy="4.6" r="3.3" fill="none" stroke="#fff" strokeWidth="2.2" />
+      <circle cx="12" cy="19.4" r="2.2" fill="#fff" />
+    </g>
+  </svg>
+);
 
 // ---------------------------------------------------------------------------
 // Every route below is a REAL, existing Convertam route — verified against
@@ -348,7 +393,7 @@ export default function HomePage() {
         @media (max-width: 420px) { .cvt-cat-tools { grid-template-columns: 1fr; } }
         .cvt-cat-tool-link { display: flex; align-items: center; gap: 6px; text-decoration: none; color: #334155; font-size: 12.5px; font-weight: 500; padding: 3px; margin: -3px; border-radius: 7px; min-width: 0; transition: background 150ms ease, color 150ms ease; }
         .cvt-cat-tool-link:hover { background: var(--hover-bg); color: var(--hover-color); }
-        .cvt-cat-tool-icon { width: 20px; height: 20px; border-radius: 6px; overflow: hidden; flex-shrink: 0; display: flex; }
+        .cvt-cat-tool-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
         .cvt-cat-tool-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .cvt-cat-viewall { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; text-decoration: none; }
 
@@ -427,7 +472,7 @@ export default function HomePage() {
                       className="cvt-cat-tool-link"
                       style={{ '--hover-bg': cat.borderColor, '--hover-color': cat.accentText }}
                     >
-                      <span className="cvt-cat-tool-icon"><ToolIcon slug={toolSlugFromHref(tool.href)} suite={ICON_TO_SUITE[cat.icon]} size={20} /></span>
+                      <span className="cvt-cat-tool-dot" style={{ background: cat.dotColor }} />
                       <span className="cvt-cat-tool-name">{tool.name}</span>
                     </Link>
                   ))}

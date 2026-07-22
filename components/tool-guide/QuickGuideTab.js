@@ -73,6 +73,7 @@ export default function QuickGuideTab({ guide, toolSlug, children }) {
           onClick={() => setOpen(true)}
           className="fixed top-24 right-5 z-[999] flex items-center gap-2 bg-stamp-blue text-white border-none rounded-full cursor-pointer shadow-lg px-4 py-2.5 text-[13px] font-semibold hover:brightness-110 transition"
         >
+          <span>📖</span>
           <span>Quick Guide</span>
         </button>
       )}
@@ -87,7 +88,7 @@ export default function QuickGuideTab({ guide, toolSlug, children }) {
           top:0 spot and covering it while scrolling. */}
       {open && (
         <div className="hidden md:block md:sticky md:z-[1001] md:flex-shrink-0 md:w-[420px] md:border-l md:border-[#E2E6ED] md:top-16 md:self-start md:h-[calc(100vh-64px)]">
-          <QuickGuidePanel guide={guide} toolSlug={toolSlug} onClose={close} />
+          <QuickGuidePanel guide={guide} onClose={close} />
         </div>
       )}
 
@@ -103,7 +104,7 @@ export default function QuickGuideTab({ guide, toolSlug, children }) {
             ${open ? 'translate-y-0' : 'translate-y-full'}`}
           style={{ background: '#fffefb' }}
         >
-          <QuickGuidePanel guide={guide} toolSlug={toolSlug} onClose={close} />
+          <QuickGuidePanel guide={guide} onClose={close} />
         </div>
       </div>
     </div>

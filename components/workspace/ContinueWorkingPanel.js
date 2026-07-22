@@ -2,8 +2,6 @@
 
 import Link from 'next/link';
 import { getToolSuggestions } from '@/lib/workspace/toolSuggestions';
-import { getTool } from '@/lib/tools-config';
-import { ToolIcon, suiteForCategory } from '@/components/icons/ToolIconSystem';
 
 // Shown at a session-compatible tool's terminal step instead of an automatic
 // download — Continue Working and Download become an explicit choice. The
@@ -32,9 +30,7 @@ export default function ContinueWorkingPanel({ toolSlug, documentName, onDownloa
                 background: 'white', border: '1px solid #BFDBFE', textDecoration: 'none',
               }}
             >
-              <span aria-hidden="true" style={{ display: 'flex', flexShrink: 0 }}>
-                <ToolIcon slug={s.slug} suite={suiteForCategory(getTool(s.slug)?.category)} size={28} />
-              </span>
+              <span aria-hidden="true">{s.icon}</span>
               <span>
                 <span style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1D4ED8' }}>
                   Continue to {s.title}

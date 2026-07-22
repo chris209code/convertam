@@ -1,24 +1,18 @@
 import Link from 'next/link';
 import { getTool } from '@/lib/tools-config';
-import { ToolIcon, suiteForCategory } from '@/components/icons/ToolIconSystem';
 import FaqAccordion from './FaqAccordion';
 
 const H3 = 'font-display text-[15px] font-bold text-ink mb-3';
 
-export default function QuickGuidePanel({ guide, toolSlug, onClose }) {
+export default function QuickGuidePanel({ guide, onClose }) {
   const recTool = guide.recommendation ? getTool(guide.recommendation.slug) : null;
-  const currentTool = toolSlug ? getTool(toolSlug) : null;
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between gap-3 bg-stamp-blue px-5 py-4 flex-shrink-0">
         <div className="flex items-center gap-2.5">
-          {currentTool && (
-            <span className="flex-shrink-0 w-7 h-7 rounded-md overflow-hidden">
-              <ToolIcon slug={currentTool.slug} suite={suiteForCategory(currentTool.category)} size={28} />
-            </span>
-          )}
+          <span className="text-lg">📖</span>
           <span className="text-white font-display font-bold text-[15px]">{guide.title}</span>
         </div>
         <button
@@ -136,8 +130,8 @@ export default function QuickGuidePanel({ guide, toolSlug, onClose }) {
               href={`/${recTool.slug}`}
               className="flex items-center gap-3 px-3.5 py-3 rounded-xl border border-[#E2E6ED] bg-white hover:border-stamp-blue transition-colors no-underline"
             >
-              <span className="flex-shrink-0 w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center">
-                <ToolIcon slug={recTool.slug} suite={suiteForCategory(recTool.category)} size={36} />
+              <span className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-base" style={{ background: '#EFF3FC' }}>
+                {guide.recommendation.icon}
               </span>
               <span className="flex-1 min-w-0">
                 <span className="block text-[12px] text-ink-soft leading-snug">{guide.recommendation.prompt}</span>

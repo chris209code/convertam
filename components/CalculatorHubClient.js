@@ -2,22 +2,21 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ToolIcon, CategoryIcon } from './icons/ToolIconSystem';
 
 // Only calculators that genuinely solve a financial/business decision make
 // the cut — see the Phase 1 brief. BMI and Tip Calculator are deliberately
 // excluded from this hub (their code still exists in CalculatorWorkspace.js,
 // just unreferenced) since they no longer fit Convertam's direction.
 const ACTIVE_CALCULATORS = [
-  { id: 'salary', slug: 'salary-calculator', href: '/salary-calculator', title: 'Salary Calculator', desc: 'Calculate gross salary, deductions and take-home pay instantly.', badge: 'POPULAR', category: 'financial' },
-  { id: 'loan', slug: 'loan-calculator', href: '/calculators/loan-calculator', title: 'Loan Calculator', desc: 'Work out monthly repayments, total interest and total repayment.', category: 'financial' },
-  { id: 'vat', slug: 'vat-calculator', href: '/calculators/vat-calculator', title: 'VAT Calculator', desc: 'Add VAT to an amount or extract it from a VAT-inclusive price.', category: 'financial' },
-  { id: 'profit-margin', slug: 'profit-margin', href: '/calculators/profit-margin', title: 'Profit & Loss Calculator', desc: 'Analyse revenue, expenses, margins, pricing and business performance.', category: 'financial' },
-  { id: 'discount', slug: 'discount-calculator', href: '/calculators/discount-calculator', title: 'Discount Calculator', desc: 'Find the final price and total savings on any discounted item.', category: 'financial' },
-  { id: 'age', slug: 'age-calculator', href: '/calculators/age-calculator', title: 'Age Calculator', desc: 'Calculate exact age in years, months and days from a date of birth.', category: 'personal' },
-  { id: 'expense-budget', slug: 'expense-budget-calculator', href: '/calculators/expense-budget-calculator', title: 'Expense & Budget Calculator', desc: 'Track income, expenses and savings, and see your remaining balance live.', category: 'financial' },
-  { id: 'break-even', slug: 'break-even-calculator', href: '/calculators/break-even-calculator', title: 'Break-even Calculator', desc: 'Find out how many units you need to sell to cover your costs.', category: 'financial' },
-  { id: 'savings-goal', slug: 'savings-goal-calculator', href: '/calculators/savings-goal-calculator', title: 'Savings Goal Calculator', desc: 'Plan how much to save regularly to hit a target, interest included.', category: 'financial' },
+  { id: 'salary', href: '/salary-calculator', icon: '💰', title: 'Salary Calculator', desc: 'Calculate gross salary, deductions and take-home pay instantly.', badge: 'POPULAR', category: 'financial' },
+  { id: 'loan', href: '/calculators/loan-calculator', icon: '🏦', title: 'Loan Calculator', desc: 'Work out monthly repayments, total interest and total repayment.', category: 'financial' },
+  { id: 'vat', href: '/calculators/vat-calculator', icon: '🧾', title: 'VAT Calculator', desc: 'Add VAT to an amount or extract it from a VAT-inclusive price.', category: 'financial' },
+  { id: 'profit-margin', href: '/calculators/profit-margin', icon: '📈', title: 'Profit & Loss Calculator', desc: 'Analyse revenue, expenses, margins, pricing and business performance.', category: 'financial' },
+  { id: 'discount', href: '/calculators/discount-calculator', icon: '🏷️', title: 'Discount Calculator', desc: 'Find the final price and total savings on any discounted item.', category: 'financial' },
+  { id: 'age', href: '/calculators/age-calculator', icon: '🎂', title: 'Age Calculator', desc: 'Calculate exact age in years, months and days from a date of birth.', category: 'personal' },
+  { id: 'expense-budget', href: '/calculators/expense-budget-calculator', icon: '💵', title: 'Expense & Budget Calculator', desc: 'Track income, expenses and savings, and see your remaining balance live.', category: 'financial' },
+  { id: 'break-even', href: '/calculators/break-even-calculator', icon: '⚖️', title: 'Break-even Calculator', desc: 'Find out how many units you need to sell to cover your costs.', category: 'financial' },
+  { id: 'savings-goal', href: '/calculators/savings-goal-calculator', icon: '🎯', title: 'Savings Goal Calculator', desc: 'Plan how much to save regularly to hit a target, interest included.', category: 'financial' },
 ];
 
 const FEATURED_ID = 'salary';
@@ -36,7 +35,7 @@ function scrollToSection(id) {
 function CalcCard({ calc }) {
   return (
     <Link href={calc.href} className="calc-card">
-      <span className="calc-card-icon" aria-hidden="true"><ToolIcon slug={calc.slug} suite="calculator" size={40} /></span>
+      <span className="calc-card-icon" aria-hidden="true">{calc.icon}</span>
       <div className="calc-card-body">
         <div className="calc-card-title-row">
           <span className="calc-card-title">{calc.title}</span>
@@ -96,8 +95,8 @@ export default function CalculatorHubClient() {
         }
         .calc-featured:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(15,23,42,0.08); border-color: #BFDBFE; }
         .calc-featured-icon {
-          flex-shrink: 0; width: 52px; height: 52px; border-radius: 14px;
-          display: flex; align-items: center; justify-content: center; overflow: hidden;
+          font-size: 1.7rem; flex-shrink: 0; width: 52px; height: 52px; border-radius: 14px;
+          display: flex; align-items: center; justify-content: center; background: #DBEAFE;
         }
         .calc-featured-eyebrow { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #1D4ED8; margin: 0 0 4px; }
         .calc-featured-title { font-size: 1.15rem; font-weight: 800; margin: 0 0 3px; color: #0F172A; }
@@ -116,8 +115,8 @@ export default function CalculatorHubClient() {
         .calc-card:hover { transform: translateY(-3px); box-shadow: 0 12px 24px rgba(15,23,42,0.08); border-color: #BFDBFE; }
         .calc-card:hover .calc-card-arrow { opacity: 1; transform: translateX(0); }
         .calc-card-icon {
-          flex-shrink: 0; line-height: 1; width: 40px; height: 40px; border-radius: 11px;
-          display: flex; align-items: center; justify-content: center; overflow: hidden;
+          font-size: 1.3rem; flex-shrink: 0; line-height: 1; width: 40px; height: 40px; border-radius: 11px;
+          display: flex; align-items: center; justify-content: center; background: #EFF6FF;
         }
         .calc-card-body { flex: 1; min-width: 0; padding-right: 14px; }
         .calc-card-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
@@ -147,7 +146,7 @@ export default function CalculatorHubClient() {
         <div className="page-inner">
           <Link href="/" style={{ fontSize: '0.8rem', color: '#2563EB', textDecoration: 'none', marginBottom: 12, display: 'inline-block' }}>← Back to Home</Link>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
-            <CategoryIcon suite="calculator" size={56} />
+            <span style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(120deg, #2563EB 0%, #1D4ED8 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 8px 20px rgba(37,99,235,0.25)', fontSize: '1.6rem' }} aria-hidden="true">🧮</span>
             <div>
               <h1 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 800, color: '#152238', margin: 0 }}>Calculator Hub</h1>
               <p style={{ fontSize: '0.9rem', color: '#64748B', margin: '4px 0 0' }}>Calculators that help you make real financial and business decisions.</p>
@@ -180,7 +179,7 @@ export default function CalculatorHubClient() {
       <div className="page-inner" style={{ padding: '40px 4% 64px' }}>
         {!isSearching && featured && (
           <Link href={featured.href} className="calc-featured">
-            <span className="calc-featured-icon"><ToolIcon slug={featured.slug} suite="calculator" size={52} /></span>
+            <span className="calc-featured-icon">{featured.icon}</span>
             <div>
               <p className="calc-featured-eyebrow">Featured Calculator</p>
               <p className="calc-featured-title">{featured.title}</p>
@@ -196,7 +195,7 @@ export default function CalculatorHubClient() {
           <>
             {(isSearching ? byCategory('financial').length > 0 : true) && (
               <div style={{ marginBottom: 40 }}>
-                <h2 id="financial" className="calc-section-title" style={{ fontSize: '1.05rem', fontWeight: 700, color: '#152238' }}><CategoryIcon suite="calculator" size={22} /> Business & Finance</h2>
+                <h2 id="financial" className="calc-section-title" style={{ fontSize: '1.05rem', fontWeight: 700, color: '#152238' }}>💼 Business & Finance</h2>
                 <div className="calc-grid">
                   {byCategory('financial').map((c) => <CalcCard key={c.id} calc={c} />)}
                 </div>
@@ -205,7 +204,7 @@ export default function CalculatorHubClient() {
 
             {(isSearching ? byCategory('personal').length > 0 : true) && (
               <div style={{ marginBottom: 40 }}>
-                <h2 id="personal" className="calc-section-title" style={{ fontSize: '1.05rem', fontWeight: 700, color: '#152238' }}><CategoryIcon suite="calculator" size={22} /> Everyday</h2>
+                <h2 id="personal" className="calc-section-title" style={{ fontSize: '1.05rem', fontWeight: 700, color: '#152238' }}>🙋 Everyday</h2>
                 <div className="calc-grid">
                   {byCategory('personal').map((c) => <CalcCard key={c.id} calc={c} />)}
                 </div>

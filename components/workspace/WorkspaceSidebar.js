@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 import { tools, getTool } from '@/lib/tools-config';
 import { canPullSessionDocument, isDestinationOnly, PUSH_ONLY_TOOLS } from '@/lib/workspace/toolCompatibility';
-import { SectionIcon } from '@/components/icons/ToolIconSystem';
 
 function toolLabel(slug) {
   if (!slug) return null;
@@ -13,11 +12,11 @@ function toolLabel(slug) {
 }
 
 const GROUPS = [
-  { id: 'edit', label: 'Edit' },
-  { id: 'organize', label: 'Organize' },
-  { id: 'security', label: 'Security' },
-  { id: 'optimize', label: 'Optimize' },
-  { id: 'export', label: 'Export' },
+  { id: 'edit', label: 'Edit', icon: '✏️' },
+  { id: 'organize', label: 'Organize', icon: '📂' },
+  { id: 'security', label: 'Security', icon: '🔒' },
+  { id: 'optimize', label: 'Optimize', icon: '⚡' },
+  { id: 'export', label: 'Export', icon: '⬇️' },
 ];
 
 function groupedTools() {
@@ -143,7 +142,7 @@ function SidebarContent({ session, onNavigate, onClose, onRestoreOriginal }) {
         {groups.map((g) => (
           <div key={g.id} style={{ marginBottom: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.04em', color: '#94A3B8', textTransform: 'uppercase', padding: '0 10px', marginBottom: 4 }}>
-              <SectionIcon id={g.id} suite="pdf" size={16} />{g.label}
+              <span aria-hidden="true">{g.icon}</span>{g.label}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               {g.tools.map((t) => (
@@ -256,7 +255,7 @@ function DesktopRail({ session, onClose, onRestoreOriginal }) {
                 color: isCurrent ? '#1D4ED8' : '#334155', fontWeight: isCurrent ? 700 : 600, fontSize: '0.8rem',
               }}
             >
-              <SectionIcon id={g.id} suite="pdf" size={18} />
+              <span aria-hidden="true">{g.icon}</span>
               <span style={{ flex: 1 }}>{g.label}</span>
               <span style={{ fontSize: '0.62rem', color: '#94A3B8' }}>{isOpen ? '▾' : '▸'}</span>
             </button>

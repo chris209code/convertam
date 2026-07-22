@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 import { tools, getTool } from '@/lib/tools-config';
-import { canPullSessionDocument, isDestinationOnly } from '@/lib/workspace/toolCompatibility';
+import { canPullSessionDocument, isDestinationOnly, PUSH_ONLY_TOOLS } from '@/lib/workspace/toolCompatibility';
 
 function toolLabel(slug) {
   if (!slug) return null;
@@ -44,15 +44,35 @@ function downloadCurrentDocument(session) {
   URL.revokeObjectURL(url);
 }
 
-function ToolLink({ tool, active, onNavigate }) {
+function ToolLink({ tool, active, onNavigate, session, doc }) {
   const pullable = canPullSessionDocument(tool.slug);
   const destinationOnly = isDestinationOnly(tool.slug);
   const note = !pullable ? (destinationOnly ? 'opens with a new upload' : 'needs a different file type') : null;
 
+  // The one real file-type mismatch today: Images to PDF takes images, not a
+  // PDF. Rather than silently letting the click through (or just the small
+  // muted note), remind the visitor and offer the honest bridge — converting
+  // their current PDF to images first — without blocking their original
+  // intent if they'd rather start fresh with new images anyway.
+  function handleClick(e) {
+    if (PUSH_ONLY_TOOLS.includes(tool.slug) && doc?.mimeType === 'application/pdf') {
+      const wantsConversion = window.confirm(
+        `${doc.name} is a PDF — ${tool.title} works with image files (JPG/PNG), not PDFs.\n\nConvert it to images first?`
+      );
+      if (wantsConversion) {
+        e.preventDefault();
+        onNavigate?.();
+        window.location.href = '/pdf-to-png';
+        return;
+      }
+    }
+    onNavigate?.();
+  }
+
   return (
     <Link
       href={`/${tool.slug}`}
-      onClick={onNavigate}
+      onClick={handleClick}
       style={{
         display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8,
         textDecoration: 'none', fontSize: '0.8rem', fontWeight: active ? 700 : 500,
@@ -126,7 +146,7 @@ function SidebarContent({ session, onNavigate, onClose, onRestoreOriginal }) {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               {g.tools.map((t) => (
-                <ToolLink key={t.slug} tool={t} active={session.currentTool === t.slug} onNavigate={onNavigate} />
+                <ToolLink key={t.slug} tool={t} active={session.currentTool === t.slug} onNavigate={onNavigate} session={session} doc={doc} />
               ))}
             </div>
           </div>
@@ -147,6 +167,144 @@ function SidebarContent({ session, onNavigate, onClose, onRestoreOriginal }) {
           Close Workspace
         </button>
       </div>
+    </div>
+  );
+}
+
+// Desktop-only: a compact icon rail for the tool groups, with the specific
+// tools inside a group revealed in a flyout panel on click — rather than
+// every tool name always being listed inline. Document identity and
+// history/restore stay exactly as in SidebarContent above them; only the
+// tool-navigation part of the column changes shape. Mobile keeps the full
+// always-expanded list (SidebarContent) since a flyout doesn't translate
+// well to a touch drawer without its own dedicated interaction design.
+function DesktopRail({ session, onClose, onRestoreOriginal }) {
+  const doc = session.document;
+  const groups = groupedTools();
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [activeGroupId, setActiveGroupId] = useState(null);
+  const railRef = useRef(null);
+  const { history } = session;
+  const currentGroupId = groups.find((g) => g.tools.some((t) => t.slug === session.currentTool))?.id;
+  const activeGroup = groups.find((g) => g.id === activeGroupId);
+
+  useEffect(() => {
+    function handleOutsideClick(e) {
+      if (railRef.current && !railRef.current.contains(e.target)) setActiveGroupId(null);
+    }
+    if (activeGroupId) document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [activeGroupId]);
+
+  return (
+    <div ref={railRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+      <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid #EEF1F5' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.03em', color: '#059669', textTransform: 'uppercase', marginBottom: 6 }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981', display: 'inline-block' }} />
+          Workspace
+        </div>
+        <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {doc?.name}
+        </div>
+        <div style={{ fontSize: '0.7rem', color: '#64748B', marginTop: 2 }}>
+          {doc?.pageCount != null ? `${doc.pageCount} page${doc.pageCount === 1 ? '' : 's'} · ` : ''}{formatBytes(doc?.sizeBytes)}
+        </div>
+      </div>
+
+      {history.length > 0 && (
+        <div style={{ padding: '10px 16px', borderBottom: '1px solid #EEF1F5' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={() => setHistoryOpen((v) => !v)}
+              style={{ background: 'none', border: 'none', padding: 0, fontSize: '0.72rem', color: '#64748B', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}
+            >
+              {history.length} operation{history.length === 1 ? '' : 's'} {historyOpen ? '▾' : '▸'}
+            </button>
+            <button
+              onClick={onRestoreOriginal}
+              style={{ marginLeft: 'auto', padding: '4px 8px', borderRadius: 6, border: '1px solid #E2E8F0', background: 'white', color: '#334155', fontSize: '0.68rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+            >
+              ↺ Restore
+            </button>
+          </div>
+          {historyOpen && (
+            <ul style={{ listStyle: 'none', margin: '6px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <li style={{ fontSize: '0.72rem', color: '#334155' }}>✓ Uploaded</li>
+              {history.map((entry) => (
+                <li key={entry.id} style={{ fontSize: '0.72rem', color: '#334155' }}>
+                  ✓ {entry.label || toolLabel(entry.toolSlug) || 'Edited'}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '10px 8px' }}>
+        {groups.map((g) => {
+          const isOpen = activeGroupId === g.id;
+          const isCurrent = currentGroupId === g.id;
+          return (
+            <button
+              key={g.id}
+              onClick={() => setActiveGroupId(isOpen ? null : g.id)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', marginBottom: 2,
+                borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                background: isOpen ? '#E2E8F0' : isCurrent ? '#EFF6FF' : 'transparent',
+                color: isCurrent ? '#1D4ED8' : '#334155', fontWeight: isCurrent ? 700 : 600, fontSize: '0.8rem',
+              }}
+            >
+              <span aria-hidden="true">{g.icon}</span>
+              <span style={{ flex: 1 }}>{g.label}</span>
+              <span style={{ fontSize: '0.62rem', color: '#94A3B8' }}>{isOpen ? '▾' : '▸'}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ padding: 12, borderTop: '1px solid #EEF1F5', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <button
+          onClick={() => downloadCurrentDocument(session)}
+          style={{ padding: '9px 12px', borderRadius: 9, border: 'none', background: '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit' }}
+        >
+          ⬇ Download Current PDF
+        </button>
+        <button
+          onClick={onClose}
+          style={{ padding: '9px 12px', borderRadius: 9, border: '1px solid #FECACA', background: '#FEF2F2', color: '#DC2626', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit' }}
+        >
+          Close Workspace
+        </button>
+      </div>
+
+      {activeGroup && (
+        <div
+          style={{
+            position: 'fixed', left: 248, top: 64, width: 260, maxHeight: 'calc(100vh - 64px)', overflowY: 'auto',
+            background: 'white', borderRight: '1px solid #E2E6ED', borderBottom: '1px solid #E2E6ED',
+            boxShadow: '6px 6px 20px rgba(15,23,42,0.12)', zIndex: 1002, borderBottomRightRadius: 12,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderBottom: '1px solid #EEF1F5' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.04em', color: '#94A3B8', textTransform: 'uppercase' }}>
+              {activeGroup.icon} {activeGroup.label}
+            </span>
+            <button
+              onClick={() => setActiveGroupId(null)}
+              aria-label="Close"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', fontSize: '1rem', lineHeight: 1, padding: 2 }}
+            >
+              ×
+            </button>
+          </div>
+          <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {activeGroup.tools.map((t) => (
+              <ToolLink key={t.slug} tool={t} active={session.currentTool === t.slug} onNavigate={() => setActiveGroupId(null)} session={session} doc={doc} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -187,7 +345,7 @@ export default function WorkspaceSidebar() {
         className="hidden md:block md:sticky md:z-[1001] md:flex-shrink-0 md:w-[248px] md:border-r md:border-[#E2E6ED] md:top-16 md:self-start md:h-[calc(100vh-64px)]"
         style={{ background: '#FAFBFC' }}
       >
-        <SidebarContent session={session} onClose={handleClose} onRestoreOriginal={handleRestoreOriginal} />
+        <DesktopRail session={session} onClose={handleClose} onRestoreOriginal={handleRestoreOriginal} />
       </div>
 
       {/* Mobile trigger pill — z-index kept above QuickGuideTab's (999/1001)

@@ -1,8 +1,7 @@
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+import { GEMINI_MODEL_URL as GEMINI_URL } from '@/lib/geminiModel';
 
 const PROMPT = `You are a document digitization engine. Look at the attached image(s) of a document, scanned page, or photo and do the following:
 1. Read every piece of text in natural reading order, exactly as written. Correct obvious scanning artifacts where you are confident, but never invent content that isn't there.

@@ -1,7 +1,7 @@
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+import { GEMINI_MODEL_URL as GEMINI_URL } from '@/lib/geminiModel';
 
 const PROMPTS = {
   summary: `You are a document summarizer. Read the following document text and provide:

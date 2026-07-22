@@ -1,8 +1,7 @@
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const GEMINI_MODEL = 'gemini-2.5-flash';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+import { GEMINI_MODEL_URL as GEMINI_URL } from '@/lib/geminiModel';
 
 export async function POST(request) {
   const apiKey = process.env.GEMINI_API_KEY;

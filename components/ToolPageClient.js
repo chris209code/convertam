@@ -60,8 +60,6 @@ import FullFaqSection from '@/components/tool-guide/FullFaqSection';
 import RelatedToolsCard from '@/components/tool-guide/RelatedToolsCard';
 import WorkspaceLayoutShell from '@/components/workspace/WorkspaceLayoutShell';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
-import { toolEducation } from '@/lib/toolEducation';
-import ToolEducationSection from '@/components/tool-education/ToolEducationSection';
 
 const isFree = (mode) =>
   ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice',
@@ -88,7 +86,6 @@ export default function ToolPageClient({ tool }) {
   // tips box / related-chips row below — scoped per-tool via that data,
   // so every other tool's page renders exactly as it did before.
   const guide = toolGuides[tool.slug];
-  const education = toolEducation[tool.slug];
   const { session } = useDocumentSession();
   // Price/speed badges, the steps breadcrumb, and the tips box are
   // acquisition chrome aimed at a cold visitor deciding whether to use this
@@ -218,13 +215,9 @@ export default function ToolPageClient({ tool }) {
           </div>
         )}
 
-        {/* Always-visible educational resource — complements the
-            interactive Quick Guide panel rather than repeating it. */}
-        <ToolEducationSection toolSlug={tool.slug} data={education} />
-
         {guide && (
           <div className="mt-10 grid gap-5 md:grid-cols-2 items-start">
-            <FullFaqSection items={education?.expandedFaqs || guide.fullFaqs} />
+            <FullFaqSection items={guide.fullFaqs} />
             <RelatedToolsCard tools={guide.relatedTools} />
           </div>
         )}

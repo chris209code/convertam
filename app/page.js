@@ -2,7 +2,16 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { CategoryIcon } from '@/components/icons/ToolIconSystem';
+import { CategoryIcon, ToolIcon } from '@/components/icons/ToolIconSystem';
+
+// Maps each category's `icon` key (used to look up its header CategoryIcon)
+// to the same suite key ToolIcon expects, so each "Popular Tools" row can
+// show its own small icon instead of a plain colored dot.
+const ICON_TO_SUITE = { fileText: 'pdf', briefcase: 'business', sparkles: 'ai', image: 'image', calculator: 'calculator', grid: 'utilities', data: 'data' };
+
+function toolSlugFromHref(href) {
+  return href.replace(/^\//, '').split('/').pop();
+}
 
 // Category card icons now come from the shared icon system (one
 // illustration style everywhere) instead of a homepage-only SVG set — see
@@ -339,7 +348,7 @@ export default function HomePage() {
         @media (max-width: 420px) { .cvt-cat-tools { grid-template-columns: 1fr; } }
         .cvt-cat-tool-link { display: flex; align-items: center; gap: 6px; text-decoration: none; color: #334155; font-size: 12.5px; font-weight: 500; padding: 3px; margin: -3px; border-radius: 7px; min-width: 0; transition: background 150ms ease, color 150ms ease; }
         .cvt-cat-tool-link:hover { background: var(--hover-bg); color: var(--hover-color); }
-        .cvt-cat-tool-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+        .cvt-cat-tool-icon { width: 20px; height: 20px; border-radius: 6px; overflow: hidden; flex-shrink: 0; display: flex; }
         .cvt-cat-tool-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .cvt-cat-viewall { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; text-decoration: none; }
 
@@ -418,7 +427,7 @@ export default function HomePage() {
                       className="cvt-cat-tool-link"
                       style={{ '--hover-bg': cat.borderColor, '--hover-color': cat.accentText }}
                     >
-                      <span className="cvt-cat-tool-dot" style={{ background: cat.dotColor }} />
+                      <span className="cvt-cat-tool-icon"><ToolIcon slug={toolSlugFromHref(tool.href)} suite={ICON_TO_SUITE[cat.icon]} size={20} /></span>
                       <span className="cvt-cat-tool-name">{tool.name}</span>
                     </Link>
                   ))}

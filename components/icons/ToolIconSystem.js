@@ -57,6 +57,93 @@ const FORMAT_COLORS = {
 
 const FORMAT_LABELS = { pdf: 'PDF', word: 'W', excel: 'X', powerpoint: 'P', jpg: 'JPG', png: 'PNG', html: '<>' };
 
+// A broader palette individual tool icons draw from — richer variety than
+// the 6 suite colors alone, matching the approved reference where tools in
+// the same suite (e.g. all of PDF Suite) each get their own distinct hue
+// rather than sharing one flat color. Suite headers/section icons still use
+// SUITE_COLORS — only individual tool chips pull from here.
+const PALETTE = {
+  red: { tint: '#FEE2E2', fg: '#DC2626' },
+  orange: { tint: '#FFEDD5', fg: '#EA580C' },
+  amber: { tint: '#FEF3C7', fg: '#D97706' },
+  green: { tint: '#D1FAE5', fg: '#059669' },
+  teal: { tint: '#CCFBF1', fg: '#0D9488' },
+  cyan: { tint: '#CFFAFE', fg: '#0891B2' },
+  blue: { tint: '#DBEAFE', fg: '#2563EB' },
+  indigo: { tint: '#E0E7FF', fg: '#4F46E5' },
+  purple: { tint: '#EDE9FE', fg: '#7C3AED' },
+  pink: { tint: '#FCE7F3', fg: '#DB2777' },
+  slate: { tint: '#E2E8F0', fg: '#475569' },
+};
+
+const TOOL_PALETTE = {
+  // ---- PDF suite ----
+  'html-to-pdf': 'cyan',
+  'merge-pdf': 'blue',
+  'split-pdf': 'teal',
+  'compress-pdf': 'indigo',
+  'rotate-pdf': 'purple',
+  'extract-pdf-pages': 'orange',
+  'remove-pdf-pages': 'red',
+  'add-page-numbers': 'slate',
+  'protect-pdf': 'green',
+  'images-to-pdf': 'pink',
+  'extract-pdf-images': 'amber',
+  'compare-pdf': 'indigo',
+  'redact-pdf': 'slate',
+  'pdf-overlay': 'purple',
+  'write-on-pdf': 'blue',
+  'fill-pdf': 'amber',
+  'sign-pdf': 'teal',
+  'reorder-pdf': 'cyan',
+  'watermark-pdf': 'purple',
+  'invoice-generator': 'green',
+
+  // ---- Business suite ----
+  'business-document-studio': 'blue',
+  'quotation-generator': 'indigo',
+  'id-card-generator': 'green',
+  'delivery-note-waybill': 'teal',
+
+  // ---- AI / Smart Converter suite ----
+  'summarize-pdf': 'purple',
+  'smart-converter': 'blue',
+  'receipt-scanner': 'green',
+  'ocr-pdf': 'orange',
+  'cv-improver': 'blue',
+  'qr-code-generator': 'slate',
+  'ask-solve-ai': 'amber',
+  'document-translator': 'purple',
+  'resume-builder': 'slate',
+  'cover-letter': 'indigo',
+  'contract-summarizer': 'teal',
+  'presentation-generator': 'blue',
+  'data-analyst': 'pink',
+
+  // ---- Image suite ----
+  'image-compressor': 'orange',
+  'resize-image': 'blue',
+  'watermark-image': 'purple',
+  'convert-image-format': 'teal',
+  'meme-generator': 'amber',
+  'document-enhancer': 'indigo',
+
+  // ---- Calculators suite ----
+  'salary-calculator': 'blue',
+  'loan-calculator': 'green',
+  'vat-calculator': 'indigo',
+  'profit-margin': 'teal',
+  'discount-calculator': 'pink',
+  'age-calculator': 'purple',
+  'expense-budget-calculator': 'blue',
+  'break-even-calculator': 'orange',
+  'savings-goal-calculator': 'red',
+
+  // ---- Utilities suite ----
+  'password-generator': 'slate',
+  'utilities-hub': 'blue',
+};
+
 // The ~10 tools whose entire job is converting one specific file format —
 // these render the source format's badge instead of a suite-tinted chip.
 const FORMAT_BADGE_SLUGS = {
@@ -86,9 +173,8 @@ function FormatBadge({ size, format }) {
   );
 }
 
-function Chip({ size, suite, bg, children }) {
-  const { fg } = SUITE_COLORS[suite] || SUITE_COLORS.pdf;
-  const fill = bg || (SUITE_COLORS[suite] || SUITE_COLORS.pdf).tint;
+function Chip({ size, tint, fg, bg, children }) {
+  const fill = bg || tint;
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ display: 'block', color: fg }}>
       <rect width="24" height="24" rx={CORNER_RADIUS} fill={fill} />
@@ -182,7 +268,9 @@ const FALLBACK_GLYPH = (<><rect x="6" y="4" width="12" height="16" rx="1.5" /><p
 export function ToolIcon({ slug, suite = 'pdf', size = 24 }) {
   const format = FORMAT_BADGE_SLUGS[slug];
   if (format) return <FormatBadge size={size} format={format} />;
-  return <Chip size={size} suite={suite}>{GLYPHS[slug] || FALLBACK_GLYPH}</Chip>;
+  const paletteKey = TOOL_PALETTE[slug];
+  const { tint, fg } = paletteKey ? PALETTE[paletteKey] : (SUITE_COLORS[suite] || SUITE_COLORS.pdf);
+  return <Chip size={size} tint={tint} fg={fg}>{GLYPHS[slug] || FALLBACK_GLYPH}</Chip>;
 }
 
 // Larger, category-level pictograms — one per suite, used anywhere a whole
@@ -201,7 +289,8 @@ const CATEGORY_GLYPHS = {
 };
 
 export function CategoryIcon({ suite = 'pdf', size = 30, bg = '#fff' }) {
-  return <Chip size={size} suite={suite} bg={bg}>{CATEGORY_GLYPHS[suite] || CATEGORY_GLYPHS.pdf}</Chip>;
+  const { tint, fg } = SUITE_COLORS[suite] || SUITE_COLORS.pdf;
+  return <Chip size={size} tint={tint} fg={fg} bg={bg}>{CATEGORY_GLYPHS[suite] || CATEGORY_GLYPHS.pdf}</Chip>;
 }
 
 // Small icons for the named sub-groups within a hub page (Conversion,
@@ -228,5 +317,6 @@ SECTION_GLYPHS.edit = SECTION_GLYPHS.editing;
 SECTION_GLYPHS.optimize = SECTION_GLYPHS.optimization;
 
 export function SectionIcon({ id, suite = 'pdf', size = 20 }) {
-  return <Chip size={size} suite={suite}>{SECTION_GLYPHS[id] || SECTION_GLYPHS.all}</Chip>;
+  const { tint, fg } = SUITE_COLORS[suite] || SUITE_COLORS.pdf;
+  return <Chip size={size} tint={tint} fg={fg}>{SECTION_GLYPHS[id] || SECTION_GLYPHS.all}</Chip>;
 }

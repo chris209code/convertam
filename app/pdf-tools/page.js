@@ -6,57 +6,6 @@ export const metadata = {
   description: 'Complete PDF toolkit. Convert, edit, merge, split, compress, sign, watermark and secure your PDFs. Free, no login required.',
 };
 
-// Steps without a Convertam tool behind them (taking the photo, editing in
-// Word, downloading/sharing the file) are included for a complete
-// real-world picture but carry no link. The one deliberate substitution:
-// "Optimize PDF" isn't a real, separate Convertam tool (Optimization only
-// has Compress PDF and OCR PDF), so that workflow is kept to the two real
-// steps rather than inventing a tool that doesn't exist.
-const WORKFLOWS = [
-  {
-    id: 'scan-to-word',
-    title: 'Scan to Editable Word',
-    steps: [
-      { label: 'Scan Document', icon: '📷' },
-      { label: 'Document Enhancer', icon: '✨', slug: 'document-enhancer' },
-      { label: 'OCR PDF', icon: '🔎', slug: 'ocr-pdf' },
-      { label: 'PDF to Word', icon: '📝', slug: 'pdf-to-word' },
-    ],
-    href: '/document-enhancer',
-  },
-  {
-    id: 'edit-convert',
-    title: 'Edit & Convert',
-    steps: [
-      { label: 'PDF to Word', icon: '📝', slug: 'pdf-to-word' },
-      { label: 'Edit in Word', icon: '✏️' },
-      { label: 'Word to PDF', icon: '📄', slug: 'word-to-pdf' },
-      { label: 'Compress PDF', icon: '🗜️', slug: 'compress-pdf' },
-    ],
-    href: '/pdf-to-word',
-  },
-  {
-    id: 'merge-share',
-    title: 'Merge & Share',
-    steps: [
-      { label: 'Merge PDF', icon: '🔗', slug: 'merge-pdf' },
-      { label: 'Watermark PDF', icon: '💧', slug: 'watermark-pdf' },
-      { label: 'Protect PDF', icon: '🔒', slug: 'protect-pdf' },
-      { label: 'Share Securely', icon: '📤' },
-    ],
-    href: '/merge-pdf',
-  },
-  {
-    id: 'compress-optimize',
-    title: 'Compress & Optimize',
-    steps: [
-      { label: 'Compress PDF', icon: '🗜️', slug: 'compress-pdf' },
-      { label: 'Download', icon: '⬇️' },
-    ],
-    href: '/compress-pdf',
-  },
-];
-
 const FAQS = [
   {
     q: 'Is Convertam\'s PDF tools really free?',
@@ -76,7 +25,7 @@ const FAQS = [
   },
   {
     q: 'Can I combine multiple PDF tools for one task?',
-    a: 'Yes — that\'s exactly what the Popular Workflows above show. Each one is a real sequence of Convertam tools for a common task, like turning a phone photo into an editable Word document or merging, watermarking, and password-protecting a document before sending it.',
+    a: 'Yes — many people scan a document, enhance it, run OCR, then convert it to Word, or merge, watermark, and password-protect a document before sending it. Each tool is designed to hand off cleanly into the next.',
   },
   {
     q: 'Which file formats can I convert to and from?',
@@ -166,7 +115,6 @@ export default function PdfToolsPage() {
       icon={PdfIcon}
       title="PDF Tools"
       subtitle="Convert, edit, organize, secure and optimize PDF files — all free, all in one place."
-      workflows={WORKFLOWS}
       sections={SECTIONS_WITH_HREF}
       faqs={FAQS}
       relatedCategories={RELATED_CATEGORIES}

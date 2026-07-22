@@ -8,7 +8,7 @@ import { encodeSignedCookie, buildCookieHeader, msUntilNextWATMidnight, computeD
 
 const USAGE_COOKIE_NAME = 'convertam_document_translator_daily_usage';
 const OWNER_COOKIE_NAME = 'convertam_owner';
-const DAILY_TRANSLATION_LIMIT = 10;
+const DAILY_TRANSLATION_LIMIT = 2;
 
 function readUsageState(request) {
   const usageSecret = process.env.CONVERTAM_OWNER_COOKIE_SECRET;

@@ -5,7 +5,7 @@ import Script from 'next/script';
 import { Document, Packer, Paragraph } from 'docx';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
-import { validateFileSize, validateTextLength, MAX_CHARACTERS } from '@/lib/documentTranslate/limits';
+import { validateFileSize, validateTextLength, validatePageCount, MAX_CHARACTERS, MAX_PAGES } from '@/lib/documentTranslate/limits';
 
 // Pinned languages surface above the searchable full list — the ones this
 // tool differentiates on (per the owner's brief) plus the handful of major
@@ -37,10 +37,16 @@ function rememberLanguage(lang) {
   } catch { /* localStorage unavailable — not worth surfacing an error for */ }
 }
 
+// Checks the page count as soon as it's known — before extracting a single
+// page of text — so an oversized PDF is rejected without doing any of the
+// extraction work, matching the "validate before sending, never send an
+// oversized document and reject it afterward" requirement.
 async function extractPdfText(file) {
   window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   const buf = await file.arrayBuffer();
   const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+  const pageError = validatePageCount(pdf.numPages);
+  if (pageError) { const err = new Error(pageError); err.isLimitError = true; throw err; }
   let text = '';
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
@@ -75,6 +81,9 @@ async function extractPptxSlides(file) {
       const nb = parseInt(b.match(/slide(\d+)\.xml/)[1], 10);
       return na - nb;
     });
+
+  const slideCountError = validatePageCount(slideFiles.length);
+  if (slideCountError) { const err = new Error(slideCountError); err.isLimitError = true; throw err; }
 
   const slides = [];
   for (const name of slideFiles) {
@@ -133,6 +142,11 @@ export default function DocumentTranslatorWorkspace() {
   const [downloadingFormat, setDownloadingFormat] = useState('');
 
   const fileRef = useRef(null);
+  // "One active translation request at a time" is enforced with a ref, not
+  // just the `busy` state above — state updates are async, so a very fast
+  // double-click/double-Enter can fire twice before the first re-render
+  // lands (the same race CVImproverWorkspace was hardened against earlier).
+  const translatingRef = useRef(false);
 
   useEffect(() => { setRecentLanguages(readRecentLanguages()); }, []);
 
@@ -230,7 +244,7 @@ export default function DocumentTranslatorWorkspace() {
       }
     } catch (err) {
       console.error(err);
-      setError('Could not read this file. Please try another file, or paste your text manually instead.');
+      setError(err.isLimitError ? err.message : 'Could not read this file. Please try another file, or paste your text manually instead.');
     } finally {
       setBusy(false);
       setStage('');
@@ -265,7 +279,8 @@ export default function DocumentTranslatorWorkspace() {
   }
 
   async function runTranslate() {
-    if (!canTranslate || overLimit) return;
+    if (!canTranslate || overLimit || translatingRef.current) return;
+    translatingRef.current = true;
     setBusy(true);
     setError('');
     setStage('translating');
@@ -309,6 +324,7 @@ export default function DocumentTranslatorWorkspace() {
       setStage('');
     } finally {
       setBusy(false);
+      translatingRef.current = false;
     }
   }
 

@@ -5,18 +5,47 @@ import Script from 'next/script';
 import { Document, Packer, Paragraph } from 'docx';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
-import { validateFileSize, validateTextLength, validatePageCount, MAX_CHARACTERS, MAX_PAGES } from '@/lib/documentTranslate/limits';
+import { validateFileSize, validateTextLength, validatePageCount, MAX_CHARACTERS } from '@/lib/documentTranslate/limits';
+import { extractBlocks, reinjectBlocks } from '@/lib/documentTranslate/htmlBlocks';
 
-// Pinned languages surface above the searchable full list — the ones this
-// tool differentiates on (per the owner's brief) plus the handful of major
-// world languages most visitors will actually want.
-const PINNED_LANGUAGES = ['English', 'French', 'Spanish', 'Portuguese', 'Arabic', 'Chinese', 'Hausa', 'Yoruba', 'Igbo', 'Swahili'];
-const ALL_LANGUAGES = [...PINNED_LANGUAGES, 'German', 'Italian', 'Russian', 'Japanese', 'Korean', 'Turkish', 'Vietnamese', 'Indonesian', 'Dutch', 'Polish', 'Pidgin English'];
+// Pinned languages surface above the full alphabetical list below — the
+// African languages this tool differentiates on (per the owner's brief),
+// plus the other most-requested world languages. Everything else Gemini
+// can reasonably translate is still reachable in the full list or by
+// search; this is a shortcut, not a restriction.
+const PINNED_LANGUAGES = [
+  'English', 'French', 'Spanish', 'Portuguese', 'German', 'Arabic', 'Chinese', 'Japanese', 'Korean',
+  'Hindi', 'Bengali', 'Turkish', 'Russian', 'Ukrainian', 'Italian', 'Dutch',
+  'Yoruba', 'Hausa', 'Igbo', 'Swahili', 'Amharic', 'Somali', 'Zulu', 'Xhosa', 'Afrikaans',
+];
 
+// A broad, alphabetically-ordered set of world languages — deliberately not
+// scoped to "languages we've specifically tested," since Gemini is a
+// general-purpose multilingual model rather than a service with a fixed,
+// published per-language certification list the way a dedicated translation
+// API would have. Kept as one flat list (search + pinned both read from it)
+// rather than a second, separately-maintained list, so there's exactly one
+// place that ever needs a language added.
+const ALL_LANGUAGES = [
+  'Afrikaans', 'Albanian', 'Amharic', 'Arabic', 'Armenian', 'Azerbaijani', 'Basque', 'Belarusian', 'Bengali',
+  'Bosnian', 'Bulgarian', 'Burmese', 'Catalan', 'Cebuano', 'Chichewa', 'Chinese (Simplified)', 'Chinese (Traditional)',
+  'Corsican', 'Croatian', 'Czech', 'Danish', 'Dutch', 'English', 'Esperanto', 'Estonian', 'Filipino', 'Finnish',
+  'French', 'Frisian', 'Galician', 'Georgian', 'German', 'Greek', 'Gujarati', 'Haitian Creole', 'Hausa', 'Hawaiian',
+  'Hebrew', 'Hindi', 'Hmong', 'Hungarian', 'Icelandic', 'Igbo', 'Indonesian', 'Irish', 'Italian', 'Japanese',
+  'Javanese', 'Kannada', 'Kazakh', 'Khmer', 'Kinyarwanda', 'Korean', 'Kurdish', 'Kyrgyz', 'Lao', 'Latin', 'Latvian',
+  'Lithuanian', 'Luxembourgish', 'Macedonian', 'Malagasy', 'Malay', 'Malayalam', 'Maltese', 'Maori', 'Marathi',
+  'Mongolian', 'Nepali', 'Nigerian Pidgin', 'Norwegian', 'Odia', 'Pashto', 'Persian', 'Polish', 'Portuguese',
+  'Punjabi', 'Romanian', 'Russian', 'Samoan', 'Scots Gaelic', 'Serbian', 'Sesotho', 'Shona', 'Sindhi', 'Sinhala',
+  'Slovak', 'Slovenian', 'Somali', 'Spanish', 'Sundanese', 'Swahili', 'Swedish', 'Tajik', 'Tamil', 'Tatar', 'Telugu',
+  'Thai', 'Turkish', 'Turkmen', 'Ukrainian', 'Urdu', 'Uyghur', 'Uzbek', 'Vietnamese', 'Welsh', 'Xhosa', 'Yiddish',
+  'Yoruba', 'Zulu',
+];
+
+// Formatting preservation is now automatic by file type, not a mode the
+// user picks — these two only ever affect translation quality/speed.
 const MODES = [
-  { id: 'fast', label: 'Fast', desc: 'Best speed — a quick, direct translation.' },
-  { id: 'accurate', label: 'Accurate', desc: 'Best quality — slower, more precise and idiomatic.' },
-  { id: 'preserve', label: 'Preserve Formatting', desc: 'Coming soon — keeps headings, tables and layout in the output.', disabled: true },
+  { id: 'fast', label: '⚡ Fast', desc: 'Optimized for speed — suitable for everyday translation.' },
+  { id: 'accurate', label: '🧠 Accurate', desc: 'Better context awareness, wording and sentence flow — slightly slower.' },
 ];
 
 const RECENT_LANGUAGES_KEY = 'convertam_translator_recent_languages';
@@ -137,11 +166,21 @@ export default function DocumentTranslatorWorkspace() {
   const [stage, setStage] = useState(''); // '' | 'reading' | 'translating' | 'ready'
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [translatedText, setTranslatedText] = useState('');
+  const [translatedText, setTranslatedText] = useState(''); // flat text — always kept, used for Copy/.txt regardless of source format
+  const [translatedHtml, setTranslatedHtml] = useState(''); // DOCX only — structure-preserved result, feeds the preview and the .docx download
+  const [translatedSlides, setTranslatedSlides] = useState(null); // PPTX only — translated per-slide text, feeds the preview and the .pptx download
   const [detectedSourceLanguage, setDetectedSourceLanguage] = useState('');
   const [downloadingFormat, setDownloadingFormat] = useState('');
 
   const fileRef = useRef(null);
+  // Holds the live DOM (doc + Text node references) extracted from the
+  // uploaded DOCX's HTML — kept in a ref rather than state because it's
+  // mutated in place at translate time (see reinjectBlocks) and DOM nodes
+  // aren't meaningfully serializable React state anyway.
+  const docxExtractionRef = useRef(null);
+  // Remembers how many text runs belonged to each PPTX slide, so the
+  // flattened, translated blocks array can be regrouped back into slides.
+  const pptxSlideRunCountsRef = useRef(null);
   // "One active translation request at a time" is enforced with a ref, not
   // just the `busy` state above — state updates are async, so a very fast
   // double-click/double-Enter can fire twice before the first re-render
@@ -184,8 +223,12 @@ export default function DocumentTranslatorWorkspace() {
     setDocxHtml('');
     setPptxSlides(null);
     setTranslatedText('');
+    setTranslatedHtml('');
+    setTranslatedSlides(null);
     setDetectedSourceLanguage('');
     setError('');
+    docxExtractionRef.current = null;
+    pptxSlideRunCountsRef.current = null;
   }
 
   async function handleFile(file, { fromSession = false } = {}) {
@@ -278,6 +321,79 @@ export default function DocumentTranslatorWorkspace() {
     setLangSearch('');
   }
 
+  // Flat-text pipeline — PDF, TXT, and pasted text, none of which have a
+  // real structure to preserve. Unchanged from Phase 1.
+  async function translateFlatText() {
+    const res = await fetch('/api/document-translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: sourceText, sourceLanguage, targetLanguage, mode }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Translation failed.');
+    setTranslatedText(data.translatedText);
+    setDetectedSourceLanguage(data.detectedSourceLanguage || '');
+    return data.translatedText;
+  }
+
+  // Structure-preserving pipeline for DOCX — extract every real text node
+  // from the HTML mammoth already parsed out of the uploaded file, translate
+  // just those strings (same order, same count), then write the
+  // translations back into the exact same nodes. Every heading, bold/
+  // italic/underline run, list, table, hyperlink, and image is untouched;
+  // only the text inside changed.
+  async function translateDocxStructure() {
+    const extraction = extractBlocks(docxHtml);
+    docxExtractionRef.current = extraction;
+
+    const res = await fetch('/api/document-translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blocks: extraction.blocks, sourceLanguage, targetLanguage, mode }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Translation failed.');
+
+    const html = reinjectBlocks(extraction, data.translatedBlocks);
+    setTranslatedHtml(html);
+    setDetectedSourceLanguage(data.detectedSourceLanguage || '');
+    const flat = data.translatedBlocks.join('\n\n');
+    setTranslatedText(flat);
+    return flat;
+  }
+
+  // Lightweight structure-preserving pipeline for PPTX — the per-slide text
+  // runs extracted at upload time are flattened into one blocks array (so
+  // translation still happens in a single request), then regrouped back
+  // into slides using the run counts remembered from extraction. Slide
+  // count and slide-by-slide text order survive; the original visual
+  // design does not (see extractPptxSlides).
+  async function translatePptxStructure() {
+    const counts = pptxSlides.map((s) => s.length);
+    pptxSlideRunCountsRef.current = counts;
+    const blocks = pptxSlides.flat();
+
+    const res = await fetch('/api/document-translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blocks, sourceLanguage, targetLanguage, mode }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Translation failed.');
+
+    let cursor = 0;
+    const slides = counts.map((count) => {
+      const slice = data.translatedBlocks.slice(cursor, cursor + count);
+      cursor += count;
+      return slice;
+    });
+    setTranslatedSlides(slides);
+    setDetectedSourceLanguage(data.detectedSourceLanguage || '');
+    const flat = slides.map((s) => s.join('\n')).join('\n\n');
+    setTranslatedText(flat);
+    return flat;
+  }
+
   async function runTranslate() {
     if (!canTranslate || overLimit || translatingRef.current) return;
     translatingRef.current = true;
@@ -285,29 +401,37 @@ export default function DocumentTranslatorWorkspace() {
     setError('');
     setStage('translating');
     setTranslatedText('');
+    setTranslatedHtml('');
+    setTranslatedSlides(null);
 
     try {
-      const res = await fetch('/api/document-translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: sourceText, sourceLanguage, targetLanguage, mode }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Translation failed.');
-
-      setTranslatedText(data.translatedText);
-      setDetectedSourceLanguage(data.detectedSourceLanguage || '');
+      // Formatting preservation is automatic by file type — not a mode the
+      // user picks. DOCX and PPTX get the structure-preserving pipeline;
+      // everything else (PDF/TXT/paste) gets the flat-text pipeline that
+      // already existed.
+      let flatTranslatedText;
+      if (fileInfo?.isDocx) {
+        flatTranslatedText = await translateDocxStructure();
+      } else if (fileInfo?.isPptx) {
+        flatTranslatedText = await translatePptxStructure();
+      } else {
+        flatTranslatedText = await translateFlatText();
+      }
       setStage('ready');
 
       // Only pushes into the workspace session when one is already active —
       // most casual (no-session) visitors never trigger the Puppeteer PDF
       // render below, keeping this free tool's operating cost tied to
-      // actual multi-step usage rather than every single translation.
+      // actual multi-step usage rather than every single translation. The
+      // session document stays PDF regardless of source format — every
+      // other session-compatible tool (Sign PDF, Merge PDF, etc.) expects
+      // one — the structure-preserving DOCX/PPTX downloads are separate,
+      // explicit choices below, not what gets pushed into the workspace.
       if (session.status === 'active') {
         const pdfRes = await fetch('/api/document-translate-pdf', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: data.translatedText, title: `${baseName(fileInfo?.name)} — translated to ${targetLanguage}` }),
+          body: JSON.stringify({ text: flatTranslatedText, title: `${baseName(fileInfo?.name)} — translated to ${targetLanguage}` }),
         });
         if (pdfRes.ok) {
           const buf = new Uint8Array(await pdfRes.arrayBuffer());
@@ -339,10 +463,53 @@ export default function DocumentTranslatorWorkspace() {
   async function downloadDocx() {
     setDownloadingFormat('docx');
     try {
+      // Real structure-preserving DOCX for DOCX-sourced translations —
+      // built server-side from the same translatedHtml shown in the right
+      // panel. Everything else (PDF/TXT/paste sources, no structure to
+      // preserve in the first place) keeps the simple paragraphs-only
+      // client-side build.
+      if (fileInfo?.isDocx && translatedHtml) {
+        const res = await fetch('/api/document-translate-docx', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ html: translatedHtml, title: `${baseName(fileInfo?.name)} — translated to ${targetLanguage}` }),
+        });
+        if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Could not generate the Word document.'); }
+        const blob = await res.blob();
+        downloadBlob(blob, `${baseName(fileInfo?.name)}-${targetLanguage.toLowerCase()}.docx`);
+        return;
+      }
+
       const paragraphs = translatedText.split(/\n{2,}/).map((p) => new Paragraph({ text: p }));
       const doc = new Document({ sections: [{ children: paragraphs }] });
       const blob = await Packer.toBlob(doc);
       downloadBlob(blob, `${baseName(fileInfo?.name)}-${targetLanguage.toLowerCase()}.docx`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDownloadingFormat('');
+    }
+  }
+
+  // PPTX rebuild happens entirely client-side via pptxgenjs, same pattern
+  // already used by PresentationGeneratorWorkspace/DataAnalystWorkspace —
+  // no server route needed. One slide per original slide, translated text
+  // stacked as plain lines — structure (slide count/order) is preserved,
+  // the original visual design is not (see extractPptxSlides).
+  async function downloadPptx() {
+    setDownloadingFormat('pptx');
+    try {
+      const PptxGenJS = (await import('pptxgenjs')).default;
+      const pptx = new PptxGenJS();
+      (translatedSlides || []).forEach((lines) => {
+        const slide = pptx.addSlide();
+        if (lines.length) {
+          slide.addText(lines.join('\n'), { x: 0.5, y: 0.4, w: 9, h: 4.7, fontSize: 16, valign: 'top', color: '1F2937' });
+        }
+      });
+      await pptx.writeFile({ fileName: `${baseName(fileInfo?.name)}-${targetLanguage.toLowerCase()}.pptx` });
+    } catch (err) {
+      setError(err.message);
     } finally {
       setDownloadingFormat('');
     }
@@ -530,11 +697,22 @@ export default function DocumentTranslatorWorkspace() {
               Your translation will appear here
             </div>
           )}
-          {translatedText && (
+          {translatedText && translatedHtml ? (
+            <div style={{ flex: 1, minHeight: 220, overflow: 'auto', border: '1px solid #E2E8F0', borderRadius: 8, padding: 12, fontSize: '0.82rem', lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: translatedHtml }} />
+          ) : translatedText && translatedSlides ? (
+            <div style={{ flex: 1, minHeight: 220, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {translatedSlides.map((lines, i) => (
+                <div key={i} style={{ border: '1px solid #E2E8F0', borderRadius: 8, padding: 10 }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94A3B8', marginBottom: 4 }}>Slide {i + 1}</div>
+                  {lines.map((l, j) => <div key={j} style={{ fontSize: '0.8rem', color: '#334155' }}>{l}</div>)}
+                </div>
+              ))}
+            </div>
+          ) : translatedText ? (
             <div style={{ flex: 1, minHeight: 220, overflow: 'auto', border: '1px solid #E2E8F0', borderRadius: 8, padding: 12, fontSize: '0.85rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
               {translatedText}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -559,7 +737,11 @@ export default function DocumentTranslatorWorkspace() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button onClick={copyTranslated} style={{ fontSize: '0.78rem', fontWeight: 600, padding: '8px 14px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>📋 Copy text</button>
           <button onClick={downloadTxt} style={{ fontSize: '0.78rem', fontWeight: 600, padding: '8px 14px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>⬇ Download .txt</button>
-          <button onClick={downloadDocx} disabled={downloadingFormat === 'docx'} style={{ fontSize: '0.78rem', fontWeight: 600, padding: '8px 14px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>{downloadingFormat === 'docx' ? 'Preparing…' : '⬇ Download .docx'}</button>
+          {fileInfo?.isPptx ? (
+            <button onClick={downloadPptx} disabled={downloadingFormat === 'pptx'} style={{ fontSize: '0.78rem', fontWeight: 600, padding: '8px 14px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>{downloadingFormat === 'pptx' ? 'Preparing…' : '⬇ Download .pptx'}</button>
+          ) : (
+            <button onClick={downloadDocx} disabled={downloadingFormat === 'docx'} style={{ fontSize: '0.78rem', fontWeight: 600, padding: '8px 14px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>{downloadingFormat === 'docx' ? 'Preparing…' : '⬇ Download .docx'}</button>
+          )}
           <button onClick={downloadPdf} disabled={downloadingFormat === 'pdf'} style={{ fontSize: '0.78rem', fontWeight: 600, padding: '8px 14px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>{downloadingFormat === 'pdf' ? 'Preparing…' : '⬇ Download .pdf'}</button>
         </div>
       )}
@@ -577,7 +759,11 @@ export default function DocumentTranslatorWorkspace() {
 }
 
 function LanguagePicker({ label, value, isOpen, onToggle, onSelect, onSelectAuto, showAuto, search, setSearch, filtered, recent }) {
-  const list = filtered || PINNED_LANGUAGES;
+  // Search narrows the full alphabetical list. Otherwise: Recent, then
+  // Popular (the pinned shortcut row), then the complete list underneath —
+  // all four of "searchable," "recent," "pinned," and "alphabetically
+  // organized" coexist rather than being alternate views of each other.
+  const list = filtered || ALL_LANGUAGES;
   return (
     <div style={{ position: 'relative', flex: '1 1 180px' }}>
       <button
@@ -605,7 +791,15 @@ function LanguagePicker({ label, value, isOpen, onToggle, onSelect, onSelectAuto
               {recent.map((l) => (
                 <button key={`recent-${l}`} onClick={() => onSelect(l)} style={{ width: '100%', textAlign: 'left', padding: '6px 8px', borderRadius: 6, border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.8rem' }}>{l}</button>
               ))}
+            </>
+          )}
+          {!search && (
+            <>
               <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94A3B8', padding: '4px 8px' }}>POPULAR</div>
+              {PINNED_LANGUAGES.map((l) => (
+                <button key={`pinned-${l}`} onClick={() => onSelect(l)} style={{ width: '100%', textAlign: 'left', padding: '6px 8px', borderRadius: 6, border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.8rem' }}>{l}</button>
+              ))}
+              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94A3B8', padding: '4px 8px', marginTop: 4, borderTop: '1px solid #F1F5F9', paddingTop: 8 }}>ALL LANGUAGES (A–Z)</div>
             </>
           )}
           {list.map((l) => (

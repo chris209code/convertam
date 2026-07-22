@@ -3,7 +3,7 @@ export const maxDuration = 60;
 
 import { AIError, CATEGORY_MESSAGES } from '@/lib/geminiClient';
 import { getTranslationEngine } from '@/lib/documentTranslate/engine';
-import { validateTextLength } from '@/lib/documentTranslate/limits';
+import { validateTextLength, validateTotalLength } from '@/lib/documentTranslate/limits';
 import { encodeSignedCookie, buildCookieHeader, msUntilNextWATMidnight, computeDocumentTranslatorUsageState } from '@/lib/usageCookie';
 
 const USAGE_COOKIE_NAME = 'convertam_document_translator_daily_usage';
@@ -50,17 +50,36 @@ export async function POST(request) {
       });
     }
 
-    const { text, sourceLanguage, targetLanguage, mode } = body;
+    const { text, blocks, sourceLanguage, targetLanguage, mode } = body;
 
-    if (!text || !text.trim()) {
-      return Response.json({ error: 'No text to translate.' }, { status: 400 });
-    }
     if (!targetLanguage) {
       return Response.json({ error: 'Please choose a target language.' }, { status: 400 });
     }
-    const lengthError = validateTextLength(text);
-    if (lengthError) {
-      return Response.json({ error: lengthError }, { status: 400 });
+
+    // Two request shapes share this route: `text` for the flat-text
+    // pipeline (PDF/TXT/paste), `blocks` (an array of strings) for the
+    // structure-preserving pipeline (DOCX/PPTX) — the caller has already
+    // extracted the document's translatable text in document order and
+    // just needs each item translated in place, same count, same order.
+    const isBlockRequest = Array.isArray(blocks);
+
+    if (isBlockRequest) {
+      if (blocks.length === 0) {
+        return Response.json({ error: 'No text to translate.' }, { status: 400 });
+      }
+      const totalLength = blocks.reduce((sum, b) => sum + (b?.length || 0), 0);
+      const lengthError = validateTotalLength(totalLength);
+      if (lengthError) {
+        return Response.json({ error: lengthError }, { status: 400 });
+      }
+    } else {
+      if (!text || !text.trim()) {
+        return Response.json({ error: 'No text to translate.' }, { status: 400 });
+      }
+      const lengthError = validateTextLength(text);
+      if (lengthError) {
+        return Response.json({ error: lengthError }, { status: 400 });
+      }
     }
 
     const usageState = readUsageState(request);
@@ -74,6 +93,22 @@ export async function POST(request) {
     }
 
     const engine = getTranslationEngine();
+
+    if (isBlockRequest) {
+      const { translatedBlocks, detectedSourceLanguage, requestId } = await engine.translateBlocks({
+        apiKey,
+        blocks,
+        sourceLanguage: sourceLanguage || 'auto',
+        targetLanguage,
+      });
+      return withUsageCookie(
+        { translatedBlocks, detectedSourceLanguage, requestId },
+        200,
+        usageState,
+        usageState.count + 1,
+      );
+    }
+
     const { translatedText, detectedSourceLanguage, requestId } = await engine.translateText({
       apiKey,
       text,

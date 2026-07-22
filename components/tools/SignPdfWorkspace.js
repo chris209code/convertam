@@ -35,6 +35,100 @@ function readFileAsDataUrl(file) {
   });
 }
 
+// Detects what kind of document was uploaded so the workspace can silently
+// convert it to PDF before continuing — the user never has to think about
+// file formats or convert anything themselves first.
+function detectDocumentKind(file) {
+  const name = (file.name || '').toLowerCase();
+  if (file.type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
+  if (file.type.includes('word') || name.endsWith('.docx') || name.endsWith('.doc')) return 'docx';
+  if (file.type.startsWith('image/') || /\.(png|jpe?g|jpg)$/i.test(name)) return 'image';
+  return 'unknown';
+}
+
+// Renders a DOCX's content into a real, multi-page PDF entirely in the
+// browser — same html2canvas + jsPDF pagination technique already used by
+// HtmlToPdfWorkspace.jsx — so a Word document never has to leave the
+// browser or go through a paid conversion just to get signed.
+async function convertDocxToPdfFile(file) {
+  const mammothModule = await import('mammoth');
+  const mammoth = mammothModule.default || mammothModule;
+  const html2canvas = (await import('html2canvas')).default;
+  const { jsPDF } = await import('jspdf');
+
+  const buf = await file.arrayBuffer();
+  const { value: docxHtml } = await mammoth.convertToHtml({ arrayBuffer: buf });
+
+  const container = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.left = '-9999px';
+  container.style.top = '0';
+  container.style.width = '794px';
+  container.style.background = '#ffffff';
+  container.style.padding = '40px';
+  container.style.fontFamily = 'Arial, sans-serif';
+  container.style.color = '#000000';
+  container.innerHTML = docxHtml;
+  document.body.appendChild(container);
+  await new Promise((r) => setTimeout(r, 300));
+
+  let canvas;
+  try {
+    canvas = await html2canvas(container, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff', width: 794 });
+  } finally {
+    document.body.removeChild(container);
+  }
+
+  const pdfW = 210, pdfH = 297; // A4 portrait, mm
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const imgW = pdfW;
+  const imgH = (canvas.height * imgW) / canvas.width;
+  let yOffset = 0, remaining = imgH;
+  while (remaining > 0) {
+    if (yOffset > 0) pdf.addPage();
+    const srcY = (yOffset / imgH) * canvas.height;
+    const sliceH = Math.min(pdfH, remaining);
+    const slicePx = (sliceH / imgH) * canvas.height;
+    const sliceCanvas = document.createElement('canvas');
+    sliceCanvas.width = canvas.width;
+    sliceCanvas.height = Math.ceil(slicePx);
+    sliceCanvas.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, slicePx, 0, 0, canvas.width, slicePx);
+    pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, imgW, sliceH);
+    remaining -= sliceH;
+    yOffset += sliceH;
+  }
+
+  const blob = pdf.output('blob');
+  return new File([blob], file.name.replace(/\.docx?$/i, '.pdf'), { type: 'application/pdf' });
+}
+
+// Wraps a photographed/scanned image (JPG/PNG) in a single-page PDF, fit to
+// A4 and centered — so a snapshot of a document can be signed the same way
+// as any other upload, without the user needing to convert it first.
+async function convertImageToPdfFile(file) {
+  const { jsPDF } = await import('jspdf');
+  const dataUrl = await readFileAsDataUrl(file);
+  const img = await loadImage(dataUrl);
+
+  const landscape = img.width > img.height;
+  const pdf = new jsPDF({ orientation: landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const margin = 10;
+  const maxW = pageW - margin * 2;
+  const maxH = pageH - margin * 2;
+  const ratio = Math.min(maxW / img.width, maxH / img.height);
+  const w = img.width * ratio;
+  const h = img.height * ratio;
+  const x = (pageW - w) / 2;
+  const y = (pageH - h) / 2;
+  const format = file.type.includes('png') || /\.png$/i.test(file.name) ? 'PNG' : 'JPEG';
+  pdf.addImage(dataUrl, format, x, y, w, h);
+
+  const blob = pdf.output('blob');
+  return new File([blob], file.name.replace(/\.(png|jpe?g|jpg)$/i, '.pdf'), { type: 'application/pdf' });
+}
+
 // Makes near-white pixels transparent so only the dark ink remains — the
 // first pass of turning a photo of a signature into a placeable overlay.
 function removeWhiteBackground(ctx, w, h) {
@@ -302,22 +396,57 @@ export default function SignPdfWorkspace() {
   }
 
   // Step 2: Render PDF pages as images for preview. Shared by a fresh
-  // upload and a document pulled from an active Document Session.
+  // upload and a document pulled from an active Document Session. Accepts
+  // PDF, Word (.docx/.doc), JPG, or PNG — anything that isn't already a PDF
+  // is silently converted to one first, entirely in the browser, so the
+  // rest of this function (and everything downstream) only ever deals with
+  // a real PDF file, exactly as before.
   async function loadPdfFile(file, { fromSession = false } = {}) {
     if (!file || !window.pdfjsLib) return;
     if (file.size > 100 * 1024 * 1024) {
-      setError('That file is larger than the 100MB limit. Please choose a smaller PDF.');
+      setError('That file is larger than the 100MB limit. Please choose a smaller document.');
       return;
     }
-    setPdfFile(file);
     setError('');
-    setStatus('Loading PDF…');
     setBusy(true);
+
+    const kind = detectDocumentKind(file);
+    let workingFile = file;
+
+    if (kind === 'unknown') {
+      setError('That file type isn’t supported. Please upload a PDF, Word document (.docx/.doc), JPG, or PNG.');
+      setBusy(false);
+      setStatus('');
+      return;
+    }
+
+    try {
+      if (kind === 'docx') {
+        setStatus('Converting your document to PDF…');
+        workingFile = await convertDocxToPdfFile(file);
+      } else if (kind === 'image') {
+        setStatus('Preparing your document…');
+        workingFile = await convertImageToPdfFile(file);
+      }
+    } catch (err) {
+      console.error(err);
+      setError(
+        kind === 'docx'
+          ? 'Could not convert that Word document. Please try saving it as a PDF and uploading that instead.'
+          : 'Could not process that file. Please try a different one.'
+      );
+      setBusy(false);
+      setStatus('');
+      return;
+    }
+
+    setPdfFile(workingFile);
+    setStatus('Loading document…');
 
     try {
       window.pdfjsLib.GlobalWorkerOptions.workerSrc =
         'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      const buf = await file.arrayBuffer();
+      const buf = await workingFile.arrayBuffer();
       const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
       const pages = [];
 
@@ -339,7 +468,7 @@ export default function SignPdfWorkspace() {
       if (!fromSession) {
         const hasUndownloadedWork = session.status === 'active' && session.history.length > 0;
         if (!hasUndownloadedWork || window.confirm('Starting with this document will replace the document currently in your session. Continue?')) {
-          startSession(file, { toolSlug: 'sign-pdf' });
+          startSession(workingFile, { toolSlug: 'sign-pdf' });
         }
       }
     } catch (err) {
@@ -494,7 +623,7 @@ export default function SignPdfWorkspace() {
 
       {/* Step indicators */}
       <div className="flex gap-3 mb-6">
-        {['Upload signature', 'Upload PDF', 'Place & download'].map((label, i) => (
+        {['Upload signature', 'Upload document', 'Place & download'].map((label, i) => (
           <div key={i} className="flex items-center gap-2">
             <div
               className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
@@ -632,12 +761,18 @@ export default function SignPdfWorkspace() {
               </button>
             </div>
           )}
-          <p className="text-sm text-ink-soft mb-4">Now upload the PDF you want to sign.</p>
+          <p className="text-sm text-ink-soft mb-4">Now upload the document you want to sign. Word documents and images are automatically turned into a PDF first — you don't need to convert anything yourself.</p>
           <label className="dropzone block cursor-pointer" style={{ borderColor: '#e2dcc9' }}>
-            <input type="file" accept="application/pdf" onChange={handlePdfUpload} disabled={!pdfjsReady} hidden />
-            <div className="dz-icon">[ PDF ]</div>
-            <div className="dz-main">Click to upload your PDF</div>
-            <div className="dz-sub">Max 100MB. Processed entirely in your browser.</div>
+            <input
+              type="file"
+              accept="application/pdf,.pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg,.png,.jpg,.jpeg"
+              onChange={handlePdfUpload}
+              disabled={!pdfjsReady}
+              hidden
+            />
+            <div className="dz-icon">[ DOC ]</div>
+            <div className="dz-main">Click to upload your document</div>
+            <div className="dz-sub">Supported formats: PDF, DOCX, DOC, JPG, PNG · Max 100MB · Processed entirely in your browser.</div>
           </label>
           {busy && <div className="status">{status}</div>}
           {error && <div className="status error">{error}</div>}

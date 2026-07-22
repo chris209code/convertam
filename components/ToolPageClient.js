@@ -12,7 +12,7 @@ import SmartConverterWorkspace from '@/components/tools/SmartConverterWorkspace'
 import SummarizePdfWorkspace from '@/components/tools/SummarizePdfWorkspace';
 import ReceiptScanWorkspace from '@/components/tools/ReceiptScanWorkspace';
 import CompressPdfWorkspace from '@/components/tools/CompressPdfWorkspace';
-import SignPdfWorkspace from '@/components/tools/SignPdfWorkspace';
+import SignDocumentsWorkspace from '@/components/tools/SignDocumentsWorkspace';
 import FillPdfWorkspace from '@/components/tools/FillPdfWorkspace';
 import ReorderPdfWorkspace from '@/components/tools/ReorderPdfWorkspace';
 import WatermarkPdfWorkspace from '@/components/tools/WatermarkPdfWorkspace';
@@ -154,7 +154,7 @@ export default function ToolPageClient({ tool }) {
         {tool.mode === 'compress' && <PaymentGate toolName={tool.slug}><CompressPdfWorkspace /></PaymentGate>}
         {tool.mode === 'fill' && <FillPdfWorkspace />}
         {tool.mode === 'write-on-pdf' && <OverlayTextWorkspace />}
-        {tool.mode === 'sign' && <SignPdfWorkspace />}
+        {tool.mode === 'sign' && <SignDocumentsWorkspace />}
         {tool.mode === 'reorder' && <ReorderPdfWorkspace />}
         {tool.mode === 'watermark' && <WatermarkPdfWorkspace />}
         {tool.mode === 'invoice' && <BusinessDocumentStudioWorkspace initialDocType="invoice" />}

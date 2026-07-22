@@ -17,7 +17,7 @@ const FAQS = [
   },
   {
     q: 'Are my files secure?',
-    a: 'Browser-based tools (Merge PDF, Split PDF, Sign PDF, and most others) process everything locally on your device — your file never leaves your browser. Tools that require server-side processing use encrypted transfer and delete your file immediately after the job completes.',
+    a: 'Browser-based tools (Merge PDF, Split PDF, Sign Documents, and most others) process everything locally on your device — your file never leaves your browser. Tools that require server-side processing use encrypted transfer and delete your file immediately after the job completes.',
   },
   {
     q: 'What\'s the maximum file size?',
@@ -65,7 +65,7 @@ const SECTIONS = [
     tools: [
       { slug: 'write-on-pdf', title: 'Write on PDF', desc: 'Click anywhere on any PDF and type text on it', icon: '✍️', badge: 'free' },
       { slug: 'fill-pdf', title: 'Fill PDF Forms', desc: 'Fill digital PDF forms with built-in fields', icon: '🗒️', badge: 'free' },
-      { slug: 'sign-pdf', title: 'Sign PDF', desc: 'Place your signature anywhere on a PDF', icon: '✒️', badge: 'free' },
+      { slug: 'sign-documents', title: 'Sign Documents', desc: 'Place your signature anywhere on your document', icon: '✒️', badge: 'free' },
       { slug: 'watermark-pdf', title: 'Watermark PDF', desc: 'Add custom text watermarks to your PDF', icon: '💧', badge: 'free' },
       { slug: 'reorder-pdf', title: 'Reorder Pages', desc: 'Drag and drop pages into any order', icon: '🔀', badge: 'free' },
       { slug: 'redact-pdf', title: 'Redact & Edit PDF', desc: 'Permanently redact sensitive info, or whiteout and correct mistakes', icon: '⬛', badge: 'free' },

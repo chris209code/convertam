@@ -56,6 +56,7 @@ const nextConfig = {
     // to protect here. Redirecting anyway costs nothing and covers anyone
     // who guesses the flat URL by analogy with /salary-calculator.
     return [
+      { source: '/sign-pdf', destination: '/sign-documents', permanent: true },
       { source: '/loan-calculator', destination: '/calculators/loan-calculator', permanent: true },
       { source: '/vat-calculator', destination: '/calculators/vat-calculator', permanent: true },
       { source: '/profit-margin', destination: '/calculators/profit-margin', permanent: true },

@@ -208,7 +208,7 @@ export function ToolIcon({ slug, size = 22 }) {
       </svg>
     ),
     'fill-pdf': <FillPdfIcon size={size}/>,
-    'sign-pdf': <><SignIcon size={size}/></>,
+    'sign-documents': <><SignIcon size={size}/></>,
     'reorder-pdf': <><ReorderIcon size={size}/></>,
     'watermark-pdf': <><WatermarkIcon size={size}/></>,
     'invoice-generator': <><InvoiceIcon size={size}/></>,

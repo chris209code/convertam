@@ -102,7 +102,7 @@ const ALL_TOOLS = [
   { name: 'PDF to Images', href: '/pdf-to-png' },
   { name: 'Write on PDF', href: '/write-on-pdf' },
   { name: 'Fill PDF Forms', href: '/fill-pdf' },
-  { name: 'Sign PDF', href: '/sign-pdf' },
+  { name: 'Sign Documents', href: '/sign-documents' },
   { name: 'Reorder PDF Pages', href: '/reorder-pdf' },
   { name: 'Watermark PDF', href: '/watermark-pdf' },
   { name: 'OCR PDF', href: '/ocr-pdf' },

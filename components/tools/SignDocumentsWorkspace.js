@@ -41,9 +41,10 @@ function makeDocId() {
 
 const defaultSigPos = { x: 50, y: 50, w: 180, h: 60 };
 
-// Detects what kind of document was uploaded so the workspace can silently
-// convert it to PDF before continuing — the user never has to think about
-// file formats or convert anything themselves first.
+// Detects what kind of document was uploaded. Word documents still convert
+// to PDF silently (a Word document has no fixed page coordinates, so
+// free-drag signature placement only really works once it's paginated);
+// images sign in place and stay in their original format.
 function detectDocumentKind(file) {
   const name = (file.name || '').toLowerCase();
   if (file.type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
@@ -106,33 +107,6 @@ async function convertDocxToPdfFile(file) {
 
   const blob = pdf.output('blob');
   return new File([blob], file.name.replace(/\.docx?$/i, '.pdf'), { type: 'application/pdf' });
-}
-
-// Wraps a photographed/scanned image (JPG/PNG) in a single-page PDF, fit to
-// A4 and centered — so a snapshot of a document can be signed the same way
-// as any other upload, without the user needing to convert it first.
-async function convertImageToPdfFile(file) {
-  const { jsPDF } = await import('jspdf');
-  const dataUrl = await readFileAsDataUrl(file);
-  const img = await loadImage(dataUrl);
-
-  const landscape = img.width > img.height;
-  const pdf = new jsPDF({ orientation: landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
-  const pageW = pdf.internal.pageSize.getWidth();
-  const pageH = pdf.internal.pageSize.getHeight();
-  const margin = 10;
-  const maxW = pageW - margin * 2;
-  const maxH = pageH - margin * 2;
-  const ratio = Math.min(maxW / img.width, maxH / img.height);
-  const w = img.width * ratio;
-  const h = img.height * ratio;
-  const x = (pageW - w) / 2;
-  const y = (pageH - h) / 2;
-  const format = file.type.includes('png') || /\.png$/i.test(file.name) ? 'PNG' : 'JPEG';
-  pdf.addImage(dataUrl, format, x, y, w, h);
-
-  const blob = pdf.output('blob');
-  return new File([blob], file.name.replace(/\.(png|jpe?g|jpg)$/i, '.pdf'), { type: 'application/pdf' });
 }
 
 // Makes near-white pixels transparent so only the dark ink remains — the
@@ -221,7 +195,7 @@ const defaultCropRect = { x: 0, y: 0, w: 1, h: 1 };
 const SIGN_TO_ENHANCER_KEY = 'convertam_sign_to_enhancer';
 const ENHANCER_TO_SIGN_KEY = 'convertam_enhancer_to_sign';
 
-export default function SignPdfWorkspace() {
+export default function SignDocumentsWorkspace() {
   const { session, startSession, updateDocument, getDocumentAsFile } = useDocumentSession();
   const [step, setStep] = useState(1); // 1=upload sig, 2=upload document(s), 3=sign
   const [sigStage, setSigStage] = useState('select'); // select | analyzing | manual-crop | needs-enhancer-hint
@@ -232,8 +206,10 @@ export default function SignPdfWorkspace() {
 
   // Every document uploaded this session. Kept as one array so the
   // signature above is shared across all of them — switching documents
-  // never touches sigDataUrl. Each entry: { id, name, pdfFile, pages,
-  // selectedPage, sigPos, signed, resultBytes }.
+  // never touches sigDataUrl. Each entry: { id, name, kind ('pdf' | 'image'),
+  // file, mimeType, pages, selectedPage, sigPos, signed, resultBlob,
+  // resultMimeType }. Images sign in place and keep their native format;
+  // PDFs (and Word documents, already converted to PDF) sign via pdf-lib.
   const [documents, setDocuments] = useState([]);
   const [activeDocId, setActiveDocId] = useState(null);
 
@@ -310,7 +286,7 @@ export default function SignPdfWorkspace() {
   }
 
   // One-time pickup of a photo sent back from Document Enhancer's "Continue
-  // to Sign PDF" — re-attempts automatic extraction on the improved image.
+  // to Sign Documents" — re-attempts automatic extraction on the improved image.
   useEffect(() => {
     let raw;
     try { raw = localStorage.getItem(ENHANCER_TO_SIGN_KEY); } catch { return; }
@@ -422,10 +398,10 @@ export default function SignPdfWorkspace() {
     setStep(2);
   }
 
-  // Turns one uploaded file into a ready-to-sign document object: silently
-  // converts DOCX/DOC/JPG/PNG to PDF first if needed, then renders every
-  // page for preview — identical pipeline regardless of whether this is the
-  // only document in the batch or one of many.
+  // Turns one uploaded file into a ready-to-sign document object. Word
+  // documents still silently convert to PDF first (see detectDocumentKind);
+  // images are read as-is and sign in place, keeping their original format
+  // all the way through to download.
   async function processOneFile(file) {
     if (file.size > 100 * 1024 * 1024) {
       return { ok: false, name: file.name, message: 'Larger than the 100MB limit.' };
@@ -435,13 +411,39 @@ export default function SignPdfWorkspace() {
       return { ok: false, name: file.name, message: 'Unsupported file type — upload a PDF, Word document (.docx/.doc), JPG, or PNG.' };
     }
 
+    if (kind === 'image') {
+      try {
+        const dataUrl = await readFileAsDataUrl(file);
+        const img = await loadImage(dataUrl);
+        const mimeType = file.type || (/\.png$/i.test(file.name) ? 'image/png' : 'image/jpeg');
+        return {
+          ok: true,
+          doc: {
+            id: makeDocId(),
+            name: file.name,
+            kind: 'image',
+            file,
+            mimeType,
+            pages: [{ dataUrl, w: img.naturalWidth, h: img.naturalHeight }],
+            selectedPage: 0,
+            sigPos: { ...defaultSigPos },
+            signed: false,
+            resultBlob: null,
+            resultMimeType: null,
+          },
+        };
+      } catch (err) {
+        console.error(err);
+        return { ok: false, name: file.name, message: 'Could not read this image.' };
+      }
+    }
+
     let workingFile = file;
     try {
       if (kind === 'docx') workingFile = await convertDocxToPdfFile(file);
-      else if (kind === 'image') workingFile = await convertImageToPdfFile(file);
     } catch (err) {
       console.error(err);
-      return { ok: false, name: file.name, message: kind === 'docx' ? 'Could not convert this Word document.' : 'Could not process this file.' };
+      return { ok: false, name: file.name, message: 'Could not convert this Word document.' };
     }
 
     try {
@@ -464,12 +466,15 @@ export default function SignPdfWorkspace() {
         doc: {
           id: makeDocId(),
           name: workingFile.name,
-          pdfFile: workingFile,
+          kind: 'pdf',
+          file: workingFile,
+          mimeType: 'application/pdf',
           pages,
           selectedPage: 0,
           sigPos: { ...defaultSigPos },
           signed: false,
-          resultBytes: null,
+          resultBlob: null,
+          resultMimeType: null,
         },
       };
     } catch (err) {
@@ -594,34 +599,73 @@ export default function SignPdfWorkspace() {
     setBusy(true);
     setStatus('Embedding signature…');
     try {
-      const pdfBytes = await doc.pdfFile.arrayBuffer();
-      const pdfDoc = await PDFDocument.load(pdfBytes);
-      const pages = pdfDoc.getPages();
-      const page = pages[doc.selectedPage];
-      const { width: pageW, height: pageH } = page.getSize();
+      let resultBlob, resultMimeType;
 
-      const previewEl = previewRef.current;
-      const scaleX = pageW / previewEl.offsetWidth;
-      const scaleY = pageH / previewEl.offsetHeight;
+      if (doc.kind === 'image') {
+        // Canvas coordinates already run top-left-down, same as the DOM
+        // preview — unlike the PDF path below, no y-axis flip is needed.
+        const page = doc.pages[0];
+        const previewEl = previewRef.current;
+        const scaleX = page.w / previewEl.offsetWidth;
+        const scaleY = page.h / previewEl.offsetHeight;
 
-      const pdfX = doc.sigPos.x * scaleX;
-      const pdfY = pageH - (doc.sigPos.y * scaleY) - (doc.sigPos.h * scaleY);
-      const pdfW = doc.sigPos.w * scaleX;
-      const pdfH = doc.sigPos.h * scaleY;
+        const canvas = document.createElement('canvas');
+        canvas.width = page.w;
+        canvas.height = page.h;
+        const ctx = canvas.getContext('2d');
+        const baseImg = await loadImage(page.dataUrl);
+        ctx.drawImage(baseImg, 0, 0, page.w, page.h);
 
-      const sigRes = await fetch(sigDataUrl);
-      const sigBuf = await sigRes.arrayBuffer();
-      const sigImage = await pdfDoc.embedPng(sigBuf);
+        const sigImg = await loadImage(sigDataUrl);
+        ctx.drawImage(
+          sigImg,
+          doc.sigPos.x * scaleX,
+          doc.sigPos.y * scaleY,
+          doc.sigPos.w * scaleX,
+          doc.sigPos.h * scaleY,
+        );
 
-      page.drawImage(sigImage, { x: pdfX, y: pdfY, width: pdfW, height: pdfH });
+        resultMimeType = doc.mimeType === 'image/png' ? 'image/png' : 'image/jpeg';
+        resultBlob = await new Promise((resolve) => canvas.toBlob(resolve, resultMimeType, 0.95));
+      } else {
+        const pdfBytes = await doc.file.arrayBuffer();
+        const pdfDoc = await PDFDocument.load(pdfBytes);
+        const pages = pdfDoc.getPages();
+        const page = pages[doc.selectedPage];
+        const { width: pageW, height: pageH } = page.getSize();
 
-      const signed = await pdfDoc.save();
-      patchDoc(doc.id, { signed: true, resultBytes: signed });
+        const previewEl = previewRef.current;
+        const scaleX = pageW / previewEl.offsetWidth;
+        const scaleY = pageH / previewEl.offsetHeight;
+
+        const pdfX = doc.sigPos.x * scaleX;
+        const pdfY = pageH - (doc.sigPos.y * scaleY) - (doc.sigPos.h * scaleY);
+        const pdfW = doc.sigPos.w * scaleX;
+        const pdfH = doc.sigPos.h * scaleY;
+
+        const sigRes = await fetch(sigDataUrl);
+        const sigBuf = await sigRes.arrayBuffer();
+        const sigImage = await pdfDoc.embedPng(sigBuf);
+
+        page.drawImage(sigImage, { x: pdfX, y: pdfY, width: pdfW, height: pdfH });
+
+        const signed = await pdfDoc.save();
+        resultMimeType = 'application/pdf';
+        resultBlob = new Blob([signed], { type: 'application/pdf' });
+      }
+
+      patchDoc(doc.id, { signed: true, resultBlob, resultMimeType });
 
       if (session.status !== 'active') {
-        await startSession(doc.pdfFile, { toolSlug: 'sign-pdf' });
+        await startSession(doc.file, { toolSlug: 'sign-documents' });
       }
-      await updateDocument(signed, { toolSlug: 'sign-pdf', label: `Signed — ${doc.name}` });
+      const resultBytes = new Uint8Array(await resultBlob.arrayBuffer());
+      await updateDocument(resultBytes, {
+        toolSlug: 'sign-documents',
+        label: `Signed — ${doc.name}`,
+        mimeType: resultMimeType,
+        name: doc.name,
+      });
 
       setStatus('Signature placed.');
 
@@ -639,19 +683,24 @@ export default function SignPdfWorkspace() {
   }
 
   function undoSignature(id) {
-    patchDoc(id, { signed: false, resultBytes: null });
+    patchDoc(id, { signed: false, resultBlob: null, resultMimeType: null });
+  }
+
+  function signedFileName(doc) {
+    const ext = doc.kind === 'image' ? (doc.resultMimeType === 'image/png' ? 'png' : 'jpg') : 'pdf';
+    const baseName = doc.name.replace(/\.[^.]+$/, '');
+    return `${baseName}-signed.${ext}`;
   }
 
   // Downloading exports a document but does not end the workspace — the
   // session stays active until the user closes it or starts a new document.
   function downloadDoc(doc) {
-    if (!doc?.resultBytes) return;
-    const baseName = doc.name.replace(/\.pdf$/i, '');
-    downloadBlob(new Blob([doc.resultBytes], { type: 'application/pdf' }), `${baseName}-signed.pdf`);
+    if (!doc?.resultBlob) return;
+    downloadBlob(doc.resultBlob, signedFileName(doc));
   }
 
   async function downloadAllAsZip() {
-    const signedDocs = documents.filter((d) => d.signed && d.resultBytes);
+    const signedDocs = documents.filter((d) => d.signed && d.resultBlob);
     if (!signedDocs.length) return;
     setBusy(true);
     setStatus('Building ZIP…');
@@ -660,11 +709,13 @@ export default function SignPdfWorkspace() {
       const zip = new JSZip();
       const usedNames = new Set();
       for (const doc of signedDocs) {
-        let name = `${doc.name.replace(/\.pdf$/i, '')}-signed.pdf`;
+        const ext = doc.kind === 'image' ? (doc.resultMimeType === 'image/png' ? 'png' : 'jpg') : 'pdf';
+        const baseName = doc.name.replace(/\.[^.]+$/, '');
+        let name = signedFileName(doc);
         let n = 2;
-        while (usedNames.has(name)) { name = `${doc.name.replace(/\.pdf$/i, '')}-signed-${n}.pdf`; n += 1; }
+        while (usedNames.has(name)) { name = `${baseName}-signed-${n}.${ext}`; n += 1; }
         usedNames.add(name);
-        zip.file(name, doc.resultBytes);
+        zip.file(name, doc.resultBlob);
       }
       const blob = await zip.generateAsync({ type: 'blob' });
       downloadBlob(blob, 'convertam-signed-documents.zip');
@@ -1019,7 +1070,7 @@ export default function SignPdfWorkspace() {
                 <button className="btn btn-ghost" onClick={reset}>End signing session</button>
               </div>
               <ContinueWorkingPanel
-                toolSlug="sign-pdf"
+                toolSlug="sign-documents"
                 documentName={activeDoc?.name || 'document.pdf'}
                 onDownload={() => downloadDoc(activeDoc)}
                 downloading={busy}

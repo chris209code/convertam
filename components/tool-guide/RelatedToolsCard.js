@@ -6,9 +6,9 @@ import { getTool } from '@/lib/tools-config';
 // provides a `relatedTools` list ([{ slug, icon }]) in lib/toolGuides.js.
 export default function RelatedToolsCard({ tools }) {
   const resolved = (tools || [])
-    .map(({ slug, icon }) => {
+    .map(({ slug, icon, reason }) => {
       const tool = getTool(slug);
-      return tool ? { slug, icon, title: tool.title } : null;
+      return tool ? { slug, icon, title: tool.title, reason } : null;
     })
     .filter(Boolean);
 
@@ -18,7 +18,7 @@ export default function RelatedToolsCard({ tools }) {
     <div className="border border-[#E2E6ED] rounded-2xl p-5 bg-paper">
       <h2 className="font-display text-base font-bold text-ink mb-3.5">Related Tools</h2>
       <div className="flex flex-col gap-2">
-        {resolved.map(({ slug, icon, title }) => (
+        {resolved.map(({ slug, icon, title, reason }) => (
           <Link
             key={slug}
             href={`/${slug}`}
@@ -30,8 +30,11 @@ export default function RelatedToolsCard({ tools }) {
             >
               {icon}
             </span>
-            <span className="flex-1 text-sm font-medium text-ink">{title}</span>
-            <span className="text-stamp-blue text-sm">→</span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-sm font-medium text-ink">{title}</span>
+              {reason && <span className="block text-xs text-ink-soft mt-0.5 leading-snug">{reason}</span>}
+            </span>
+            <span className="text-stamp-blue text-sm flex-shrink-0">→</span>
           </Link>
         ))}
       </div>

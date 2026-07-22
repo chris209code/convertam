@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Script from 'next/script';
 import UploadBox from '@/components/UploadBox';
+import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import { canPullSessionDocument } from '@/lib/workspace/toolCompatibility';
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -16,6 +18,7 @@ function downloadBlob(blob, filename) {
 }
 
 export default function PdfToImageWorkspace({ format }) {
+  const { session, startSession, getDocumentAsFile } = useDocumentSession();
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
@@ -23,10 +26,28 @@ export default function PdfToImageWorkspace({ format }) {
   const [pdfjsReady, setPdfjsReady] = useState(false);
   const [zipReady, setZipReady] = useState(false);
 
-  function handleFiles(files) {
+  // pdf-to-png is pull-only (the output is images, so nothing feeds back
+  // into the session) — pdf-to-jpg shares this component but isn't part of
+  // the workspace group, so it stays a plain standalone tool.
+  const toolSlug = format === 'png' ? 'pdf-to-png' : 'pdf-to-jpg';
+  const pullEnabled = canPullSessionDocument(toolSlug);
+
+  function handleFiles(files, { fromSession = false } = {}) {
     setError('');
     setStatus('');
-    setFile(files[0] || null);
+    const f = files[0] || null;
+    setFile(f);
+    if (pullEnabled && f && !fromSession) {
+      const hasUndownloadedWork = session.status === 'active' && session.history.length > 0;
+      if (!hasUndownloadedWork || window.confirm('Starting with this document will replace the document currently in your session. Continue?')) {
+        startSession(f, { toolSlug });
+      }
+    }
+  }
+
+  async function continueWithSessionDocument() {
+    const f = getDocumentAsFile();
+    if (f) handleFiles([f], { fromSession: true });
   }
 
   async function handleConvert() {
@@ -82,7 +103,22 @@ export default function PdfToImageWorkspace({ format }) {
         onLoad={() => setZipReady(true)}
       />
 
-      <UploadBox accept="application/pdf" multiple={false} onFiles={handleFiles} />
+      {pullEnabled && !file && session.status === 'active' && session.document && (
+        <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12, padding: '14px 16px', marginBottom: 14, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: '1.4rem' }} aria-hidden="true">📄</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>Continue with {session.document.name}</div>
+            <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
+              {session.document.pageCount ? `${session.document.pageCount} pages · ` : ''}already in this session — no need to re-upload.
+            </div>
+          </div>
+          <button onClick={continueWithSessionDocument} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+            Continue
+          </button>
+        </div>
+      )}
+
+      <UploadBox accept="application/pdf" multiple={false} onFiles={handleFiles} compact={!!file} />
 
       {file && (
         <div className="file-list">

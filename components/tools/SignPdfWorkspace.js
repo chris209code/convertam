@@ -35,6 +35,12 @@ function readFileAsDataUrl(file) {
   });
 }
 
+function makeDocId() {
+  return `doc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+const defaultSigPos = { x: 50, y: 50, w: 180, h: 60 };
+
 // Detects what kind of document was uploaded so the workspace can silently
 // convert it to PDF before continuing — the user never has to think about
 // file formats or convert anything themselves first.
@@ -217,17 +223,20 @@ const ENHANCER_TO_SIGN_KEY = 'convertam_enhancer_to_sign';
 
 export default function SignPdfWorkspace() {
   const { session, startSession, updateDocument, getDocumentAsFile } = useDocumentSession();
-  const [step, setStep] = useState(1); // 1=upload sig, 2=upload pdf, 3=place sig
-  const [resultBytes, setResultBytes] = useState(null); // set once a signature is applied; cleared by any further change
+  const [step, setStep] = useState(1); // 1=upload sig, 2=upload document(s), 3=sign
   const [sigStage, setSigStage] = useState('select'); // select | analyzing | manual-crop | needs-enhancer-hint
   const [sourceImg, setSourceImg] = useState(null); // the originally uploaded photo, for the crop fallback
   const [cropRect, setCropRect] = useState(defaultCropRect);
   const [sigFile, setSigFile] = useState(null);
-  const [sigDataUrl, setSigDataUrl] = useState(null); // cleaned, isolated signature
-  const [pdfFile, setPdfFile] = useState(null);
-  const [pdfPages, setPdfPages] = useState([]); // rendered page canvases as dataURLs
-  const [selectedPage, setSelectedPage] = useState(0);
-  const [sigPos, setSigPos] = useState({ x: 50, y: 50, w: 180, h: 60 });
+  const [sigDataUrl, setSigDataUrl] = useState(null); // cleaned, isolated signature — stays active for the whole session
+
+  // Every document uploaded this session. Kept as one array so the
+  // signature above is shared across all of them — switching documents
+  // never touches sigDataUrl. Each entry: { id, name, pdfFile, pages,
+  // selectedPage, sigPos, signed, resultBytes }.
+  const [documents, setDocuments] = useState([]);
+  const [activeDocId, setActiveDocId] = useState(null);
+
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
@@ -239,6 +248,15 @@ export default function SignPdfWorkspace() {
   const dragStart = useRef({ x: 0, y: 0 });
   const cropContainerRef = useRef(null);
   const cropDragRef = useRef(null);
+  const addMoreInputRef = useRef(null);
+
+  const activeDoc = documents.find((d) => d.id === activeDocId) || null;
+  const activeIndex = documents.findIndex((d) => d.id === activeDocId);
+  const signedCount = documents.filter((d) => d.signed).length;
+
+  function patchDoc(id, patch) {
+    setDocuments((prev) => prev.map((d) => (d.id === id ? { ...d, ...(typeof patch === 'function' ? patch(d) : patch) } : d)));
+  }
 
   // Shared extraction pipeline: given an already-loaded photo, try to
   // automatically isolate just the signature, falling back to manual crop
@@ -306,6 +324,15 @@ export default function SignPdfWorkspace() {
     loadImage(raw).then((img) => processSignatureImage(img));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Replacing the signature only changes the ink — every document already
+  // in the batch, signed or not, keeps its place. This is the one place a
+  // fresh signature upload is allowed to happen after step 1.
+  function changeSignature() {
+    setStep(1);
+    setSigStage('select');
+    setImportedFromEnhancer(false);
+  }
 
   // Sends the photo (cropped to whatever region is currently selected, if
   // any) to Document Enhancer for cleanup, as a continuation of this flow
@@ -395,53 +422,27 @@ export default function SignPdfWorkspace() {
     setStep(2);
   }
 
-  // Step 2: Render PDF pages as images for preview. Shared by a fresh
-  // upload and a document pulled from an active Document Session. Accepts
-  // PDF, Word (.docx/.doc), JPG, or PNG — anything that isn't already a PDF
-  // is silently converted to one first, entirely in the browser, so the
-  // rest of this function (and everything downstream) only ever deals with
-  // a real PDF file, exactly as before.
-  async function loadPdfFile(file, { fromSession = false } = {}) {
-    if (!file || !window.pdfjsLib) return;
+  // Turns one uploaded file into a ready-to-sign document object: silently
+  // converts DOCX/DOC/JPG/PNG to PDF first if needed, then renders every
+  // page for preview — identical pipeline regardless of whether this is the
+  // only document in the batch or one of many.
+  async function processOneFile(file) {
     if (file.size > 100 * 1024 * 1024) {
-      setError('That file is larger than the 100MB limit. Please choose a smaller document.');
-      return;
+      return { ok: false, name: file.name, message: 'Larger than the 100MB limit.' };
     }
-    setError('');
-    setBusy(true);
-
     const kind = detectDocumentKind(file);
-    let workingFile = file;
-
     if (kind === 'unknown') {
-      setError('That file type isn’t supported. Please upload a PDF, Word document (.docx/.doc), JPG, or PNG.');
-      setBusy(false);
-      setStatus('');
-      return;
+      return { ok: false, name: file.name, message: 'Unsupported file type — upload a PDF, Word document (.docx/.doc), JPG, or PNG.' };
     }
 
+    let workingFile = file;
     try {
-      if (kind === 'docx') {
-        setStatus('Converting your document to PDF…');
-        workingFile = await convertDocxToPdfFile(file);
-      } else if (kind === 'image') {
-        setStatus('Preparing your document…');
-        workingFile = await convertImageToPdfFile(file);
-      }
+      if (kind === 'docx') workingFile = await convertDocxToPdfFile(file);
+      else if (kind === 'image') workingFile = await convertImageToPdfFile(file);
     } catch (err) {
       console.error(err);
-      setError(
-        kind === 'docx'
-          ? 'Could not convert that Word document. Please try saving it as a PDF and uploading that instead.'
-          : 'Could not process that file. Please try a different one.'
-      );
-      setBusy(false);
-      setStatus('');
-      return;
+      return { ok: false, name: file.name, message: kind === 'docx' ? 'Could not convert this Word document.' : 'Could not process this file.' };
     }
-
-    setPdfFile(workingFile);
-    setStatus('Loading document…');
 
     try {
       window.pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -449,7 +450,6 @@ export default function SignPdfWorkspace() {
       const buf = await workingFile.arrayBuffer();
       const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
       const pages = [];
-
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const viewport = page.getViewport({ scale: 1.5 });
@@ -459,53 +459,98 @@ export default function SignPdfWorkspace() {
         await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
         pages.push({ dataUrl: canvas.toDataURL('image/jpeg', 0.9), w: viewport.width, h: viewport.height });
       }
-
-      setPdfPages(pages);
-      setStatus('');
-      setBusy(false);
-      setStep(3);
-      setResultBytes(null);
-      if (!fromSession) {
-        const hasUndownloadedWork = session.status === 'active' && session.history.length > 0;
-        if (!hasUndownloadedWork || window.confirm('Starting with this document will replace the document currently in your session. Continue?')) {
-          startSession(workingFile, { toolSlug: 'sign-pdf' });
-        }
-      }
+      return {
+        ok: true,
+        doc: {
+          id: makeDocId(),
+          name: workingFile.name,
+          pdfFile: workingFile,
+          pages,
+          selectedPage: 0,
+          sigPos: { ...defaultSigPos },
+          signed: false,
+          resultBytes: null,
+        },
+      };
     } catch (err) {
-      setError('Could not read that PDF. Make sure it is not password-protected.');
-      setStatus('');
-      setBusy(false);
+      return { ok: false, name: file.name, message: 'Could not read this PDF. Make sure it is not password-protected.' };
     }
   }
 
-  async function handlePdfUpload(e) {
-    const file = e.target.files[0];
-    await loadPdfFile(file);
+  // Step 2: accepts one or many files at once. Every document lands in the
+  // same batch, sharing whatever signature was set up in step 1 — nothing
+  // about the signature is touched here.
+  async function handleFilesUpload(e) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length || !window.pdfjsLib) return;
+    setError('');
+    setBusy(true);
+
+    const newDocs = [];
+    const failures = [];
+    for (let i = 0; i < files.length; i++) {
+      setStatus(
+        files.length > 1
+          ? `Adding document ${i + 1} of ${files.length}…`
+          : 'Loading your document…'
+      );
+      const result = await processOneFile(files[i]);
+      if (result.ok) newDocs.push(result.doc);
+      else failures.push(result);
+    }
+
+    setBusy(false);
+    setStatus('');
+    if (newDocs.length) {
+      setDocuments((prev) => [...prev, ...newDocs]);
+      setActiveDocId((prev) => prev || newDocs[0].id);
+      setStep(3);
+    }
+    setError(
+      failures.length === 0 ? '' :
+      failures.length === 1 ? `${failures[0].name}: ${failures[0].message}` :
+      `${failures.length} file(s) couldn't be added — ${failures.map((f) => f.name).join(', ')}`
+    );
+    e.target.value = '';
   }
 
   async function continueWithSessionPdf() {
     const file = getDocumentAsFile();
-    await loadPdfFile(file, { fromSession: true });
+    if (!file || !window.pdfjsLib) return;
+    setError('');
+    setBusy(true);
+    setStatus('Loading document…');
+    const result = await processOneFile(file);
+    setBusy(false);
+    setStatus('');
+    if (result.ok) {
+      setDocuments((prev) => [...prev, result.doc]);
+      setActiveDocId(result.doc.id);
+      setStep(3);
+    } else {
+      setError(result.message);
+    }
   }
-  // Drag signature on preview
+
+  // Drag signature on preview — operates on the active document's own
+  // sigPos, so every document remembers where its signature was placed.
   function onMouseDown(e) {
     e.preventDefault();
     isDragging.current = true;
     const rect = previewRef.current.getBoundingClientRect();
     dragStart.current = {
-      x: e.clientX - rect.left - sigPos.x,
-      y: e.clientY - rect.top - sigPos.y,
+      x: e.clientX - rect.left - activeDoc.sigPos.x,
+      y: e.clientY - rect.top - activeDoc.sigPos.y,
     };
   }
 
   useEffect(() => {
     function onMouseMove(e) {
-      if (!isDragging.current || !previewRef.current) return;
+      if (!isDragging.current || !previewRef.current || !activeDocId) return;
       const rect = previewRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left - dragStart.current.x;
       const y = e.clientY - rect.top - dragStart.current.y;
-      setSigPos((p) => ({ ...p, x: Math.max(0, x), y: Math.max(0, y) }));
-      setResultBytes(null);
+      patchDoc(activeDocId, (d) => ({ sigPos: { ...d.sigPos, x: Math.max(0, x), y: Math.max(0, y) } }));
     }
     function onMouseUp() { isDragging.current = false; }
     window.addEventListener('mousemove', onMouseMove);
@@ -514,7 +559,8 @@ export default function SignPdfWorkspace() {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDocId]);
 
   // Touch support for mobile
   function onTouchStart(e) {
@@ -522,63 +568,67 @@ export default function SignPdfWorkspace() {
     isDragging.current = true;
     const rect = previewRef.current.getBoundingClientRect();
     dragStart.current = {
-      x: touch.clientX - rect.left - sigPos.x,
-      y: touch.clientY - rect.top - sigPos.y,
+      x: touch.clientX - rect.left - activeDoc.sigPos.x,
+      y: touch.clientY - rect.top - activeDoc.sigPos.y,
     };
   }
 
   function onTouchMove(e) {
-    if (!isDragging.current || !previewRef.current) return;
+    if (!isDragging.current || !previewRef.current || !activeDocId) return;
     e.preventDefault();
     const touch = e.touches[0];
     const rect = previewRef.current.getBoundingClientRect();
     const x = touch.clientX - rect.left - dragStart.current.x;
     const y = touch.clientY - rect.top - dragStart.current.y;
-    setSigPos((p) => ({ ...p, x: Math.max(0, x), y: Math.max(0, y) }));
-    setResultBytes(null);
+    patchDoc(activeDocId, (d) => ({ sigPos: { ...d.sigPos, x: Math.max(0, x), y: Math.max(0, y) } }));
   }
 
-  // Embeds the signature into the PDF and hands the result to the Document
-  // Session instead of downloading immediately — Continue Working or
-  // Download becomes an explicit choice (see ContinueWorkingPanel below).
+  // Embeds the signature into the active document and marks it signed, then
+  // pushes it to the Document Session (so "Continue Working" always means
+  // whichever document was most recently signed) and auto-advances to the
+  // next unsigned document — no re-upload, no re-creating the signature,
+  // exactly like a pen staying in hand while the paper changes.
   async function handleApplySignature() {
-    if (!pdfFile || !sigDataUrl) return;
+    if (!activeDoc || !sigDataUrl) return;
+    const doc = activeDoc;
     setBusy(true);
     setStatus('Embedding signature…');
     try {
-      const pdfBytes = await pdfFile.arrayBuffer();
+      const pdfBytes = await doc.pdfFile.arrayBuffer();
       const pdfDoc = await PDFDocument.load(pdfBytes);
       const pages = pdfDoc.getPages();
-      const page = pages[selectedPage];
+      const page = pages[doc.selectedPage];
       const { width: pageW, height: pageH } = page.getSize();
 
-      // Convert preview coordinates to PDF coordinates
       const previewEl = previewRef.current;
       const scaleX = pageW / previewEl.offsetWidth;
       const scaleY = pageH / previewEl.offsetHeight;
 
-      // PDF coordinates: y=0 is bottom, so flip
-      const pdfX = sigPos.x * scaleX;
-      const pdfY = pageH - (sigPos.y * scaleY) - (sigPos.h * scaleY);
-      const pdfW = sigPos.w * scaleX;
-      const pdfH = sigPos.h * scaleY;
+      const pdfX = doc.sigPos.x * scaleX;
+      const pdfY = pageH - (doc.sigPos.y * scaleY) - (doc.sigPos.h * scaleY);
+      const pdfW = doc.sigPos.w * scaleX;
+      const pdfH = doc.sigPos.h * scaleY;
 
-      // Embed signature PNG
       const sigRes = await fetch(sigDataUrl);
       const sigBuf = await sigRes.arrayBuffer();
       const sigImage = await pdfDoc.embedPng(sigBuf);
 
-      page.drawImage(sigImage, {
-        x: pdfX,
-        y: pdfY,
-        width: pdfW,
-        height: pdfH,
-      });
+      page.drawImage(sigImage, { x: pdfX, y: pdfY, width: pdfW, height: pdfH });
 
       const signed = await pdfDoc.save();
-      setResultBytes(signed);
-      await updateDocument(signed, { toolSlug: 'sign-pdf', label: 'Signed' });
-      setStatus('Signature placed — choose what to do next.');
+      patchDoc(doc.id, { signed: true, resultBytes: signed });
+
+      if (session.status !== 'active') {
+        await startSession(doc.pdfFile, { toolSlug: 'sign-pdf' });
+      }
+      await updateDocument(signed, { toolSlug: 'sign-pdf', label: `Signed — ${doc.name}` });
+
+      setStatus('Signature placed.');
+
+      const next = documents.find((d) => d.id !== doc.id && !d.signed);
+      if (next) {
+        setTimeout(() => setActiveDocId(next.id), 350);
+      }
     } catch (err) {
       console.error(err);
       setError('Could not embed the signature. Please try again.');
@@ -588,16 +638,48 @@ export default function SignPdfWorkspace() {
     }
   }
 
-  // Downloading exports the current document but does not end the
-  // workspace — the session stays active until the user closes it (see
-  // WorkspaceSidebar) or starts a new document.
-  function downloadResult() {
-    if (!resultBytes || !pdfFile) return;
-    const baseName = pdfFile.name.replace('.pdf', '');
-    downloadBlob(new Blob([resultBytes], { type: 'application/pdf' }), `${baseName}-signed.pdf`);
-    setStatus('Done — your signed PDF has downloaded.');
+  function undoSignature(id) {
+    patchDoc(id, { signed: false, resultBytes: null });
   }
 
+  // Downloading exports a document but does not end the workspace — the
+  // session stays active until the user closes it or starts a new document.
+  function downloadDoc(doc) {
+    if (!doc?.resultBytes) return;
+    const baseName = doc.name.replace(/\.pdf$/i, '');
+    downloadBlob(new Blob([doc.resultBytes], { type: 'application/pdf' }), `${baseName}-signed.pdf`);
+  }
+
+  async function downloadAllAsZip() {
+    const signedDocs = documents.filter((d) => d.signed && d.resultBytes);
+    if (!signedDocs.length) return;
+    setBusy(true);
+    setStatus('Building ZIP…');
+    try {
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+      const usedNames = new Set();
+      for (const doc of signedDocs) {
+        let name = `${doc.name.replace(/\.pdf$/i, '')}-signed.pdf`;
+        let n = 2;
+        while (usedNames.has(name)) { name = `${doc.name.replace(/\.pdf$/i, '')}-signed-${n}.pdf`; n += 1; }
+        usedNames.add(name);
+        zip.file(name, doc.resultBytes);
+      }
+      const blob = await zip.generateAsync({ type: 'blob' });
+      downloadBlob(blob, 'convertam-signed-documents.zip');
+      setStatus('');
+    } catch (err) {
+      console.error(err);
+      setError('Could not build the ZIP file. Please try downloading documents individually.');
+      setStatus('');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Ends the whole signing session — clears every document and the
+  // signature, back to a completely fresh start.
   function reset() {
     setStep(1);
     setSigStage('select');
@@ -605,13 +687,10 @@ export default function SignPdfWorkspace() {
     setCropRect(defaultCropRect);
     setSigFile(null);
     setSigDataUrl(null);
-    setPdfFile(null);
-    setPdfPages([]);
-    setSelectedPage(0);
-    setSigPos({ x: 50, y: 50, w: 180, h: 60 });
+    setDocuments([]);
+    setActiveDocId(null);
     setStatus('');
     setError('');
-    setResultBytes(null);
   }
 
   return (
@@ -623,7 +702,7 @@ export default function SignPdfWorkspace() {
 
       {/* Step indicators */}
       <div className="flex gap-3 mb-6">
-        {['Upload signature', 'Upload document', 'Place & download'].map((label, i) => (
+        {['Upload signature', 'Upload document(s)', 'Sign & download'].map((label, i) => (
           <div key={i} className="flex items-center gap-2">
             <div
               className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
@@ -644,7 +723,7 @@ export default function SignPdfWorkspace() {
       {step === 1 && sigStage === 'select' && (
         <div>
           <p className="text-sm text-ink-soft mb-4">
-            Sign your name on <strong>white paper</strong> with a <strong>dark pen</strong>, then take a clear photo of it and upload below. Convertam will try to automatically isolate just your signature.
+            Sign your name on <strong>white paper</strong> with a <strong>dark pen</strong>, then take a clear photo of it and upload below. Convertam will try to automatically isolate just your signature, and keep it ready for every document you sign in this session.
           </p>
           <label
             className="dropzone block cursor-pointer"
@@ -732,7 +811,7 @@ export default function SignPdfWorkspace() {
         </div>
       )}
 
-      {/* STEP 2: Upload PDF */}
+      {/* STEP 2: Upload document(s) */}
       {step === 2 && (
         <div>
           {importedFromEnhancer && (
@@ -743,8 +822,8 @@ export default function SignPdfWorkspace() {
           <div className="mb-4 p-3 rounded-xl flex items-center gap-3" style={{ background: '#f0f5ff', border: '1px solid #3a63b8' }}>
             <img src={sigDataUrl} alt="Your signature" style={{ height: '40px', maxWidth: '120px', objectFit: 'contain' }} />
             <div>
-              <div className="text-xs font-semibold text-ink">Signature ready</div>
-              <button onClick={() => { setStep(1); setSigStage('select'); setImportedFromEnhancer(false); }} className="text-xs text-stamp-blue underline">Change</button>
+              <div className="text-xs font-semibold text-ink">Signature ready — stays active for every document you sign</div>
+              <button onClick={changeSignature} className="text-xs text-stamp-blue underline">Change</button>
             </div>
           </div>
           {session.status === 'active' && session.document && (
@@ -761,112 +840,191 @@ export default function SignPdfWorkspace() {
               </button>
             </div>
           )}
-          <p className="text-sm text-ink-soft mb-4">Now upload the document you want to sign. Word documents and images are automatically turned into a PDF first — you don't need to convert anything yourself.</p>
+          <p className="text-sm text-ink-soft mb-4">
+            Now upload the document(s) you want to sign — select more than one at once if you have several. Word documents and images are automatically turned into PDFs first; you don't need to convert anything yourself.
+          </p>
           <label className="dropzone block cursor-pointer" style={{ borderColor: '#e2dcc9' }}>
             <input
               type="file"
+              multiple
               accept="application/pdf,.pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg,.png,.jpg,.jpeg"
-              onChange={handlePdfUpload}
+              onChange={handleFilesUpload}
               disabled={!pdfjsReady}
               hidden
             />
             <div className="dz-icon">[ DOC ]</div>
-            <div className="dz-main">Click to upload your document</div>
-            <div className="dz-sub">Supported formats: PDF, DOCX, DOC, JPG, PNG · Max 100MB · Processed entirely in your browser.</div>
+            <div className="dz-main">Click to upload one or more documents</div>
+            <div className="dz-sub">Supported formats: PDF, DOCX, DOC, JPG, PNG · Max 100MB each · Processed entirely in your browser.</div>
           </label>
           {busy && <div className="status">{status}</div>}
           {error && <div className="status error">{error}</div>}
         </div>
       )}
 
-      {/* STEP 3: Place signature */}
-      {step === 3 && (
+      {/* STEP 3: Sign & download — multi-document workspace */}
+      {step === 3 && activeDoc && (
         <div>
-          <p className="text-sm text-ink-soft mb-3">
-            Drag your signature to the correct position. Use the size slider to resize it.
-          </p>
+          {/* Progress */}
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+            <p className="text-sm text-ink-soft m-0">
+              Document {activeIndex + 1} of {documents.length} · <strong>{signedCount} signed</strong> · {documents.length - signedCount} remaining
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                className="btn-ghost-sm"
+                disabled={activeIndex <= 0}
+                onClick={() => setActiveDocId(documents[activeIndex - 1].id)}
+              >
+                ← Previous
+              </button>
+              <button
+                className="btn-ghost-sm"
+                disabled={activeIndex >= documents.length - 1}
+                onClick={() => setActiveDocId(documents[activeIndex + 1].id)}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
 
-          {/* Page selector */}
-          {pdfPages.length > 1 && (
-            <div className="flex gap-2 mb-3 flex-wrap">
-              {pdfPages.map((_, i) => (
+          {/* Document list (sidebar-style row, shown once there's more than one) */}
+          {documents.length > 1 && (
+            <div className="mb-4 flex flex-col gap-1 rounded-xl p-2" style={{ border: '1px solid #e2dcc9', maxHeight: 220, overflowY: 'auto' }}>
+              {documents.map((d) => (
                 <button
-                  key={i}
-                  onClick={() => { setSelectedPage(i); setResultBytes(null); }}
-                  className={`btn-ghost-sm ${selectedPage === i ? 'active-choice' : ''}`}
+                  key={d.id}
+                  onClick={() => setActiveDocId(d.id)}
+                  className="flex items-center gap-2 text-left"
+                  style={{
+                    background: d.id === activeDocId ? '#f0f5ff' : 'transparent',
+                    border: 'none', borderRadius: 8, padding: '7px 9px', cursor: 'pointer', fontFamily: 'inherit',
+                  }}
                 >
-                  Page {i + 1}
+                  <span style={{ color: d.signed ? '#2f8f5b' : '#9a9490', fontWeight: 700, flexShrink: 0 }}>{d.signed ? '✓' : '○'}</span>
+                  <span className="text-sm text-ink" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</span>
+                  <span className="text-xs text-ink-soft flex-shrink-0">{d.pages.length} pg</span>
                 </button>
               ))}
             </div>
           )}
 
-          {/* PDF preview with draggable signature */}
-          <div
-            ref={previewRef}
-            className="relative border rounded-xl overflow-hidden select-none"
-            style={{ borderColor: '#e2dcc9', background: '#fff', cursor: 'default' }}
-          >
-            <img
-              src={pdfPages[selectedPage]?.dataUrl}
-              alt={`Page ${selectedPage + 1}`}
-              className="w-full"
-              draggable={false}
-            />
-            {/* Draggable signature */}
-            <img
-              ref={sigRef}
-              src={sigDataUrl}
-              alt="Signature"
-              onMouseDown={onMouseDown}
-              onTouchStart={onTouchStart}
-              onTouchMove={onTouchMove}
-              onTouchEnd={() => { isDragging.current = false; }}
-              style={{
-                position: 'absolute',
-                left: sigPos.x,
-                top: sigPos.y,
-                width: sigPos.w,
-                height: sigPos.h,
-                cursor: 'grab',
-                userSelect: 'none',
-                filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.15))',
-              }}
-              draggable={false}
-            />
+          <div className="mb-3">
+            <input ref={addMoreInputRef} type="file" multiple accept="application/pdf,.pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg,.png,.jpg,.jpeg" onChange={handleFilesUpload} hidden />
+            <button className="btn-ghost-sm" onClick={() => addMoreInputRef.current?.click()}>+ Add more documents</button>
           </div>
 
-          {/* Size slider */}
-          <div className="mt-3 flex items-center gap-3">
-            <label className="text-xs text-ink-soft whitespace-nowrap">Signature size</label>
-            <input
-              type="range"
-              min="80"
-              max="400"
-              value={sigPos.w}
-              onChange={(e) => {
-                const w = Number(e.target.value);
-                setSigPos((p) => ({ ...p, w, h: Math.round(w / 3) }));
-                setResultBytes(null);
-              }}
-              className="flex-1"
-            />
-          </div>
-
-          {!resultBytes ? (
-            <div className="actions mt-4">
-              <button className="btn btn-primary" disabled={busy} onClick={handleApplySignature}>
-                {busy ? 'Embedding…' : 'Apply signature'}
-              </button>
-              <button className="btn btn-ghost" onClick={reset}>Start over</button>
-            </div>
-          ) : (
+          {!activeDoc.signed ? (
             <>
-              <ContinueWorkingPanel toolSlug="sign-pdf" documentName={pdfFile?.name || 'document.pdf'} onDownload={downloadResult} downloading={busy} />
-              <div className="mt-3">
-                <button className="btn btn-ghost" onClick={() => setResultBytes(null)}>← Place signature again</button>
+              <p className="text-sm text-ink-soft mb-3">
+                Drag your signature to the correct position. Use the size slider to resize it.
+              </p>
+
+              {/* Page selector */}
+              {activeDoc.pages.length > 1 && (
+                <div className="flex gap-2 mb-3 flex-wrap">
+                  {activeDoc.pages.map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => patchDoc(activeDoc.id, { selectedPage: i })}
+                      className={`btn-ghost-sm ${activeDoc.selectedPage === i ? 'active-choice' : ''}`}
+                    >
+                      Page {i + 1}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Page preview with draggable signature */}
+              <div
+                ref={previewRef}
+                className="relative border rounded-xl overflow-hidden select-none"
+                style={{ borderColor: '#e2dcc9', background: '#fff', cursor: 'default' }}
+              >
+                <img
+                  src={activeDoc.pages[activeDoc.selectedPage]?.dataUrl}
+                  alt={`Page ${activeDoc.selectedPage + 1}`}
+                  className="w-full"
+                  draggable={false}
+                />
+                <img
+                  ref={sigRef}
+                  src={sigDataUrl}
+                  alt="Signature"
+                  onMouseDown={onMouseDown}
+                  onTouchStart={onTouchStart}
+                  onTouchMove={onTouchMove}
+                  onTouchEnd={() => { isDragging.current = false; }}
+                  style={{
+                    position: 'absolute',
+                    left: activeDoc.sigPos.x,
+                    top: activeDoc.sigPos.y,
+                    width: activeDoc.sigPos.w,
+                    height: activeDoc.sigPos.h,
+                    cursor: 'grab',
+                    userSelect: 'none',
+                    filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.15))',
+                  }}
+                  draggable={false}
+                />
+              </div>
+
+              {/* Size slider */}
+              <div className="mt-3 flex items-center gap-3">
+                <label className="text-xs text-ink-soft whitespace-nowrap">Signature size</label>
+                <input
+                  type="range"
+                  min="80"
+                  max="400"
+                  value={activeDoc.sigPos.w}
+                  onChange={(e) => {
+                    const w = Number(e.target.value);
+                    patchDoc(activeDoc.id, (d) => ({ sigPos: { ...d.sigPos, w, h: Math.round(w / 3) } }));
+                  }}
+                  className="flex-1"
+                />
+              </div>
+
+              <div className="actions mt-4">
+                <button className="btn btn-primary" disabled={busy} onClick={handleApplySignature}>
+                  {busy ? 'Embedding…' : 'Apply signature'}
+                </button>
               </div>
             </>
+          ) : (
+            <div className="mb-3 p-3 rounded-xl flex items-center gap-3" style={{ background: '#ECFDF5', border: '1px solid #A7F3D0' }}>
+              <span style={{ color: '#2f8f5b', fontWeight: 700, fontSize: '1.1rem' }}>✓</span>
+              <div style={{ flex: 1 }}>
+                <div className="text-sm font-semibold text-ink">{activeDoc.name} is signed</div>
+                <button onClick={() => undoSignature(activeDoc.id)} className="text-xs text-stamp-blue underline">Place signature again</button>
+              </div>
+              <button className="btn btn-ghost-sm" onClick={() => downloadDoc(activeDoc)}>Download this document</button>
+            </div>
+          )}
+
+          {/* Session-wide actions — available as soon as at least one document is signed */}
+          {signedCount > 0 && (
+            <div className="mt-5 pt-4" style={{ borderTop: '1px solid #e2dcc9' }}>
+              <p className="text-xs font-semibold text-ink-soft mb-2" style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                {signedCount === documents.length ? 'All documents signed' : 'Finish whenever you\'re ready'}
+              </p>
+              <div className="flex gap-2 flex-wrap mb-3">
+                <button className="btn btn-ghost" onClick={() => downloadDoc(activeDoc)} disabled={!activeDoc.signed}>
+                  Download current
+                </button>
+                {documents.filter((d) => d.signed).length > 1 && (
+                  <button className="btn btn-ghost" disabled={busy} onClick={downloadAllAsZip}>
+                    {busy ? 'Building ZIP…' : 'Download all (ZIP)'}
+                  </button>
+                )}
+                <button className="btn btn-ghost" onClick={reset}>End signing session</button>
+              </div>
+              <ContinueWorkingPanel
+                toolSlug="sign-pdf"
+                documentName={activeDoc?.name || 'document.pdf'}
+                onDownload={() => downloadDoc(activeDoc)}
+                downloading={busy}
+              />
+            </div>
           )}
 
           {status && <div className="status success">{status}</div>}

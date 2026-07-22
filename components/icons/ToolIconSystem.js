@@ -2,26 +2,31 @@
 
 import { useId } from 'react';
 
-// One illustration style for every icon in Convertam: a rounded-square chip
-// in the tool's suite color, with a simple two-tone-stroke pictogram
-// centered inside. Format-conversion tools (pdf-to-word, etc.) are the one
-// deliberate exception — those show the source file format's own
-// universally-recognized brand color instead of the suite color, since a
-// file format's identity is a stronger, more useful signal there than
-// which suite hosts the converter.
+// Convertam's own icon library — one premium illustration style for every
+// icon in the app, built as a real design system rather than a grab-bag of
+// artwork: every icon is a rounded-square badge with the same corner
+// radius, the same layered lighting recipe (diagonal gradient -> soft top
+// gloss -> top-light/bottom-shadow edge tint -> hairline border -> outer
+// drop shadow), and the same stroke weight on its center glyph. Only the
+// glyph and the suite's gradient stops change between icons — the "soft
+// 3D / glass" badge treatment itself never varies, which is what makes the
+// whole set read as one family instead of assembled icon packs.
 //
-// Suite colors match components/categoryVisuals.js's CATEGORY_ACCENTS
-// exactly, so a tool card and its hub page's header chip are always the
-// same color family.
+// Suite colors are richer, 3-stop versions of components/categoryVisuals.js's
+// CATEGORY_ACCENTS, so a tool card and its hub page's header chip are always
+// the same color family, just with the added light/deep stops this badge
+// style needs.
 export const SUITE_GRADIENTS = {
-  pdf: ['#EF4444', '#DC2626'],
-  business: ['#10B981', '#059669'],
-  ai: ['#8B5CF6', '#7C3AED'],
-  image: ['#F59E0B', '#F97316'],
-  calculator: ['#2563EB', '#1D4ED8'],
-  utilities: ['#64748B', '#475569'],
-  data: ['#22D3EE', '#0891B2'],
+  pdf: ['#FCA5A5', '#EF4444', '#B91C1C'],
+  business: ['#6EE7B7', '#10B981', '#047857'],
+  ai: ['#C4B5FD', '#8B5CF6', '#6D28D9'],
+  image: ['#FCD34D', '#F59E0B', '#C2410C'],
+  calculator: ['#93C5FD', '#2563EB', '#1E3A8A'],
+  utilities: ['#CBD5E1', '#64748B', '#334155'],
+  data: ['#A5F3FC', '#22D3EE', '#0E7490'],
 };
+
+const CORNER_RADIUS = 6.4; // out of a 24x24 viewBox — every badge shares this
 
 // Maps lib/tools-config.js's `category` field to a suite key, so any
 // component that already has a tool object (not just a slug) can derive the
@@ -69,41 +74,99 @@ const FORMAT_BADGE_SLUGS = {
   'png-to-pdf': 'png',
 };
 
+// The shared lighting recipe every badge (suite chip or format badge) is
+// built from — three overlay rects on top of the base fill, plus a hairline
+// border and an outer drop shadow on the whole svg. Kept as one function so
+// "consistent shadows / gradients / lighting" is enforced structurally, not
+// by convention.
+function BadgeShell({ size, gradientId, glossId, edgeId, baseFill, children }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      style={{
+        display: 'block',
+        overflow: 'visible',
+        filter: 'drop-shadow(0 1px 1px rgba(15,23,42,0.20)) drop-shadow(0 3px 6px rgba(15,23,42,0.16))',
+      }}
+    >
+      <defs>
+        <linearGradient id={edgeId} x1="12" y1="0.5" x2="12" y2="23.5" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.38" />
+          <stop offset="0.42" stopColor="#fff" stopOpacity="0" />
+          <stop offset="1" stopColor="#000" stopOpacity="0.20" />
+        </linearGradient>
+        <radialGradient id={glossId} cx="0.30" cy="0.20" r="0.62">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <rect x="0.5" y="0.5" width="23" height="23" rx={CORNER_RADIUS} fill={baseFill} />
+      <rect x="0.5" y="0.5" width="23" height="23" rx={CORNER_RADIUS} fill={`url(#${glossId})`} />
+      <rect x="0.5" y="0.5" width="23" height="23" rx={CORNER_RADIUS} fill={`url(#${edgeId})`} />
+      <rect x="0.9" y="0.9" width="22.2" height="22.2" rx={CORNER_RADIUS - 0.4} fill="none" stroke="#000" strokeOpacity="0.12" strokeWidth="0.8" />
+      {children}
+    </svg>
+  );
+}
+
 function FormatBadge({ size, format }) {
+  const uid = useId();
+  const gid = `fmt-bg-${uid}`;
   const color = FORMAT_COLORS[format] || FORMAT_COLORS.pdf;
   const label = FORMAT_LABELS[format] || 'PDF';
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect width="24" height="24" rx="6" fill="#F1F5F9" />
-      <path d="M6.6 3.8A1.6 1.6 0 0 1 8.2 2.2H13l4 4v14.2a1.6 1.6 0 0 1-1.6 1.6H8.2a1.6 1.6 0 0 1-1.6-1.6z" fill="#fff" stroke="#E2E8F0" strokeWidth="0.7" />
-      <path d="M13 2.2l4 4h-2.6a1.4 1.4 0 0 1-1.4-1.4z" fill={color} opacity="0.9" />
-      <text x="10.9" y="16.4" textAnchor="middle" fontFamily="Arial, sans-serif" fontSize={label.length > 2 ? 4.4 : 6} fontWeight="800" fill={color}>{label}</text>
-    </svg>
+    <BadgeShell size={size} gradientId={gid} glossId={`fmt-gl-${uid}`} edgeId={`fmt-e-${uid}`} baseFill={`url(#${gid})`}>
+      <defs>
+        <linearGradient id={gid} x1="2" y1="1" x2="22" y2="23" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#FFFFFF" />
+          <stop offset="1" stopColor="#E2E8F0" />
+        </linearGradient>
+      </defs>
+      <g style={{ filter: 'drop-shadow(0 0.6px 0.8px rgba(15,23,42,0.28))' }}>
+        <path d="M6.6 3.8A1.6 1.6 0 0 1 8.2 2.2H13l4 4v14.2a1.6 1.6 0 0 1-1.6 1.6H8.2a1.6 1.6 0 0 1-1.6-1.6z" fill="#fff" stroke="#CBD5E1" strokeWidth="0.7" />
+        <path d="M13 2.2l4 4h-2.6a1.4 1.4 0 0 1-1.4-1.4z" fill={color} opacity="0.92" />
+        <text x="10.9" y="16.4" textAnchor="middle" fontFamily="Arial, sans-serif" fontSize={label.length > 2 ? 4.4 : 6} fontWeight="800" fill={color}>{label}</text>
+      </g>
+    </BadgeShell>
   );
 }
 
 function Chip({ size, suite, children }) {
-  const gid = useId();
-  const [c1, c2] = SUITE_GRADIENTS[suite] || SUITE_GRADIENTS.pdf;
+  const uid = useId();
+  const gid = `chip-bg-${uid}`;
+  const [light, mid, deep] = SUITE_GRADIENTS[suite] || SUITE_GRADIENTS.pdf;
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <BadgeShell size={size} gradientId={gid} glossId={`chip-gl-${uid}`} edgeId={`chip-e-${uid}`} baseFill={`url(#${gid})`}>
       <defs>
-        <linearGradient id={gid} x1="0" y1="0" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor={c1} />
-          <stop offset="1" stopColor={c2} />
+        <linearGradient id={gid} x1="3" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor={light} />
+          <stop offset="0.55" stopColor={mid} />
+          <stop offset="1" stopColor={deep} />
         </linearGradient>
       </defs>
-      <rect width="24" height="24" rx="6" fill={`url(#${gid})`} />
-      <g stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none">
+      <g
+        stroke="#fff"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        style={{ filter: 'drop-shadow(0 0.5px 0.6px rgba(0,0,0,0.38))' }}
+      >
         {children}
       </g>
-    </svg>
+    </BadgeShell>
   );
 }
 
 // Every functional (non-format-badge) glyph, one entry per tool slug. Kept
-// to simple strokes/shapes on purpose — one consistent hand, not 64
-// different illustration styles.
+// to one consistent stroke weight/cap style on purpose — one hand, not 64
+// different illustration styles. Each is drawn to visually say what the
+// tool does (a truck for delivery, a magnifying glass for review, a QR
+// pattern for QR codes) rather than being a document icon recolored.
 const GLYPHS = {
   // ---- PDF suite ----
   'html-to-pdf': (<><path d="M7 8l-3 4 3 4M17 8l3 4-3 4M13.5 6l-3 12" /></>),
@@ -138,13 +201,13 @@ const GLYPHS = {
   'smart-converter': (<><rect x="4.5" y="8" width="15" height="10.5" rx="2" /><circle cx="12" cy="13.2" r="2.6" /><path d="M9.5 8l1-2h3l1 2" /></>),
   'receipt-scanner': (<><path d="M6.5 4h11v15.5l-1.8-1.4-1.8 1.4-1.9-1.4-1.9 1.4-1.8-1.4-1.8 1.4z" /><path d="M9 8h6M9 11h6M9 14h3.5" /></>),
   'ocr-pdf': (<><rect x="4.5" y="4" width="11" height="15" rx="1.2" /><path d="M7 8.4h6M7 11h4" /><circle cx="16.2" cy="15.2" r="3.4" /><path d="M18.6 17.6l2 2" /></>),
-  'cv-improver': (<><rect x="6" y="4" width="12" height="16" rx="1.5" /><circle cx="12" cy="9" r="1.9" /><path d="M8.6 14c.7-1.8 1.9-2.7 3.4-2.7s2.7.9 3.4 2.7" /><path d="M9 17.5h6" /></>),
+  'cv-improver': (<><rect x="6" y="4" width="12" height="16" rx="1.5" /><path d="M9 9h6M9 12h4" /><path d="M15.5 15l1.3 1.3 2.5-2.6" strokeWidth="1.4" /><path d="M17.5 10.5v-3M16 9h3" strokeWidth="1.3" /></>),
   'qr-code-generator': (<><rect x="4.5" y="4.5" width="6" height="6" rx="0.6" /><rect x="13.5" y="4.5" width="6" height="6" rx="0.6" /><rect x="4.5" y="13.5" width="6" height="6" rx="0.6" /><rect x="14" y="14" width="2" height="2" fill="#fff" stroke="none" /><rect x="17.5" y="14" width="2" height="2" fill="#fff" stroke="none" /><rect x="14" y="17.5" width="2" height="2" fill="#fff" stroke="none" /><rect x="17.5" y="17.5" width="2" height="2" fill="#fff" stroke="none" /></>),
   'ask-solve-ai': (<><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v6A2.5 2.5 0 0 1 16.5 15H10l-3.5 3.4V15h-1A2.5 2.5 0 0 1 3 12.5z" /><path d="M12 7.6a1.6 1.6 0 1 1 1.8 1.58c-.5.1-.8.5-.8 1v.32" strokeWidth="1.4" /><circle cx="13" cy="12.4" r="0.15" fill="#fff" stroke="#fff" strokeWidth="0.9" /></>),
   'document-translator': (<><rect x="4.5" y="4.5" width="10" height="15" rx="1.4" /><path d="M7 9h5M7 12h3.5" /><circle cx="17.5" cy="15.5" r="3.9" /><path d="M15.5 15.5h4M17.5 13v5" strokeWidth="1.3" /></>),
-  'resume-builder': (<><rect x="6" y="4" width="12" height="16" rx="1.5" /><circle cx="12" cy="9" r="1.9" /><path d="M8.6 14c.7-1.8 1.9-2.7 3.4-2.7s2.7.9 3.4 2.7" /><path d="M9 17.5h6" opacity="0" /><path d="M17.5 6.5v3M16 8h3" strokeWidth="1.3" /></>),
+  'resume-builder': (<><path d="M5 19h4v-4H5zM10 19h4v-7h-4zM15 19h4v-10h-4z" /><path d="M6 8.5l1.6-1.6L9 8.5M7.6 7v-3" strokeWidth="1.4" /></>),
   'cover-letter': (<><rect x="4.5" y="6" width="15" height="12" rx="1.5" /><path d="M4.5 7l7.5 6 7.5-6" /></>),
-  'contract-summarizer': (<><rect x="6" y="3.5" width="12" height="17" rx="1.5" /><path d="M9 8h6M9 11h6M9 14h4" /><circle cx="15.5" cy="16.5" r="0.9" fill="#fff" stroke="none" /><circle cx="12" cy="16.5" r="0.9" fill="#fff" stroke="none" /><circle cx="8.5" cy="16.5" r="0.9" fill="#fff" stroke="none" /></>),
+  'contract-summarizer': (<><rect x="6" y="3.5" width="10" height="17" rx="1.5" /><path d="M8.5 8h5M8.5 11h5M8.5 14h3" /><circle cx="16.8" cy="16.8" r="3.6" /><path d="M19.3 19.3l1.7 1.7" strokeWidth="1.3" /></>),
   'presentation-generator': (<><rect x="4" y="5.5" width="16" height="10.5" rx="1.3" /><path d="M8 15.5v3M16 15.5v3M6.5 19h11" /><path d="M7 9.5l3 2.4 2.5-3 4.5 3.6" strokeWidth="1.4" /></>),
   'data-analyst': (<><path d="M5 19V6M5 19h14" /><rect x="7.5" y="13" width="2.4" height="6" fill="#fff" stroke="none" /><rect x="11.3" y="9.5" width="2.4" height="9.5" fill="#fff" stroke="none" /><rect x="15.1" y="11.8" width="2.4" height="7.2" fill="#fff" stroke="none" /></>),
 

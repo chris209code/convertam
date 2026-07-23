@@ -7,7 +7,6 @@ import { getFeaturedArticles, getPopularArticles, getLatestArticles, getArticles
 import { LEARN_CSS } from './learnStyles';
 import ArticleCard from './ArticleCard';
 import LearnSearch from './LearnSearch';
-import LearnHeroIllustration from './LearnHeroIllustration';
 
 const CATEGORY_ICONS = { pdf: PdfIcon, business: BusinessIcon, ai: AiIcon, image: ImageIcon, calculator: CalculatorIcon, utilities: UtilitiesIcon, workflow: WorkflowIcon };
 
@@ -21,20 +20,15 @@ export default function LearnHomepageClient() {
       <style dangerouslySetInnerHTML={{ __html: LEARN_CSS }} />
 
       <div className="lrn-hero">
-        <div className="lrn-inner lrn-hero-row">
-          <div className="lrn-hero-copy">
-            <Link href="/" className="lrn-back" style={{ color: '#CBD5E1' }}>← Back to Home</Link>
-            <h1 className="lrn-hero-title">Convertam Learn</h1>
-            <p className="lrn-hero-sub">
-              A knowledge base for documents, AI, business paperwork, images, calculators and getting
-              things done — practical guides, not marketing fluff, each one connected to the Convertam
-              tool that puts it into practice.
-            </p>
-            <LearnSearch />
-          </div>
-          <div className="lrn-hero-art" aria-hidden="true">
-            <LearnHeroIllustration width={420} />
-          </div>
+        <div className="lrn-inner">
+          <Link href="/" className="lrn-back" style={{ color: '#CBD5E1' }}>← Back to Home</Link>
+          <h1 className="lrn-hero-title">Convertam Learn</h1>
+          <p className="lrn-hero-sub">
+            A knowledge base for documents, AI, business paperwork, images, calculators and getting
+            things done — practical guides, not marketing fluff, each one connected to the Convertam
+            tool that puts it into practice.
+          </p>
+          <LearnSearch />
         </div>
       </div>
 

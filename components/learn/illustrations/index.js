@@ -181,81 +181,6 @@ export function WorkflowChainIllustration({ size = 88 }) {
   );
 }
 
-// Three separate pages converging into one — the specific "merge" action,
-// not just "a document" like DocumentStackIllustration. Deliberately kept
-// upright and evenly spaced (not fanned/rotated) so it still reads clearly
-// at small card-banner sizes, not just in the larger article hero.
-export function MergeArrowsIllustration({ size = 88 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 88 88" fill="none">
-      <rect x="10" y="10" width="18" height="24" rx="3" fill="#fff" />
-      <rect x="35" y="10" width="18" height="24" rx="3" fill="#fff" />
-      <rect x="60" y="10" width="18" height="24" rx="3" fill="#fff" />
-      <path d="M19 34v8M44 34v8M69 34v8" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" />
-      <path d="M19 42q0 10 25 10t25-10" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" fill="none" />
-      <rect x="26" y="56" width="36" height="24" rx="4" fill="#fff" />
-      <rect x="32" y="63" width="24" height="2.6" rx="1.3" fill="#000" opacity="0.16" />
-      <rect x="32" y="70" width="16" height="2.6" rx="1.3" fill="#000" opacity="0.16" />
-      <circle cx="66" cy="72" r="10" fill="currentColor" />
-      <path d="M61.5 72l3 3.2 6-7" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-    </svg>
-  );
-}
-
-// A scanned page transforming into recognized, selectable text — the OCR
-// concept specifically, distinct from AiSparkIllustration's generic "AI".
-export function OcrScanIllustration({ size = 88 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 88 88" fill="none">
-      <rect x="10" y="18" width="28" height="36" rx="4" fill="#fff" />
-      <path d="M15 26h18M15 32h18M15 38h12" stroke="#000" strokeOpacity="0.16" strokeWidth="2" strokeLinecap="round" />
-      <path d="M44 36h10" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
-      <path d="M40 30l10 6-10 6z" fill="#fff" opacity="0.7" />
-      <rect x="58" y="18" width="24" height="36" rx="4" fill="#fff" />
-      <text x="70" y="42" fontFamily="Arial, sans-serif" fontSize="22" fontWeight="800" fill="currentColor" textAnchor="middle">T</text>
-      <path d="M14 62h60" stroke="#fff" strokeWidth="2" strokeDasharray="2 5" strokeLinecap="round" opacity="0.5" />
-      <circle cx="14" cy="62" r="2.4" fill="#fff" /><circle cx="74" cy="62" r="2.4" fill="#fff" />
-    </svg>
-  );
-}
-
-// Three distinct document types (invoice/quotation/delivery note) fanned
-// out with a pen — the "compare these document types" concept, not a
-// single generic invoice like InvoiceLedgerIllustration.
-export function DocumentTypesCompareIllustration({ size = 88 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 88 88" fill="none">
-      <rect x="12" y="20" width="30" height="40" rx="4" fill="#fff" opacity="0.7" transform="rotate(-10 27 40)" />
-      <rect x="29" y="14" width="30" height="40" rx="4" fill="#fff" opacity="0.85" />
-      <rect x="46" y="20" width="30" height="40" rx="4" fill="#fff" transform="rotate(10 61 40)" />
-      <rect x="35" y="22" width="18" height="2.6" rx="1.3" fill="#000" opacity="0.16" />
-      <rect x="35" y="29" width="18" height="2" rx="1" fill="#000" opacity="0.1" />
-      <rect x="35" y="34" width="14" height="2" rx="1" fill="#000" opacity="0.1" />
-      <rect x="35" y="39" width="16" height="2" rx="1" fill="#000" opacity="0.1" />
-      <g transform="translate(60 58) rotate(45)">
-        <rect x="0" y="0" width="5.5" height="20" rx="2" fill="currentColor" />
-        <path d="M0 20h5.5l-2.75 6z" fill="currentColor" />
-      </g>
-    </svg>
-  );
-}
-
-// Two overlapping image swatches, each labeled with its format — the
-// specific "compare these two file types" concept for the JPG vs PNG guide.
-export function ImageFormatCompareIllustration({ size = 88 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 88 88" fill="none">
-      <rect x="12" y="18" width="38" height="38" rx="6" fill="#fff" opacity="0.9" />
-      <path d="M16 46l9-11 7 7 6-8 9 10v6a2 2 0 0 1-2 2H18a2 2 0 0 1-2-2z" fill="currentColor" opacity="0.35" />
-      <text x="31" y="66" fontFamily="Arial, sans-serif" fontSize="9" fontWeight="800" fill="#fff" textAnchor="middle">JPG</text>
-      <rect x="38" y="30" width="38" height="38" rx="6" fill="#fff" />
-      <rect x="42" y="34" width="30" height="30" rx="4" fill="none" stroke="#000" strokeOpacity="0.12" strokeWidth="1.6" />
-      <circle cx="52" cy="44" r="4" fill="currentColor" opacity="0.5" />
-      <text x="57" y="78" fontFamily="Arial, sans-serif" fontSize="9" fontWeight="800" fill="currentColor" textAnchor="middle">PNG</text>
-    </svg>
-  );
-}
-
 export function FolderOrganizeIllustration({ size = 88 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 88 88" fill="none">
@@ -282,8 +207,4 @@ export const LEARN_ILLUSTRATIONS = {
   qrGrid: QrGridIllustration,
   workflowChain: WorkflowChainIllustration,
   folderOrganize: FolderOrganizeIllustration,
-  mergeArrows: MergeArrowsIllustration,
-  ocrScan: OcrScanIllustration,
-  documentTypesCompare: DocumentTypesCompareIllustration,
-  imageFormatCompare: ImageFormatCompareIllustration,
 };

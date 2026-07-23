@@ -134,6 +134,7 @@ export default function Header() {
             )}
           </div>
 
+          <Link href="/learn" className="nav-link">Learn</Link>
           <Link href="/about" className="nav-link">Our Story</Link>
           <Link href="/" className="nav-cta">🚀 Start Free</Link>
         </div>
@@ -155,6 +156,9 @@ export default function Header() {
           </Link>
         ))}
         <div className="mobile-section-title" style={{ marginTop: '8px' }}>More</div>
+        <Link href="/learn" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>
+          📚 Learn
+        </Link>
         <Link href="/about" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>
           Our Story
         </Link>

@@ -73,6 +73,21 @@ export const UtilitiesIcon = (
   </svg>
 );
 
+// Three connected nodes — represents a Learn "Workflow Guide": several
+// Convertam tools chained together into one repeatable process.
+export const WorkflowIcon = (
+  <svg width="30" height="30" viewBox="0 0 24 24">
+    <path d="M6 7.5 L12 12 L18 7.5" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" opacity="0.55" />
+    <path d="M6 16.5 L12 12 L18 16.5" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" opacity="0.55" />
+    <circle cx="6" cy="7.5" r="3" fill="#fff" />
+    <circle cx="18" cy="7.5" r="3" fill="#fff" />
+    <circle cx="6" cy="16.5" r="3" fill="#fff" />
+    <circle cx="18" cy="16.5" r="3" fill="#fff" />
+    <circle cx="12" cy="12" r="3.4" fill="#fff" />
+    <circle cx="12" cy="12" r="1.4" fill="#4F46E5" />
+  </svg>
+);
+
 export const CATEGORY_ACCENTS = {
   pdf: {
     gradient: 'linear-gradient(120deg, #EF4444 0%, #DC2626 100%)',
@@ -122,5 +137,12 @@ export const CATEGORY_ACCENTS = {
     borderColor: '#E2E8F0', accentText: '#475569',
     focusRing: 'rgba(71,85,105,0.12)', shadowTint: 'rgba(71,85,105,0.15)',
     badgeFreeBg: '#E2E8F0', badgeFreeText: '#334155',
+  },
+  workflow: {
+    gradient: 'linear-gradient(120deg, #6366F1 0%, #4F46E5 100%)',
+    pageBgTop: '#EEF2FF', pageBgBottom: '#E0E7FF',
+    borderColor: '#C7D2FE', accentText: '#4F46E5',
+    focusRing: 'rgba(79,70,229,0.12)', shadowTint: 'rgba(79,70,229,0.15)',
+    badgeFreeBg: '#E0E7FF', badgeFreeText: '#3730A3',
   },
 };

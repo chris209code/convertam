@@ -4,11 +4,18 @@ import { getTool } from '@/lib/tools-config';
 // "Related Tools" card shown below the tool — a compact list of icon + name
 // rows, each linking to another tool page. Reusable across any tool that
 // provides a `relatedTools` list ([{ slug, icon }]) in lib/toolGuides.js.
-export default function RelatedToolsCard({ tools }) {
+export default function RelatedToolsCard({ tools, heading = 'Related Tools' }) {
   const resolved = (tools || [])
     .map(({ slug, icon, reason }) => {
       const tool = getTool(slug);
-      return tool ? { slug, icon, title: tool.title, reason } : null;
+      // Tools with a basePath (currently just /calculators/*) live under a
+      // nested route instead of the flat /<slug> — see app/[tool]/page.js's
+      // notFound() guard, which is the only thing that makes /<slug> resolve
+      // for a basePath tool: an explicit redirect in next.config.js. Most
+      // basePath tools don't have one, so building the href from the real
+      // path here avoids a silent 404 for those.
+      const href = tool ? (tool.basePath ? `/${tool.basePath}/${tool.slug}` : `/${tool.slug}`) : null;
+      return tool ? { slug, icon, title: tool.title, reason, href } : null;
     })
     .filter(Boolean);
 
@@ -16,12 +23,12 @@ export default function RelatedToolsCard({ tools }) {
 
   return (
     <div className="border border-[#E2E6ED] rounded-2xl p-5 bg-paper">
-      <h2 className="font-display text-base font-bold text-ink mb-3.5">Related Tools</h2>
+      <h2 className="font-display text-base font-bold text-ink mb-3.5">{heading}</h2>
       <div className="flex flex-col gap-2">
-        {resolved.map(({ slug, icon, title, reason }) => (
+        {resolved.map(({ slug, icon, title, reason, href }) => (
           <Link
             key={slug}
-            href={`/${slug}`}
+            href={href}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[#E2E6ED] bg-white hover:border-stamp-blue transition-colors no-underline"
           >
             <span

@@ -1,4 +1,6 @@
 import { tools } from '@/lib/tools-config';
+import { LEARN_CATEGORIES } from '@/lib/learn/categories';
+import { ARTICLES } from '@/lib/learn';
 
 const BASE_URL = 'https://www.convertam.app';
 
@@ -53,6 +55,28 @@ export default function sitemap() {
   //   priority: 0.8,
   // }));
 
+  // Convertam Learn — the knowledge-base section: one homepage, 7 category
+  // pages, and one page per article, each carrying its own updatedAt as
+  // lastModified so the sitemap reflects real content freshness.
+  const learnHomePage = {
+    url: `${BASE_URL}/learn`,
+    lastModified: new Date(),
+    changeFrequency: 'weekly',
+    priority: 0.85,
+  };
+  const learnCategoryPages = LEARN_CATEGORIES.map((c) => ({
+    url: `${BASE_URL}/learn/${c.slug}`,
+    lastModified: new Date(),
+    changeFrequency: 'weekly',
+    priority: 0.75,
+  }));
+  const learnArticlePages = ARTICLES.map((a) => ({
+    url: `${BASE_URL}/learn/${a.category}/${a.slug}`,
+    lastModified: new Date(a.updatedAt),
+    changeFrequency: 'monthly',
+    priority: 0.7,
+  }));
+
   return [
     {
       url: BASE_URL,
@@ -74,5 +98,8 @@ export default function sitemap() {
     },
     ...categoryPages,
     ...toolPages,
+    learnHomePage,
+    ...learnCategoryPages,
+    ...learnArticlePages,
   ];
 }

@@ -9,6 +9,15 @@
 // All motifs are self-contained SVGs (no image assets), sized via `size`
 // (default matches the hero banner's illustration slot).
 
+import {
+  MergePdfIllustration,
+  OcrIllustration,
+  InvoiceQuotationIllustration,
+  JpgPngIllustration,
+  LoanAmortizationIllustration,
+  PasswordSecurityIllustration,
+} from './premiumIllustrations';
+
 export function DocumentStackIllustration({ size = 88 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 88 88" fill="none">
@@ -193,6 +202,12 @@ export function FolderOrganizeIllustration({ size = 88 }) {
   );
 }
 
+// Six more detailed, multi-element card illustrations for specific guides —
+// see premiumIllustrations.js's header comment for provenance/rationale.
+// These use a native 200x150 (4:3) viewBox and a `width` prop rather than
+// the square 88x88 / `size` prop the motifs above use; ArticleCard.js
+// passes both props to every illustration it renders, and each component
+// only reads the one it declares.
 export const LEARN_ILLUSTRATIONS = {
   documentStack: DocumentStackIllustration,
   signaturePen: SignaturePenIllustration,
@@ -207,4 +222,10 @@ export const LEARN_ILLUSTRATIONS = {
   qrGrid: QrGridIllustration,
   workflowChain: WorkflowChainIllustration,
   folderOrganize: FolderOrganizeIllustration,
+  mergePdfPremium: MergePdfIllustration,
+  ocrPremium: OcrIllustration,
+  invoiceQuotationPremium: InvoiceQuotationIllustration,
+  jpgPngPremium: JpgPngIllustration,
+  loanAmortizationPremium: LoanAmortizationIllustration,
+  passwordSecurityPremium: PasswordSecurityIllustration,
 };

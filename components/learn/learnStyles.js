@@ -14,7 +14,11 @@ export const LEARN_CSS = `
   .lrn-section-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #94A3B8; margin: 0 0 10px; }
 
   /* Hero (homepage) */
-  .lrn-hero { background: linear-gradient(120deg, #1E293B 0%, #0F172A 100%); padding: 48px 0 40px; }
+  .lrn-hero { background: linear-gradient(120deg, #1E293B 0%, #0F172A 100%); padding: 48px 0 40px; overflow: hidden; }
+  .lrn-hero-row { display: flex; align-items: center; justify-content: space-between; gap: 32px; }
+  .lrn-hero-copy { flex: 1 1 460px; min-width: 0; }
+  .lrn-hero-art { flex: 0 0 auto; width: 420px; max-width: 42vw; }
+  .lrn-hero-art svg { width: 100%; height: auto; display: block; }
   .lrn-hero-title { font-size: clamp(1.7rem, 4vw, 2.5rem); font-weight: 800; color: white; margin: 0 0 10px; letter-spacing: -0.01em; }
   .lrn-hero-sub { font-size: 1rem; color: #CBD5E1; margin: 0 0 26px; max-width: 620px; line-height: 1.5; }
 
@@ -37,21 +41,26 @@ export const LEARN_CSS = `
   /* Article/guide card grid */
   .lrn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
   .lrn-card {
-    display: flex; flex-direction: column; border-radius: 16px; overflow: hidden; text-decoration: none;
-    border: 1px solid #EEF1F5; background: #FEFEFE;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 2px rgba(15,23,42,0.04), 0 8px 20px rgba(15,23,42,0.06);
+    position: relative; display: flex; flex-direction: column; border-radius: 16px; overflow: hidden;
+    text-decoration: none; padding: 18px 20px 16px; min-height: 212px;
+    border: 1px solid rgba(15,23,42,0.05);
+    box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 8px 20px rgba(15,23,42,0.05);
     transition: transform 0.25s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s ease;
   }
   .lrn-card:hover {
     transform: translateY(-3px);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 6px rgba(15,23,42,0.06), 0 18px 36px rgba(15,23,42,0.10);
+    box-shadow: 0 2px 6px rgba(15,23,42,0.06), 0 18px 36px rgba(15,23,42,0.10);
   }
-  .lrn-card-banner { height: 92px; display: flex; align-items: center; justify-content: center; gap: 8px; position: relative; flex-shrink: 0; }
-  .lrn-card-body { padding: 16px; flex: 1; display: flex; flex-direction: column; }
+  .lrn-card-content { position: relative; z-index: 1; max-width: 58%; }
   .lrn-card-cat { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; margin: 0 0 6px; }
   .lrn-card-title { font-size: 0.94rem; font-weight: 700; color: #0F172A; margin: 0 0 6px; line-height: 1.3; }
-  .lrn-card-excerpt { font-size: 0.8rem; color: #64748B; margin: 0; line-height: 1.45; flex: 1; }
-  .lrn-card-meta { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 0.72rem; color: #94A3B8; }
+  .lrn-card-excerpt { font-size: 0.78rem; color: #475569; margin: 0; line-height: 1.45; }
+  .lrn-card-illustration { position: absolute; right: 4px; bottom: 30px; z-index: 0; pointer-events: none; }
+  .lrn-card-illustration-badge {
+    width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.92); box-shadow: 0 8px 18px rgba(15,23,42,0.14);
+  }
+  .lrn-card-meta { position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; margin-top: auto; padding-top: 12px; font-size: 0.72rem; color: #64748B; }
 
   /* Category browse cards (homepage) */
   .lrn-cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
@@ -144,6 +153,10 @@ export const LEARN_CSS = `
     .lrn-article-layout { grid-template-columns: 1fr; }
     .lrn-toc { position: static; margin-bottom: 24px; }
     .lrn-related-grid { grid-template-columns: repeat(2, 1fr); }
+    .lrn-hero-art { width: 280px; max-width: 42vw; }
+  }
+  @media (max-width: 760px) {
+    .lrn-hero-art { display: none; }
   }
   @media (max-width: 640px) {
     .lrn-inner { padding: 0 5%; }
@@ -152,5 +165,7 @@ export const LEARN_CSS = `
     .lrn-related-grid { grid-template-columns: 1fr; }
     .lrn-workflow-chain { flex-direction: column; }
     .lrn-workflow-arrow { transform: rotate(90deg); width: 100%; height: 24px; }
+    .lrn-card-content { max-width: 62%; }
+    .lrn-card-illustration { transform: scale(0.85); transform-origin: bottom right; }
   }
 `;

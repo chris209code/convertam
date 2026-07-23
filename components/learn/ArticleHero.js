@@ -23,7 +23,7 @@ export default function ArticleHero({ article, category, accent, categoryIcon, r
           </div>
           {Illustration && (
             <div className="lrn-article-illustration">
-              <Illustration size={104} />
+              <Illustration size={104} width={190} />
             </div>
           )}
         </div>

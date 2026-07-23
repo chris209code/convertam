@@ -829,6 +829,52 @@ export async function downloadResumePdf({ templateKey, templateData, fileName, o
   URL.revokeObjectURL(url);
 }
 
+// Same real, sequential-stage pattern as downloadResumePdf above, hitting
+// /api/resume-docx instead — a direct, purpose-built .docx export from the
+// same templateData (see lib/resume/renderResumeDocxHtml.js) rather than
+// routing the CV through the generic, lossy PDF-to-Word tool.
+export const DOCX_DOWNLOAD_STAGE_LABELS = {
+  preparing: 'Preparing CV…',
+  generating: 'Generating Word document…',
+  'starting-download': 'Starting download…',
+};
+
+export async function downloadResumeDocx({ templateKey, templateData, fileName, onStage }) {
+  onStage?.('preparing');
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
+  let res;
+  try {
+    onStage?.('generating');
+    res = await fetch('/api/resume-docx', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ templateKey, templateData }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('Word document generation is taking longer than expected. Please try again.');
+    throw new Error('Could not reach the server — check your internet connection and try again.');
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `The server could not generate the Word document (error ${res.status}). Please try again.`);
+  }
+  onStage?.('starting-download');
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 // Shared print isolation CSS — only the resume itself is visible when printing,
 // regardless of what else is on the page (sidebar controls, other UI, etc.)
 export const RESUME_PRINT_STYLES = `

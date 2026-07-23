@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptToModernProfessionalData, RESUME_PRINT_STYLES, downloadResumePdf, DOWNLOAD_STAGE_LABELS } from './resumeTemplates';
+import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptToModernProfessionalData, RESUME_PRINT_STYLES, downloadResumePdf, DOWNLOAD_STAGE_LABELS, downloadResumeDocx, DOCX_DOWNLOAD_STAGE_LABELS } from './resumeTemplates';
 
 async function callAI(action, payload) {
   const res = await fetch('/api/resume-ai', {
@@ -60,6 +60,8 @@ export default function ResumeBuilderWorkspace() {
 
   const [downloadStage, setDownloadStage] = useState(null); // null | 'preparing' | 'generating' | 'starting-download'
   const downloadingRef = useRef(false);
+  const [docxDownloadStage, setDocxDownloadStage] = useState(null);
+  const docxDownloadingRef = useRef(false);
 
   // Generates the PDF server-side (see resumeTemplates.js's
   // downloadResumePdf) instead of relying on the visitor's own
@@ -89,6 +91,32 @@ export default function ResumeBuilderWorkspace() {
     } finally {
       downloadingRef.current = false;
       setDownloadStage(null);
+    }
+  }
+
+  // Generates a real, editable .docx directly from templateData (see
+  // resumeTemplates.js's downloadResumeDocx / lib/resume/renderResumeDocxHtml.js)
+  // instead of sending the user to the generic PDF-to-Word tool — that
+  // round-trip through a rendered PDF is what silently lost the chosen
+  // template's layout (a sidebar column becoming a flattened linear
+  // document), since a generic PDF-to-DOCX engine has no way to recover a
+  // multi-column layout from PDF text coordinates alone.
+  async function handleDownloadDocx() {
+    if (docxDownloadingRef.current) return;
+    docxDownloadingRef.current = true;
+    setError('');
+    try {
+      await downloadResumeDocx({
+        templateKey: template,
+        templateData,
+        fileName: `${(form.fullName || 'CV').trim().replace(/\s+/g, '-')}.docx`,
+        onStage: setDocxDownloadStage,
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      docxDownloadingRef.current = false;
+      setDocxDownloadStage(null);
     }
   }
   const [experience, setExperience] = useState([{ ...EMPTY_EXP }]);
@@ -511,12 +539,16 @@ export default function ResumeBuilderWorkspace() {
           <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
             <button className="btn btn-ghost" onClick={() => setStep(5)}>← Back</button>
             <button className="btn btn-primary" onClick={handleDownload} disabled={!!downloadStage}>{downloadStage ? DOWNLOAD_STAGE_LABELS[downloadStage] : '⬇️ Download PDF'}</button>
-            <a href="/pdf-to-word" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600, color: '#2563EB', textDecoration: 'none', padding: '10px 14px', borderRadius: 8, border: '1px solid #BFDBFE', background: '#EFF6FF' }}>
-              <Icon.doc /> Convert to MS Word
-            </a>
+            <button
+              onClick={handleDownloadDocx}
+              disabled={!!docxDownloadStage}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600, color: '#2563EB', background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '10px 14px', borderRadius: 8, cursor: docxDownloadStage ? 'default' : 'pointer', fontFamily: 'inherit' }}
+            >
+              <Icon.doc /> {docxDownloadStage ? DOCX_DOWNLOAD_STAGE_LABELS[docxDownloadStage] : 'Download as Word (.docx)'}
+            </button>
           </div>
           <p className="no-print" style={{ fontSize: '0.75rem', color: '#94A3B8', textAlign: 'right', marginTop: -8, marginBottom: 16 }}>
-            Need an editable copy? Convert your downloaded PDF to Word.
+            Generated directly from your CV's layout — keeps your chosen template's structure, not a generic reflow.
           </p>
 
           <div style={{ background: '#E2E8F0', padding: '20px 0', borderRadius: 12, display: 'flex', justifyContent: 'center', overflowX: 'auto' }}>

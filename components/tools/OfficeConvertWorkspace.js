@@ -95,11 +95,21 @@ export default function OfficeConvertWorkspace({ accept, toFormat, toLabel }) {
   const [analysis, setAnalysis] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [paid, setPaid] = useState(false);
+  const [paymentReference, setPaymentReference] = useState(null);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [payLoading, setPayLoading] = useState(false);
+  // Set once a conversion for the current payment reference has finished —
+  // from then on, Convert is retired in favor of Download + Start New
+  // Conversion, so the same payment can't be re-spent on another
+  // CloudConvert job just by clicking Convert again (the backend guard in
+  // /api/convert/start also enforces this independently — see
+  // lib/paymentIdempotency.js — this is the matching frontend state, not
+  // the only protection).
+  const [completed, setCompleted] = useState(false);
+  const [lastResult, setLastResult] = useState(null); // { blob, filename }
 
   const currency = typeof window !== 'undefined' ? detectCurrency() : 'NGN';
   const pullEnabled = accept === 'application/pdf';
@@ -110,6 +120,9 @@ export default function OfficeConvertWorkspace({ accept, toFormat, toLabel }) {
     setFile(f);
     setAnalysis(null);
     setPaid(false);
+    setPaymentReference(null);
+    setCompleted(false);
+    setLastResult(null);
     setError('');
     setStatus('');
     if (f.type === 'application/pdf') {
@@ -176,6 +189,17 @@ export default function OfficeConvertWorkspace({ accept, toFormat, toLabel }) {
           .then(function(data) {
             if (data.verified) {
               setPaid(true);
+              setPaymentReference(data.token || transaction.reference);
+              // Defensive edge case: if this exact reference somehow
+              // already has a completed conversion on record (e.g. a
+              // stale/reused reference), go straight to the completed
+              // state with that result instead of allowing a new
+              // CloudConvert job for it.
+              if (data.alreadyCompleted) {
+                setCompleted(true);
+                setLastResult({ downloadUrl: data.alreadyCompleted.downloadUrl, filename: data.alreadyCompleted.filename });
+                setStatus('This payment already has a completed conversion — use Download below.');
+              }
             } else {
               setError(data.error || 'Payment verification failed. Please contact support.');
             }
@@ -193,7 +217,7 @@ export default function OfficeConvertWorkspace({ accept, toFormat, toLabel }) {
   }
 
   async function handleConvert() {
-    if (!file) return;
+    if (!file || completed) return;
     setBusy(true);
     setError('');
     try {
@@ -201,9 +225,13 @@ export default function OfficeConvertWorkspace({ accept, toFormat, toLabel }) {
         file,
         operation: 'convert',
         to: toFormat,
+        paymentReference,
         onStatus: setStatus,
       });
-      downloadBlob(blob, filename || 'convertam-converted.' + toFormat);
+      const finalFilename = filename || 'convertam-converted.' + toFormat;
+      downloadBlob(blob, finalFilename);
+      setLastResult({ blob, filename: finalFilename });
+      setCompleted(true);
       setStatus('Done — your file has downloaded.');
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
@@ -211,6 +239,46 @@ export default function OfficeConvertWorkspace({ accept, toFormat, toLabel }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  // Re-downloads the already-completed result without touching CloudConvert
+  // or the payment reference again — lastResult.blob exists when this
+  // conversion just finished in this session; lastResult.downloadUrl
+  // exists when it was picked up as an already-completed replay (see
+  // handlePay's onSuccess above), in which case it's fetched once here.
+  async function handleDownloadAgain() {
+    if (!lastResult) return;
+    setError('');
+    try {
+      if (lastResult.blob) {
+        downloadBlob(lastResult.blob, lastResult.filename);
+        return;
+      }
+      setBusy(true);
+      const res = await fetch(lastResult.downloadUrl);
+      const blob = await res.blob();
+      downloadBlob(blob, lastResult.filename || 'convertam-converted.' + toFormat);
+      setLastResult((prev) => ({ ...prev, blob }));
+    } catch {
+      setError('Could not download the file. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Fully resets so another conversion requires its own upload and its own
+  // payment — the old file, job, and payment reference are all cleared
+  // rather than reused, so nothing here can be strung together into
+  // getting a second conversion out of one payment.
+  function handleStartNewConversion() {
+    setFile(null);
+    setAnalysis(null);
+    setPaid(false);
+    setPaymentReference(null);
+    setCompleted(false);
+    setLastResult(null);
+    setError('');
+    setStatus('');
   }
 
   if (!file) {
@@ -321,7 +389,7 @@ export default function OfficeConvertWorkspace({ accept, toFormat, toLabel }) {
     <div className="panel">
       <div className="flex items-center gap-2 mb-4 px-4 py-2 rounded-xl text-sm"
         style={{ background: 'rgba(47,143,91,0.1)', color: '#2f8f5b', border: '1px solid rgba(47,143,91,0.2)' }}>
-        ✅ Payment confirmed — ready to convert
+        ✅ Payment confirmed — {completed ? 'conversion complete' : 'ready to convert'}
       </div>
       <div className="file-list mb-4">
         <div className="file-row">
@@ -330,13 +398,27 @@ export default function OfficeConvertWorkspace({ accept, toFormat, toLabel }) {
         </div>
       </div>
       <div className="actions">
-        <button className="btn btn-primary" disabled={busy} onClick={handleConvert}>
-          {busy ? 'Converting…' : 'Convert to ' + toLabel}
-        </button>
+        {completed ? (
+          <>
+            <button className="btn btn-primary" disabled={busy} onClick={handleDownloadAgain}>
+              {busy ? 'Preparing download…' : '⬇️ Download ' + toLabel + ' again'}
+            </button>
+            <button className="btn btn-ghost" onClick={handleStartNewConversion}>
+              Start New Conversion
+            </button>
+          </>
+        ) : (
+          <button className="btn btn-primary" disabled={busy} onClick={handleConvert}>
+            {busy ? 'Converting…' : 'Convert to ' + toLabel}
+          </button>
+        )}
       </div>
       {status && <div className="status success">{status}</div>}
       {error && <div className="status error">{error}</div>}
-      <p className="privacy-note">Your file is sent securely to CloudConvert and deleted immediately after download.</p>
+      {completed && (
+        <p className="privacy-note">This payment has already been used for one conversion — start a new conversion (and a new payment) for another file.</p>
+      )}
+      {!completed && <p className="privacy-note">Your file is sent securely to CloudConvert and deleted immediately after download.</p>}
     </div>
   );
 }

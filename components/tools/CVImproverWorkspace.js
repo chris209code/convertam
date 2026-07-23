@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import Script from 'next/script';
-import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptToModernProfessionalData, RESUME_PRINT_STYLES, downloadResumePdf, DOWNLOAD_STAGE_LABELS } from './resumeTemplates';
+import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptToModernProfessionalData, RESUME_PRINT_STYLES, downloadResumePdf, DOWNLOAD_STAGE_LABELS, downloadResumeDocx, DOCX_DOWNLOAD_STAGE_LABELS } from './resumeTemplates';
 import { extractTextFromFile } from '@/lib/extractDocText';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
@@ -120,6 +120,8 @@ export default function CVImproverWorkspace() {
   const [busy, setBusy] = useState(false);
   const [downloadStage, setDownloadStage] = useState(null); // null | 'preparing' | 'generating' | 'starting-download'
   const downloadingRef = useRef(false);
+  const [docxDownloadStage, setDocxDownloadStage] = useState(null);
+  const docxDownloadingRef = useRef(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
 
@@ -215,6 +217,29 @@ export default function CVImproverWorkspace() {
     } finally {
       downloadingRef.current = false;
       setDownloadStage(null);
+    }
+  }
+
+  // Generates a real, editable .docx directly from templateData instead of
+  // sending the user through the generic PDF-to-Word tool — that round-trip
+  // through a rendered PDF is what silently lost the chosen template's
+  // layout (see lib/resume/renderResumeDocxHtml.js).
+  async function handleDownloadDocx() {
+    if (docxDownloadingRef.current) return;
+    docxDownloadingRef.current = true;
+    setError('');
+    try {
+      await downloadResumeDocx({
+        templateKey: template,
+        templateData,
+        fileName: `${(structured?.name || 'CV').trim().replace(/\s+/g, '-')}.docx`,
+        onStage: setDocxDownloadStage,
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      docxDownloadingRef.current = false;
+      setDocxDownloadStage(null);
     }
   }
 
@@ -511,9 +536,13 @@ export default function CVImproverWorkspace() {
               <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
                 <button className="btn btn-ghost" onClick={copyText}>{copied ? '✓ Copied' : 'Copy Text'}</button>
                 <button className="btn btn-primary" onClick={handleDownload} disabled={!!downloadStage}>{downloadStage ? DOWNLOAD_STAGE_LABELS[downloadStage] : '⬇️ Download PDF'}</button>
-                <a href="/pdf-to-word" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600, color: '#2563EB', textDecoration: 'none', padding: '10px 14px', borderRadius: 8, border: '1px solid #BFDBFE', background: '#EFF6FF' }}>
-                  <Icon.doc /> Convert to MS Word
-                </a>
+                <button
+                  onClick={handleDownloadDocx}
+                  disabled={!!docxDownloadStage}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600, color: '#2563EB', background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '10px 14px', borderRadius: 8, cursor: docxDownloadStage ? 'default' : 'pointer', fontFamily: 'inherit' }}
+                >
+                  <Icon.doc /> {docxDownloadStage ? DOCX_DOWNLOAD_STAGE_LABELS[docxDownloadStage] : 'Download as Word (.docx)'}
+                </button>
                 <button onClick={sendToBuilder} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', fontWeight: 600, color: '#7C3AED', textDecoration: 'none', padding: '10px 14px', borderRadius: 8, border: '1px solid #DDD6FE', background: '#F5F3FF', cursor: 'pointer', fontFamily: 'inherit' }}>
                   🧩 Send to CV Builder
                 </button>

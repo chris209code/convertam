@@ -1,6 +1,8 @@
 
 export const runtime = 'nodejs';
 
+import { claimPaymentForNewJob, recordJobCreated } from '@/lib/paymentIdempotency';
+
 const CLOUDCONVERT_BASE = 'https://api.cloudconvert.com/v2';
 
 export async function POST(request) {
@@ -15,13 +17,39 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const { operation = 'convert', to, profile = 'web', password } = body;
+    const { operation = 'convert', to, profile = 'web', password, paymentReference } = body;
 
     if (operation === 'convert' && !to) {
       return Response.json({ error: 'Missing target format.' }, { status: 400 });
     }
     if (operation === 'encrypt' && !password) {
       return Response.json({ error: 'Missing password.' }, { status: 400 });
+    }
+
+    // Idempotency guard — opt-in via paymentReference, so free tools that
+    // never send one (compress-pdf, protect-pdf) are completely unaffected.
+    // See lib/paymentIdempotency.js: this is what stops one successful
+    // Paystack payment from being able to trigger more than one
+    // CloudConvert job, covering double-clicks, refreshes, back/forward
+    // navigation, and a directly repeated API request alike, since it's
+    // enforced here server-side rather than relying on frontend state.
+    if (paymentReference) {
+      const { claimed, record } = await claimPaymentForNewJob(paymentReference);
+      if (!claimed) {
+        if (!record) {
+          return Response.json({ error: 'Payment not verified for this conversion.' }, { status: 402 });
+        }
+        if (record.status === 'completed') {
+          return Response.json({ replay: true, jobId: record.jobId, downloadUrl: record.result?.downloadUrl, filename: record.result?.filename });
+        }
+        if (record.status === 'consumed') {
+          return Response.json({ replay: true, jobId: record.jobId });
+        }
+        // Lost a very tight race for the lock and the winner hasn't written
+        // 'consumed' yet — safe to ask the client to retry shortly rather
+        // than risk creating a second job.
+        return Response.json({ error: 'This conversion is already starting — please wait a moment and try again.' }, { status: 409 });
+      }
     }
 
     const processTask =
@@ -63,6 +91,10 @@ export async function POST(request) {
     }
 
     const uploadTask = job.data.tasks.find((t) => t.name === 'upload-file');
+
+    if (paymentReference) {
+      await recordJobCreated(paymentReference, job.data.id);
+    }
 
     return Response.json({
       jobId: job.data.id,

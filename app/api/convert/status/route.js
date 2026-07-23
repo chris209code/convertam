@@ -1,5 +1,7 @@
 export const runtime = 'nodejs';
 
+import { recordJobCompleted } from '@/lib/paymentIdempotency';
+
 const CLOUDCONVERT_BASE = 'https://api.cloudconvert.com/v2';
 
 export async function GET(request) {
@@ -11,6 +13,7 @@ export async function GET(request) {
 
   const { searchParams } = new URL(request.url);
   const jobId = searchParams.get('jobId');
+  const paymentReference = searchParams.get('paymentReference');
 
   if (!jobId) {
     return Response.json({ error: 'Missing jobId.' }, { status: 400 });
@@ -31,6 +34,13 @@ export async function GET(request) {
     if (status === 'finished') {
       const exportTask = data.data.tasks.find((t) => t.name === 'export-file');
       const file = exportTask.result.files[0];
+      // Persists the completed result against the payment reference so a
+      // repeated /api/convert/start call for it (refresh, replay, second
+      // click) can return this exact result instead of ever reaching
+      // CloudConvert again — see lib/paymentIdempotency.js.
+      if (paymentReference) {
+        await recordJobCompleted(paymentReference, jobId, { downloadUrl: file.url, filename: file.filename });
+      }
       return Response.json({
         status: 'finished',
         downloadUrl: file.url,

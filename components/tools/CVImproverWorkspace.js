@@ -4,6 +4,8 @@ import { useState, useRef } from 'react';
 import Script from 'next/script';
 import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptToModernProfessionalData, RESUME_PRINT_STYLES, downloadResumePdf, DOWNLOAD_STAGE_LABELS } from './resumeTemplates';
 import { extractTextFromFile } from '@/lib/extractDocText';
+import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
 
 const inputStyle = { width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' };
 const labelStyle = { fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' };
@@ -21,15 +23,16 @@ function tagStyle(bg, fg) {
 }
 
 const POSITION_EXAMPLES = ['Quality Assurance Manager', 'Production Supervisor', 'Brewing Manager', 'Shift Manager', 'Operations Manager', 'Financial Analyst', 'Software Engineer'];
+const COVER_LETTER_TONES = ['Professional', 'Enthusiastic', 'Confident', 'Warm'];
 
 export const RESUME_BUILDER_IMPORT_KEY = 'convertam_cv_builder_import';
 
-// Converts Gemini's simpler structured output into the same raw shape the
-// shared templates expect. The AI only ever returns {degree, institution,
-// year} for education and plain strings for certifications — richer fields
-// like course, location, grade, or credential info just aren't something an
-// improved-from-pasted-text CV can reliably contain, so those are left blank
-// rather than guessed at.
+// Converts the AI's structured CV output into the same raw shape the shared
+// templates expect. The AI only ever returns {degree, institution, year}
+// for education and plain strings for certifications — richer fields like
+// course, location, grade, or credential info just aren't something an
+// improved-from-pasted-text CV can reliably contain, so those are left
+// blank rather than guessed at.
 function adaptStructuredToTemplateInput(structured) {
   const form = {
     fullName: structured.name || '',
@@ -69,14 +72,14 @@ function adaptStructuredToTemplateInput(structured) {
   return { form, experience, education, certifications, skills };
 }
 
-function structuredToPlainText(structured, summary) {
+function structuredToPlainText(structured) {
   const lines = [];
   if (structured.name) lines.push(structured.name);
   if (structured.title) lines.push(structured.title);
   const contact = [structured.email, structured.phone, structured.location, structured.linkedin].filter(Boolean).join(' | ');
   if (contact) lines.push(contact);
   lines.push('');
-  if (summary) { lines.push('PROFESSIONAL SUMMARY'); lines.push(summary); lines.push(''); }
+  if (structured.summary) { lines.push('PROFESSIONAL SUMMARY'); lines.push(structured.summary); lines.push(''); }
   if (structured.experience?.length) {
     lines.push('EXPERIENCE');
     structured.experience.forEach((exp) => {
@@ -102,6 +105,8 @@ function structuredToPlainText(structured, summary) {
 }
 
 export default function CVImproverWorkspace() {
+  const { session, startSession, updateDocument } = useDocumentSession();
+
   const [cvText, setCvText] = useState('');
   const [targetPosition, setTargetPosition] = useState('');
   const [jobDescription, setJobDescription] = useState('');
@@ -118,10 +123,17 @@ export default function CVImproverWorkspace() {
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
 
-  const [viewOriginal, setViewOriginal] = useState(false);
-  const [additionsState, setAdditionsState] = useState({}); // { [i]: { text, status: 'pending'|'confirmed'|'dismissed' } }
-  const [editingAdditionIndex, setEditingAdditionIndex] = useState(null);
+  const [activeView, setActiveView] = useState('improved'); // 'improved' | 'original' | 'coverLetter'
+  const [suggestionState, setSuggestionState] = useState({}); // { [i]: { status: 'pending'|'applied'|'dismissed', editedText? } }
+  const [editingSuggestionIndex, setEditingSuggestionIndex] = useState(null);
   const [copied, setCopied] = useState(false);
+
+  const [coverLetterCompanyName, setCoverLetterCompanyName] = useState('');
+  const [coverLetterTone, setCoverLetterTone] = useState('Professional');
+  const [coverLetter, setCoverLetter] = useState('');
+  const [coverLetterBusy, setCoverLetterBusy] = useState(false);
+  const [coverLetterError, setCoverLetterError] = useState('');
+  const [coverLetterCopied, setCoverLetterCopied] = useState(false);
 
   async function handleFileUpload(e) {
     const file = e.target.files?.[0];
@@ -138,6 +150,40 @@ export default function CVImproverWorkspace() {
       setStatus(`Extracted text from "${file.name}" — review and edit it below before continuing.`);
     } finally {
       setUploading(false);
+    }
+  }
+
+  // Builds the current CV as real PDF bytes via the same server-side
+  // generator the Download button uses (/api/resume-pdf), without
+  // triggering a browser download — used to push the improved CV into the
+  // Document Workspace session so compatible tools (PDF to Word, Compress
+  // PDF, OCR PDF, Merge PDF) can pick it up with no re-upload.
+  async function pushCvToWorkspace(currentStructured, currentTemplate) {
+    try {
+      const input = adaptStructuredToTemplateInput(currentStructured);
+      const isMp = currentTemplate.startsWith('mp');
+      const data = isMp
+        ? adaptToModernProfessionalData({ form: input.form, experience: input.experience, education: input.education, certifications: input.certifications, skills: input.skills })
+        : useResumeData({ form: input.form, targetRole: targetPosition, experience: input.experience, education: input.education, certifications: input.certifications, skills: input.skills });
+
+      const res = await fetch('/api/resume-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ templateKey: currentTemplate, templateData: data }),
+      });
+      if (!res.ok) return; // non-critical — silently skip, the user can still download manually
+      const buf = await res.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      const fileName = `${(currentStructured.name || 'CV').trim().replace(/\s+/g, '-')}.pdf`;
+      if (session.status !== 'active') {
+        const file = new File([bytes], fileName, { type: 'application/pdf' });
+        await startSession(file, { toolSlug: 'cv-improver' });
+      } else {
+        await updateDocument(bytes, { toolSlug: 'cv-improver', label: 'Improved CV', mimeType: 'application/pdf', name: fileName });
+      }
+    } catch {
+      // Workspace handoff is a convenience, not a required step — a failure
+      // here should never block or error out the main CV-improvement flow.
     }
   }
 
@@ -186,9 +232,11 @@ export default function CVImproverWorkspace() {
       if (!res.ok) throw new Error(data.error || 'Something went wrong.');
       if (data.structured) {
         setStructured(data.structured);
-        setAdditionsState({});
-        setViewOriginal(false);
-        setStatus('✅ Your CV has been improved — review everything below before downloading.');
+        setSuggestionState({});
+        setActiveView('improved');
+        setCoverLetter('');
+        setStatus('✅ Your CV has been improved — review the CV and the Professional Review below before downloading.');
+        pushCvToWorkspace(data.structured, template);
       } else {
         setError('AI returned an unexpected format. Please try again.');
       }
@@ -203,50 +251,80 @@ export default function CVImproverWorkspace() {
 
   function restoreOriginal() {
     setStructured(null);
-    setAdditionsState({});
-    setViewOriginal(false);
+    setSuggestionState({});
+    setActiveView('improved');
+    setCoverLetter('');
     setStatus('');
     setError('');
   }
   function startOver() {
     setStructured(null); setCvText(''); setTargetPosition(''); setJobDescription('');
-    setAdditionsState({}); setViewOriginal(false); setStatus(''); setError(''); setUploadedName('');
+    setSuggestionState({}); setActiveView('improved'); setStatus(''); setError(''); setUploadedName('');
+    setCoverLetter(''); setCoverLetterCompanyName('');
   }
 
-  function additionText(i) {
-    return additionsState[i]?.text ?? structured.suggestedAdditions[i].suggestion;
+  function suggestionStatus(i) {
+    return suggestionState[i]?.status || 'pending';
   }
-  function additionStatus(i) {
-    return additionsState[i]?.status || 'pending';
+  function suggestionEditedText(i) {
+    return suggestionState[i]?.editedText ?? structured.suggestions[i].proposedRewrite;
   }
-  function setAdditionText(i, text) {
-    setAdditionsState((prev) => ({ ...prev, [i]: { text, status: prev[i]?.status || 'pending' } }));
-  }
-  function confirmAddition(i) {
-    setAdditionsState((prev) => ({ ...prev, [i]: { text: prev[i]?.text ?? structured.suggestedAdditions[i].suggestion, status: 'confirmed' } }));
-    setEditingAdditionIndex(null);
-  }
-  function dismissAddition(i) {
-    setAdditionsState((prev) => ({ ...prev, [i]: { text: prev[i]?.text ?? structured.suggestedAdditions[i].suggestion, status: 'dismissed' } }));
-    setEditingAdditionIndex(null);
-  }
-  function undoAdditionDecision(i) {
-    setAdditionsState((prev) => ({ ...prev, [i]: { text: prev[i]?.text ?? structured.suggestedAdditions[i].suggestion, status: 'pending' } }));
+  function setSuggestionEditedText(i, text) {
+    setSuggestionState((prev) => ({ ...prev, [i]: { ...prev[i], editedText: text } }));
   }
 
-  // Confirmed additions are appended as extra sentences onto the Professional
-  // Summary — the one freeform text field every template renders — rather
-  // than guessing which specific experience entry a suggestion belongs to.
-  const confirmedAdditionTexts = structured
-    ? (structured.suggestedAdditions || [])
-        .map((_, i) => ({ status: additionStatus(i), text: additionText(i) }))
-        .filter((a) => a.status === 'confirmed')
-        .map((a) => a.text)
-    : [];
-  const effectiveSummary = structured ? [structured.summary, ...confirmedAdditionTexts].filter(Boolean).join(' ') : '';
-  const effectiveStructured = structured ? { ...structured, summary: effectiveSummary } : null;
+  // Applies a suggestion's rewrite directly into the CV field it targets —
+  // never appends the raw suggestion/reason text anywhere. A rewrite
+  // replaces its exact currentText where found (an experience bullet, or
+  // the whole summary); a pure addition (empty currentText) is appended.
+  function applySuggestion(i) {
+    const suggestion = structured.suggestions[i];
+    const finalText = (suggestionEditedText(i) || '').trim();
+    if (!finalText) return;
 
-  const templateInput = effectiveStructured ? adaptStructuredToTemplateInput(effectiveStructured) : null;
+    setStructured((prev) => {
+      const next = { ...prev };
+      if (suggestion.targetSection === 'summary') {
+        next.summary = finalText;
+      } else if (suggestion.targetSection === 'experience') {
+        const idx = suggestion.targetIndex;
+        if (idx == null || idx < 0 || !next.experience?.[idx]) return prev;
+        const experience = [...next.experience];
+        const bullets = [...(experience[idx].bullets || [])];
+        const matchIdx = suggestion.currentText ? bullets.findIndex((b) => b === suggestion.currentText) : -1;
+        if (matchIdx >= 0) bullets[matchIdx] = finalText;
+        else bullets.push(finalText);
+        experience[idx] = { ...experience[idx], bullets };
+        next.experience = experience;
+      } else if (suggestion.targetSection === 'skills') {
+        const skills = [...(next.skills || [])];
+        const matchIdx = suggestion.currentText ? skills.findIndex((s) => s === suggestion.currentText) : -1;
+        if (matchIdx >= 0) skills[matchIdx] = finalText;
+        else skills.push(finalText);
+        next.skills = skills;
+      }
+      return next;
+    });
+    setSuggestionState((prev) => ({ ...prev, [i]: { ...prev[i], status: 'applied' } }));
+    setEditingSuggestionIndex(null);
+  }
+  function dismissSuggestion(i) {
+    setSuggestionState((prev) => ({ ...prev, [i]: { ...prev[i], status: 'dismissed' } }));
+    setEditingSuggestionIndex(null);
+  }
+  function undoSuggestionDecision(i) {
+    setSuggestionState((prev) => ({ ...prev, [i]: { ...prev[i], status: 'pending' } }));
+  }
+
+  // Re-syncs the Document Workspace session whenever a suggestion changes
+  // the CV's actual content, so any tool the user continues to afterward
+  // always has the latest version, not a stale snapshot from before the edit.
+  function applySuggestionAndSync(i) {
+    applySuggestion(i);
+    setTimeout(() => { if (structured) pushCvToWorkspace(structured, template); }, 0);
+  }
+
+  const templateInput = structured ? adaptStructuredToTemplateInput(structured) : null;
   const resumeData = templateInput
     ? useResumeData({ form: templateInput.form, targetRole: targetPosition, experience: templateInput.experience, education: templateInput.education, certifications: templateInput.certifications, skills: templateInput.skills })
     : null;
@@ -259,8 +337,8 @@ export default function CVImproverWorkspace() {
   const TemplateComponent = TEMPLATES[template];
 
   function copyText() {
-    if (!effectiveStructured) return;
-    navigator.clipboard.writeText(structuredToPlainText(effectiveStructured, effectiveSummary));
+    if (!structured) return;
+    navigator.clipboard.writeText(structuredToPlainText(structured));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -272,6 +350,42 @@ export default function CVImproverWorkspace() {
     } catch { /* localStorage unavailable — handoff just won't pre-fill, not fatal */ }
     window.location.href = '/resume-builder';
   }
+
+  async function generateCoverLetter() {
+    if (!structured) return;
+    if (!coverLetterCompanyName.trim()) { setCoverLetterError('Please enter the company name.'); return; }
+    setCoverLetterBusy(true); setCoverLetterError('');
+    try {
+      const res = await fetch('/api/cover-letter-writer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          yourName: structured.name,
+          jobTitle: targetPosition,
+          companyName: coverLetterCompanyName,
+          background: structuredToPlainText(structured),
+          jobDescription,
+          tone: coverLetterTone,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+      setCoverLetter(data.letter || '');
+    } catch (err) {
+      setCoverLetterError(err.message);
+    } finally {
+      setCoverLetterBusy(false);
+    }
+  }
+  function copyCoverLetter() {
+    if (!coverLetter) return;
+    navigator.clipboard.writeText(coverLetter);
+    setCoverLetterCopied(true);
+    setTimeout(() => setCoverLetterCopied(false), 2000);
+  }
+
+  const pendingSuggestions = structured?.suggestions?.filter((_, i) => suggestionStatus(i) !== 'dismissed') || [];
+  const review = structured?.review;
 
   return (
     <div className="panel">
@@ -308,7 +422,7 @@ export default function CVImproverWorkspace() {
           <div style={{ marginBottom: 20 }} className="no-print">
             <label style={labelStyle}>🎯 Target Position</label>
             <input type="text" value={targetPosition} onChange={(e) => setTargetPosition(e.target.value)} placeholder="e.g. Quality Assurance Manager" style={inputStyle} />
-            <p style={helperStyle}>Enter the exact role you want your CV optimized for.</p>
+            <p style={helperStyle}>Enter the exact role you want your CV optimized for. This tailors your summary, skills and experience wording — your professional title stays based on your own career, not this role.</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
               {POSITION_EXAMPLES.map((ex) => (
                 <button key={ex} type="button" onClick={() => setTargetPosition(ex)} style={{ fontSize: '0.72rem', padding: '4px 10px', borderRadius: 999, border: '1px solid #E2E8F0', background: 'white', color: '#475569', cursor: 'pointer', fontFamily: 'inherit' }}>{ex}</button>
@@ -340,8 +454,9 @@ export default function CVImproverWorkspace() {
         <div>
           <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button style={pillStyle(!viewOriginal)} onClick={() => setViewOriginal(false)}>Improved CV</button>
-              <button style={pillStyle(viewOriginal)} onClick={() => setViewOriginal(true)}>Original CV</button>
+              <button style={pillStyle(activeView === 'improved')} onClick={() => setActiveView('improved')}>Improved CV</button>
+              <button style={pillStyle(activeView === 'original')} onClick={() => setActiveView('original')}>Original CV</button>
+              <button style={pillStyle(activeView === 'coverLetter')} onClick={() => setActiveView('coverLetter')}>Cover Letter</button>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button className="btn btn-ghost" onClick={restoreOriginal}>↺ Restore Original</button>
@@ -349,11 +464,44 @@ export default function CVImproverWorkspace() {
             </div>
           </div>
 
-          {viewOriginal ? (
+          {activeView === 'original' && (
             <div className="no-print" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 18, whiteSpace: 'pre-wrap', fontSize: '0.85rem', lineHeight: 1.7, color: '#334155', maxHeight: 600, overflow: 'auto' }}>
               {cvText}
             </div>
-          ) : (
+          )}
+
+          {activeView === 'coverLetter' && (
+            <div className="no-print">
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+                <div style={{ flex: '1 1 220px' }}>
+                  <label style={labelStyle}>Company Name</label>
+                  <input type="text" value={coverLetterCompanyName} onChange={(e) => setCoverLetterCompanyName(e.target.value)} placeholder="e.g. Acme Manufacturing Ltd" style={inputStyle} />
+                </div>
+                <div style={{ flex: '0 1 180px' }}>
+                  <label style={labelStyle}>Tone</label>
+                  <select value={coverLetterTone} onChange={(e) => setCoverLetterTone(e.target.value)} style={inputStyle}>
+                    {COVER_LETTER_TONES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
+                <button className="btn btn-primary" disabled={coverLetterBusy} onClick={generateCoverLetter}>
+                  {coverLetterBusy ? '✦ Writing your cover letter…' : coverLetter ? '↻ Regenerate Cover Letter' : '✦ Generate Cover Letter'}
+                </button>
+                {coverLetter && (
+                  <button className="btn btn-ghost" onClick={copyCoverLetter}>{coverLetterCopied ? '✓ Copied' : 'Copy Text'}</button>
+                )}
+              </div>
+              {coverLetterError && <div className="status error">{coverLetterError}</div>}
+              {coverLetter && (
+                <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 12, padding: 24, whiteSpace: 'pre-wrap', fontSize: '0.88rem', lineHeight: 1.75, color: '#1E293B', maxWidth: 720 }}>
+                  {coverLetter}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeView === 'improved' && (
             <>
               <p className="no-print" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', marginBottom: 10 }}>Choose a template</p>
               <div className="no-print" style={{ marginBottom: 18 }}>
@@ -382,44 +530,126 @@ export default function CVImproverWorkspace() {
                 Long CVs automatically continue onto additional pages when you download — nothing gets cut off.
               </p>
 
-              {structured.improvementsMade?.length > 0 && (
-                <section className="no-print" style={{ marginTop: 30 }}>
-                  <h3 style={sectionTitle}>✅ Key Improvements Made</h3>
-                  <ul style={{ margin: 0, paddingLeft: 20 }}>
-                    {structured.improvementsMade.map((imp, i) => (
-                      <li key={i} style={{ fontSize: '0.86rem', color: '#1E293B', marginBottom: 6, lineHeight: 1.5 }}>{imp}</li>
-                    ))}
-                  </ul>
+              {session.status === 'active' && session.currentTool === 'cv-improver' && (
+                <div className="no-print" style={{ marginTop: 24 }}>
+                  <ContinueWorkingPanel
+                    toolSlug="cv-improver"
+                    documentName={`${structured.name || 'CV'}.pdf`}
+                    onDownload={handleDownload}
+                    downloading={!!downloadStage}
+                  />
+                </div>
+              )}
+
+              {/* ============================================================
+                  OUTPUT B — Professional Review. Kept entirely separate from
+                  the CV rendered above; nothing here is ever inserted into it.
+                  ============================================================ */}
+              {review && (
+                <section className="no-print" style={{ marginTop: 34 }}>
+                  <h3 style={sectionTitle}>📊 Professional Review</h3>
+                  <div style={{ border: '1px solid #E2E8F0', borderRadius: 12, padding: 18 }}>
+                    <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 18 }}>
+                      <div>
+                        <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', margin: '0 0 4px' }}>ATS Compatibility</p>
+                        <p style={{ fontSize: '1.6rem', fontWeight: 800, color: review.atsScore >= 70 ? '#16A34A' : review.atsScore >= 40 ? '#D97706' : '#DC2626', margin: 0 }}>{review.atsScore}<span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#94A3B8' }}>/100</span></p>
+                      </div>
+                      <div>
+                        <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', margin: '0 0 4px' }}>Recruiter Readiness</p>
+                        <p style={{ fontSize: '1rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>{review.recruiterReadiness}</p>
+                      </div>
+                      {review.interviewReadiness && (
+                        <div>
+                          <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', margin: '0 0 4px' }}>Interview Readiness</p>
+                          <p style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155', margin: 0, maxWidth: 260 }}>{review.interviewReadiness}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+                      {review.strengths?.length > 0 && (
+                        <div>
+                          <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#166534', margin: '0 0 6px' }}>Strengths</p>
+                          <ul style={{ margin: 0, paddingLeft: 18 }}>{review.strengths.map((s, i) => <li key={i} style={{ fontSize: '0.82rem', color: '#334155', marginBottom: 4 }}>{s}</li>)}</ul>
+                        </div>
+                      )}
+                      {review.weaknesses?.length > 0 && (
+                        <div>
+                          <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#92400E', margin: '0 0 6px' }}>Weaknesses</p>
+                          <ul style={{ margin: 0, paddingLeft: 18 }}>{review.weaknesses.map((s, i) => <li key={i} style={{ fontSize: '0.82rem', color: '#334155', marginBottom: 4 }}>{s}</li>)}</ul>
+                        </div>
+                      )}
+                      {review.missingAchievements?.length > 0 && (
+                        <div>
+                          <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#9A3412', margin: '0 0 6px' }}>Missing Achievements</p>
+                          <ul style={{ margin: 0, paddingLeft: 18 }}>{review.missingAchievements.map((s, i) => <li key={i} style={{ fontSize: '0.82rem', color: '#334155', marginBottom: 4 }}>{s}</li>)}</ul>
+                        </div>
+                      )}
+                      {review.topImprovements?.length > 0 && (
+                        <div>
+                          <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1E3A8A', margin: '0 0 6px' }}>Top Improvements Made</p>
+                          <ul style={{ margin: 0, paddingLeft: 18 }}>{review.topImprovements.map((s, i) => <li key={i} style={{ fontSize: '0.82rem', color: '#334155', marginBottom: 4 }}>{s}</li>)}</ul>
+                        </div>
+                      )}
+                    </div>
+
+                    {(review.keywordsMatched?.length > 0 || review.keywordsMissing?.length > 0) && (
+                      <div style={{ marginTop: 16 }}>
+                        <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155', margin: '0 0 6px' }}>Keyword Match</p>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {review.keywordsMatched?.map((k, i) => <span key={`m${i}`} style={tagStyle('#DCFCE7', '#166534')}>✓ {k}</span>)}
+                          {review.keywordsMissing?.map((k, i) => <span key={`x${i}`} style={tagStyle('#FEF3C7', '#92400E')}>missing: {k}</span>)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {structured.warnings?.length > 0 && (
+                    <div style={{ marginTop: 10, fontSize: '0.78rem', color: '#92400E', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, padding: '8px 10px' }}>
+                      {structured.warnings.map((w, i) => <p key={i} style={{ margin: i > 0 ? '4px 0 0' : 0 }}>{w}</p>)}
+                    </div>
+                  )}
                 </section>
               )}
 
-              {structured.suggestedAdditions?.length > 0 && (
+              {/* ============================================================
+                  Suggestions — each is a ready-to-insert rewrite, never
+                  applied until the candidate explicitly clicks Apply Rewrite.
+                  ============================================================ */}
+              {pendingSuggestions.length > 0 && (
                 <section className="no-print" style={{ marginTop: 30 }}>
-                  <h3 style={sectionTitle}>💡 Suggested Additions for You to Confirm</h3>
-                  <p style={{ fontSize: '0.78rem', color: '#64748B', marginBottom: 12 }}>These could strengthen your CV — nothing here is added until you confirm it.</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {structured.suggestedAdditions.map((s, i) => {
-                      const st = additionStatus(i);
-                      const isEditing = editingAdditionIndex === i;
+                  <h3 style={sectionTitle}>💡 Suggested Rewrites</h3>
+                  <p style={{ fontSize: '0.78rem', color: '#64748B', marginBottom: 12 }}>Nothing here changes your CV until you click Apply Rewrite.</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {structured.suggestions.map((s, i) => {
+                      if (suggestionStatus(i) === 'dismissed') return null;
+                      const st = suggestionStatus(i);
+                      const isEditing = editingSuggestionIndex === i;
                       return (
-                        <div key={i} style={{ border: '1px solid #E2E8F0', borderRadius: 10, padding: 14, background: st === 'confirmed' ? '#F0FDF4' : st === 'dismissed' ? '#F8FAFC' : 'white', opacity: st === 'dismissed' ? 0.65 : 1 }}>
-                          <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', margin: '0 0 4px' }}>Suggested Addition</p>
-                          {isEditing ? (
-                            <textarea value={additionText(i)} onChange={(e) => setAdditionText(i, e.target.value)} style={{ ...inputStyle, minHeight: 64 }} />
-                          ) : (
-                            <p style={{ fontSize: '0.88rem', color: '#0F172A', margin: '0 0 8px', fontWeight: 600 }}>{additionText(i)}</p>
+                        <div key={i} style={{ border: '1px solid #E2E8F0', borderRadius: 10, padding: 14, background: st === 'applied' ? '#F0FDF4' : 'white' }}>
+                          {s.currentText && (
+                            <>
+                              <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', margin: '0 0 4px' }}>Current Text</p>
+                              <p style={{ fontSize: '0.84rem', color: '#94A3B8', margin: '0 0 10px', fontStyle: 'italic' }}>{s.currentText}</p>
+                            </>
                           )}
-                          <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', margin: '8px 0 4px' }}>Reason</p>
+                          <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', margin: '0 0 4px' }}>AI Proposed Rewrite</p>
+                          {isEditing ? (
+                            <textarea value={suggestionEditedText(i)} onChange={(e) => setSuggestionEditedText(i, e.target.value)} style={{ ...inputStyle, minHeight: 72 }} />
+                          ) : (
+                            <p style={{ fontSize: '0.88rem', color: '#0F172A', margin: '0 0 8px', fontWeight: 600 }}>{suggestionEditedText(i)}</p>
+                          )}
+                          <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', margin: '10px 0 4px' }}>Reason for Suggestion</p>
                           <p style={{ fontSize: '0.82rem', color: '#475569', margin: '0 0 10px' }}>{s.reason}</p>
                           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                             {isEditing ? (
-                              <button onClick={() => confirmAddition(i)} style={smallActionBtn('#16A34A')}>Save &amp; Add to CV</button>
+                              <button onClick={() => applySuggestionAndSync(i)} style={smallActionBtn('#16A34A')}>Apply My Edit</button>
                             ) : (
                               <>
-                                <button onClick={() => confirmAddition(i)} disabled={st === 'confirmed'} style={smallActionBtn('#16A34A', st === 'confirmed')}>{st === 'confirmed' ? '✓ Added' : 'Accept'}</button>
-                                <button onClick={() => setEditingAdditionIndex(i)} style={smallActionBtn('#2563EB')}>Edit</button>
-                                <button onClick={() => dismissAddition(i)} disabled={st === 'dismissed'} style={smallActionBtn('#94A3B8', st === 'dismissed')}>{st === 'dismissed' ? 'Ignored' : 'Ignore'}</button>
-                                {st !== 'pending' && <button onClick={() => undoAdditionDecision(i)} style={smallActionBtn('#94A3B8')}>Undo</button>}
+                                <button onClick={() => applySuggestionAndSync(i)} disabled={st === 'applied'} style={smallActionBtn('#16A34A', st === 'applied')}>{st === 'applied' ? '✓ Applied' : 'Apply Rewrite'}</button>
+                                <button onClick={() => setEditingSuggestionIndex(i)} style={smallActionBtn('#2563EB')}>Edit Myself</button>
+                                <button onClick={() => dismissSuggestion(i)} style={smallActionBtn('#94A3B8')}>Dismiss</button>
+                                {st === 'applied' && <button onClick={() => undoSuggestionDecision(i)} style={smallActionBtn('#94A3B8')}>Undo</button>}
                               </>
                             )}
                           </div>
@@ -427,50 +657,6 @@ export default function CVImproverWorkspace() {
                       );
                     })}
                   </div>
-                </section>
-              )}
-
-              {structured.jobMatchSummary && (
-                <section className="no-print" style={{ marginTop: 30, marginBottom: 10 }}>
-                  <h3 style={sectionTitle}>📊 Job Match Summary</h3>
-                  <div style={{ border: '1px solid #E2E8F0', borderRadius: 10, padding: 16 }}>
-                    <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', margin: '0 0 4px' }}>Target Position</p>
-                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0F172A', margin: '0 0 16px' }}>{structured.jobMatchSummary.targetPosition || targetPosition}</p>
-
-                    {structured.jobMatchSummary.strongMatches?.length > 0 && (
-                      <div style={{ marginBottom: 16 }}>
-                        <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#166534', margin: '0 0 6px' }}>Strong Matches</p>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                          {structured.jobMatchSummary.strongMatches.map((m, i) => <span key={i} style={tagStyle('#DCFCE7', '#166534')}>{m}</span>)}
-                        </div>
-                      </div>
-                    )}
-                    {structured.jobMatchSummary.gaps?.length > 0 && (
-                      <div style={{ marginBottom: 16 }}>
-                        <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#92400E', margin: '0 0 6px' }}>Areas That Could Be Strengthened</p>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                          {structured.jobMatchSummary.gaps.map((m, i) => <span key={i} style={tagStyle('#FEF3C7', '#92400E')}>{m}</span>)}
-                        </div>
-                      </div>
-                    )}
-                    {structured.jobMatchSummary.recommendedAdditions?.length > 0 && (
-                      <div>
-                        <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1E3A8A', margin: '0 0 6px' }}>Recommended Additions</p>
-                        <ul style={{ margin: 0, paddingLeft: 18 }}>
-                          {structured.jobMatchSummary.recommendedAdditions.map((r, i) => <li key={i} style={{ fontSize: '0.84rem', color: '#334155', marginBottom: 4 }}>{r}</li>)}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-
-                  {structured.keywordsUsed?.length > 0 && (
-                    <p style={{ fontSize: '0.76rem', color: '#64748B', marginTop: 10 }}>Optimized for stronger ATS compatibility using keywords: {structured.keywordsUsed.join(', ')}.</p>
-                  )}
-                  {structured.warnings?.length > 0 && (
-                    <div style={{ marginTop: 10, fontSize: '0.78rem', color: '#92400E', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, padding: '8px 10px' }}>
-                      {structured.warnings.map((w, i) => <p key={i} style={{ margin: i > 0 ? '4px 0 0' : 0 }}>{w}</p>)}
-                    </div>
-                  )}
                 </section>
               )}
             </>

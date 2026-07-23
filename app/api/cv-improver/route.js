@@ -2,77 +2,166 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 import { callGemini, AIError, CATEGORY_MESSAGES } from '@/lib/geminiClient';
+import { detectCvLeakage, stripCvLeakage } from '@/lib/cvValidation';
 
-// The resume fields (name/title/.../certifications) keep the exact shape the
-// existing template-rendering pipeline (resumeTemplates.js) already expects
-// — unchanged so PDF/DOCX-link/CV-Builder handoff all keep working. The rest
-// is the new "CV consultant" layer: improvements made, additions that need
-// the user's confirmation before entering the CV, and a job-match summary.
-const cvSchema = {
-  type: 'OBJECT',
-  properties: {
-    name: { type: 'STRING' },
-    title: { type: 'STRING' },
-    email: { type: 'STRING' },
-    phone: { type: 'STRING' },
-    location: { type: 'STRING' },
-    linkedin: { type: 'STRING' },
-    summary: { type: 'STRING' },
-    experience: {
-      type: 'ARRAY',
-      items: {
-        type: 'OBJECT',
-        properties: {
-          role: { type: 'STRING' },
-          company: { type: 'STRING' },
-          period: { type: 'STRING' },
-          bullets: { type: 'ARRAY', items: { type: 'STRING' } },
-        },
-        required: ['role', 'company', 'bullets'],
-      },
-    },
-    education: {
-      type: 'ARRAY',
-      items: {
-        type: 'OBJECT',
-        properties: {
-          degree: { type: 'STRING' },
-          institution: { type: 'STRING' },
-          year: { type: 'STRING' },
-        },
-        required: ['degree', 'institution'],
-      },
-    },
-    skills: { type: 'ARRAY', items: { type: 'STRING' } },
-    certifications: { type: 'ARRAY', items: { type: 'STRING' } },
-
-    improvementsMade: { type: 'ARRAY', items: { type: 'STRING' } },
-    suggestedAdditions: {
-      type: 'ARRAY',
-      items: {
-        type: 'OBJECT',
-        properties: {
-          suggestion: { type: 'STRING' },
-          reason: { type: 'STRING' },
-        },
-        required: ['suggestion', 'reason'],
-      },
-    },
-    jobMatchSummary: {
+// OUTPUT A — the CV itself. Every field here must be finished, ready-to-send
+// content only: no advice, no instructions, no reasoning, no placeholders.
+// Kept in the exact shape the existing template-rendering pipeline
+// (resumeTemplates.js) already expects — unchanged so PDF/DOCX-link/CV
+// Builder handoff all keep working.
+const cvFields = {
+  name: { type: 'STRING' },
+  title: { type: 'STRING' },
+  email: { type: 'STRING' },
+  phone: { type: 'STRING' },
+  location: { type: 'STRING' },
+  linkedin: { type: 'STRING' },
+  summary: { type: 'STRING' },
+  experience: {
+    type: 'ARRAY',
+    items: {
       type: 'OBJECT',
       properties: {
-        targetPosition: { type: 'STRING' },
-        strongMatches: { type: 'ARRAY', items: { type: 'STRING' } },
-        gaps: { type: 'ARRAY', items: { type: 'STRING' } },
-        recommendedAdditions: { type: 'ARRAY', items: { type: 'STRING' } },
+        role: { type: 'STRING' },
+        company: { type: 'STRING' },
+        period: { type: 'STRING' },
+        bullets: { type: 'ARRAY', items: { type: 'STRING' } },
       },
-      required: ['strongMatches', 'gaps', 'recommendedAdditions'],
+      required: ['role', 'company', 'bullets'],
     },
-    keywordsUsed: { type: 'ARRAY', items: { type: 'STRING' } },
-    warnings: { type: 'ARRAY', items: { type: 'STRING' } },
   },
-  required: ['name', 'summary', 'experience', 'skills', 'improvementsMade', 'suggestedAdditions', 'jobMatchSummary'],
+  education: {
+    type: 'ARRAY',
+    items: {
+      type: 'OBJECT',
+      properties: {
+        degree: { type: 'STRING' },
+        institution: { type: 'STRING' },
+        year: { type: 'STRING' },
+      },
+      required: ['degree', 'institution'],
+    },
+  },
+  skills: { type: 'ARRAY', items: { type: 'STRING' } },
+  certifications: { type: 'ARRAY', items: { type: 'STRING' } },
 };
+
+// OUTPUT B — the professional review. Never rendered as part of the CV;
+// the workspace shows it in a completely separate panel/tab.
+const reviewFields = {
+  review: {
+    type: 'OBJECT',
+    properties: {
+      atsScore: { type: 'NUMBER' },
+      recruiterReadiness: { type: 'STRING' },
+      strengths: { type: 'ARRAY', items: { type: 'STRING' } },
+      weaknesses: { type: 'ARRAY', items: { type: 'STRING' } },
+      missingAchievements: { type: 'ARRAY', items: { type: 'STRING' } },
+      keywordsMatched: { type: 'ARRAY', items: { type: 'STRING' } },
+      keywordsMissing: { type: 'ARRAY', items: { type: 'STRING' } },
+      interviewReadiness: { type: 'STRING' },
+      topImprovements: { type: 'ARRAY', items: { type: 'STRING' } },
+    },
+    required: ['atsScore', 'recruiterReadiness', 'strengths', 'weaknesses', 'topImprovements'],
+  },
+  // Rewrite suggestions — each one is a fully-written, ready-to-insert
+  // replacement, never an instruction. targetSection/targetIndex identify
+  // exactly what in the CV a suggestion would replace if applied.
+  suggestions: {
+    type: 'ARRAY',
+    items: {
+      type: 'OBJECT',
+      properties: {
+        targetSection: { type: 'STRING' }, // 'summary' | 'experience' | 'skills'
+        targetIndex: { type: 'NUMBER' }, // experience array index; -1 when not applicable
+        currentText: { type: 'STRING' },
+        proposedRewrite: { type: 'STRING' },
+        reason: { type: 'STRING' },
+      },
+      required: ['targetSection', 'targetIndex', 'currentText', 'proposedRewrite', 'reason'],
+    },
+  },
+  warnings: { type: 'ARRAY', items: { type: 'STRING' } },
+};
+
+const cvSchema = {
+  type: 'OBJECT',
+  properties: { ...cvFields, ...reviewFields },
+  required: ['name', 'title', 'summary', 'experience', 'skills', 'review', 'suggestions'],
+};
+
+function buildPrompt({ cvText, targetPosition, jobDescription }) {
+  return `You are an experienced professional CV consultant — not a chatbot. A candidate has given you their current CV and the exact role they are applying for. Produce two completely separate things: (A) a stronger, more competitive, ATS-friendly, ready-to-send CV, and (B) a private consulting review that the candidate will see in a separate panel, never inside the CV itself. Return everything as one structured JSON object.
+
+TARGET POSITION (drives tailoring — see title rule below for the one place it must NOT be used):
+${targetPosition}
+
+${jobDescription?.trim() ? `JOB DESCRIPTION / REQUIREMENTS (use this to tailor even more precisely — pull in its natural, relevant keywords without stuffing):\n${jobDescription.trim()}\n` : ''}
+
+====================================================
+ABSOLUTE RULE — NEVER FABRICATE
+====================================================
+Never invent employers, job titles, dates, certifications, degrees, licences, responsibilities the candidate never performed, KPIs, numbers, awards, software proficiency, leadership experience, or projects that are not already present in the CV below. You may rewrite what IS there into stronger, more professional language (e.g. "Checked production quality" -> "Performed routine production quality inspections, identified non-conformances, and supported compliance with GMP standards" is fine — it adds no new fact). Never add a specific number, percentage, or metric unless that figure already appears in the candidate's CV. If the CV is missing something that would meaningfully strengthen it, do NOT insert it into the CV — put it in "suggestions" instead (see below), so the candidate can confirm it themselves.
+
+====================================================
+PROFESSIONAL TITLE RULES (the "title" field)
+====================================================
+The title is the candidate's professional identity line, shown directly under their name. It must NEVER be the target job title with "Applicant" tacked on, and must NEVER contain the words: Applicant, Candidate, Seeking, Applying For, Looking For, or Job Seeker. Wrong: "Packaging Technical Trainee Applicant", "Quality Assurance Applicant", "Production Manager Applicant".
+
+Instead, generate a polished professional identity based on the candidate's CURRENT or MOST RECENT position, elevated into confident, natural title language. Examples of the transformation:
+- Packaging Laboratory Specialist -> Packaging Quality Specialist
+- Laboratory Technician -> Quality Assurance Professional
+- Quality Assurance Lead -> Quality Assurance & Process Improvement Specialist
+- Production Supervisor -> Production Operations Specialist
+
+The target position may ONLY be used to tailor the Professional Summary, Skills, and Experience wording — never to replace or appear directly in the title line itself. If the candidate has little or no work experience, generate a suitable entry-level professional title instead (e.g. "Aspiring Quality Assurance Professional", "Entry-Level Production Technician") rather than leaving it blank or using the target title.
+
+====================================================
+HOW TO IMPROVE THE CV (Output A)
+====================================================
+- Strengthen the professional summary and tailor it toward the target position (language and emphasis only — see title rule above).
+- Rewrite weak, passive responsibility statements into stronger professional achievement statements, using only real, existing facts.
+- Highlight transferable skills relevant to the target position.
+- Improve action verbs and overall wording.
+- Prioritize and, where beneficial, reorder content so the most relevant experience for this role stands out.
+- Strengthen measurable achievements ONLY where the underlying numbers already exist in the source CV.
+- Use standard CV section headings, and naturally weave in keywords from the target position and job description for stronger ATS compatibility — never keyword-stuff, never sacrifice readability.
+- Include ALL experience entries, ALL education entries, ALL skills from the original — do not truncate, drop, or cut anything off.
+- Extract and use ONLY real information already in the CV — names, contacts, companies, dates. If something is missing, omit that field entirely or use an empty string. Never invent placeholders like "[Your Name]" or "[Company Name]" — a placeholder left in a document meant to be sent to an employer is a serious defect.
+
+====================================================
+WHAT MUST NEVER APPEAR ANYWHERE IN THE CV FIELDS (name, title, summary, experience bullets, skills, certifications)
+====================================================
+The CV fields must contain ONLY finished, professional, ready-to-send content. NEVER include, anywhere in those fields: AI suggestions, AI reasoning, editing notes, recommendations, prompt instructions, ATS explanations, bracketed placeholders, or any sentence that reads as an instruction addressed to the candidate rather than a statement of fact about their work — for example sentences beginning with "Consider...", "Elaborate on...", "Mention...", "Include...", "Quantify...", "Provide...", "Insert...", "Add...", "Expand on...", or "Explain...". Advice and suggestions belong ONLY in the "suggestions" and "review" fields below, never inside the CV itself. The finished CV must never reveal that AI generated or edited it.
+
+====================================================
+THE PROFESSIONAL REVIEW (Output B — the "review" field, never part of the CV)
+====================================================
+- atsScore: your honest estimate (0-100) of how well this CV would parse and rank in an Applicant Tracking System for the target position.
+- recruiterReadiness: one short label describing overall readiness (e.g. "Strong", "Needs Work", "Excellent", "Not Ready Yet").
+- strengths: genuine strengths of this CV for this specific role.
+- weaknesses: genuine weaknesses or gaps.
+- missingAchievements: specific things a strong version of this CV would ideally include but this one doesn't yet (e.g. "No quantified results in the most recent role") — describe the gap, do not invent a fake achievement to fill it.
+- keywordsMatched: real keywords from the target position / job description that ARE already reflected in the improved CV.
+- keywordsMissing: real, relevant keywords from the target position / job description that are NOT yet reflected.
+- interviewReadiness: one short assessment of how ready this candidate likely is for an interview based on what's on the CV.
+- topImprovements: a short list of concrete improvements you actually made to the CV (plain, specific sentences — not generic praise).
+Do not invent a fabricated-sounding false-precision score presented as fact from a real scoring algorithm — atsScore is your qualitative estimate, treat it and present it as such.
+
+====================================================
+SUGGESTIONS (the "suggestions" field — separate, optional rewrites the candidate can choose to apply)
+====================================================
+Each suggestion is a fully-written, ready-to-insert REPLACEMENT for a specific piece of the CV — never an instruction telling the candidate what to do. Wrong: proposedRewrite = "Elaborate on instrumentation and control." Correct: proposedRewrite = a complete, polished sentence or bullet that actually elaborates on instrumentation and control, using only real facts already present elsewhere in the CV, ready to be inserted as-is.
+- targetSection: "summary" (rewrite of the whole summary), "experience" (a bullet within one experience entry), or "skills" (an addition to the skills list).
+- targetIndex: for "experience", the 0-based index into the experience array this suggestion targets; use -1 for "summary" and "skills".
+- currentText: the exact current text this would replace (empty string if it's a pure addition, like a new bullet or skill, rather than a replacement).
+- proposedRewrite: the complete, ready-to-insert replacement or addition text — finished CV prose, never an instruction.
+- reason: a short explanation of why this would strengthen the CV — this is shown to the candidate alongside the rewrite, it never appears in the CV itself.
+Only propose suggestions genuinely worth making — an empty array is correct if the CV is already strong.
+
+CANDIDATE'S CURRENT CV:
+${cvText}`;
+}
 
 export async function POST(request) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -88,40 +177,28 @@ export async function POST(request) {
       return Response.json({ error: 'Please enter the position you want your CV optimized for.' }, { status: 400 });
     }
 
-    const prompt = `You are an experienced professional CV consultant. A candidate has given you their current CV and the exact role they are applying for. Produce a stronger, more competitive, ATS-friendly version of their CV — tailored specifically to that role — plus a short consulting report. Return everything as one structured JSON object.
+    const prompt = buildPrompt({ cvText, targetPosition, jobDescription });
+    let { parsed } = await callGemini({ apiKey, toolName: 'cv-improver', routeName: '/api/cv-improver', parts: [{ text: prompt }], schema: cvSchema, maxOutputTokens: 65536, inputSizeApprox: prompt.length });
 
-TARGET POSITION (this must drive the whole optimization):
-${targetPosition}
+    // Final quality check (defense in depth — the prompt above already asks
+    // for this, this is what guarantees it before anything reaches the
+    // candidate). If leakage is found, regenerate once with the exact
+    // issues called out; if it still isn't clean, deterministically strip
+    // the offending sentences as a last resort rather than ever shipping
+    // AI-instruction text inside a document meant to be sent to an employer.
+    let leakage = detectCvLeakage(parsed);
+    if (!leakage.clean) {
+      const correctivePrompt = `${prompt}\n\n====================================================\nCORRECTION REQUIRED\n====================================================\nYour previous attempt at this task left the following problems inside the CV fields (not the review — the CV itself): ${leakage.issues.join('; ')}. Regenerate the complete JSON object again, fixing every one of these — the CV fields must contain only finished, ready-to-send professional content with no instructions, placeholders, or banned title words.`;
+      const retry = await callGemini({ apiKey, toolName: 'cv-improver-correction', routeName: '/api/cv-improver', parts: [{ text: correctivePrompt }], schema: cvSchema, maxOutputTokens: 65536, inputSizeApprox: correctivePrompt.length });
+      parsed = retry.parsed;
+      leakage = detectCvLeakage(parsed);
+      if (!leakage.clean) {
+        parsed = stripCvLeakage(parsed);
+        parsed.warnings = [...(parsed.warnings || []), 'Some AI-generated text was automatically removed from your CV during a final quality check. Please review the result carefully.'];
+      }
+    }
 
-${jobDescription?.trim() ? `JOB DESCRIPTION / REQUIREMENTS (use this to tailor even more precisely — pull in its natural, relevant keywords without stuffing):\n${jobDescription.trim()}\n` : ''}
-
-ABSOLUTE RULE — NEVER FABRICATE:
-Never invent employers, job titles, dates, certifications, degrees, licences, responsibilities the candidate never performed, KPIs, numbers, awards, software proficiency, leadership experience, or projects that are not already present in the CV below. You may rewrite what IS there into stronger, more professional language (e.g. "Checked production quality" -> "Performed routine production quality inspections, identified non-conformances, and supported compliance with GMP standards" is fine — it does not add any new fact). But you must NEVER add a specific number, percentage, or metric (e.g. "reduced defects by 35%") unless that figure already appears in the candidate's CV. If you believe the CV is missing something that would meaningfully strengthen it for this role, do NOT insert it — put it in suggestedAdditions instead, so the candidate can confirm it themselves.
-
-HOW TO IMPROVE THE CV:
-- Strengthen the professional summary and tailor it toward the target position
-- Rewrite weak, passive responsibility statements into stronger professional achievement statements (using only real, existing facts)
-- Highlight transferable skills relevant to the target position
-- Improve action verbs and overall wording
-- Prioritize and, where beneficial, reorder content so the most relevant experience for this role stands out
-- Strengthen measurable achievements ONLY where the underlying numbers already exist in the source CV
-- Improve readability and recruiter appeal
-- Use standard CV section headings, and naturally weave in keywords from the target position and job description for stronger ATS compatibility — never keyword-stuff, and never sacrifice readability for keywords
-- Include ALL experience entries, ALL education entries, ALL skills from the original — do not truncate, drop, or cut anything off. Return the complete CV.
-- Extract and use ONLY real information already in the CV — names, contacts, companies, dates. If something is missing, omit that field entirely or use an empty string. Never invent placeholders like [Your Name].
-
-ALSO RETURN:
-- improvementsMade: a short list of concrete improvements you actually made (plain, specific sentences — not generic praise)
-- suggestedAdditions: things that would strengthen this CV for the target position but are NOT already in it, each as {suggestion, reason}. These must NEVER be merged into the CV itself — they are for the candidate to confirm.
-- jobMatchSummary: {targetPosition, strongMatches (skills/experience from the CV that genuinely align with the target position), gaps (areas the CV doesn't yet cover for this role), recommendedAdditions (short actionable suggestions, e.g. "Mention team size supervised")}. Do not invent a percentage match score — there is no scoring algorithm, so never state something like "92% match".
-- keywordsUsed: the real keywords from the target position / job description that you naturally worked into the improved CV
-- warnings: anything worth flagging to the candidate (e.g. the CV seems very short, or a section seems missing) — empty array if nothing to flag
-
-CANDIDATE'S CURRENT CV:
-${cvText}`;
-
-    const { raw, parsed } = await callGemini({ apiKey, toolName: 'cv-improver', routeName: '/api/cv-improver', parts: [{ text: prompt }], schema: cvSchema, maxOutputTokens: 65536, inputSizeApprox: prompt.length });
-    return Response.json({ improved: raw, structured: parsed });
+    return Response.json({ structured: parsed });
   } catch (err) {
     if (err instanceof AIError) {
       console.error(`CV improver error [${err.requestId}] category=${err.category}:`, err.message);

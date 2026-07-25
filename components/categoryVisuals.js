@@ -1,35 +1,55 @@
-// Shared category icon + accent-color tokens, reused across the homepage
-// category cards, every hub page, the Header nav, and Learn so the same
+// Shared "engraved paper" icon set + accent tokens, reused across the
+// homepage category cards and each category's own hub page so the same
 // icon and colour language shows up everywhere a category appears.
-//
-// Icons come from the official Convertam Visual System export
-// (public/visuals/icons/category/*.svg) — each one is a self-contained tile
-// (its own white card + border + drop shadow baked in), so it renders
-// correctly on any background without an extra colored wrapper. The colour
-// tokens below match that same package's palette exactly (PDF=blue,
-// Business=red, Career=green, AI=purple, Image=orange, Calculators=steel,
-// Utilities=slate) — a deliberate reassignment from the site's previous
-// category colours (PDF used to be red, Business used to be green), made to
-// stay faithful to the supplied design system rather than mixing old and
-// new colour identities across pages.
 
-function CategoryIcon({ src, alt = '', size = 30 }) {
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={alt} width={size} height={size} style={{ display: 'block' }} />;
-}
+export const PdfIcon = (
+  <svg width="30" height="30" viewBox="0 0 24 24">
+    <rect x="6.5" y="3" width="12.5" height="17" rx="2" fill="#fff" opacity="0.32" />
+    <path d="M3 4.8A1.8 1.8 0 0 1 4.8 3H13l4 4v11.2A1.8 1.8 0 0 1 15.2 20H4.8A1.8 1.8 0 0 1 3 18.2z" fill="#fff" />
+    <path d="M13 3l4 4h-2.6A1.4 1.4 0 0 1 13 5.6z" fill="#fff" opacity="0.55" />
+    <text x="9.4" y="16.2" fontFamily="Arial, sans-serif" fontSize="5.6" fontWeight="800" fill="#DC2626" textAnchor="middle">PDF</text>
+  </svg>
+);
 
-export const PdfIcon = <CategoryIcon src="/visuals/icons/category/pdf-suite.svg" />;
-export const BusinessIcon = <CategoryIcon src="/visuals/icons/category/business-suite.svg" />;
-export const AiIcon = <CategoryIcon src="/visuals/icons/category/ai-workspace.svg" />;
-export const ImageIcon = <CategoryIcon src="/visuals/icons/category/image-studio.svg" />;
-export const CalculatorIcon = <CategoryIcon src="/visuals/icons/category/calculators.svg" />;
-export const UtilitiesIcon = <CategoryIcon src="/visuals/icons/category/utilities.svg" />;
-export const CareerIcon = <CategoryIcon src="/visuals/icons/category/career-studio.svg" />;
+export const BusinessIcon = (
+  <svg width="30" height="30" viewBox="0 0 24 24">
+    <rect x="3.5" y="9.5" width="18" height="12" rx="2.5" fill="#fff" opacity="0.3" />
+    <path d="M9 8.2V6.6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.6" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
+    <rect x="2" y="8" width="20" height="13" rx="2.5" fill="#fff" />
+    <rect x="2" y="13.2" width="20" height="1" fill="#000" opacity="0.14" />
+    <rect x="10.2" y="12.4" width="3.6" height="2.6" rx="0.6" fill="#059669" />
+  </svg>
+);
 
-// No supplied replacement exists for these two (Data Workspace is hidden
-// from navigation; Workflow is a Learn-only content grouping, not a product
-// category) — kept as the original hand-drawn icons rather than inventing
-// new assets outside the supplied package.
+export const AiIcon = (
+  <svg width="30" height="30" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="12" rx="9.5" ry="4.2" fill="none" stroke="#fff" strokeWidth="1.1" opacity="0.4" transform="rotate(-18 12 12)" />
+    <path d="M11.5 4l1.6 4.6L17.5 10l-4.4 1.6L11.5 16l-1.6-4.4L5.5 10l4.4-1.4z" fill="#fff" />
+    <path d="M17.2 15.3l0.8 2.1 2.1 0.8-2.1 0.8-0.8 2.1-0.8-2.1-2.1-0.8 2.1-0.8z" fill="#7C3AED" />
+  </svg>
+);
+
+export const ImageIcon = (
+  <svg width="30" height="30" viewBox="0 0 24 24">
+    <rect x="6" y="3.2" width="14.5" height="14.5" rx="2" fill="#fff" opacity="0.3" transform="rotate(7 12 12)" />
+    <rect x="3" y="5" width="15" height="15" rx="2" fill="#fff" />
+    <path d="M4.5 17.5l4-5 3 3.2 2.6-3.6 3.9 5.4z" fill="#000" opacity="0.15" />
+    <circle cx="7.3" cy="8.6" r="1.7" fill="#EA580C" />
+  </svg>
+);
+
+export const CalculatorIcon = (
+  <svg width="30" height="30" viewBox="0 0 24 24">
+    <rect x="4.5" y="2" width="15" height="20" rx="2.5" fill="#fff" />
+    <rect x="6.3" y="4" width="11.4" height="4.4" rx="1" fill="#2563EB" />
+    <g fill="#000" opacity="0.16">
+      <rect x="6.3" y="10.4" width="3" height="2.4" rx="0.6" /><rect x="10.5" y="10.4" width="3" height="2.4" rx="0.6" /><rect x="14.7" y="10.4" width="3" height="2.4" rx="0.6" />
+      <rect x="6.3" y="14" width="3" height="2.4" rx="0.6" /><rect x="10.5" y="14" width="3" height="2.4" rx="0.6" /><rect x="14.7" y="14" width="3" height="2.4" rx="0.6" />
+      <rect x="6.3" y="17.6" width="11.4" height="2.4" rx="0.6" />
+    </g>
+  </svg>
+);
+
 export const DataIcon = (
   <svg width="30" height="30" viewBox="0 0 24 24">
     <rect x="6" y="3" width="14" height="15" rx="2" fill="#fff" opacity="0.3" />
@@ -43,6 +63,18 @@ export const DataIcon = (
   </svg>
 );
 
+export const UtilitiesIcon = (
+  <svg width="30" height="30" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="19.6" rx="8.5" ry="1.5" fill="#fff" opacity="0.2" />
+    <path d="M8.5 7.6V6a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v1.6" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
+    <rect x="3" y="7.6" width="18" height="11.4" rx="2" fill="#fff" />
+    <rect x="3" y="12.1" width="18" height="1" fill="#000" opacity="0.14" />
+    <rect x="10.2" y="11.3" width="3.6" height="2.6" rx="0.6" fill="#334155" />
+  </svg>
+);
+
+// Three connected nodes — represents a Learn "Workflow Guide": several
+// Convertam tools chained together into one repeatable process.
 export const WorkflowIcon = (
   <svg width="30" height="30" viewBox="0 0 24 24">
     <path d="M6 7.5 L12 12 L18 7.5" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" opacity="0.55" />
@@ -56,26 +88,20 @@ export const WorkflowIcon = (
   </svg>
 );
 
-// Colors below are the exact per-category values from the supplied visual
-// system's data/icon-mapping.json (pdf #246BFE, business #F43F3F, career
-// #14B875, ai #7C3AED, image #FF7A1A, calculator #58749A, utility #667085)
-// — the same accent each category's icon SVG is drawn in — so every page
-// that shares this file stays consistent with the package, not just the
-// homepage suite cards.
 export const CATEGORY_ACCENTS = {
   pdf: {
-    gradient: 'linear-gradient(120deg, #246BFE 0%, #1D58D0 100%)',
-    pageBgTop: '#F5F8FF', pageBgBottom: '#EAF1FF',
-    borderColor: '#CBDCFB', accentText: '#1D58D0',
-    focusRing: 'rgba(36,107,254,0.12)', shadowTint: 'rgba(36,107,254,0.15)',
-    badgeFreeBg: '#DCE9FF', badgeFreeText: '#173F99',
+    gradient: 'linear-gradient(120deg, #EF4444 0%, #DC2626 100%)',
+    pageBgTop: '#FFF8F7', pageBgBottom: '#FFF1EF',
+    borderColor: '#FEE2E2', accentText: '#DC2626',
+    focusRing: 'rgba(220,38,38,0.12)', shadowTint: 'rgba(220,38,38,0.15)',
+    badgeFreeBg: '#FEE2E2', badgeFreeText: '#B91C1C',
   },
   business: {
-    gradient: 'linear-gradient(120deg, #F43F3F 0%, #CF3636 100%)',
-    pageBgTop: '#FFF6F6', pageBgBottom: '#FFE9E9',
-    borderColor: '#FBCFCF', accentText: '#CF3636',
-    focusRing: 'rgba(244,63,63,0.12)', shadowTint: 'rgba(244,63,63,0.15)',
-    badgeFreeBg: '#FCDCDC', badgeFreeText: '#9F2A2A',
+    gradient: 'linear-gradient(120deg, #10B981 0%, #059669 100%)',
+    pageBgTop: '#F0FDF4', pageBgBottom: '#ECFDF5',
+    borderColor: '#A7F3D0', accentText: '#059669',
+    focusRing: 'rgba(5,150,105,0.12)', shadowTint: 'rgba(5,150,105,0.15)',
+    badgeFreeBg: '#D1FAE5', badgeFreeText: '#065F46',
   },
   ai: {
     gradient: 'linear-gradient(120deg, #8B5CF6 0%, #7C3AED 100%)',
@@ -85,11 +111,11 @@ export const CATEGORY_ACCENTS = {
     badgeFreeBg: '#EDE9FE', badgeFreeText: '#5B21B6',
   },
   image: {
-    gradient: 'linear-gradient(120deg, #FF7A1A 0%, #D96816 100%)',
-    pageBgTop: '#FFF7ED', pageBgBottom: '#FFEDD5',
-    borderColor: '#FED7AA', accentText: '#D96816',
-    focusRing: 'rgba(255,122,26,0.12)', shadowTint: 'rgba(255,122,26,0.15)',
-    badgeFreeBg: '#FFEDD5', badgeFreeText: '#9A3412',
+    gradient: 'linear-gradient(120deg, #F59E0B 0%, #F97316 100%)',
+    pageBgTop: '#FFFBEB', pageBgBottom: '#FEF3C7',
+    borderColor: '#FDE68A', accentText: '#D97706',
+    focusRing: 'rgba(217,119,6,0.12)', shadowTint: 'rgba(217,119,6,0.15)',
+    badgeFreeBg: '#FEF3C7', badgeFreeText: '#92400E',
   },
   data: {
     gradient: 'linear-gradient(120deg, #22D3EE 0%, #0891B2 100%)',
@@ -99,17 +125,17 @@ export const CATEGORY_ACCENTS = {
     badgeFreeBg: '#CFFAFE', badgeFreeText: '#155E63',
   },
   calculator: {
-    gradient: 'linear-gradient(120deg, #58749A 0%, #4B6383 100%)',
-    pageBgTop: '#F7F8FA', pageBgBottom: '#EEF1F5',
-    borderColor: '#DDE3EB', accentText: '#4B6383',
-    focusRing: 'rgba(88,116,154,0.12)', shadowTint: 'rgba(88,116,154,0.25)',
-    badgeFreeBg: '#DDE3EB', badgeFreeText: '#35465C',
+    gradient: 'linear-gradient(120deg, #2563EB 0%, #1D4ED8 100%)',
+    pageBgTop: '#EFF6FF', pageBgBottom: '#DBEAFE',
+    borderColor: '#BFDBFE', accentText: '#1D4ED8',
+    focusRing: 'rgba(37,99,235,0.12)', shadowTint: 'rgba(37,99,235,0.25)',
+    badgeFreeBg: '#DBEAFE', badgeFreeText: '#1E40AF',
   },
   utilities: {
-    gradient: 'linear-gradient(120deg, #667085 0%, #575F71 100%)',
+    gradient: 'linear-gradient(120deg, #64748B 0%, #475569 100%)',
     pageBgTop: '#F8FAFC', pageBgBottom: '#F1F5F9',
-    borderColor: '#E2E8F0', accentText: '#575F71',
-    focusRing: 'rgba(102,112,133,0.12)', shadowTint: 'rgba(102,112,133,0.15)',
+    borderColor: '#E2E8F0', accentText: '#475569',
+    focusRing: 'rgba(71,85,105,0.12)', shadowTint: 'rgba(71,85,105,0.15)',
     badgeFreeBg: '#E2E8F0', badgeFreeText: '#334155',
   },
   workflow: {
@@ -118,12 +144,5 @@ export const CATEGORY_ACCENTS = {
     borderColor: '#C7D2FE', accentText: '#4F46E5',
     focusRing: 'rgba(79,70,229,0.12)', shadowTint: 'rgba(79,70,229,0.15)',
     badgeFreeBg: '#E0E7FF', badgeFreeText: '#3730A3',
-  },
-  career: {
-    gradient: 'linear-gradient(120deg, #14B875 0%, #0E9F63 100%)',
-    pageBgTop: '#F0FDF7', pageBgBottom: '#DDFBEC',
-    borderColor: '#BBF3D8', accentText: '#0E9F63',
-    focusRing: 'rgba(20,184,117,0.12)', shadowTint: 'rgba(20,184,117,0.15)',
-    badgeFreeBg: '#DDFBEC', badgeFreeText: '#0A6E45',
   },
 };

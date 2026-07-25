@@ -1,20 +1,14 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
-import { PdfIcon, BusinessIcon, AiIcon, CareerIcon, ImageIcon, CalculatorIcon, UtilitiesIcon } from './categoryVisuals';
 
-// Same category icons as every hub page and Learn (components/categoryVisuals.js)
-// instead of a separate emoji set — one less place a category's identity drifts.
-// These are self-contained tiles (own card/border/shadow baked in), so they
-// render correctly directly on this menu's white background with no wrapper.
 const CATEGORIES = [
-  { slug: 'pdf-tools', icon: PdfIcon, title: 'PDF Tools' },
-  { slug: 'business', icon: BusinessIcon, title: 'Business Tools' },
-  { slug: 'ai-tools', icon: AiIcon, title: 'AI Tools' },
-  { slug: 'career-studio', icon: CareerIcon, title: 'Career Studio' },
-  { slug: 'image-tools', icon: ImageIcon, title: 'Image Tools' },
-  { slug: 'calculator', icon: CalculatorIcon, title: 'Calculators' },
-  { slug: 'utilities', icon: UtilitiesIcon, title: 'Utilities' },
+  { slug: 'pdf-tools', icon: '📄', title: 'PDF Tools' },
+  { slug: 'business', icon: '🧾', title: 'Business Tools' },
+  { slug: 'ai-tools', icon: '🤖', title: 'AI Tools' },
+  { slug: 'image-tools', icon: '🖼️', title: 'Image Tools' },
+  { slug: 'calculator', icon: '🧮', title: 'Calculators' },
+  { slug: 'utilities', icon: '⚙️', title: 'Utilities' },
 ];
 
 export default function Header() {

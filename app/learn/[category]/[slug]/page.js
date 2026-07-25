@@ -48,10 +48,41 @@ export default function LearnArticlePage({ params }) {
     })),
   } : null;
 
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://convertam.app/' },
+      { '@type': 'ListItem', position: 2, name: 'Learn', item: 'https://convertam.app/learn' },
+      { '@type': 'ListItem', position: 3, name: category?.title, item: `https://convertam.app/learn/${article.category}` },
+      { '@type': 'ListItem', position: 4, name: article.title, item: url },
+    ],
+  };
+
+  // Only real "how-to" guides get a HowTo schema, and only when the article
+  // actually contains one clear ordered list of steps to draw from — never
+  // fabricated steps for an article that isn't genuinely instructional.
+  const stepList = article.slug.startsWith('how-to-')
+    ? article.body?.find((b) => b.type === 'list' && b.ordered)
+    : null;
+  const howToSchema = stepList ? {
+    '@context': 'https://schema.org',
+    '@type': 'HowTo',
+    name: article.title,
+    description: article.excerpt,
+    step: stepList.items.map((text, i) => ({
+      '@type': 'HowToStep',
+      position: i + 1,
+      text,
+    })),
+  } : null;
+
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
       {faqSchema && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />}
+      {howToSchema && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(howToSchema) }} />}
       <ArticleShell article={article} />
     </>
   );

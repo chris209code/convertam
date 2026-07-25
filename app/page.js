@@ -1,7 +1,31 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+
+// Google's SearchAction schema needs a real URL target that actually
+// performs a search — "/?q={search_term_string}" plus this effect (which
+// pre-fills the search box from that query param on load) makes that true,
+// rather than the schema pointing at a URL that silently does nothing.
+const SEARCH_ACTION_SCHEMA = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'Convertam',
+  url: 'https://www.convertam.app',
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: { '@type': 'EntryPoint', urlTemplate: 'https://www.convertam.app/?q={search_term_string}' },
+    'query-input': 'required name=search_term_string',
+  },
+};
+const ORGANIZATION_SCHEMA = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'Convertam',
+  url: 'https://www.convertam.app',
+  logo: 'https://www.convertam.app/logo.png',
+  sameAs: ['https://x.com/chrisndz'],
+};
 
 // A newer, more professional icon set for the homepage category cards only —
 // categoryVisuals.js's icons are shared with the 5 hub pages (via
@@ -297,6 +321,14 @@ export default function HomePage() {
   const [search, setSearch] = useState('');
   const [showResults, setShowResults] = useState(false);
 
+  // Pre-fills the search box from ?q= so the SearchAction schema's URL
+  // target actually does something real when visited, not just a URL that
+  // resolves to the plain homepage.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('q');
+    if (q) { setSearch(q); setShowResults(true); }
+  }, []);
+
   // A real, working search over the actual tool list — no pre-existing
   // search route was found anywhere in the project to hook into, so this
   // filters live against the same tools every category page lists.
@@ -315,6 +347,8 @@ export default function HomePage() {
 
   return (
     <section className="cvt-home">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(SEARCH_ACTION_SCHEMA) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ORGANIZATION_SCHEMA) }} />
       {/* dangerouslySetInnerHTML, not a JSX text child: react-dom/server HTML-escapes
           text children (e.g. ' -> &#x27;) but <style> is a raw-text element per the
           HTML spec, so the browser never decodes that entity back — a guaranteed

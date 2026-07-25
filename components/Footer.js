@@ -49,9 +49,13 @@ export default function Footer() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
           {[
             { label: 'Our Story', href: '/about', internal: true },
+            { label: 'Why Convertam', href: '/why-convertam', internal: true },
+            { label: 'Security', href: '/security', internal: true },
+            { label: 'File Deletion Policy', href: '/file-deletion-policy', internal: true },
+            { label: 'AI Transparency', href: '/ai-transparency', internal: true },
             { label: 'Privacy Policy', href: '/about#privacy', internal: true },
             { label: 'Terms of Service', href: '/terms', internal: true },
-            { label: 'Contact', href: 'mailto:okekechris24@yahoo.com', internal: false },
+            { label: 'Contact', href: '/contact', internal: true },
             { label: '𝕏 @chrisndz', href: 'https://x.com/chrisndz', internal: false },
           ].map(({ label, href, internal }, i) => (
             <span key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

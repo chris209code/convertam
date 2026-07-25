@@ -96,6 +96,12 @@ export default function sitemap() {
       changeFrequency: 'monthly',
       priority: 0.4,
     },
+    ...['why-convertam', 'security', 'file-deletion-policy', 'ai-transparency', 'contact'].map((slug) => ({
+      url: `${BASE_URL}/${slug}`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.5,
+    })),
     ...categoryPages,
     ...toolPages,
     learnHomePage,

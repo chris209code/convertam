@@ -108,16 +108,29 @@ const SECTIONS = [
 
 const SECTIONS_WITH_HREF = SECTIONS.map((s) => ({ ...s, tools: s.tools.map((t) => ({ ...t, href: `/${t.slug}` })) }));
 
+const faqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: FAQS.map((f) => ({
+    '@type': 'Question',
+    name: f.q,
+    acceptedAnswer: { '@type': 'Answer', text: f.a },
+  })),
+};
+
 export default function PdfToolsPage() {
   return (
-    <CategoryLandingClient
-      accent={CATEGORY_ACCENTS.pdf}
-      icon={PdfIcon}
-      title="PDF Tools"
-      subtitle="Convert, edit, organize, secure and optimize PDF files — all free, all in one place."
-      sections={SECTIONS_WITH_HREF}
-      faqs={FAQS}
-      relatedCategories={RELATED_CATEGORIES}
-    />
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
+      <CategoryLandingClient
+        accent={CATEGORY_ACCENTS.pdf}
+        icon={PdfIcon}
+        title="PDF Tools"
+        subtitle="Convert, edit, organize, secure and optimize PDF files — all free, all in one place."
+        sections={SECTIONS_WITH_HREF}
+        faqs={FAQS}
+        relatedCategories={RELATED_CATEGORIES}
+      />
+    </>
   );
 }

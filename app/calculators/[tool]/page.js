@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { tools, getTool } from '@/lib/tools-config';
+import { buildToolSchemas } from '@/lib/toolSchema';
 import ToolPageClient from '@/components/ToolPageClient';
 
 // Mirrors app/[tool]/page.js's pattern, scoped to just the calculators that
@@ -25,5 +26,12 @@ export function generateMetadata({ params }) {
 export default function CalculatorToolPage({ params }) {
   const tool = getTool(params.tool);
   if (!tool || tool.basePath !== 'calculators') notFound();
-  return <ToolPageClient tool={tool} />;
+  const { softwareApplication, breadcrumbList } = buildToolSchemas(tool);
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplication) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbList) }} />
+      <ToolPageClient tool={tool} />
+    </>
+  );
 }

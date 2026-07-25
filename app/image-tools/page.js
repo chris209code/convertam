@@ -30,27 +30,6 @@ const EDITORIAL = {
   ],
 };
 
-const WORKFLOWS = [
-  {
-    id: 'scan-with-phone',
-    title: 'Clean up a phone photo of a document, then combine several into a PDF',
-    steps: [{ icon: '✨', label: 'Enhance the photo' }, { icon: '🖼️', label: 'Combine pages into a PDF' }],
-    href: '/document-enhancer',
-  },
-  {
-    id: 'resize-and-compress',
-    title: 'Fit an image to an exact size, then shrink it for faster loading',
-    steps: [{ icon: '✂️', label: 'Resize to the target dimensions' }, { icon: '🗜️', label: 'Compress the result' }],
-    href: '/resize-image',
-  },
-  {
-    id: 'watermark-before-sharing',
-    title: 'Protect photos with a watermark before sharing them publicly',
-    steps: [{ icon: '💧', label: 'Add a watermark' }, { icon: '🗜️', label: 'Compress for web use' }],
-    href: '/watermark-image',
-  },
-];
-
 const FAQS = [
   {
     q: 'Are these image tools really free, with no upload limits?',
@@ -113,7 +92,6 @@ export default function ImageToolsPage() {
         title="Image Tools"
         subtitle="Convert, compress, resize and edit images — all free, all in your browser."
         editorial={EDITORIAL}
-        workflows={WORKFLOWS}
         sections={SECTIONS_WITH_HREF}
         faqs={FAQS}
         relatedCategories={RELATED_CATEGORIES}

@@ -28,15 +28,6 @@ const EDITORIAL = {
   ],
 };
 
-const WORKFLOWS = [
-  {
-    id: 'wifi-qr-and-password',
-    title: "Share Wi-Fi access without reading out a password",
-    steps: [{ icon: '🔐', label: 'Generate a strong Wi-Fi password' }, { icon: '📱', label: 'Turn it into a scannable QR code' }],
-    href: '/password-generator',
-  },
-];
-
 const FAQS = [
   {
     q: 'Are these utilities free to use?',
@@ -89,7 +80,6 @@ export default function UtilitiesPage() {
         title="Utilities"
         subtitle="Handy, focused tools for everyday tasks — QR codes, passwords, and text formatting."
         editorial={EDITORIAL}
-        workflows={WORKFLOWS}
         sections={SECTIONS_WITH_HREF}
         faqs={FAQS}
         relatedCategories={RELATED_CATEGORIES}

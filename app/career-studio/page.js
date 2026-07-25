@@ -28,21 +28,6 @@ const EDITORIAL = {
   ],
 };
 
-const WORKFLOWS = [
-  {
-    id: 'improve-and-apply',
-    title: 'Tailor an existing CV to a job, then write a matching cover letter',
-    steps: [{ icon: '📄', label: 'Improve your CV for the target role' }, { icon: '✉️', label: 'Generate a matching cover letter' }],
-    href: '/cv-improver',
-  },
-  {
-    id: 'build-from-scratch',
-    title: "Build a CV from nothing, then write a cover letter to go with it",
-    steps: [{ icon: '🛠️', label: 'Answer guided questions in Resume Builder' }, { icon: '✉️', label: 'Generate a matching cover letter' }],
-    href: '/resume-builder',
-  },
-];
-
 const FAQS = [
   {
     q: "What's the difference between CV Improver and Resume Builder?",
@@ -99,7 +84,6 @@ export default function CareerStudioPage() {
         title="Career Studio"
         subtitle="AI-assisted CV, resume and cover letter tools — tailor what you have, or build from scratch."
         editorial={EDITORIAL}
-        workflows={WORKFLOWS}
         sections={SECTIONS_WITH_HREF}
         faqs={FAQS}
         relatedCategories={RELATED_CATEGORIES}

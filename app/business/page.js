@@ -30,27 +30,6 @@ const EDITORIAL = {
   ],
 };
 
-const WORKFLOWS = [
-  {
-    id: 'quote-to-invoice',
-    title: 'Quote a client, then convert straight to an invoice once they accept',
-    steps: [{ icon: '📋', label: 'Send a Quotation' }, { icon: '🧾', label: 'Convert it to an Invoice' }],
-    href: '/quotation-generator',
-  },
-  {
-    id: 'invoice-to-delivery',
-    title: 'Confirm a delivery straight from the invoice you already sent',
-    steps: [{ icon: '🧾', label: 'Create the Invoice' }, { icon: '📦', label: 'Convert it to a Delivery Note or Waybill' }],
-    href: '/invoice-generator',
-  },
-  {
-    id: 'quote-sign-deliver',
-    title: 'Take a deal from quote to signed, paid, and delivered',
-    steps: [{ icon: '📋', label: 'Quotation' }, { icon: '🧾', label: 'Invoice' }, { icon: '✒️', label: 'Sign it' }, { icon: '📦', label: 'Delivery Note' }],
-    href: '/business-document-studio',
-  },
-];
-
 const FAQS = [
   {
     q: 'What\'s the difference between Business Document Studio and the individual generators?',
@@ -120,7 +99,6 @@ export default function BusinessPage() {
         title="Business Tools"
         subtitle="Professional business documents — invoices, quotations, delivery notes and ID cards."
         editorial={EDITORIAL}
-        workflows={WORKFLOWS}
         sections={SECTIONS_WITH_HREF}
         faqs={FAQS}
         relatedCategories={RELATED_CATEGORIES}

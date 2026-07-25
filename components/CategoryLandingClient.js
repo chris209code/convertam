@@ -9,47 +9,13 @@ import Link from 'next/link';
 // page for each one. Only the content passed in changes; the structure and
 // design language stay identical everywhere it's used:
 //
-//   Back to Home -> Title -> Description -> Popular Workflows -> Tool
-//   Listings -> FAQ -> Related Categories
+//   Back to Home -> Title -> Description -> Tool Listings -> FAQ ->
+//   Related Categories
 //
 // Deliberately keeps the "get to the tools fast" philosophy from the plain
-// launcher version (no search bar, no single Featured Tool card) while
-// adding genuine educational content: workflow cards that teach how several
-// tools chain together for a real task, and a category-level FAQ. Nothing
-// sits between the workflows and the tool grid.
-
-// Small rotating palette for the workflow icon chips — purely visual
-// variety within a card, independent of the page's own category accent.
-const CHIP_COLORS = ['#FEE2E2', '#DBEAFE', '#D1FAE5', '#EDE9FE', '#FEF3C7'];
-
-function WorkflowCard({ workflow, accent }) {
-  return (
-    <div className="cl-workflow-card">
-      <p className="cl-workflow-title">{workflow.title}</p>
-
-      <div className="cl-workflow-chips">
-        {workflow.steps.map((step, i) => (
-          <span key={i} className="cl-workflow-chip-wrap">
-            <span className="cl-workflow-chip" style={{ background: CHIP_COLORS[i % CHIP_COLORS.length] }}>
-              {step.icon}
-            </span>
-            {i < workflow.steps.length - 1 && <span className="cl-workflow-arrow">→</span>}
-          </span>
-        ))}
-      </div>
-
-      <ol className="cl-workflow-steps">
-        {workflow.steps.map((step, i) => (
-          <li key={i}>{step.label}</li>
-        ))}
-      </ol>
-
-      <Link href={workflow.href} className="cl-workflow-link" style={{ color: accent.accentText }}>
-        Use Workflow →
-      </Link>
-    </div>
-  );
-}
+// launcher version (no search bar, no single Featured Tool card, no
+// Popular Workflows block) — the editorial intro leads straight into the
+// tool grid so it's reachable with minimal scrolling.
 
 function ToolCard({ tool, accent }) {
   const disabled = tool.available === false;
@@ -86,7 +52,7 @@ function FaqItem({ q, a }) {
   );
 }
 
-export default function CategoryLandingClient({ accent, icon, title, subtitle, editorial, workflows, sections, faqs, relatedCategories }) {
+export default function CategoryLandingClient({ accent, icon, title, subtitle, editorial, sections, faqs, relatedCategories }) {
   const showNav = sections.length > 1;
 
   function scrollToSection(id) {
@@ -113,30 +79,6 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, e
         .th-header-icon { width: 46px; height: 46px; border-radius: 14px; background: ${accent.gradient}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 8px 20px ${accent.shadowTint}; font-size: 1.3rem; }
 
         .cl-section-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #94A3B8; margin: 0 0 8px; }
-
-        .cl-workflow-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-        .cl-workflow-card {
-          border: 1px solid #EEF1F5; border-radius: 12px; padding: 12px; background: #FEFEFE;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 2px rgba(15,23,42,0.04), 0 6px 16px rgba(15,23,42,0.05);
-          display: flex; flex-direction: column; gap: 7px;
-          transition: transform 0.25s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s ease, background 0.25s ease;
-        }
-        .cl-workflow-card:hover {
-          transform: translateY(-2px); background: #FFFFFF;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 4px rgba(15,23,42,0.05), 0 12px 24px rgba(15,23,42,0.08);
-        }
-        .cl-workflow-title { font-size: 0.8rem; font-weight: 700; color: #0F172A; margin: 0; line-height: 1.25; }
-        .cl-workflow-chips { display: flex; align-items: center; flex-wrap: wrap; gap: 3px; }
-        .cl-workflow-chip-wrap { display: flex; align-items: center; gap: 3px; }
-        .cl-workflow-chip {
-          width: 22px; height: 22px; border-radius: 7px; display: flex; align-items: center;
-          justify-content: center; font-size: 0.72rem; flex-shrink: 0;
-        }
-        .cl-workflow-arrow { color: #CBD5E1; font-size: 0.68rem; }
-        .cl-workflow-steps { margin: 0; padding-left: 15px; display: flex; flex-direction: column; gap: 1px; }
-        .cl-workflow-steps li { font-size: 0.68rem; color: #64748B; line-height: 1.3; }
-        .cl-workflow-link { font-size: 0.72rem; font-weight: 700; text-decoration: none; margin-top: auto; }
-        .cl-workflow-link:hover { text-decoration: underline; }
 
         .th-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
         .th-card {
@@ -204,7 +146,7 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, e
         .cl-related-desc { font-size: 0.76rem; color: #64748B; margin: 0; line-height: 1.4; }
         .cl-related-cta { font-size: 0.76rem; font-weight: 700; margin-top: auto; }
 
-        .cl-editorial { display: grid; grid-template-columns: 1.6fr 1fr; gap: 28px; margin-bottom: 26px; align-items: start; }
+        .cl-editorial { display: grid; grid-template-columns: 1.6fr 1fr; gap: 28px; margin-bottom: 18px; align-items: start; }
         .cl-editorial-intro p { font-size: 0.88rem; color: #334155; line-height: 1.65; margin: 0 0 12px; }
         .cl-editorial-intro p:last-child { margin-bottom: 0; }
         .cl-editorial-side { display: flex; flex-direction: column; gap: 16px; }
@@ -218,7 +160,6 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, e
         .cl-learn-link:hover { color: ${accent.accentText}; text-decoration: underline; }
 
         @media (max-width: 1024px) {
-          .cl-workflow-grid { grid-template-columns: repeat(2, 1fr); }
           .cl-related-grid { grid-template-columns: repeat(3, 1fr); }
           .cl-editorial { grid-template-columns: 1fr; }
         }
@@ -228,7 +169,6 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, e
         @media (max-width: 640px) {
           .page-inner { padding: 0 5%; }
           .th-grid { grid-template-columns: 1fr; }
-          .cl-workflow-grid { grid-template-columns: 1fr; }
           .cl-faq-grid { grid-template-columns: 1fr; }
           .cl-related-grid { grid-template-columns: repeat(2, 1fr); }
         }
@@ -255,7 +195,7 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, e
         </div>
       </div>
 
-      <div className="page-inner" style={{ padding: '14px 4% 56px' }}>
+      <div className="page-inner" style={{ padding: '10px 4% 56px' }}>
 
         {editorial && (
           <div className="cl-editorial">
@@ -281,15 +221,6 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, e
                   </ul>
                 </div>
               )}
-            </div>
-          </div>
-        )}
-
-        {workflows && workflows.length > 0 && (
-          <div style={{ marginBottom: 18 }}>
-            <p className="cl-section-label">Popular Workflows</p>
-            <div className="cl-workflow-grid">
-              {workflows.map((w) => <WorkflowCard key={w.id} workflow={w} accent={accent} />)}
             </div>
           </div>
         )}

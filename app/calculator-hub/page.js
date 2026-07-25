@@ -30,27 +30,6 @@ const EDITORIAL = {
   ],
 };
 
-const WORKFLOWS = [
-  {
-    id: 'salary-to-budget',
-    title: 'Work out take-home pay, then plan a monthly budget around it',
-    steps: [{ icon: '💰', label: 'Calculate take-home salary' }, { icon: '💵', label: 'Build a budget around it' }],
-    href: '/salary-calculator',
-  },
-  {
-    id: 'price-with-vat-and-margin',
-    title: 'Price a product correctly: add VAT, then check your real margin',
-    steps: [{ icon: '🧾', label: 'Add VAT to the price' }, { icon: '📈', label: 'Check the resulting profit margin' }],
-    href: '/calculators/vat-calculator',
-  },
-  {
-    id: 'loan-affordability',
-    title: 'Check whether a loan fits your budget before committing',
-    steps: [{ icon: '🏦', label: 'Calculate loan repayments' }, { icon: '💵', label: 'Compare against your budget' }],
-    href: '/calculators/loan-calculator',
-  },
-];
-
 const FAQS = [
   {
     q: 'Are these calculators accurate enough for real financial decisions?',
@@ -120,7 +99,6 @@ export default function CalculatorHubPage() {
         title="Calculator Hub"
         subtitle="Calculators that help you make real financial and business decisions."
         editorial={EDITORIAL}
-        workflows={WORKFLOWS}
         sections={SECTIONS_WITH_HREF}
         faqs={FAQS}
         relatedCategories={RELATED_CATEGORIES}

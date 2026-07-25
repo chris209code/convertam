@@ -29,27 +29,6 @@ const EDITORIAL = {
   ],
 };
 
-const WORKFLOWS = [
-  {
-    id: 'scan-summarize',
-    title: 'Turn a scanned report into a written summary',
-    steps: [{ icon: '📸', label: 'Read the scan with Smart AI Converter' }, { icon: '📚', label: 'Summarize the extracted text' }],
-    href: '/smart-converter',
-  },
-  {
-    id: 'translate-contract',
-    title: 'Understand a contract written in another language',
-    steps: [{ icon: '🌐', label: 'Translate the document' }, { icon: '📜', label: 'Summarize its key terms' }],
-    href: '/document-translator',
-  },
-  {
-    id: 'data-to-deck',
-    title: 'Turn raw spreadsheet data into a presentation-ready report',
-    steps: [{ icon: '📊', label: 'Analyze the data' }, { icon: '🎞️', label: 'Generate a presentation from the findings' }],
-    href: '/data-analyst',
-  },
-];
-
 const FAQS = [
   {
     q: 'Which AI model powers these tools, and is my data used to train it?',
@@ -112,7 +91,6 @@ export default function AIToolsPage() {
         title="AI Tools"
         subtitle="Powered by Google Gemini AI — smart tools that read, extract, translate and analyze your documents."
         editorial={EDITORIAL}
-        workflows={WORKFLOWS}
         sections={SECTIONS_WITH_HREF}
         faqs={FAQS}
         relatedCategories={RELATED_CATEGORIES}

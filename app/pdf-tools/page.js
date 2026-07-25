@@ -30,33 +30,6 @@ const EDITORIAL = {
   ],
 };
 
-const WORKFLOWS = [
-  {
-    id: 'scan-to-word',
-    title: 'Turn a scanned document into an editable Word file',
-    steps: [{ icon: '🔎', label: 'Run OCR PDF to extract real text from the scan' }, { icon: '📝', label: 'Convert the result to Word' }],
-    href: '/ocr-pdf',
-  },
-  {
-    id: 'merge-protect-send',
-    title: 'Combine, watermark and password-protect before sending',
-    steps: [{ icon: '🔗', label: 'Merge the files into one PDF' }, { icon: '💧', label: 'Add a watermark' }, { icon: '🔒', label: 'Password-protect the result' }],
-    href: '/merge-pdf',
-  },
-  {
-    id: 'shrink-for-email',
-    title: 'Shrink a large PDF so it fits an email attachment limit',
-    steps: [{ icon: '🗜️', label: 'Compress the PDF' }],
-    href: '/compress-pdf',
-  },
-  {
-    id: 'sign-and-merge',
-    title: 'Sign a contract and merge it with supporting documents',
-    steps: [{ icon: '✒️', label: 'Sign the document' }, { icon: '🔗', label: 'Merge it with the rest of the package' }],
-    href: '/sign-documents',
-  },
-];
-
 const FAQS = [
   {
     q: 'Is Convertam\'s PDF tools really free?',
@@ -173,7 +146,6 @@ export default function PdfToolsPage() {
         title="PDF Tools"
         subtitle="Convert, edit, organize, secure and optimize PDF files — all free, all in one place."
         editorial={EDITORIAL}
-        workflows={WORKFLOWS}
         sections={SECTIONS_WITH_HREF}
         faqs={FAQS}
         relatedCategories={RELATED_CATEGORIES}

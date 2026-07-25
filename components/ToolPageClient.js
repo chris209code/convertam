@@ -70,7 +70,7 @@ const isFree = (mode) =>
    'remove-pages', 'add-page-numbers', 'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize',
    'fill', 'write-on-pdf', 'quotation', 'salary-calculator', 'loan-calculator', 'vat-calculator', 'profit-margin', 'discount-calculator', 'age-calculator',
    'expense-budget-calculator', 'break-even-calculator', 'savings-goal-calculator',
-   'utilities-hub', 'cv-improver', 'resume-builder', 'ask-solve-ai', 'document-translator', 'qr-code-generator',
+   'utilities-hub', 'cv-improver', 'resume-builder', 'ask-solve-ai', 'document-translator', 'qr-code-studio',
    'cover-letter', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'presentation-generator', 'data-analyst',
    'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio', 'password-studio'].includes(mode);
 

@@ -247,10 +247,7 @@ export default function HomePage() {
         .cvt-chips a { display: inline-flex; align-items: center; min-height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: rgb(255 255 255 / 76%); color: #536178; font-weight: 700; text-decoration: none; }
         .cvt-chips a:hover { color: var(--blue); }
 
-        .cvt-suite-section { padding-top: 44px; }
-        .cvt-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
-        .cvt-section-heading p { margin: 0 0 6px; color: var(--blue); font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; font-size: 12px; }
-        .cvt-section-heading h2 { margin: 0; font-size: clamp(24px, 3vw, 34px); line-height: 1.1; }
+        .cvt-suite-section { padding-top: 40px; }
         .cvt-suite-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
         .cvt-suite-card { --accent: var(--blue); position: relative; overflow: hidden; display: flex; min-height: 270px; flex-direction: column; padding: 20px; border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--line)); border-radius: 12px; background: radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 36%), linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, white), #ffffff 45%); box-shadow: var(--soft-shadow); text-decoration: none; color: inherit; }
         .cvt-suite-card::before { content: ''; position: absolute; inset: 0 0 auto; height: 5px; background: var(--accent); }
@@ -339,13 +336,6 @@ export default function HomePage() {
         </div>
 
         <div className="cvt-suite-section">
-          <div className="cvt-section-heading">
-            <div>
-              <p>Choose a suite</p>
-              <h2>Everything you need, grouped clearly.</h2>
-            </div>
-          </div>
-
           <div className="cvt-suite-grid">
             {SUITES.map((s) => (
               <div key={s.name} className={`cvt-suite-card ${s.slug}`}>

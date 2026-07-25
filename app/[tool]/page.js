@@ -24,11 +24,12 @@ export default function ToolPage({ params }) {
   // A tool with a basePath only exists at its nested URL — this keeps the
   // flat /<slug> from also resolving, so there's one canonical URL per tool.
   if (!tool || tool.basePath) notFound();
-  const { softwareApplication, breadcrumbList } = buildToolSchemas(tool);
+  const { softwareApplication, breadcrumbList, faqSchema } = buildToolSchemas(tool);
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplication) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbList) }} />
+      {faqSchema && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />}
       <ToolPageClient tool={tool} />
     </>
   );

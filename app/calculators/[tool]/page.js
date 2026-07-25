@@ -26,11 +26,12 @@ export function generateMetadata({ params }) {
 export default function CalculatorToolPage({ params }) {
   const tool = getTool(params.tool);
   if (!tool || tool.basePath !== 'calculators') notFound();
-  const { softwareApplication, breadcrumbList } = buildToolSchemas(tool);
+  const { softwareApplication, breadcrumbList, faqSchema } = buildToolSchemas(tool);
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplication) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbList) }} />
+      {faqSchema && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />}
       <ToolPageClient tool={tool} />
     </>
   );

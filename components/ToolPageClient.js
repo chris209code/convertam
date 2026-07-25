@@ -56,9 +56,11 @@ import Link from 'next/link';
 import { getTool } from '@/lib/tools-config';
 import { toolMeta } from '@/lib/tool-meta';
 import { toolGuides } from '@/lib/toolGuides';
+import { toolExtras } from '@/lib/toolExtras';
 import QuickGuideTab from '@/components/tool-guide/QuickGuideTab';
 import FullFaqSection from '@/components/tool-guide/FullFaqSection';
 import RelatedToolsCard from '@/components/tool-guide/RelatedToolsCard';
+import ToolExtrasSection from '@/components/tool-guide/ToolExtrasSection';
 import WorkspaceLayoutShell from '@/components/workspace/WorkspaceLayoutShell';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 
@@ -87,6 +89,7 @@ export default function ToolPageClient({ tool }) {
   // tips box / related-chips row below — scoped per-tool via that data,
   // so every other tool's page renders exactly as it did before.
   const guide = toolGuides[tool.slug];
+  const extras = toolExtras[tool.slug];
   const { session } = useDocumentSession();
   // Price/speed badges, the steps breadcrumb, and the tips box are
   // acquisition chrome aimed at a cold visitor deciding whether to use this
@@ -206,7 +209,7 @@ export default function ToolPageClient({ tool }) {
             RelatedToolsCard below for tools that have a guide. */}
         {relatedTools.length > 0 && !guide && (
           <div className="mt-8">
-            <p className="text-xs font-semibold text-ink-soft uppercase tracking-widest mb-3">Related Tools</p>
+            <p className="text-xs font-semibold text-ink-soft uppercase tracking-widest mb-3">People Also Use</p>
             <div className="flex flex-wrap gap-2">
               {relatedTools.map((t) => (
                 <Link key={t.slug} href={`/${t.slug}`} className="text-sm font-medium px-4 py-2 rounded-lg transition-colors" style={{ background: '#fffefb', border: '1px solid #e2dcc9', color: '#1c2333', textDecoration: 'none' }}>
@@ -217,10 +220,15 @@ export default function ToolPageClient({ tool }) {
           </div>
         )}
 
+        {/* Supported Formats / Best For / Common Uses / Pro Tip / Questions
+            People Ask — search-intent content, kept distinct from the Quick
+            Guide's "how to use this tool" material above. */}
+        <ToolExtrasSection extras={extras} />
+
         {guide && (
           <div className="mt-10 grid gap-5 md:grid-cols-2 items-start">
             <FullFaqSection items={guide.fullFaqs} />
-            <RelatedToolsCard tools={guide.relatedTools} />
+            <RelatedToolsCard tools={guide.relatedTools} heading="People Also Use" />
           </div>
         )}
       </main>

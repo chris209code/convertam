@@ -86,7 +86,7 @@ function FaqItem({ q, a }) {
   );
 }
 
-export default function CategoryLandingClient({ accent, icon, title, subtitle, workflows, sections, faqs, relatedCategories }) {
+export default function CategoryLandingClient({ accent, icon, title, subtitle, editorial, workflows, sections, faqs, relatedCategories }) {
   const showNav = sections.length > 1;
 
   function scrollToSection(id) {
@@ -204,9 +204,23 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, w
         .cl-related-desc { font-size: 0.76rem; color: #64748B; margin: 0; line-height: 1.4; }
         .cl-related-cta { font-size: 0.76rem; font-weight: 700; margin-top: auto; }
 
+        .cl-editorial { display: grid; grid-template-columns: 1.6fr 1fr; gap: 28px; margin-bottom: 26px; align-items: start; }
+        .cl-editorial-intro p { font-size: 0.88rem; color: #334155; line-height: 1.65; margin: 0 0 12px; }
+        .cl-editorial-intro p:last-child { margin-bottom: 0; }
+        .cl-editorial-side { display: flex; flex-direction: column; gap: 16px; }
+        .cl-editorial-card { border: 1px solid #EEF1F5; border-radius: 14px; padding: 14px 16px; background: #FEFEFE; box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 2px rgba(15,23,42,0.04); }
+        .cl-editorial-card h3 { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #94A3B8; margin: 0 0 10px; }
+        .cl-whofor-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; }
+        .cl-whofor-list li { font-size: 0.8rem; color: #334155; line-height: 1.4; padding-left: 18px; position: relative; }
+        .cl-whofor-list li::before { content: '✓'; position: absolute; left: 0; color: ${accent.accentText}; font-weight: 700; }
+        .cl-learn-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+        .cl-learn-link { font-size: 0.8rem; font-weight: 600; text-decoration: none; color: #0F172A; display: block; line-height: 1.4; }
+        .cl-learn-link:hover { color: ${accent.accentText}; text-decoration: underline; }
+
         @media (max-width: 1024px) {
           .cl-workflow-grid { grid-template-columns: repeat(2, 1fr); }
           .cl-related-grid { grid-template-columns: repeat(3, 1fr); }
+          .cl-editorial { grid-template-columns: 1fr; }
         }
         @media (max-width: 860px) {
           .th-grid { grid-template-columns: repeat(2, 1fr); }
@@ -242,6 +256,34 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, w
       </div>
 
       <div className="page-inner" style={{ padding: '14px 4% 56px' }}>
+
+        {editorial && (
+          <div className="cl-editorial">
+            <div className="cl-editorial-intro">
+              {editorial.intro.map((p, i) => <p key={i}>{p}</p>)}
+            </div>
+            <div className="cl-editorial-side">
+              {editorial.whoFor && editorial.whoFor.length > 0 && (
+                <div className="cl-editorial-card">
+                  <h3>Who This Is For</h3>
+                  <ul className="cl-whofor-list">
+                    {editorial.whoFor.map((w, i) => <li key={i}>{w}</li>)}
+                  </ul>
+                </div>
+              )}
+              {editorial.learnLinks && editorial.learnLinks.length > 0 && (
+                <div className="cl-editorial-card">
+                  <h3>From the Learn Center</h3>
+                  <ul className="cl-learn-list">
+                    {editorial.learnLinks.map((l) => (
+                      <li key={l.href}><Link href={l.href} className="cl-learn-link">{l.title} →</Link></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {workflows && workflows.length > 0 && (
           <div style={{ marginBottom: 18 }}>

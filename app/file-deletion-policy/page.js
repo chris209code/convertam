@@ -1,10 +1,14 @@
 import Link from 'next/link';
+import { buildOgMeta } from '@/lib/pageMetadata';
+
+const TITLE = 'File Deletion Policy — What Happens to Your File on Convertam';
+const DESCRIPTION = 'Exactly what happens to your file when you use Convertam: which tools never leave your device, how server-side files are deleted, and what we never keep.';
 
 export const metadata = {
-  title: 'File Deletion Policy — What Happens to Your File on Convertam',
-  description:
-    'Exactly what happens to your file when you use Convertam: which tools never leave your device, how server-side files are deleted, and what we never keep.',
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: '/file-deletion-policy' },
+  ...buildOgMeta({ title: TITLE, description: DESCRIPTION, path: '/file-deletion-policy' }),
 };
 
 export default function FileDeletionPolicyPage() {

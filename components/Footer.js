@@ -48,6 +48,24 @@ export default function Footer() {
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
           {[
+            { label: 'PDF Suite', href: '/pdf-tools' },
+            { label: 'Business Suite', href: '/business' },
+            { label: 'Career Studio', href: '/career-studio' },
+            { label: 'AI Workspace', href: '/ai-tools' },
+            { label: 'Image Studio', href: '/image-tools' },
+            { label: 'Calculators', href: '/calculator-hub' },
+            { label: 'Utilities', href: '/utilities' },
+            { label: 'Learn', href: '/learn' },
+          ].map(({ label, href }, i) => (
+            <span key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {i > 0 && <span style={{ color: '#CBD5E1', fontSize: '0.65rem' }}>·</span>}
+              <Link href={href} style={{ fontSize: '0.78rem', color: '#0F172A', textDecoration: 'none', fontWeight: 600 }}>{label}</Link>
+            </span>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
+          {[
             { label: 'Our Story', href: '/about', internal: true },
             { label: 'Why Convertam', href: '/why-convertam', internal: true },
             { label: 'Security', href: '/security', internal: true },

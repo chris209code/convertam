@@ -1,10 +1,73 @@
-import ToolHubClient from '../../components/ToolHubClient';
-import { AiIcon, CATEGORY_ACCENTS } from '../../components/categoryVisuals';
+import CategoryLandingClient from '../../components/CategoryLandingClient';
+import { AiIcon, CATEGORY_ACCENTS, relatedSuites } from '../../components/categoryVisuals';
+import { buildOgMeta } from '../../lib/pageMetadata';
+
+const TITLE = 'AI Tools — Convertam';
+const DESCRIPTION = 'AI-powered tools that read, summarize, translate and analyze your documents. Powered by Google Gemini. Free, no login required.';
 
 export const metadata = {
-  title: 'AI Tools — Convertam',
-  description: 'AI-powered document tools. Summarize PDFs, extract text, improve CVs and more. Free, no login required.',
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: '/ai-tools' },
+  ...buildOgMeta({ title: TITLE, description: DESCRIPTION, path: '/ai-tools' }),
 };
+
+const EDITORIAL = {
+  intro: [
+    "AI Workspace is for the tasks a regular converter can't do — reading a photograph of a document, summarizing a report you don't have time to read in full, translating a contract into another language, or turning raw data into a written analysis. Each tool sends only what it needs (extracted text, or the file itself for image-based tools) to Google's Gemini model, and nothing is used to train any AI or kept longer than the job takes.",
+    "These tools are genuinely useful, not infallible — AI reads handwriting and low-quality scans imperfectly, and every tool here is built to say so honestly (flagging uncertain text rather than guessing) instead of presenting a confident-sounding wrong answer as fact. Reviewing AI output before you rely on it is worth the extra minute, especially for numbers and names.",
+  ],
+  whoFor: [
+    'Anyone with a scan or photo instead of a real digital document',
+    'People who need the gist of a long report without reading every page',
+    'Businesses handling contracts, receipts, or documents in another language',
+    'Anyone turning raw data or notes into a report or presentation',
+  ],
+  learnLinks: [
+    { title: 'What Is OCR, and When Do You Need It?', href: '/learn/ai-guides/what-is-ocr-and-when-you-need-it' },
+    { title: 'How AI Document Translation Actually Works', href: '/learn/ai-guides/how-ai-document-translation-works' },
+  ],
+};
+
+const WORKFLOWS = [
+  {
+    id: 'scan-summarize',
+    title: 'Turn a scanned report into a written summary',
+    steps: [{ icon: '📸', label: 'Read the scan with Smart AI Converter' }, { icon: '📚', label: 'Summarize the extracted text' }],
+    href: '/smart-converter',
+  },
+  {
+    id: 'translate-contract',
+    title: 'Understand a contract written in another language',
+    steps: [{ icon: '🌐', label: 'Translate the document' }, { icon: '📜', label: 'Summarize its key terms' }],
+    href: '/document-translator',
+  },
+  {
+    id: 'data-to-deck',
+    title: 'Turn raw spreadsheet data into a presentation-ready report',
+    steps: [{ icon: '📊', label: 'Analyze the data' }, { icon: '🎞️', label: 'Generate a presentation from the findings' }],
+    href: '/data-analyst',
+  },
+];
+
+const FAQS = [
+  {
+    q: 'Which AI model powers these tools, and is my data used to train it?',
+    a: 'Every AI tool here uses Google Gemini via the Google API. Your files and text are sent only to generate your result and are not used to train Gemini or any other model.',
+  },
+  {
+    q: 'Are the AI tools free?',
+    a: 'Yes — every AI tool is free, though Document Translator and AI Data Analyst\'s narrative reports have a fair-use daily limit to keep the service sustainable for everyone.',
+  },
+  {
+    q: 'What happens if the AI misreads something?',
+    a: "These tools are built to flag uncertainty rather than guess — OCR PDF marks unclear words as [UNREADABLE] instead of inventing text, and AI Data Analyst computes every number itself rather than letting the AI make one up. Always review results before relying on them for anything important.",
+  },
+  {
+    q: 'Can these tools read handwriting or photographs, not just typed text?',
+    a: 'Yes — Smart AI Converter, OCR PDF, Receipt & Invoice Scanner, and Contract Summarizer can all work from a clear photo, not just a digitally created file.',
+  },
+];
 
 const SECTIONS = [
   {
@@ -12,32 +75,48 @@ const SECTIONS = [
     label: 'All AI Tools',
     icon: '🤖',
     tools: [
-      { slug: 'summarize-pdf', title: 'Summarize PDF', desc: 'Upload a PDF and AI summarizes it instantly', icon: '📚', badge: 'free' },
-      { slug: 'smart-converter', title: 'Smart AI Converter', desc: 'Photograph a document and get back a Word or Excel file', icon: '📸', badge: 'free' },
-      { slug: 'receipt-scanner', title: 'Receipt & Invoice Scanner', desc: 'Scan a receipt and AI extracts vendor, items, totals', icon: '🧾', badge: 'free' },
-      { slug: 'ocr-pdf', title: 'OCR PDF', desc: 'Extract text from scanned PDFs and images using AI', icon: '🔎', badge: 'free' },
-      { slug: 'cv-improver', title: 'CV Improver', desc: 'Upload your CV and AI rewrites and improves it', icon: '📄', badge: 'free' },
-      { slug: 'resume-builder', title: 'Resume Builder', desc: 'A guided, AI-assisted CV builder for starting from scratch', icon: '🛠️', badge: 'free' },
-      { slug: 'ask-solve-ai', title: 'Ask & Solve AI', desc: 'Scan, type or upload a question and get clear answers instantly', icon: '💡', badge: 'free' },
-      { slug: 'document-translator', title: 'Document Translator', desc: 'Translate a PDF, Word, PowerPoint or text file with layout preserved', icon: '🌐', badge: 'free' },
-      { slug: 'cover-letter', title: 'Cover Letter Writer', desc: 'Generate a professional cover letter with AI', icon: '✉️', badge: 'free' },
-      { slug: 'contract-summarizer', title: 'Contract Summarizer', desc: 'Upload a contract and AI highlights key points', icon: '📜', badge: 'free' },
-      { slug: 'presentation-generator', title: 'AI Presentation Generator', desc: 'Turn documents into an editable PowerPoint presentation', icon: '🎞️', badge: 'free' },
-      { slug: 'data-analyst', title: 'AI Data Analyst', desc: 'Upload data and get charts, insights, and an executive report', icon: '📊', badge: 'free' },
+      { slug: 'summarize-pdf', title: 'Summarize PDF', desc: 'Get an AI summary, key points, or simplified version of a PDF', icon: '📚', badge: 'free' },
+      { slug: 'smart-converter', title: 'Smart AI Converter', desc: 'Photograph a document and get a clean Word file or Excel table', icon: '📸', badge: 'free' },
+      { slug: 'receipt-scanner', title: 'Receipt & Invoice Scanner', desc: 'Photograph a receipt and extract vendor, items and totals to Excel', icon: '🧾', badge: 'free' },
+      { slug: 'ocr-pdf', title: 'OCR PDF', desc: 'Extract text from scanned PDFs and images, including handwriting', icon: '🔎', badge: 'free' },
+      { slug: 'document-translator', title: 'Document Translator', desc: 'Translate a document with a side-by-side preview of the original', icon: '🌐', badge: 'free' },
+      { slug: 'contract-summarizer', title: 'Contract Summarizer', desc: 'Get a plain-language breakdown of a contract\'s key terms', icon: '📜', badge: 'free' },
+      { slug: 'ask-solve-ai', title: 'Ask & Solve AI', desc: 'Get clear answers to math or general questions, typed or photographed', icon: '💡', badge: 'free' },
+      { slug: 'presentation-generator', title: 'AI Presentation Generator', desc: 'Turn documents or notes into an editable PowerPoint deck', icon: '🎞️', badge: 'free' },
+      { slug: 'data-analyst', title: 'AI Data Analyst', desc: 'Upload data and get automatic charts, insights and a written report', icon: '📊', badge: 'free' },
     ],
   },
 ];
 
 const SECTIONS_WITH_HREF = SECTIONS.map((s) => ({ ...s, tools: s.tools.map((t) => ({ ...t, href: `/${t.slug}` })) }));
 
+const RELATED_CATEGORIES = relatedSuites('ai-tools');
+
+const faqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: FAQS.map((f) => ({
+    '@type': 'Question',
+    name: f.q,
+    acceptedAnswer: { '@type': 'Answer', text: f.a },
+  })),
+};
+
 export default function AIToolsPage() {
   return (
-    <ToolHubClient
-      accent={CATEGORY_ACCENTS.ai}
-      icon={AiIcon}
-      title="AI Tools"
-      subtitle="Powered by Google Gemini AI — smart tools that read, extract and improve your documents."
-      sections={SECTIONS_WITH_HREF}
-    />
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
+      <CategoryLandingClient
+        accent={CATEGORY_ACCENTS.ai}
+        icon={AiIcon}
+        title="AI Tools"
+        subtitle="Powered by Google Gemini AI — smart tools that read, extract, translate and analyze your documents."
+        editorial={EDITORIAL}
+        workflows={WORKFLOWS}
+        sections={SECTIONS_WITH_HREF}
+        faqs={FAQS}
+        relatedCategories={RELATED_CATEGORIES}
+      />
+    </>
   );
 }

@@ -32,7 +32,7 @@ export default function TextCleanerPage() {
           <div style={{ marginTop: 40, paddingTop: 24, borderTop: '1px solid #E2E8F0' }}>
             <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Related Tools</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              <Link href="/utilities-hub" style={{ fontSize: '0.85rem', fontWeight: 600, padding: '8px 16px', borderRadius: 10, border: '1px solid #E2E8F0', color: '#0F172A', textDecoration: 'none', background: '#fff' }}>Word Counter →</Link>
+              <Link href="/text-case-converter" style={{ fontSize: '0.85rem', fontWeight: 600, padding: '8px 16px', borderRadius: 10, border: '1px solid #E2E8F0', color: '#0F172A', textDecoration: 'none', background: '#fff' }}>Text Case Converter →</Link>
               <Link href="/data-tools" style={{ fontSize: '0.85rem', fontWeight: 600, padding: '8px 16px', borderRadius: 10, border: '1px solid #E2E8F0', color: '#0F172A', textDecoration: 'none', background: '#fff' }}>All Data Tools →</Link>
               <Link href="/pdf-tools" style={{ fontSize: '0.85rem', fontWeight: 600, padding: '8px 16px', borderRadius: 10, border: '1px solid #E2E8F0', color: '#0F172A', textDecoration: 'none', background: '#fff' }}>PDF Tools →</Link>
             </div>

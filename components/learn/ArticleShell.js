@@ -1,5 +1,8 @@
+import Link from 'next/link';
 import { getLearnCategory } from '@/lib/learn/categories';
 import { getTableOfContents, getReadingTime } from '@/lib/learn';
+import { getTool } from '@/lib/tools-config';
+import { HUB_BY_CATEGORY } from '@/lib/toolSchema';
 import { CATEGORY_ACCENTS, PdfIcon, BusinessIcon, AiIcon, ImageIcon, CalculatorIcon, UtilitiesIcon, WorkflowIcon } from '@/components/categoryVisuals';
 import FullFaqSection from '@/components/tool-guide/FullFaqSection';
 import RelatedToolsCard from '@/components/tool-guide/RelatedToolsCard';
@@ -22,6 +25,8 @@ export default function ArticleShell({ article }) {
   const accent = CATEGORY_ACCENTS[category.accentKey];
   const toc = getTableOfContents(article);
   const readingTime = getReadingTime(article);
+  const primaryToolConfig = article.primaryTool && getTool(article.primaryTool.slug);
+  const hub = primaryToolConfig && HUB_BY_CATEGORY[primaryToolConfig.category];
 
   return (
     <main className="lrn-shell">
@@ -51,6 +56,15 @@ export default function ArticleShell({ article }) {
           <div style={{ maxWidth: 720 }}>
             <RelatedToolsCard tools={article.relatedTools} heading="Use These Tools" />
           </div>
+        )}
+        {hub && (
+          <Link
+            href={`/${hub.slug}`}
+            className="inline-flex items-center gap-1.5 mt-4 text-sm font-medium hover:underline"
+            style={{ color: accent.accentText }}
+          >
+            Explore the full {hub.name} →
+          </Link>
         )}
       </div>
     </main>

@@ -29,9 +29,11 @@ export default function sitemap() {
   const categoryPages = [
     'pdf-tools',
     'business',
+    'career-studio',
     'ai-tools',
     'image-tools',
     'calculator-hub',
+    'utilities',
   ].map((slug) => ({
     url: `${BASE_URL}/${slug}`,
     lastModified: new Date(),

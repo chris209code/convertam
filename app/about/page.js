@@ -1,7 +1,13 @@
+import { buildOgMeta } from '@/lib/pageMetadata';
+
+const TITLE = 'About Convertam — Free File Conversion, No Login';
+const DESCRIPTION = 'Learn about Convertam, our story, privacy policy, and answers to common questions about file conversion, security, and how our tools work.';
+
 export const metadata = {
-  title: 'About Convertam — Free File Conversion, No Login',
-  description:
-    'Learn about Convertam, our story, privacy policy, and answers to common questions about file conversion, security, and how our tools work.',
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: '/about' },
+  ...buildOgMeta({ title: TITLE, description: DESCRIPTION, path: '/about' }),
 };
 
 const ABOUT_FAQS = [

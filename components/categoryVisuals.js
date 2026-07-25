@@ -73,6 +73,20 @@ export const UtilitiesIcon = (
   </svg>
 );
 
+// A CV/resume sheet with a checkmark ribbon — represents Career Studio's
+// CV, resume and cover-letter tools.
+export const CareerIcon = (
+  <svg width="30" height="30" viewBox="0 0 24 24">
+    <rect x="5" y="2" width="14" height="18" rx="2" fill="#fff" opacity="0.32" />
+    <rect x="3" y="2.6" width="14" height="18" rx="2" fill="#fff" />
+    <rect x="5.5" y="6" width="9" height="1.3" rx="0.6" fill="#0EA5E9" />
+    <rect x="5.5" y="9" width="9" height="1.1" rx="0.55" fill="#000" opacity="0.14" />
+    <rect x="5.5" y="11.2" width="6.5" height="1.1" rx="0.55" fill="#000" opacity="0.14" />
+    <circle cx="17.3" cy="16.5" r="4.3" fill="#0EA5E9" />
+    <path d="M15.4 16.6l1.3 1.3 2.2-2.6" fill="none" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 // Three connected nodes — represents a Learn "Workflow Guide": several
 // Convertam tools chained together into one repeatable process.
 export const WorkflowIcon = (
@@ -87,6 +101,33 @@ export const WorkflowIcon = (
     <circle cx="12" cy="12" r="1.4" fill="#4F46E5" />
   </svg>
 );
+
+// Single source of truth for the 7 suite landing pages, used to build each
+// page's "Explore Related Categories" list without hand-maintaining 7
+// near-identical arrays. relatedSuites(selfSlug) returns every OTHER suite.
+const SUITE_CARDS = [
+  { slug: 'pdf-tools', accentKey: 'pdf', href: '/pdf-tools', icon: '📄', title: 'PDF Suite', desc: 'Convert, edit, organize and secure PDF files.' },
+  { slug: 'business', accentKey: 'business', href: '/business', icon: '🧾', title: 'Business Suite', desc: 'Invoices, quotations, delivery notes and ID cards.' },
+  { slug: 'career-studio', accentKey: 'career', href: '/career-studio', icon: '🎯', title: 'Career Studio', desc: 'AI-assisted CVs, resumes and cover letters.' },
+  { slug: 'ai-tools', accentKey: 'ai', href: '/ai-tools', icon: '🤖', title: 'AI Workspace', desc: 'AI tools that read, extract and improve your documents.' },
+  { slug: 'image-tools', accentKey: 'image', href: '/image-tools', icon: '🖼️', title: 'Image Studio', desc: 'Convert, compress, resize and edit images.' },
+  { slug: 'calculator-hub', accentKey: 'calculator', href: '/calculator-hub', icon: '🧮', title: 'Calculators', desc: 'VAT, loan, salary, and other business calculators.' },
+  { slug: 'utilities', accentKey: 'utilities', href: '/utilities', icon: '⚙️', title: 'Utilities', desc: 'QR codes, passwords, text case conversion and more.' },
+];
+
+export function relatedSuites(selfSlug) {
+  return SUITE_CARDS
+    .filter((s) => s.slug !== selfSlug)
+    .map((s) => ({
+      slug: s.slug,
+      href: s.href,
+      icon: s.icon,
+      title: s.title,
+      desc: s.desc,
+      badgeBg: CATEGORY_ACCENTS[s.accentKey].badgeFreeBg,
+      accentText: CATEGORY_ACCENTS[s.accentKey].accentText,
+    }));
+}
 
 export const CATEGORY_ACCENTS = {
   pdf: {
@@ -144,5 +185,12 @@ export const CATEGORY_ACCENTS = {
     borderColor: '#C7D2FE', accentText: '#4F46E5',
     focusRing: 'rgba(79,70,229,0.12)', shadowTint: 'rgba(79,70,229,0.15)',
     badgeFreeBg: '#E0E7FF', badgeFreeText: '#3730A3',
+  },
+  career: {
+    gradient: 'linear-gradient(120deg, #38BDF8 0%, #0EA5E9 100%)',
+    pageBgTop: '#F0F9FF', pageBgBottom: '#E0F2FE',
+    borderColor: '#BAE6FD', accentText: '#0369A1',
+    focusRing: 'rgba(3,105,161,0.12)', shadowTint: 'rgba(3,105,161,0.15)',
+    badgeFreeBg: '#E0F2FE', badgeFreeText: '#075985',
   },
 };

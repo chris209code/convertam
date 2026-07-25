@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { tools, getTool } from '@/lib/tools-config';
 import { buildToolSchemas } from '@/lib/toolSchema';
+import { buildOgMeta } from '@/lib/pageMetadata';
 import ToolPageClient from '@/components/ToolPageClient';
 
 // Mirrors app/[tool]/page.js's pattern, scoped to just the calculators that
@@ -16,10 +17,12 @@ export function generateStaticParams() {
 export function generateMetadata({ params }) {
   const tool = getTool(params.tool);
   if (!tool || tool.basePath !== 'calculators') return {};
+  const title = `${tool.title} — Free, No Login`;
   return {
-    title: `${tool.title} — Free, No Login`,
+    title,
     description: tool.description,
     alternates: { canonical: `/calculators/${tool.slug}` },
+    ...buildOgMeta({ title, description: tool.description, path: `/calculators/${tool.slug}` }),
   };
 }
 

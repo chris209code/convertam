@@ -1,10 +1,14 @@
 import Link from 'next/link';
+import { buildOgMeta } from '@/lib/pageMetadata';
+
+const TITLE = 'Security — How Convertam Protects Your Files';
+const DESCRIPTION = 'How Convertam secures your files and data: encryption in transit, browser-based processing, infrastructure providers, payment security, and how to report a vulnerability.';
 
 export const metadata = {
-  title: 'Security — How Convertam Protects Your Files',
-  description:
-    'How Convertam secures your files and data: encryption in transit, browser-based processing, infrastructure providers, payment security, and how to report a vulnerability.',
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: '/security' },
+  ...buildOgMeta({ title: TITLE, description: DESCRIPTION, path: '/security' }),
 };
 
 export default function SecurityPage() {

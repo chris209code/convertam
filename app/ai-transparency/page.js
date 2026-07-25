@@ -1,10 +1,14 @@
 import Link from 'next/link';
+import { buildOgMeta } from '@/lib/pageMetadata';
+
+const TITLE = 'AI Transparency — How Convertam Uses AI';
+const DESCRIPTION = 'Which Convertam tools use AI, which model powers them, what data is sent, whether it trains on your files, and the real limitations of AI-generated output.';
 
 export const metadata = {
-  title: 'AI Transparency — How Convertam Uses AI',
-  description:
-    'Which Convertam tools use AI, which model powers them, what data is sent, whether it trains on your files, and the real limitations of AI-generated output.',
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: '/ai-transparency' },
+  ...buildOgMeta({ title: TITLE, description: DESCRIPTION, path: '/ai-transparency' }),
 };
 
 const AI_TOOLS = [

@@ -1,10 +1,14 @@
 import Link from 'next/link';
+import { buildOgMeta } from '@/lib/pageMetadata';
+
+const TITLE = 'Terms of Service — Convertam';
+const DESCRIPTION = 'The terms governing your use of Convertam — free and paid file conversion tools, acceptable use, payments, and liability.';
 
 export const metadata = {
-  title: 'Terms of Service — Convertam',
-  description:
-    'The terms governing your use of Convertam — free and paid file conversion tools, acceptable use, payments, and liability.',
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: '/terms' },
+  ...buildOgMeta({ title: TITLE, description: DESCRIPTION, path: '/terms' }),
 };
 
 export default function TermsPage() {

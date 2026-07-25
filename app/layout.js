@@ -25,7 +25,7 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata = {
-  metadataBase: new URL('https://convertam.app'),
+  metadataBase: new URL('https://www.convertam.app'),
   title: {
     default: 'Convertam — Free File Conversion. No Login. No Watermark.',
     template: '%s | Convertam',

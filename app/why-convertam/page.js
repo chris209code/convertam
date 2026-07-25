@@ -1,10 +1,14 @@
 import Link from 'next/link';
+import { buildOgMeta } from '@/lib/pageMetadata';
+
+const TITLE = 'Why Convertam — What Makes It Different';
+const DESCRIPTION = 'Why choose Convertam over other file-conversion sites: no login, no watermarks, transparent per-use pricing, browser-based privacy, and a real accountable maintainer.';
 
 export const metadata = {
-  title: 'Why Convertam — What Makes It Different',
-  description:
-    'Why choose Convertam over other file-conversion sites: no login, no watermarks, transparent per-use pricing, browser-based privacy, and a real accountable maintainer.',
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: '/why-convertam' },
+  ...buildOgMeta({ title: TITLE, description: DESCRIPTION, path: '/why-convertam' }),
 };
 
 export default function WhyConvertamPage() {

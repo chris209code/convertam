@@ -57,6 +57,13 @@ const nextConfig = {
     // who guesses the flat URL by analogy with /salary-calculator.
     return [
       { source: '/sign-pdf', destination: '/sign-documents', permanent: true },
+      // Word Counter was removed (redundant with every major word
+      // processor); the tool that lived at this slug is now Text Case
+      // Converter only, at its own slug that matches what it does.
+      { source: '/utilities-hub', destination: '/text-case-converter', permanent: true },
+      // /calculator was a thin stub duplicating /calculator-hub's real
+      // content — removed as part of the pre-AdSense content-quality pass.
+      { source: '/calculator', destination: '/calculator-hub', permanent: true },
       { source: '/loan-calculator', destination: '/calculators/loan-calculator', permanent: true },
       { source: '/vat-calculator', destination: '/calculators/vat-calculator', permanent: true },
       { source: '/profit-margin', destination: '/calculators/profit-margin', permanent: true },

@@ -1,10 +1,61 @@
 import CategoryLandingClient from '../../components/CategoryLandingClient';
-import { PdfIcon, CATEGORY_ACCENTS } from '../../components/categoryVisuals';
+import { PdfIcon, CATEGORY_ACCENTS, relatedSuites } from '../../components/categoryVisuals';
+import { buildOgMeta } from '../../lib/pageMetadata';
+
+const TITLE = 'PDF Tools — Convertam';
+const DESCRIPTION = 'Complete PDF toolkit. Convert, edit, merge, split, compress, sign, watermark and secure your PDFs. Free, no login required.';
 
 export const metadata = {
-  title: 'PDF Tools — Convertam',
-  description: 'Complete PDF toolkit. Convert, edit, merge, split, compress, sign, watermark and secure your PDFs. Free, no login required.',
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: '/pdf-tools' },
+  ...buildOgMeta({ title: TITLE, description: DESCRIPTION, path: '/pdf-tools' }),
 };
+
+const EDITORIAL = {
+  intro: [
+    "PDF is the one format almost every important document eventually becomes — a signed contract, a submitted application, an invoice you need to keep exactly as sent. The PDF Suite covers the entire lifecycle of that file: turning it into something else (Word, Excel, PowerPoint, images), reshaping it (merging, splitting, reordering, extracting pages), marking it up (signing, watermarking, adding page numbers), and locking it down (password protection).",
+    "Most of these 27 tools run entirely in your browser, so your file is processed on your own device and never touches a server — a genuine privacy guarantee, not a policy promise. A handful of format conversions (PDF to Word/Excel/PowerPoint, and Compress PDF) need a dedicated conversion engine and carry a small per-use fee, shown upfront before you pay anything.",
+  ],
+  whoFor: [
+    'Students and job seekers assembling application documents',
+    'Small business owners preparing contracts, invoices and reports',
+    'Anyone who received a scan and needs it in an editable format',
+    'Teams that need to sign, watermark or password-protect files before sending',
+  ],
+  learnLinks: [
+    { title: 'How to Merge PDF Files Without Losing Quality', href: '/learn/pdf-guides/how-to-merge-pdf-files-without-losing-quality' },
+    { title: 'How to Compress a PDF Without Losing Quality', href: '/learn/pdf-guides/how-to-compress-a-pdf-without-losing-quality' },
+    { title: 'How to Convert PDF to Word Without Breaking Formatting', href: '/learn/pdf-guides/how-to-convert-pdf-to-word-without-breaking-formatting' },
+  ],
+};
+
+const WORKFLOWS = [
+  {
+    id: 'scan-to-word',
+    title: 'Turn a scanned document into an editable Word file',
+    steps: [{ icon: '🔎', label: 'Run OCR PDF to extract real text from the scan' }, { icon: '📝', label: 'Convert the result to Word' }],
+    href: '/ocr-pdf',
+  },
+  {
+    id: 'merge-protect-send',
+    title: 'Combine, watermark and password-protect before sending',
+    steps: [{ icon: '🔗', label: 'Merge the files into one PDF' }, { icon: '💧', label: 'Add a watermark' }, { icon: '🔒', label: 'Password-protect the result' }],
+    href: '/merge-pdf',
+  },
+  {
+    id: 'shrink-for-email',
+    title: 'Shrink a large PDF so it fits an email attachment limit',
+    steps: [{ icon: '🗜️', label: 'Compress the PDF' }],
+    href: '/compress-pdf',
+  },
+  {
+    id: 'sign-and-merge',
+    title: 'Sign a contract and merge it with supporting documents',
+    steps: [{ icon: '✒️', label: 'Sign the document' }, { icon: '🔗', label: 'Merge it with the rest of the package' }],
+    href: '/sign-documents',
+  },
+];
 
 const FAQS = [
   {
@@ -33,13 +84,7 @@ const FAQS = [
   },
 ];
 
-const RELATED_CATEGORIES = [
-  { slug: 'business', href: '/business', icon: '🧾', title: 'Business Documents', desc: 'Invoices, quotations, delivery notes and ID cards.', badgeBg: CATEGORY_ACCENTS.business.badgeFreeBg, accentText: CATEGORY_ACCENTS.business.accentText },
-  { slug: 'ai-tools', href: '/ai-tools', icon: '🤖', title: 'AI Workspace', desc: 'AI tools that read, extract and improve your documents.', badgeBg: CATEGORY_ACCENTS.ai.badgeFreeBg, accentText: CATEGORY_ACCENTS.ai.accentText },
-  { slug: 'image-tools', href: '/image-tools', icon: '🖼️', title: 'Image Studio', desc: 'Convert, compress, resize and edit images.', badgeBg: CATEGORY_ACCENTS.image.badgeFreeBg, accentText: CATEGORY_ACCENTS.image.accentText },
-  { slug: 'calculator-hub', href: '/calculator-hub', icon: '🧮', title: 'Calculators', desc: 'VAT, loan, salary, and other business calculators.', badgeBg: CATEGORY_ACCENTS.calculator.badgeFreeBg, accentText: CATEGORY_ACCENTS.calculator.accentText },
-  { slug: 'utilities', href: '/utilities', icon: '⚙️', title: 'Utilities', desc: 'QR codes, passwords, word counter and more.', badgeBg: CATEGORY_ACCENTS.utilities.badgeFreeBg, accentText: CATEGORY_ACCENTS.utilities.accentText },
-];
+const RELATED_CATEGORIES = relatedSuites('pdf-tools');
 
 const SECTIONS = [
   {
@@ -127,6 +172,8 @@ export default function PdfToolsPage() {
         icon={PdfIcon}
         title="PDF Tools"
         subtitle="Convert, edit, organize, secure and optimize PDF files — all free, all in one place."
+        editorial={EDITORIAL}
+        workflows={WORKFLOWS}
         sections={SECTIONS_WITH_HREF}
         faqs={FAQS}
         relatedCategories={RELATED_CATEGORIES}

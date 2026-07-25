@@ -1,10 +1,14 @@
 import Link from 'next/link';
+import { buildOgMeta } from '@/lib/pageMetadata';
+
+const TITLE = 'Contact Convertam';
+const DESCRIPTION = 'How to reach Convertam — general support, security reports, and payment issues, with realistic response-time expectations from an independently run project.';
 
 export const metadata = {
-  title: 'Contact Convertam',
-  description:
-    'How to reach Convertam — general support, security reports, and payment issues, with realistic response-time expectations from an independently run project.',
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: '/contact' },
+  ...buildOgMeta({ title: TITLE, description: DESCRIPTION, path: '/contact' }),
 };
 
 export default function ContactPage() {

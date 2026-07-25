@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { LEARN_CATEGORIES, getLearnCategory } from '@/lib/learn/categories';
 import { getArticlesByCategory } from '@/lib/learn';
+import { buildOgMeta } from '@/lib/pageMetadata';
 import LearnCategoryClient from '@/components/learn/LearnCategoryClient';
 
 export function generateStaticParams() {
@@ -10,10 +11,12 @@ export function generateStaticParams() {
 export function generateMetadata({ params }) {
   const category = getLearnCategory(params.category);
   if (!category) return {};
+  const title = `${category.title} — Convertam Learn`;
   return {
-    title: `${category.title} — Convertam Learn`,
+    title,
     description: category.description,
     alternates: { canonical: `/learn/${category.slug}` },
+    ...buildOgMeta({ title, description: category.description, path: `/learn/${category.slug}` }),
   };
 }
 
@@ -27,11 +30,11 @@ export default function LearnCategoryPage({ params }) {
     '@type': 'CollectionPage',
     name: `${category.title} — Convertam Learn`,
     description: category.description,
-    url: `https://convertam.app/learn/${category.slug}`,
+    url: `https://www.convertam.app/learn/${category.slug}`,
     hasPart: articles.map((a) => ({
       '@type': 'Article',
       headline: a.title,
-      url: `https://convertam.app/learn/${category.slug}/${a.slug}`,
+      url: `https://www.convertam.app/learn/${category.slug}/${a.slug}`,
     })),
   };
 

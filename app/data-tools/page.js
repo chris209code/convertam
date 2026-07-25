@@ -14,10 +14,10 @@ export const metadata = {
 // Architecture-only phase: every tool here is a planned route (slug/href
 // already decided so nothing gets renamed later and no duplicate route
 // ever gets created) but not yet built, so every card is available:false
-// ("Coming Soon") except Word Counter, which already exists today inside
-// the Utilities Hub — see components/tools/UtilitiesWorkspace.js. None of
-// these slugs are registered in lib/tools-config.js yet; that happens
-// tool-by-tool as each one is actually built.
+// ("Coming Soon") except Text Case Converter, which already exists today —
+// see components/tools/UtilitiesWorkspace.js. None of these slugs are
+// registered in lib/tools-config.js yet; that happens tool-by-tool as each
+// one is actually built.
 const SECTIONS = [
   {
     id: 'text-tools',
@@ -29,7 +29,7 @@ const SECTIONS = [
       { slug: 'remove-blank-lines', title: 'Remove Blank Lines', desc: 'Delete empty lines from any text instantly.', icon: '🗑️', badge: 'soon', available: false },
       { slug: 'sort-lines', title: 'Sort Lines', desc: 'Sort lines alphabetically, numerically, or in reverse.', icon: '🔤', badge: 'soon', available: false },
       { slug: 'find-and-replace', title: 'Find & Replace', desc: 'Find and replace text across a whole document in one pass.', icon: '🔍', badge: 'soon', available: false },
-      { slug: 'utilities-hub', title: 'Word Counter', desc: 'Count words, characters, sentences and reading time instantly.', icon: '🔢', badge: 'free', available: true, href: '/utilities-hub' },
+      { slug: 'text-case-converter', title: 'Text Case Converter', desc: 'Instantly convert text into UPPERCASE, lowercase, Title Case, camelCase and more.', icon: '🔤', badge: 'free', available: true, href: '/text-case-converter' },
     ],
   },
   {

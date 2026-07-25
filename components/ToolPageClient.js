@@ -54,6 +54,8 @@ import PaymentGate from '@/components/PaymentGate';
 import ComingSoon from '@/components/tools/ComingSoon';
 import Link from 'next/link';
 import { getTool } from '@/lib/tools-config';
+import { HUB_BY_CATEGORY } from '@/lib/toolSchema';
+import { getArticleForTool } from '@/lib/learn';
 import { toolMeta } from '@/lib/tool-meta';
 import { toolGuides } from '@/lib/toolGuides';
 import { toolExtras } from '@/lib/toolExtras';
@@ -97,12 +99,20 @@ export default function ToolPageClient({ tool }) {
   // grouped navigation), so repeating that chrome on every navigation just
   // reads as "a new page" instead of "still the same workspace."
   const inSession = session.status === 'active';
+  const hub = HUB_BY_CATEGORY[tool.category];
+  const learnArticle = getArticleForTool(tool.slug);
 
   return (
     <WorkspaceLayoutShell>
     <QuickGuideTab guide={guide} toolSlug={tool.slug}>
       <main className="max-w-5xl mx-auto px-5 md:px-10 py-10">
-        <p className="font-mono text-xs text-stamp-amber tracking-wide mb-2">{tool.category.toUpperCase()}</p>
+        {hub ? (
+          <Link href={`/${hub.slug}`} className="inline-block font-mono text-xs text-stamp-amber tracking-wide mb-2 hover:underline">
+            {tool.category.toUpperCase()}
+          </Link>
+        ) : (
+          <p className="font-mono text-xs text-stamp-amber tracking-wide mb-2">{tool.category.toUpperCase()}</p>
+        )}
         <h1 className="font-display text-3xl md:text-4xl font-bold mb-2">{tool.title}</h1>
         {!inSession && <p className="text-ink-soft mb-4 max-w-xl">{tool.description}</p>}
 
@@ -203,6 +213,18 @@ export default function ToolPageClient({ tool }) {
             <span>🔒</span>
             <span className="text-ink-soft">Your files are automatically deleted after processing and are never shared with third parties.</span>
           </div>
+        )}
+
+        {learnArticle && !inSession && (
+          <Link
+            href={`/learn/${learnArticle.category}/${learnArticle.slug}`}
+            className="flex items-center gap-2 mt-3 px-4 py-3 rounded-xl text-sm transition-colors hover:border-stamp-blue"
+            style={{ background: '#fffefb', border: '1px solid #e2dcc9', color: '#1c2333', textDecoration: 'none' }}
+          >
+            <span>📖</span>
+            <span>Guide: <strong>{learnArticle.title}</strong></span>
+            <span className="ml-auto text-stamp-blue">→</span>
+          </Link>
         )}
 
         {/* Plain related-tools chip row — superseded by the richer

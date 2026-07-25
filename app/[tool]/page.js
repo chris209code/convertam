@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { tools, getTool } from '@/lib/tools-config';
 import { buildToolSchemas } from '@/lib/toolSchema';
+import { buildOgMeta } from '@/lib/pageMetadata';
 import ToolPageClient from '@/components/ToolPageClient';
 
 export function generateStaticParams() {
@@ -12,10 +13,12 @@ export function generateStaticParams() {
 export function generateMetadata({ params }) {
   const tool = getTool(params.tool);
   if (!tool || tool.basePath) return {};
+  const title = `${tool.title} — Free, No Login`;
   return {
-    title: `${tool.title} — Free, No Login`,
+    title,
     description: tool.description,
     alternates: { canonical: `/${tool.slug}` },
+    ...buildOgMeta({ title, description: tool.description, path: `/${tool.slug}` }),
   };
 }
 

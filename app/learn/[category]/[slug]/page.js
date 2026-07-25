@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { ARTICLES, getArticle, getReadingTime } from '@/lib/learn';
 import { getLearnCategory } from '@/lib/learn/categories';
+import { buildOgMeta } from '@/lib/pageMetadata';
 import ArticleShell from '@/components/learn/ArticleShell';
 
 export function generateStaticParams() {
@@ -10,10 +11,13 @@ export function generateStaticParams() {
 export function generateMetadata({ params }) {
   const article = getArticle(params.slug);
   if (!article || article.category !== params.category) return {};
+  const title = `${article.title} — Convertam Learn`;
+  const path = `/learn/${article.category}/${article.slug}`;
   return {
-    title: `${article.title} — Convertam Learn`,
+    title,
     description: article.excerpt,
-    alternates: { canonical: `/learn/${article.category}/${article.slug}` },
+    alternates: { canonical: path },
+    ...buildOgMeta({ title, description: article.excerpt, path }),
   };
 }
 
@@ -22,7 +26,7 @@ export default function LearnArticlePage({ params }) {
   if (!article || article.category !== params.category) notFound();
 
   const category = getLearnCategory(article.category);
-  const url = `https://convertam.app/learn/${article.category}/${article.slug}`;
+  const url = `https://www.convertam.app/learn/${article.category}/${article.slug}`;
 
   const articleSchema = {
     '@context': 'https://schema.org',
@@ -52,9 +56,9 @@ export default function LearnArticlePage({ params }) {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://convertam.app/' },
-      { '@type': 'ListItem', position: 2, name: 'Learn', item: 'https://convertam.app/learn' },
-      { '@type': 'ListItem', position: 3, name: category?.title, item: `https://convertam.app/learn/${article.category}` },
+      { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://www.convertam.app/' },
+      { '@type': 'ListItem', position: 2, name: 'Learn', item: 'https://www.convertam.app/learn' },
+      { '@type': 'ListItem', position: 3, name: category?.title, item: `https://www.convertam.app/learn/${article.category}` },
       { '@type': 'ListItem', position: 4, name: article.title, item: url },
     ],
   };

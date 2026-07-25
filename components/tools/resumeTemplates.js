@@ -81,23 +81,53 @@ export function normalizeBulletLines(exp) {
     .filter(Boolean);
 }
 
-export function ExpBullets({ exp, className, style, liStyle }) {
-  const lines = normalizeBulletLines(exp);
+// Deliberately NOT <ul><li> with CSS list-style — that depends on
+// list-style-type/::marker actually surviving whatever global reset
+// stylesheet and PDF/print engine the page runs through, which is exactly
+// what silently swallowed the bullet glyph before. The bullet character
+// here is real rendered text content in its own column, so it physically
+// cannot be stripped by CSS the way a list-marker can.
+function BulletList({ lines, keyPrefix, className, style, liStyle }) {
   if (!lines.length) return null;
-  // Deliberately NOT <ul><li> with CSS list-style — that depends on
-  // list-style-type/::marker actually surviving whatever global reset
-  // stylesheet and PDF/print engine the page runs through, which is
-  // exactly what silently swallowed the bullet glyph before. The bullet
-  // character here is real rendered text content in its own column, so it
-  // physically cannot be stripped by CSS the way a list-marker can.
   return (
     <div className={className || 'cv-job-bullets'} style={{ margin: '4px 0 0', ...style }}>
       {lines.map((l, i) => (
-        <div key={i} className="cv-bullet-row" style={{ display: 'grid', gridTemplateColumns: '12px 1fr', alignItems: 'start', columnGap: 4, marginBottom: 4, ...liStyle }}>
+        <div key={`${keyPrefix}-${i}`} className="cv-bullet-row" style={{ display: 'grid', gridTemplateColumns: '12px 1fr', alignItems: 'start', columnGap: 4, marginBottom: 4, ...liStyle }}>
           <span className="cv-bullet-marker" style={{ lineHeight: 'inherit' }}>•</span>
           <span className="cv-bullet-text" style={{ minWidth: 0, lineHeight: 'inherit' }}>{l}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+// exp.achievements is a Convertam CV Improver addition (a role's quantified
+// results, kept separate from its day-to-day duties) — Resume Builder's own
+// hand-typed entries never set it, so this renders exactly the single flat
+// list it always has when achievements is empty, and only adds the
+// "Responsibilities" / "Key Achievements" split when there's something to
+// split. No template's own JSX needed to change for this.
+export function ExpBullets({ exp, className, style, liStyle }) {
+  const responsibilityLines = normalizeBulletLines(exp);
+  const achievementLines = Array.isArray(exp.achievements) ? exp.achievements.map((a) => String(a).trim()).filter(Boolean) : [];
+
+  if (!achievementLines.length) {
+    return <BulletList lines={responsibilityLines} keyPrefix="b" className={className} style={style} liStyle={liStyle} />;
+  }
+  if (!responsibilityLines.length && !achievementLines.length) return null;
+
+  const subHeadSize = liStyle?.fontSize ? liStyle.fontSize - 2 : 10;
+  const subHead = { fontSize: subHeadSize, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', margin: '10px 0 2px' };
+  return (
+    <div>
+      {responsibilityLines.length > 0 && (
+        <>
+          <p style={{ ...subHead, color: '#64748B', marginTop: 6 }}>Responsibilities</p>
+          <BulletList lines={responsibilityLines} keyPrefix="r" className={className} style={style} liStyle={liStyle} />
+        </>
+      )}
+      <p style={{ ...subHead, color: '#B45309' }}>Key Achievements</p>
+      <BulletList lines={achievementLines} keyPrefix="a" className={className} style={style} liStyle={liStyle} />
     </div>
   );
 }
@@ -348,6 +378,8 @@ export function adaptToModernProfessionalData({ form, experience, education, cer
     experience: (experience || []).filter(e => e.role || e.company).map(e => ({
       role: e.role, company: e.company, location: '', start: (e.period || '').split(/[-–]/)[0]?.trim() || '', end: (e.period || '').split(/[-–]/)[1]?.trim() || '',
       bullets: e.bullets?.length ? e.bullets : (e.description ? e.description.split('\n').filter(Boolean) : []),
+      achievements: e.achievements || [],
+      isCurrent: !!e.isCurrent,
     })),
     education: (education || []).filter(e => e.institution || e.degree).map(e => ({ degree: e.degree, school: e.institution, location: e.location || '', start: e.startYear || '', end: e.current ? 'Present' : (e.endYear || '') })),
     projects: [],

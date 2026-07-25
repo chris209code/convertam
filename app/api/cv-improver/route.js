@@ -25,9 +25,20 @@ const cvFields = {
         role: { type: 'STRING' },
         company: { type: 'STRING' },
         period: { type: 'STRING' },
-        bullets: { type: 'ARRAY', items: { type: 'STRING' } },
+        // Whether this role is ongoing (determined from period text like
+        // "Present" / "Current" / "Till date" / "Ongoing" / a missing end
+        // date) — drives which tense the responsibilities below must use.
+        // Never assume based on array position; only the dates decide this.
+        isCurrentRole: { type: 'BOOLEAN' },
+        // Day-to-day duties only — present tense for the current role,
+        // past tense for every previous role. Never a quantified result.
+        responsibilities: { type: 'ARRAY', items: { type: 'STRING' } },
+        // Quantified results, completed initiatives, recognition, or
+        // measurable business impact — never a routine daily duty. Empty
+        // array is correct when a role genuinely has no achievements.
+        achievements: { type: 'ARRAY', items: { type: 'STRING' } },
       },
-      required: ['role', 'company', 'bullets'],
+      required: ['role', 'company', 'isCurrentRole', 'responsibilities', 'achievements'],
     },
   },
   education: {
@@ -74,11 +85,12 @@ const reviewFields = {
       properties: {
         targetSection: { type: 'STRING' }, // 'summary' | 'experience' | 'skills'
         targetIndex: { type: 'NUMBER' }, // experience array index; -1 when not applicable
+        targetField: { type: 'STRING' }, // 'responsibilities' | 'achievements' — only when targetSection is 'experience'
         currentText: { type: 'STRING' },
         proposedRewrite: { type: 'STRING' },
         reason: { type: 'STRING' },
       },
-      required: ['targetSection', 'targetIndex', 'currentText', 'proposedRewrite', 'reason'],
+      required: ['targetSection', 'targetIndex', 'targetField', 'currentText', 'proposedRewrite', 'reason'],
     },
   },
   warnings: { type: 'ARRAY', items: { type: 'STRING' } },
@@ -101,7 +113,30 @@ ${jobDescription?.trim() ? `JOB DESCRIPTION / REQUIREMENTS (use this to tailor e
 ====================================================
 ABSOLUTE RULE — NEVER FABRICATE
 ====================================================
-Never invent employers, job titles, dates, certifications, degrees, licences, responsibilities the candidate never performed, KPIs, numbers, awards, software proficiency, leadership experience, or projects that are not already present in the CV below. You may rewrite what IS there into stronger, more professional language (e.g. "Checked production quality" -> "Performed routine production quality inspections, identified non-conformances, and supported compliance with GMP standards" is fine — it adds no new fact). Never add a specific number, percentage, or metric unless that figure already appears in the candidate's CV. If the CV is missing something that would meaningfully strengthen it, do NOT insert it into the CV — put it in "suggestions" instead (see below), so the candidate can confirm it themselves.
+Never invent employers, job titles, dates, certifications, degrees, licences, responsibilities the candidate never performed, KPIs, numbers, awards, software proficiency, leadership experience, or projects that are not already present in the CV below. You may rewrite what IS there into stronger, more professional language (e.g. "Checked production quality" -> "Performed routine production quality inspections, identified non-conformances, and supported compliance with GMP standards" is fine — it adds no new fact). Never add a specific number, percentage, or metric unless that figure already appears in the candidate's CV, or is directly and correctly calculable from figures that already appear (e.g. "reduced from 5,000 hl to 114 hl" makes a 97.7% reduction a valid, real calculation — but never invent a percentage when the underlying numbers aren't both present). If the CV is missing something that would meaningfully strengthen it, do NOT insert it into the CV — put it in "suggestions" instead (see below), so the candidate can confirm it themselves. When a statement sounds like an achievement but has no measurable outcome in the source CV, improve its wording (e.g. "Helped improve the quality process" -> "Contributed to improvements in the quality-control process") — never invent a number to make it sound quantified.
+
+====================================================
+CURRENT VS. PREVIOUS ROLE — DETERMINE STATUS FROM DATES
+====================================================
+For every experience entry, decide isCurrentRole from its actual dates/period text — indicators include "Present", "Current", "Till date", "To date", "Ongoing", or an end date that is clearly missing/open on a role that is obviously still active. Never assume the first (or most recent) entry is current just because of its position in the list — check its dates. If the dates are genuinely ambiguous, use your best judgement from context but default to treating a role as previous (past tense) unless there is a clear current-role indicator.
+
+====================================================
+RESPONSIBILITIES vs. ACHIEVEMENTS — SEPARATE, NEVER MIXED
+====================================================
+Every experience entry must split its content into two separate arrays — "responsibilities" (day-to-day duties) and "achievements" (results). Never blend a quantified result into a responsibility bullet, and never leave an achievement sitting among ordinary duties.
+
+Achievement indicators — a bullet is an achievement, not a responsibility, when it contains any of: a measurable improvement, a percentage, cost savings, time savings, reduced losses, increased output or accuracy, reduced defects or blocked stock, audit results, an award or recognition, a successfully completed project or implementation, a problem solved with a stated outcome, exceeded targets, improved compliance or turnaround time, or a stated team/process impact.
+Example: "Reduced blocked stock from 5,000 hl to 114 hl." is an achievement, not a responsibility. "Conducted quality checks on packaged products." is a responsibility.
+
+TENSE — tied to isCurrentRole, applied independently to each array:
+- Current role: responsibilities in present tense (Manage, Lead, Monitor, Coordinate, Analyse, Ensure, Maintain, Support, Drive, Oversee...) UNLESS a specific bullet clearly describes a one-off completed initiative rather than an ongoing duty, in which case it belongs in "achievements" instead, described in past/result wording (e.g. a current QA manager who ran one specific completed audit still writes that as an achievement in past tense, while their ongoing daily oversight stays present tense).
+- Previous role: both responsibilities and achievements in past tense (Managed, Led, Improved, Reduced, Coordinated, Implemented, Achieved, Delivered...).
+Do not rewrite an ongoing current-role duty into the past tense, and do not leave a previous role's duties in the present tense.
+
+AMBIGUOUS BULLETS — SPLIT WHEN A DUTY AND A RESULT ARE COMBINED
+If a single bullet from the source CV contains both an ongoing duty and a measurable result, split it: the duty portion becomes a responsibility, the result portion becomes an achievement. Example — source: "Managed blocked stock and reduced the volume from 5,000 hl to 114 hl." becomes responsibility "Manage blocked-stock review, disposition and stakeholder follow-up." plus achievement "Reduced blocked stock from 5,000 hl to 114 hl, representing a 97.7% reduction." (only include a computed percentage when it is mathematically valid from numbers already given).
+
+Do not duplicate the same fact in both arrays — each real fact from the source CV appears exactly once, in whichever array actually describes it.
 
 ====================================================
 PROFESSIONAL TITLE RULES (the "title" field)
@@ -120,7 +155,7 @@ The target position may ONLY be used to tailor the Professional Summary, Skills,
 HOW TO IMPROVE THE CV (Output A)
 ====================================================
 - Strengthen the professional summary and tailor it toward the target position (language and emphasis only — see title rule above).
-- Rewrite weak, passive responsibility statements into stronger professional achievement statements, using only real, existing facts.
+- Rewrite weak, passive responsibility statements into stronger professional language while keeping them as responsibilities — see the section below for exactly how responsibilities and achievements must be classified, tensed, and kept separate; never blend the two into one merged statement.
 - Highlight transferable skills relevant to the target position.
 - Improve action verbs and overall wording.
 - Prioritize and, where beneficial, reorder content so the most relevant experience for this role stands out.
@@ -128,9 +163,10 @@ HOW TO IMPROVE THE CV (Output A)
 - Use standard CV section headings, and naturally weave in keywords from the target position and job description for stronger ATS compatibility — never keyword-stuff, never sacrifice readability.
 - Include ALL experience entries, ALL education entries, ALL skills from the original — do not truncate, drop, or cut anything off.
 - Extract and use ONLY real information already in the CV — names, contacts, companies, dates. If something is missing, omit that field entirely or use an empty string. Never invent placeholders like "[Your Name]" or "[Company Name]" — a placeholder left in a document meant to be sent to an employer is a serious defect.
+- Do not unnecessarily redesign the CV's substance — preserve company names, job titles, dates, and qualifications exactly; only improve classification (responsibility vs. achievement), tense, wording, clarity, and impact.
 
 ====================================================
-WHAT MUST NEVER APPEAR ANYWHERE IN THE CV FIELDS (name, title, summary, experience bullets, skills, certifications)
+WHAT MUST NEVER APPEAR ANYWHERE IN THE CV FIELDS (name, title, summary, experience responsibilities/achievements, skills, certifications)
 ====================================================
 The CV fields must contain ONLY finished, professional, ready-to-send content. NEVER include, anywhere in those fields: AI suggestions, AI reasoning, editing notes, recommendations, prompt instructions, ATS explanations, bracketed placeholders, or any sentence that reads as an instruction addressed to the candidate rather than a statement of fact about their work — for example sentences beginning with "Consider...", "Elaborate on...", "Mention...", "Include...", "Quantify...", "Provide...", "Insert...", "Add...", "Expand on...", or "Explain...". Advice and suggestions belong ONLY in the "suggestions" and "review" fields below, never inside the CV itself. The finished CV must never reveal that AI generated or edited it.
 
@@ -154,6 +190,7 @@ SUGGESTIONS (the "suggestions" field — separate, optional rewrites the candida
 Each suggestion is a fully-written, ready-to-insert REPLACEMENT for a specific piece of the CV — never an instruction telling the candidate what to do. Wrong: proposedRewrite = "Elaborate on instrumentation and control." Correct: proposedRewrite = a complete, polished sentence or bullet that actually elaborates on instrumentation and control, using only real facts already present elsewhere in the CV, ready to be inserted as-is.
 - targetSection: "summary" (rewrite of the whole summary), "experience" (a bullet within one experience entry), or "skills" (an addition to the skills list).
 - targetIndex: for "experience", the 0-based index into the experience array this suggestion targets; use -1 for "summary" and "skills".
+- targetField: for "experience", whether the bullet lives in "responsibilities" or "achievements" (must match wherever currentText actually is, so applying it edits the right list); use "" for "summary" and "skills".
 - currentText: the exact current text this would replace (empty string if it's a pure addition, like a new bullet or skill, rather than a replacement).
 - proposedRewrite: the complete, ready-to-insert replacement or addition text — finished CV prose, never an instruction.
 - reason: a short explanation of why this would strengthen the CV — this is shown to the candidate alongside the rewrite, it never appears in the CV itself.

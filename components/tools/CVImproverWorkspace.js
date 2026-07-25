@@ -48,7 +48,9 @@ function adaptStructuredToTemplateInput(structured) {
     role: exp.role || '',
     company: exp.company || '',
     period: exp.period || '',
-    bullets: exp.bullets || [],
+    isCurrent: !!exp.isCurrentRole,
+    bullets: exp.responsibilities || [],
+    achievements: exp.achievements || [],
     description: '',
   }));
   const education = (structured.education || []).map((edu) => ({
@@ -85,7 +87,17 @@ function structuredToPlainText(structured) {
     structured.experience.forEach((exp) => {
       const header = [exp.role, exp.company].filter(Boolean).join(' — ') + (exp.period ? ` (${exp.period})` : '');
       lines.push(header);
-      (exp.bullets || []).forEach((b) => lines.push(`- ${b}`));
+      const responsibilities = exp.responsibilities || [];
+      const achievements = exp.achievements || [];
+      if (achievements.length && responsibilities.length) {
+        lines.push('Responsibilities:');
+        responsibilities.forEach((b) => lines.push(`- ${b}`));
+        lines.push('Key Achievements:');
+        achievements.forEach((b) => lines.push(`- ${b}`));
+      } else {
+        responsibilities.forEach((b) => lines.push(`- ${b}`));
+        achievements.forEach((b) => lines.push(`- ${b}`));
+      }
       lines.push('');
     });
   }
@@ -102,6 +114,36 @@ function structuredToPlainText(structured) {
     structured.certifications.forEach((c) => lines.push(`- ${c}`));
   }
   return lines.join('\n').trim();
+}
+
+// One bullet row inside the Classification Review panel — shows the text,
+// with inline edit and a move/delete action. Kept as its own component
+// (rather than inlined per bullet in the parent map) purely so its edit
+// state is local to the bullet being edited, not the whole panel.
+function ClassificationBulletRow({ text, moveLabel, onMove, onEdit, onDelete }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(text);
+  if (editing) {
+    return (
+      <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', marginBottom: 6 }}>
+        <textarea value={draft} onChange={(e) => setDraft(e.target.value)} style={{ ...inputStyle, minHeight: 54, flex: 1 }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <button onClick={() => { onEdit(draft.trim()); setEditing(false); }} style={smallActionBtn('#16A34A')}>Save</button>
+          <button onClick={() => { setDraft(text); setEditing(false); }} style={smallActionBtn('#94A3B8')}>Cancel</button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 6 }}>
+      <p style={{ fontSize: '0.84rem', color: '#334155', margin: 0, flex: 1, lineHeight: 1.5 }}>{text}</p>
+      <div style={{ display: 'flex', gap: 5, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <button onClick={onMove} style={smallActionBtn('#2563EB')}>{moveLabel}</button>
+        <button onClick={() => setEditing(true)} style={smallActionBtn('#64748B')}>Edit</button>
+        <button onClick={onDelete} style={smallActionBtn('#DC2626')}>Remove</button>
+      </div>
+    </div>
+  );
 }
 
 export default function CVImproverWorkspace() {
@@ -314,12 +356,13 @@ export default function CVImproverWorkspace() {
       } else if (suggestion.targetSection === 'experience') {
         const idx = suggestion.targetIndex;
         if (idx == null || idx < 0 || !next.experience?.[idx]) return prev;
+        const field = suggestion.targetField === 'achievements' ? 'achievements' : 'responsibilities';
         const experience = [...next.experience];
-        const bullets = [...(experience[idx].bullets || [])];
+        const bullets = [...(experience[idx][field] || [])];
         const matchIdx = suggestion.currentText ? bullets.findIndex((b) => b === suggestion.currentText) : -1;
         if (matchIdx >= 0) bullets[matchIdx] = finalText;
         else bullets.push(finalText);
-        experience[idx] = { ...experience[idx], bullets };
+        experience[idx] = { ...experience[idx], [field]: bullets };
         next.experience = experience;
       } else if (suggestion.targetSection === 'skills') {
         const skills = [...(next.skills || [])];
@@ -346,6 +389,56 @@ export default function CVImproverWorkspace() {
   // always has the latest version, not a stale snapshot from before the edit.
   function applySuggestionAndSync(i) {
     applySuggestion(i);
+    setTimeout(() => { if (structured) pushCvToWorkspace(structured, template); }, 0);
+  }
+
+  // ==========================================================================
+  // Classification review — lets the candidate see exactly how the AI split
+  // each role into responsibilities vs. achievements and move/edit/delete a
+  // bullet if it disagrees. Every change here mutates `structured` directly,
+  // so it's reflected immediately in the rendered CV and every download —
+  // there's no separate "pending" draft to lose track of.
+  // ==========================================================================
+  function moveExperienceBullet(expIdx, fromField, bulletIdx) {
+    const toField = fromField === 'responsibilities' ? 'achievements' : 'responsibilities';
+    setStructured((prev) => {
+      const experience = [...prev.experience];
+      const exp = { ...experience[expIdx] };
+      const fromList = [...(exp[fromField] || [])];
+      const [moved] = fromList.splice(bulletIdx, 1);
+      if (moved == null) return prev;
+      exp[fromField] = fromList;
+      exp[toField] = [...(exp[toField] || []), moved];
+      experience[expIdx] = exp;
+      return { ...prev, experience };
+    });
+    syncStructuredToWorkspace();
+  }
+  function editExperienceBullet(expIdx, field, bulletIdx, text) {
+    setStructured((prev) => {
+      const experience = [...prev.experience];
+      const exp = { ...experience[expIdx] };
+      const list = [...(exp[field] || [])];
+      list[bulletIdx] = text;
+      exp[field] = list;
+      experience[expIdx] = exp;
+      return { ...prev, experience };
+    });
+    syncStructuredToWorkspace();
+  }
+  function deleteExperienceBullet(expIdx, field, bulletIdx) {
+    setStructured((prev) => {
+      const experience = [...prev.experience];
+      const exp = { ...experience[expIdx] };
+      const list = [...(exp[field] || [])];
+      list.splice(bulletIdx, 1);
+      exp[field] = list;
+      experience[expIdx] = exp;
+      return { ...prev, experience };
+    });
+    syncStructuredToWorkspace();
+  }
+  function syncStructuredToWorkspace() {
     setTimeout(() => { if (structured) pushCvToWorkspace(structured, template); }, 0);
   }
 
@@ -638,6 +731,63 @@ export default function CVImproverWorkspace() {
                       {structured.warnings.map((w, i) => <p key={i} style={{ margin: i > 0 ? '4px 0 0' : 0 }}>{w}</p>)}
                     </div>
                   )}
+                </section>
+              )}
+
+              {/* ============================================================
+                  Classification Review — shows exactly how each role was
+                  split into Responsibilities vs. Key Achievements (and
+                  whether it was treated as a current or previous role) so
+                  nothing is silently restructured without the candidate
+                  seeing and being able to correct it.
+                  ============================================================ */}
+              {structured.experience?.length > 0 && (
+                <section className="no-print" style={{ marginTop: 30 }}>
+                  <h3 style={sectionTitle}>🔍 Review Classification</h3>
+                  <p style={{ fontSize: '0.78rem', color: '#64748B', marginBottom: 12 }}>
+                    Here's how each role was classified and split. Move a bullet, edit its wording, or remove it — changes apply immediately to the CV above and to your downloads.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {structured.experience.map((exp, expIdx) => (
+                      <div key={expIdx} style={{ border: '1px solid #E2E8F0', borderRadius: 10, padding: 14 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                          <div>
+                            <p style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>{exp.role} <span style={{ fontWeight: 500, color: '#64748B' }}>· {exp.company}</span></p>
+                            {exp.period && <p style={{ fontSize: '0.76rem', color: '#94A3B8', margin: '2px 0 0' }}>{exp.period}</p>}
+                          </div>
+                          <span style={tagStyle(exp.isCurrentRole ? '#DCFCE7' : '#EFF6FF', exp.isCurrentRole ? '#166534' : '#1D4ED8')}>
+                            {exp.isCurrentRole ? 'Current role · present tense' : 'Previous role · past tense'}
+                          </span>
+                        </div>
+
+                        <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', margin: '0 0 6px' }}>Responsibilities</p>
+                        {!(exp.responsibilities || []).length && <p style={{ fontSize: '0.78rem', color: '#94A3B8', fontStyle: 'italic', margin: '0 0 10px' }}>None</p>}
+                        {(exp.responsibilities || []).map((b, bulletIdx) => (
+                          <ClassificationBulletRow
+                            key={`r${bulletIdx}`}
+                            text={b}
+                            moveLabel="Move to Achievements"
+                            onMove={() => moveExperienceBullet(expIdx, 'responsibilities', bulletIdx)}
+                            onEdit={(t) => editExperienceBullet(expIdx, 'responsibilities', bulletIdx, t)}
+                            onDelete={() => deleteExperienceBullet(expIdx, 'responsibilities', bulletIdx)}
+                          />
+                        ))}
+
+                        <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#B45309', textTransform: 'uppercase', margin: '14px 0 6px' }}>Key Achievements</p>
+                        {!(exp.achievements || []).length && <p style={{ fontSize: '0.78rem', color: '#94A3B8', fontStyle: 'italic', margin: 0 }}>None detected</p>}
+                        {(exp.achievements || []).map((b, bulletIdx) => (
+                          <ClassificationBulletRow
+                            key={`a${bulletIdx}`}
+                            text={b}
+                            moveLabel="Move to Responsibilities"
+                            onMove={() => moveExperienceBullet(expIdx, 'achievements', bulletIdx)}
+                            onEdit={(t) => editExperienceBullet(expIdx, 'achievements', bulletIdx, t)}
+                            onDelete={() => deleteExperienceBullet(expIdx, 'achievements', bulletIdx)}
+                          />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
                 </section>
               )}
 

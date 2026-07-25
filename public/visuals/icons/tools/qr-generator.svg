@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">QR Generator</title>
+  <desc id="desc">Convertam QR Generator icon in the official rounded document visual system.</desc>
+  <defs>
+    <linearGradient id="g" x1="14" y1="8" x2="50" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#667085" stop-opacity=".92"/>
+      <stop offset="1" stop-color="#667085" stop-opacity=".58"/>
+    </linearGradient>
+    <filter id="s" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#16345B" flood-opacity=".16"/>
+    </filter>
+  </defs>
+  <rect x="6" y="6" width="52" height="52" rx="12" fill="#F7FAFF"/>
+  <rect x="7" y="7" width="50" height="50" rx="11" fill="white" stroke="#DCE6F7"/>
+  <g filter="url(#s)"><rect x="17" y="17" width="30" height="30" rx="4" fill="#fff" stroke="#8FA6CC" stroke-width="1.8"/><g fill="#667085"><rect x="22" y="22" width="7" height="7" rx="1"/><rect x="35" y="22" width="7" height="7" rx="1"/><rect x="22" y="35" width="7" height="7" rx="1"/><rect x="34" y="34" width="4" height="4"/><rect x="40" y="39" width="3" height="3"/><rect x="33" y="42" width="3" height="3"/></g></g>
+</svg>

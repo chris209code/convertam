@@ -30,6 +30,7 @@ export default function sitemap() {
     'pdf-tools',
     'business',
     'ai-tools',
+    'career-studio',
     'image-tools',
     'calculator-hub',
   ].map((slug) => ({

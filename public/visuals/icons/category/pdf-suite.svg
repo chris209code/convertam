@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">PDF Suite</title>
+  <desc id="desc">Convertam PDF Suite icon in the official rounded document visual system.</desc>
+  <defs>
+    <linearGradient id="g" x1="14" y1="8" x2="50" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#DC2626" stop-opacity=".92"/>
+      <stop offset="1" stop-color="#DC2626" stop-opacity=".58"/>
+    </linearGradient>
+    <filter id="s" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#16345B" flood-opacity=".16"/>
+    </filter>
+  </defs>
+  <rect x="6" y="6" width="52" height="52" rx="12" fill="#F7FAFF"/>
+  <rect x="7" y="7" width="50" height="50" rx="11" fill="white" stroke="#DCE6F7"/>
+  <g filter="url(#s)"><path d="M18 16a4 4 0 0 1 4-4h14l10 10v30a4 4 0 0 1-4 4H22a4 4 0 0 1-4-4z" fill="#fff" stroke="#8FA6CC" stroke-width="1.7" stroke-linejoin="round"/>
+  <path d="M32 12v8a2 2 0 0 0 2 2h8" fill="#EAF1FF" stroke="#8FA6CC" stroke-width="1.7" stroke-linejoin="round"/>
+  <rect x="24" y="30" width="20" height="4" rx="2" fill="#DC2626" opacity=".24"/>
+  <rect x="24" y="38" width="14" height="3" rx="1.5" fill="#D6E0F1"/>
+  <rect x="24" y="45" width="8" height="3" rx="1.5" fill="#E4EAF5"/>
+  <rect x="22" y="34" width="20" height="14" rx="4" fill="#DC2626"/><text x="32" y="44" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="7" font-weight="800" fill="#fff">PDF</text>
+  <path d="M18 40h28" stroke="#DC2626" stroke-width="3" stroke-linecap="round"/><path d="M23 40l-5-5m0 5l5 5M41 40l5-5m0 5l-5 5" fill="none" stroke="#DC2626" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
+</svg>

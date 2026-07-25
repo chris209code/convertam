@@ -1,55 +1,35 @@
-// Shared "engraved paper" icon set + accent tokens, reused across the
-// homepage category cards and each category's own hub page so the same
+// Shared category icon + accent-color tokens, reused across the homepage
+// category cards, every hub page, the Header nav, and Learn so the same
 // icon and colour language shows up everywhere a category appears.
+//
+// Icons come from the official Convertam Visual System export
+// (public/visuals/icons/category/*.svg) — each one is a self-contained tile
+// (its own white card + border + drop shadow baked in), so it renders
+// correctly on any background without an extra colored wrapper. The colour
+// tokens below match that same package's palette exactly (PDF=blue,
+// Business=red, Career=green, AI=purple, Image=orange, Calculators=steel,
+// Utilities=slate) — a deliberate reassignment from the site's previous
+// category colours (PDF used to be red, Business used to be green), made to
+// stay faithful to the supplied design system rather than mixing old and
+// new colour identities across pages.
 
-export const PdfIcon = (
-  <svg width="30" height="30" viewBox="0 0 24 24">
-    <rect x="6.5" y="3" width="12.5" height="17" rx="2" fill="#fff" opacity="0.32" />
-    <path d="M3 4.8A1.8 1.8 0 0 1 4.8 3H13l4 4v11.2A1.8 1.8 0 0 1 15.2 20H4.8A1.8 1.8 0 0 1 3 18.2z" fill="#fff" />
-    <path d="M13 3l4 4h-2.6A1.4 1.4 0 0 1 13 5.6z" fill="#fff" opacity="0.55" />
-    <text x="9.4" y="16.2" fontFamily="Arial, sans-serif" fontSize="5.6" fontWeight="800" fill="#DC2626" textAnchor="middle">PDF</text>
-  </svg>
-);
+function CategoryIcon({ src, alt = '', size = 30 }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt={alt} width={size} height={size} style={{ display: 'block' }} />;
+}
 
-export const BusinessIcon = (
-  <svg width="30" height="30" viewBox="0 0 24 24">
-    <rect x="3.5" y="9.5" width="18" height="12" rx="2.5" fill="#fff" opacity="0.3" />
-    <path d="M9 8.2V6.6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.6" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
-    <rect x="2" y="8" width="20" height="13" rx="2.5" fill="#fff" />
-    <rect x="2" y="13.2" width="20" height="1" fill="#000" opacity="0.14" />
-    <rect x="10.2" y="12.4" width="3.6" height="2.6" rx="0.6" fill="#059669" />
-  </svg>
-);
+export const PdfIcon = <CategoryIcon src="/visuals/icons/category/pdf-suite.svg" />;
+export const BusinessIcon = <CategoryIcon src="/visuals/icons/category/business-suite.svg" />;
+export const AiIcon = <CategoryIcon src="/visuals/icons/category/ai-workspace.svg" />;
+export const ImageIcon = <CategoryIcon src="/visuals/icons/category/image-studio.svg" />;
+export const CalculatorIcon = <CategoryIcon src="/visuals/icons/category/calculators.svg" />;
+export const UtilitiesIcon = <CategoryIcon src="/visuals/icons/category/utilities.svg" />;
+export const CareerIcon = <CategoryIcon src="/visuals/icons/category/career-studio.svg" />;
 
-export const AiIcon = (
-  <svg width="30" height="30" viewBox="0 0 24 24">
-    <ellipse cx="12" cy="12" rx="9.5" ry="4.2" fill="none" stroke="#fff" strokeWidth="1.1" opacity="0.4" transform="rotate(-18 12 12)" />
-    <path d="M11.5 4l1.6 4.6L17.5 10l-4.4 1.6L11.5 16l-1.6-4.4L5.5 10l4.4-1.4z" fill="#fff" />
-    <path d="M17.2 15.3l0.8 2.1 2.1 0.8-2.1 0.8-0.8 2.1-0.8-2.1-2.1-0.8 2.1-0.8z" fill="#7C3AED" />
-  </svg>
-);
-
-export const ImageIcon = (
-  <svg width="30" height="30" viewBox="0 0 24 24">
-    <rect x="6" y="3.2" width="14.5" height="14.5" rx="2" fill="#fff" opacity="0.3" transform="rotate(7 12 12)" />
-    <rect x="3" y="5" width="15" height="15" rx="2" fill="#fff" />
-    <path d="M4.5 17.5l4-5 3 3.2 2.6-3.6 3.9 5.4z" fill="#000" opacity="0.15" />
-    <circle cx="7.3" cy="8.6" r="1.7" fill="#EA580C" />
-  </svg>
-);
-
-export const CalculatorIcon = (
-  <svg width="30" height="30" viewBox="0 0 24 24">
-    <rect x="4.5" y="2" width="15" height="20" rx="2.5" fill="#fff" />
-    <rect x="6.3" y="4" width="11.4" height="4.4" rx="1" fill="#2563EB" />
-    <g fill="#000" opacity="0.16">
-      <rect x="6.3" y="10.4" width="3" height="2.4" rx="0.6" /><rect x="10.5" y="10.4" width="3" height="2.4" rx="0.6" /><rect x="14.7" y="10.4" width="3" height="2.4" rx="0.6" />
-      <rect x="6.3" y="14" width="3" height="2.4" rx="0.6" /><rect x="10.5" y="14" width="3" height="2.4" rx="0.6" /><rect x="14.7" y="14" width="3" height="2.4" rx="0.6" />
-      <rect x="6.3" y="17.6" width="11.4" height="2.4" rx="0.6" />
-    </g>
-  </svg>
-);
-
+// No supplied replacement exists for these two (Data Workspace is hidden
+// from navigation; Workflow is a Learn-only content grouping, not a product
+// category) — kept as the original hand-drawn icons rather than inventing
+// new assets outside the supplied package.
 export const DataIcon = (
   <svg width="30" height="30" viewBox="0 0 24 24">
     <rect x="6" y="3" width="14" height="15" rx="2" fill="#fff" opacity="0.3" />
@@ -63,18 +43,6 @@ export const DataIcon = (
   </svg>
 );
 
-export const UtilitiesIcon = (
-  <svg width="30" height="30" viewBox="0 0 24 24">
-    <ellipse cx="12" cy="19.6" rx="8.5" ry="1.5" fill="#fff" opacity="0.2" />
-    <path d="M8.5 7.6V6a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v1.6" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" />
-    <rect x="3" y="7.6" width="18" height="11.4" rx="2" fill="#fff" />
-    <rect x="3" y="12.1" width="18" height="1" fill="#000" opacity="0.14" />
-    <rect x="10.2" y="11.3" width="3.6" height="2.6" rx="0.6" fill="#334155" />
-  </svg>
-);
-
-// Three connected nodes — represents a Learn "Workflow Guide": several
-// Convertam tools chained together into one repeatable process.
 export const WorkflowIcon = (
   <svg width="30" height="30" viewBox="0 0 24 24">
     <path d="M6 7.5 L12 12 L18 7.5" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" opacity="0.55" />
@@ -144,5 +112,12 @@ export const CATEGORY_ACCENTS = {
     borderColor: '#C7D2FE', accentText: '#4F46E5',
     focusRing: 'rgba(79,70,229,0.12)', shadowTint: 'rgba(79,70,229,0.15)',
     badgeFreeBg: '#E0E7FF', badgeFreeText: '#3730A3',
+  },
+  career: {
+    gradient: 'linear-gradient(120deg, #0EA5E9 0%, #0284C7 100%)',
+    pageBgTop: '#F0F9FF', pageBgBottom: '#E0F2FE',
+    borderColor: '#BAE6FD', accentText: '#0284C7',
+    focusRing: 'rgba(2,132,199,0.12)', shadowTint: 'rgba(2,132,199,0.15)',
+    badgeFreeBg: '#E0F2FE', badgeFreeText: '#075985',
   },
 };

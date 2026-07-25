@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="220" viewBox="0 0 320 220" role="img" aria-labelledby="title desc">
+  <title id="title">Workflow Guides</title>
+  <desc id="desc">Editable Convertam Learn illustration for Workflow Guides.</desc>
+  <defs>
+    <linearGradient id="soft" x1="40" y1="20" x2="280" y2="210" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7C3AED" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#7C3AED" stop-opacity=".04"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#16345B" flood-opacity=".14"/>
+    </filter>
+  </defs>
+  <rect width="320" height="220" rx="20" fill="#F8FBFF"/>
+  <path d="M28 166c40-72 80-74 120-30s91 36 142-42v90H28z" fill="url(#soft)"/>
+  <g opacity=".46" stroke="#7C3AED" stroke-width="2" stroke-linecap="round"><path d="M38 42h8M42 38v8M282 54h8M286 50v8M260 172h8M264 168v8"/></g>
+  <g filter="url(#shadow)"><rect x="86" y="68" width="148" height="92" rx="26" fill="#7C3AED" opacity=".9"/><circle cx="130" cy="112" r="13" fill="#fff"/><circle cx="190" cy="112" r="13" fill="#fff"/><path d="M138 138h44" stroke="#fff" stroke-width="7" stroke-linecap="round"/><path d="M160 42v26" stroke="#7C3AED" stroke-width="6" stroke-linecap="round"/><circle cx="160" cy="36" r="10" fill="#7C3AED"/></g>
+</svg>

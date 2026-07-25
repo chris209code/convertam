@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="220" viewBox="0 0 320 220" role="img" aria-labelledby="title desc">
+  <title id="title">How Merge PDF Works</title>
+  <desc id="desc">Editable Convertam Learn illustration for How Merge PDF Works.</desc>
+  <defs>
+    <linearGradient id="soft" x1="40" y1="20" x2="280" y2="210" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#246BFE" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#246BFE" stop-opacity=".04"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#16345B" flood-opacity=".14"/>
+    </filter>
+  </defs>
+  <rect width="320" height="220" rx="20" fill="#F8FBFF"/>
+  <path d="M28 166c40-72 80-74 120-30s91 36 142-42v90H28z" fill="url(#soft)"/>
+  <g opacity=".46" stroke="#246BFE" stroke-width="2" stroke-linecap="round"><path d="M38 42h8M42 38v8M282 54h8M286 50v8M260 172h8M264 168v8"/></g>
+  <g filter="url(#shadow)"><path d="M126 108h68m-16-14 16 14-16 14" stroke="#246BFE" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M58 61a4 4 0 0 1 4-4h52l10 10v86a4 4 0 0 1-4 4H62a4 4 0 0 1-4-4z" fill="#fff" stroke="#8FA6CC" stroke-width="1.7" stroke-linejoin="round"/>
+  <path d="M110 57v8a2 2 0 0 0 2 2h8" fill="#EAF1FF" stroke="#8FA6CC" stroke-width="1.7" stroke-linejoin="round"/>
+  <rect x="64" y="75" width="20" height="4" rx="2" fill="#246BFE" opacity=".24"/>
+  <rect x="64" y="83" width="52" height="3" rx="1.5" fill="#D6E0F1"/>
+  <rect x="64" y="90" width="46" height="3" rx="1.5" fill="#E4EAF5"/>
+  <rect x="79" y="135" width="24" height="14" rx="4" fill="#246BFE"/><text x="91" y="145" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="7" font-weight="800" fill="#fff">PDF</text><path d="M196 58a4 4 0 0 1 4-4h52l10 10v88a4 4 0 0 1-4 4H200a4 4 0 0 1-4-4z" fill="#fff" stroke="#8FA6CC" stroke-width="1.7" stroke-linejoin="round"/>
+  <path d="M248 54v8a2 2 0 0 0 2 2h8" fill="#EAF1FF" stroke="#8FA6CC" stroke-width="1.7" stroke-linejoin="round"/>
+  <rect x="202" y="72" width="20" height="4" rx="2" fill="#246BFE" opacity=".24"/>
+  <rect x="202" y="80" width="52" height="3" rx="1.5" fill="#D6E0F1"/>
+  <rect x="202" y="87" width="46" height="3" rx="1.5" fill="#E4EAF5"/>
+  </g>
+</svg>

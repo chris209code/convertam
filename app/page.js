@@ -208,8 +208,6 @@ export default function HomePage() {
           --orange: #ff7a1a; --steel: #58749a; --slate: #667085; --ink: #07122f;
           --muted: #5f6f86; --line: #dce6f7; --page: #f7fbff;
           --shadow: 0 18px 44px rgb(24 55 102 / 12%); --soft-shadow: 0 8px 24px rgb(24 55 102 / 10%);
-          --cat-pdf: #DC2626; --cat-business: #059669; --cat-career: #0284C7;
-          --cat-ai: #7C3AED; --cat-image: #F97316; --cat-calc: #2563EB; --cat-utility: #475569;
           position: relative; color: var(--ink);
           font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           background:
@@ -252,13 +250,13 @@ export default function HomePage() {
         .cvt-suite-card { --accent: var(--blue); position: relative; overflow: hidden; display: flex; min-height: 270px; flex-direction: column; padding: 20px; border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--line)); border-radius: 12px; background: radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 36%), linear-gradient(180deg, color-mix(in srgb, var(--accent) 8%, white), #ffffff 45%); box-shadow: var(--soft-shadow); text-decoration: none; color: inherit; }
         .cvt-suite-card::before { content: ''; position: absolute; inset: 0 0 auto; height: 5px; background: var(--accent); }
         .cvt-suite-card::after { content: ''; position: absolute; right: -24px; bottom: -28px; width: 130px; height: 130px; border: 24px solid color-mix(in srgb, var(--accent) 10%, transparent); border-radius: 34px; transform: rotate(18deg); }
-        .cvt-suite-card.pdf { --accent: var(--cat-pdf); }
-        .cvt-suite-card.business { --accent: var(--cat-business); }
-        .cvt-suite-card.career { --accent: var(--cat-career); }
-        .cvt-suite-card.ai { --accent: var(--cat-ai); }
-        .cvt-suite-card.image { --accent: var(--cat-image); }
-        .cvt-suite-card.calculator { --accent: var(--cat-calc); }
-        .cvt-suite-card.utility { --accent: var(--cat-utility); }
+        .cvt-suite-card.pdf { --accent: var(--blue); }
+        .cvt-suite-card.business { --accent: var(--red); }
+        .cvt-suite-card.career { --accent: var(--green); }
+        .cvt-suite-card.ai { --accent: var(--purple); }
+        .cvt-suite-card.image { --accent: var(--orange); }
+        .cvt-suite-card.calculator { --accent: var(--steel); }
+        .cvt-suite-card.utility { --accent: var(--slate); }
         .cvt-suite-top { position: relative; z-index: 1; display: grid; grid-template-columns: 64px 1fr; gap: 14px; }
         .cvt-icon-tile { display: grid; place-items: center; width: 70px; height: 70px; border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); border-radius: 16px; background: color-mix(in srgb, var(--accent) 8%, white); box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 14%, transparent); }
         .cvt-icon-tile img { width: 56px; height: 56px; }

@@ -56,20 +56,26 @@ export const WorkflowIcon = (
   </svg>
 );
 
+// Colors below are the exact per-category values from the supplied visual
+// system's data/icon-mapping.json (pdf #246BFE, business #F43F3F, career
+// #14B875, ai #7C3AED, image #FF7A1A, calculator #58749A, utility #667085)
+// — the same accent each category's icon SVG is drawn in — so every page
+// that shares this file stays consistent with the package, not just the
+// homepage suite cards.
 export const CATEGORY_ACCENTS = {
   pdf: {
-    gradient: 'linear-gradient(120deg, #EF4444 0%, #DC2626 100%)',
-    pageBgTop: '#FFF8F7', pageBgBottom: '#FFF1EF',
-    borderColor: '#FEE2E2', accentText: '#DC2626',
-    focusRing: 'rgba(220,38,38,0.12)', shadowTint: 'rgba(220,38,38,0.15)',
-    badgeFreeBg: '#FEE2E2', badgeFreeText: '#B91C1C',
+    gradient: 'linear-gradient(120deg, #246BFE 0%, #1D58D0 100%)',
+    pageBgTop: '#F5F8FF', pageBgBottom: '#EAF1FF',
+    borderColor: '#CBDCFB', accentText: '#1D58D0',
+    focusRing: 'rgba(36,107,254,0.12)', shadowTint: 'rgba(36,107,254,0.15)',
+    badgeFreeBg: '#DCE9FF', badgeFreeText: '#173F99',
   },
   business: {
-    gradient: 'linear-gradient(120deg, #10B981 0%, #059669 100%)',
-    pageBgTop: '#F0FDF4', pageBgBottom: '#ECFDF5',
-    borderColor: '#A7F3D0', accentText: '#059669',
-    focusRing: 'rgba(5,150,105,0.12)', shadowTint: 'rgba(5,150,105,0.15)',
-    badgeFreeBg: '#D1FAE5', badgeFreeText: '#065F46',
+    gradient: 'linear-gradient(120deg, #F43F3F 0%, #CF3636 100%)',
+    pageBgTop: '#FFF6F6', pageBgBottom: '#FFE9E9',
+    borderColor: '#FBCFCF', accentText: '#CF3636',
+    focusRing: 'rgba(244,63,63,0.12)', shadowTint: 'rgba(244,63,63,0.15)',
+    badgeFreeBg: '#FCDCDC', badgeFreeText: '#9F2A2A',
   },
   ai: {
     gradient: 'linear-gradient(120deg, #8B5CF6 0%, #7C3AED 100%)',
@@ -79,11 +85,11 @@ export const CATEGORY_ACCENTS = {
     badgeFreeBg: '#EDE9FE', badgeFreeText: '#5B21B6',
   },
   image: {
-    gradient: 'linear-gradient(120deg, #F59E0B 0%, #F97316 100%)',
-    pageBgTop: '#FFFBEB', pageBgBottom: '#FEF3C7',
-    borderColor: '#FDE68A', accentText: '#D97706',
-    focusRing: 'rgba(217,119,6,0.12)', shadowTint: 'rgba(217,119,6,0.15)',
-    badgeFreeBg: '#FEF3C7', badgeFreeText: '#92400E',
+    gradient: 'linear-gradient(120deg, #FF7A1A 0%, #D96816 100%)',
+    pageBgTop: '#FFF7ED', pageBgBottom: '#FFEDD5',
+    borderColor: '#FED7AA', accentText: '#D96816',
+    focusRing: 'rgba(255,122,26,0.12)', shadowTint: 'rgba(255,122,26,0.15)',
+    badgeFreeBg: '#FFEDD5', badgeFreeText: '#9A3412',
   },
   data: {
     gradient: 'linear-gradient(120deg, #22D3EE 0%, #0891B2 100%)',
@@ -93,17 +99,17 @@ export const CATEGORY_ACCENTS = {
     badgeFreeBg: '#CFFAFE', badgeFreeText: '#155E63',
   },
   calculator: {
-    gradient: 'linear-gradient(120deg, #2563EB 0%, #1D4ED8 100%)',
-    pageBgTop: '#EFF6FF', pageBgBottom: '#DBEAFE',
-    borderColor: '#BFDBFE', accentText: '#1D4ED8',
-    focusRing: 'rgba(37,99,235,0.12)', shadowTint: 'rgba(37,99,235,0.25)',
-    badgeFreeBg: '#DBEAFE', badgeFreeText: '#1E40AF',
+    gradient: 'linear-gradient(120deg, #58749A 0%, #4B6383 100%)',
+    pageBgTop: '#F7F8FA', pageBgBottom: '#EEF1F5',
+    borderColor: '#DDE3EB', accentText: '#4B6383',
+    focusRing: 'rgba(88,116,154,0.12)', shadowTint: 'rgba(88,116,154,0.25)',
+    badgeFreeBg: '#DDE3EB', badgeFreeText: '#35465C',
   },
   utilities: {
-    gradient: 'linear-gradient(120deg, #64748B 0%, #475569 100%)',
+    gradient: 'linear-gradient(120deg, #667085 0%, #575F71 100%)',
     pageBgTop: '#F8FAFC', pageBgBottom: '#F1F5F9',
-    borderColor: '#E2E8F0', accentText: '#475569',
-    focusRing: 'rgba(71,85,105,0.12)', shadowTint: 'rgba(71,85,105,0.15)',
+    borderColor: '#E2E8F0', accentText: '#575F71',
+    focusRing: 'rgba(102,112,133,0.12)', shadowTint: 'rgba(102,112,133,0.15)',
     badgeFreeBg: '#E2E8F0', badgeFreeText: '#334155',
   },
   workflow: {
@@ -114,10 +120,10 @@ export const CATEGORY_ACCENTS = {
     badgeFreeBg: '#E0E7FF', badgeFreeText: '#3730A3',
   },
   career: {
-    gradient: 'linear-gradient(120deg, #0EA5E9 0%, #0284C7 100%)',
-    pageBgTop: '#F0F9FF', pageBgBottom: '#E0F2FE',
-    borderColor: '#BAE6FD', accentText: '#0284C7',
-    focusRing: 'rgba(2,132,199,0.12)', shadowTint: 'rgba(2,132,199,0.15)',
-    badgeFreeBg: '#E0F2FE', badgeFreeText: '#075985',
+    gradient: 'linear-gradient(120deg, #14B875 0%, #0E9F63 100%)',
+    pageBgTop: '#F0FDF7', pageBgBottom: '#DDFBEC',
+    borderColor: '#BBF3D8', accentText: '#0E9F63',
+    focusRing: 'rgba(20,184,117,0.12)', shadowTint: 'rgba(20,184,117,0.15)',
+    badgeFreeBg: '#DDFBEC', badgeFreeText: '#0A6E45',
   },
 };

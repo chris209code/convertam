@@ -39,6 +39,7 @@ import QrCodeStudioWorkspace from '@/components/tools/QrCodeStudioWorkspace';
 import AskSolveAIWorkspace from '@/components/tools/AskSolveAIWorkspace';
 import DocumentTranslatorWorkspace from '@/components/tools/DocumentTranslatorWorkspace';
 import CoverLetterWriterWorkspace from '@/components/tools/CoverLetterWriterWorkspace';
+import LinkedInOptimizerWorkspace from '@/components/tools/LinkedInOptimizerWorkspace';
 import ContractSummarizerWorkspace from '@/components/tools/ContractSummarizerWorkspace';
 import PresentationGeneratorWorkspace from '@/components/tools/PresentationGeneratorWorkspace';
 import DataAnalystWorkspace from '@/components/tools/DataAnalystWorkspace';
@@ -73,7 +74,7 @@ const isFree = (mode) =>
    'fill', 'write-on-pdf', 'quotation', 'salary-calculator', 'loan-calculator', 'vat-calculator', 'profit-margin', 'discount-calculator', 'age-calculator',
    'expense-budget-calculator', 'break-even-calculator', 'savings-goal-calculator',
    'utilities-hub', 'cv-improver', 'resume-builder', 'ask-solve-ai', 'document-translator', 'qr-code-studio',
-   'cover-letter', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'presentation-generator', 'data-analyst',
+   'cover-letter', 'linkedin-optimizer', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'presentation-generator', 'data-analyst',
    'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio', 'password-studio'].includes(mode);
 
 function getPriceBadge(mode) {
@@ -194,6 +195,7 @@ export default function ToolPageClient({ tool }) {
         {tool.mode === 'ask-solve-ai' && <AskSolveAIWorkspace />}
         {tool.mode === 'document-translator' && <DocumentTranslatorWorkspace />}
         {tool.mode === 'cover-letter' && <CoverLetterWriterWorkspace />}
+        {tool.mode === 'linkedin-optimizer' && <LinkedInOptimizerWorkspace />}
         {tool.mode === 'contract-summarizer' && <ContractSummarizerWorkspace />}
         {tool.mode === 'presentation-generator' && <PresentationGeneratorWorkspace />}
         {tool.mode === 'data-analyst' && <DataAnalystWorkspace />}

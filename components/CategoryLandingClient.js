@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import SmartWorkflowPrompt from './smart-workflows/SmartWorkflowPrompt';
+import SmartWorkflowStepBanner from './smart-workflows/SmartWorkflowStepBanner';
 
 // Reusable Category Landing Page framework — one layout, driven entirely by
 // props, meant to power every category hub (PDF Tools, Business Documents,
@@ -196,6 +198,9 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, e
       </div>
 
       <div className="page-inner" style={{ padding: '10px 4% 56px' }}>
+
+        <SmartWorkflowStepBanner />
+        <SmartWorkflowPrompt />
 
         {editorial && (
           <div className="cl-editorial">

@@ -130,7 +130,9 @@ const ALL_TOOLS = [
   { name: 'Protect PDF', href: '/protect-pdf' },
   { name: 'Images to PDF', href: '/images-to-pdf' },
   { name: 'Extract PDF Images', href: '/extract-pdf-images' },
-  { name: 'Compare PDFs', href: '/compare-pdf' },
+  { name: 'PDF Compare', href: '/compare-pdf' },
+  { name: 'Passport Photo Studio', href: '/passport-photo-studio' },
+  { name: 'Screenshot Studio', href: '/screenshot-studio' },
   { name: 'Redact & Edit PDF', href: '/redact-pdf' },
   { name: 'PDF Overlay', href: '/pdf-overlay' },
   { name: 'PDF to Images', href: '/pdf-to-png' },
@@ -512,6 +514,11 @@ export default function HomePageClient() {
             </div>
           )}
         </div>
+
+        <p style={{ textAlign: 'center', fontSize: '0.82rem', color: '#64748B', margin: '0 0 14px' }}>
+          Not sure which tool you need?{' '}
+          <Link href="/smart-workflows" style={{ color: '#2563EB', fontWeight: 700, textDecoration: 'none' }}>Tell Smart Workflows what you're trying to accomplish →</Link>
+        </p>
 
         <div className="cvt-trending">
           <span className="cvt-trending-label">Trending now:</span>

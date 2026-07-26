@@ -64,6 +64,8 @@ const SECTIONS = [
       { slug: 'convert-image-format', title: 'Image Format Converter', desc: 'Convert between JPG, PNG, and WebP', icon: '🔁', badge: 'free' },
       { slug: 'meme-generator', title: 'Meme Generator', desc: 'Add classic bold top/bottom captions to any image', icon: '😄', badge: 'free' },
       { slug: 'document-enhancer', title: 'Document Enhancer', desc: 'Remove shadows and enhance scanned documents', icon: '✨', badge: 'free' },
+      { slug: 'passport-photo-studio', title: 'Passport Photo Studio', desc: 'Passport, visa, ID and driver\'s licence photos with the correct size, head position and background', icon: '🛂', badge: 'free' },
+      { slug: 'screenshot-studio', title: 'Screenshot Studio', desc: 'Device mockups, social post cards, and before/after showcases with annotation tools', icon: '🖥️', badge: 'free' },
     ],
   },
 ];

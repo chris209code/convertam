@@ -34,6 +34,7 @@ export default function sitemap() {
     'image-tools',
     'calculator-hub',
     'utilities',
+    'smart-workflows',
   ].map((slug) => ({
     url: `${BASE_URL}/${slug}`,
     lastModified: new Date(),

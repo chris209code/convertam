@@ -51,6 +51,8 @@ import MemeGeneratorWorkspace from '@/components/tools/MemeGeneratorWorkspace';
 import ResumeBuilderWorkspace from '@/components/tools/ResumeBuilderWorkspace';
 import IdCardGeneratorWorkspace from '@/components/tools/IdCardGeneratorWorkspace';
 import DocumentEnhancerWorkspace from '@/components/tools/DocumentEnhancerWorkspace';
+import PassportPhotoStudioWorkspace from '@/components/tools/PassportPhotoStudioWorkspace';
+import ScreenshotStudioWorkspace from '@/components/tools/ScreenshotStudioWorkspace';
 import PaymentGate from '@/components/PaymentGate';
 import ComingSoon from '@/components/tools/ComingSoon';
 import Link from 'next/link';
@@ -66,6 +68,7 @@ import RelatedToolsCard from '@/components/tool-guide/RelatedToolsCard';
 import ToolExtrasSection from '@/components/tool-guide/ToolExtrasSection';
 import WorkspaceLayoutShell from '@/components/workspace/WorkspaceLayoutShell';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import SmartWorkflowStepBanner from '@/components/smart-workflows/SmartWorkflowStepBanner';
 
 const isFree = (mode) =>
   ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice',
@@ -75,7 +78,8 @@ const isFree = (mode) =>
    'expense-budget-calculator', 'break-even-calculator', 'savings-goal-calculator',
    'utilities-hub', 'cv-improver', 'resume-builder', 'ask-solve-ai', 'document-translator', 'qr-code-studio',
    'cover-letter', 'linkedin-optimizer', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'presentation-generator', 'data-analyst',
-   'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio', 'password-studio'].includes(mode);
+   'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio', 'password-studio',
+   'passport-photo-studio', 'screenshot-studio'].includes(mode);
 
 function getPriceBadge(mode) {
   if (isFree(mode)) return 'Free';
@@ -126,6 +130,8 @@ export default function ToolPageClient({ tool }) {
             ))}
           </div>
         )}
+
+        <SmartWorkflowStepBanner />
 
         {meta.steps && !inSession && (
           <div className="flex items-center gap-2 flex-wrap mb-6">
@@ -208,6 +214,8 @@ export default function ToolPageClient({ tool }) {
         {tool.mode === 'id-card-generator' && <IdCardGeneratorWorkspace />}
         {tool.mode === 'document-enhancer' && <DocumentEnhancerWorkspace />}
         {tool.mode === 'delivery-note-waybill' && <BusinessDocumentStudioWorkspace initialDocType="delivery-note" />}
+        {tool.mode === 'passport-photo-studio' && <PassportPhotoStudioWorkspace />}
+        {tool.mode === 'screenshot-studio' && <ScreenshotStudioWorkspace />}
         {tool.mode === 'soon' && <ComingSoon title={tool.title} note={tool.note} />}
 
         {tool.mode !== 'password-studio' && (

@@ -102,7 +102,7 @@ const SECTIONS = [
       { slug: 'extract-pdf-pages', title: 'Extract Pages', desc: 'Pull specific pages into a new PDF', icon: '📤', badge: 'free' },
       { slug: 'add-page-numbers', title: 'Add Page Numbers', desc: 'Stamp page numbers onto every page', icon: '#️⃣', badge: 'free' },
       { slug: 'extract-pdf-images', title: 'Extract PDF Images', desc: 'Pull the embedded images out of a PDF', icon: '🖼️', badge: 'free' },
-      { slug: 'compare-pdf', title: 'Compare PDFs', desc: 'See what changed between two versions of a PDF', icon: '🔍', badge: 'free' },
+      { slug: 'compare-pdf', title: 'PDF Compare', desc: 'See what changed between two versions of a PDF — side by side, overlaid, or in an exportable report', icon: '🔍', badge: 'free' },
     ],
   },
   {

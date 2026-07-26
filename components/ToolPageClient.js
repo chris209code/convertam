@@ -51,7 +51,6 @@ import MemeGeneratorWorkspace from '@/components/tools/MemeGeneratorWorkspace';
 import ResumeBuilderWorkspace from '@/components/tools/ResumeBuilderWorkspace';
 import IdCardGeneratorWorkspace from '@/components/tools/IdCardGeneratorWorkspace';
 import DocumentEnhancerWorkspace from '@/components/tools/DocumentEnhancerWorkspace';
-import PassportPhotoStudioWorkspace from '@/components/tools/PassportPhotoStudioWorkspace';
 import ScreenshotStudioWorkspace from '@/components/tools/ScreenshotStudioWorkspace';
 import PaymentGate from '@/components/PaymentGate';
 import ComingSoon from '@/components/tools/ComingSoon';
@@ -79,7 +78,7 @@ const isFree = (mode) =>
    'utilities-hub', 'cv-improver', 'resume-builder', 'ask-solve-ai', 'document-translator', 'qr-code-studio',
    'cover-letter', 'linkedin-optimizer', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'presentation-generator', 'data-analyst',
    'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio', 'password-studio',
-   'passport-photo-studio', 'screenshot-studio'].includes(mode);
+   'screenshot-studio'].includes(mode);
 
 function getPriceBadge(mode) {
   if (isFree(mode)) return 'Free';
@@ -106,34 +105,6 @@ export default function ToolPageClient({ tool }) {
   const inSession = session.status === 'active';
   const hub = HUB_BY_CATEGORY[tool.category];
   const learnArticle = getArticleForTool(tool.slug);
-
-  // Temporarily de-listed tool: show a plain "back soon" panel instead of
-  // the real workspace, and skip the guide/extras/related-tools sections
-  // entirely so nothing on this page still promotes or explains a feature
-  // that isn't working right now. The URL still resolves (no 404) for
-  // anyone who already has this link. See lib/tools-config.js.
-  if (tool.disabled) {
-    return (
-      <WorkspaceLayoutShell>
-        <main className="max-w-3xl mx-auto px-5 md:px-10 py-10">
-          {hub ? (
-            <Link href={`/${hub.slug}`} className="inline-block font-mono text-xs text-stamp-amber tracking-wide mb-2 hover:underline">
-              {tool.category.toUpperCase()}
-            </Link>
-          ) : (
-            <p className="font-mono text-xs text-stamp-amber tracking-wide mb-2">{tool.category.toUpperCase()}</p>
-          )}
-          <h1 className="font-display text-3xl md:text-4xl font-bold mb-6">{tool.title}</h1>
-          <ComingSoon stamp="TEMPORARILY UNAVAILABLE" title="We've paused this tool for now" note={tool.disabledNote} />
-          {hub && (
-            <Link href={`/${hub.slug}`} className="inline-block mt-6 text-sm font-medium text-stamp-blue hover:underline">
-              ← Back to {hub.name}
-            </Link>
-          )}
-        </main>
-      </WorkspaceLayoutShell>
-    );
-  }
 
   return (
     <WorkspaceLayoutShell>
@@ -242,7 +213,6 @@ export default function ToolPageClient({ tool }) {
         {tool.mode === 'id-card-generator' && <IdCardGeneratorWorkspace />}
         {tool.mode === 'document-enhancer' && <DocumentEnhancerWorkspace />}
         {tool.mode === 'delivery-note-waybill' && <BusinessDocumentStudioWorkspace initialDocType="delivery-note" />}
-        {tool.mode === 'passport-photo-studio' && <PassportPhotoStudioWorkspace />}
         {tool.mode === 'screenshot-studio' && <ScreenshotStudioWorkspace />}
         {tool.mode === 'soon' && <ComingSoon title={tool.title} note={tool.note} />}
 

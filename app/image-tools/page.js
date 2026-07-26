@@ -64,9 +64,6 @@ const SECTIONS = [
       { slug: 'convert-image-format', title: 'Image Format Converter', desc: 'Convert between JPG, PNG, and WebP', icon: '🔁', badge: 'free' },
       { slug: 'meme-generator', title: 'Meme Generator', desc: 'Add classic bold top/bottom captions to any image', icon: '😄', badge: 'free' },
       { slug: 'document-enhancer', title: 'Document Enhancer', desc: 'Remove shadows and enhance scanned documents', icon: '✨', badge: 'free' },
-      // Passport Photo Studio is temporarily de-listed — see the `disabled`
-      // note on its entry in lib/tools-config.js. Not deleted here, just
-      // not surfaced as a card, so re-adding it later is a one-line change.
       { slug: 'screenshot-studio', title: 'Screenshot Studio', desc: 'Device mockups, social post cards, and before/after showcases with annotation tools', icon: '🖥️', badge: 'free' },
     ],
   },

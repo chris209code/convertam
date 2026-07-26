@@ -5,7 +5,7 @@ import { ARTICLES } from '@/lib/learn';
 const BASE_URL = 'https://www.convertam.app';
 
 export default function sitemap() {
-  const toolPages = tools.filter((tool) => !tool.disabled).map((tool) => ({
+  const toolPages = tools.map((tool) => ({
     // Tools with a basePath (currently just /calculators/*) live under a
     // nested path instead of the usual flat /<slug> — see
     // app/calculators/[tool]/page.js and the notFound() guard that keeps

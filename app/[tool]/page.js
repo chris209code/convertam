@@ -13,17 +13,6 @@ export function generateStaticParams() {
 export function generateMetadata({ params }) {
   const tool = getTool(params.tool);
   if (!tool || tool.basePath) return {};
-  // Temporarily de-listed tools keep their URL resolving (rather than
-  // 404ing for anyone who already has the link) but carry noindex and no
-  // promotional metadata/structured data — see the `disabled` note in
-  // lib/tools-config.js.
-  if (tool.disabled) {
-    return {
-      title: `${tool.title} — Temporarily Unavailable`,
-      description: tool.disabledNote || `${tool.title} is temporarily unavailable.`,
-      robots: { index: false, follow: false },
-    };
-  }
   const title = `${tool.title} — Free, No Login`;
   return {
     title,
@@ -38,7 +27,6 @@ export default function ToolPage({ params }) {
   // A tool with a basePath only exists at its nested URL — this keeps the
   // flat /<slug> from also resolving, so there's one canonical URL per tool.
   if (!tool || tool.basePath) notFound();
-  if (tool.disabled) return <ToolPageClient tool={tool} />;
   const { softwareApplication, breadcrumbList, faqSchema } = buildToolSchemas(tool);
   return (
     <>

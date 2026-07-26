@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getCareerSession, saveCareerSession, clearCareerSession } from '@/lib/careerSession';
 
 const TONES = ['Professional', 'Friendly', 'Enthusiastic', 'Formal'];
 
@@ -17,6 +18,31 @@ export default function CoverLetterWriterWorkspace() {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
+
+  // Inherits an active Career Session (from CV Improver, or any future
+  // Career Studio tool) so the candidate never has to retype the job
+  // title, company, job description, or their own background/CV — this is
+  // the entire point of "Continue to Cover Letter" and "Generate Cover
+  // Letter" both landing here. Runs once on mount; if no session exists
+  // (someone opened this tool directly), every field just stays blank and
+  // the tool works exactly as it always has.
+  const [inheritedFromSession, setInheritedFromSession] = useState(false);
+  useEffect(() => {
+    const session = getCareerSession();
+    if (!session) return;
+    if (session.applicantName) setYourName(session.applicantName);
+    if (session.jobTitle || session.targetRole) setJobTitle(session.jobTitle || session.targetRole);
+    if (session.companyName) setCompanyName(session.companyName);
+    if (session.cvPlainText) setBackground(session.cvPlainText);
+    setJobDescription(session.industry ? `Industry: ${session.industry}${session.jobDescription ? `\n\n${session.jobDescription}` : ''}` : (session.jobDescription || ''));
+    setInheritedFromSession(true);
+  }, []);
+
+  function clearInheritedSession() {
+    clearCareerSession();
+    setInheritedFromSession(false);
+    setYourName(''); setJobTitle(''); setCompanyName(''); setBackground(''); setJobDescription('');
+  }
 
   async function handleGenerate() {
     if (!jobTitle || !companyName || !background) {
@@ -42,6 +68,11 @@ export default function CoverLetterWriterWorkspace() {
       }
 
       setLetter(data.letter || '');
+      // Refreshes the Career Session with whatever the candidate actually
+      // used (including any edits made here) and extends its idle timeout —
+      // so a future tool (e.g. an ATS Match checker) sees the latest values,
+      // and the session stays alive while Career Studio work continues.
+      saveCareerSession({ sourceTool: 'cover-letter', applicantName: yourName, jobTitle, targetRole: jobTitle, companyName, jobDescription, cvPlainText: background });
     } catch (err) {
       console.error(err);
       setError('Something went wrong. Please try again.');
@@ -121,6 +152,16 @@ export default function CoverLetterWriterWorkspace() {
 
   return (
     <div className="panel">
+      {inheritedFromSession && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 18, padding: '10px 14px', borderRadius: 10, background: '#ECFDF5', border: '1px solid #C9F1DE' }}>
+          <p style={{ margin: 0, fontSize: '0.82rem', color: '#065F46' }}>
+            ✓ Continuing from CV Improver — your job details and CV are already filled in below.
+          </p>
+          <button onClick={clearInheritedSession} style={{ fontSize: '0.78rem', fontWeight: 600, color: '#065F46', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+            Not this job? Start fresh
+          </button>
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) minmax(280px, 1.1fr)', gap: 28 }}>
         <div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

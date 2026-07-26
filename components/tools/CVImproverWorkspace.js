@@ -6,6 +6,7 @@ import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptT
 import { extractTextFromFile } from '@/lib/extractDocText';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
+import { saveCareerSession, clearCareerSession } from '@/lib/careerSession';
 
 const inputStyle = { width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' };
 const labelStyle = { fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' };
@@ -23,7 +24,6 @@ function tagStyle(bg, fg) {
 }
 
 const POSITION_EXAMPLES = ['Quality Assurance Manager', 'Production Supervisor', 'Brewing Manager', 'Shift Manager', 'Operations Manager', 'Financial Analyst', 'Software Engineer'];
-const COVER_LETTER_TONES = ['Professional', 'Enthusiastic', 'Confident', 'Warm'];
 
 export const RESUME_BUILDER_IMPORT_KEY = 'convertam_cv_builder_import';
 
@@ -152,6 +152,8 @@ export default function CVImproverWorkspace() {
   const [cvText, setCvText] = useState('');
   const [targetPosition, setTargetPosition] = useState('');
   const [jobDescription, setJobDescription] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [industry, setIndustry] = useState('');
   const [structured, setStructured] = useState(null);
 
   const [uploading, setUploading] = useState(false);
@@ -167,17 +169,15 @@ export default function CVImproverWorkspace() {
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
 
-  const [activeView, setActiveView] = useState('improved'); // 'improved' | 'original' | 'coverLetter'
+  const [activeView, setActiveView] = useState('improved'); // 'improved' | 'original'
   const [suggestionState, setSuggestionState] = useState({}); // { [i]: { status: 'pending'|'applied'|'dismissed', editedText? } }
   const [editingSuggestionIndex, setEditingSuggestionIndex] = useState(null);
   const [copied, setCopied] = useState(false);
 
-  const [coverLetterCompanyName, setCoverLetterCompanyName] = useState('');
-  const [coverLetterTone, setCoverLetterTone] = useState('Professional');
-  const [coverLetter, setCoverLetter] = useState('');
-  const [coverLetterBusy, setCoverLetterBusy] = useState(false);
-  const [coverLetterError, setCoverLetterError] = useState('');
-  const [coverLetterCopied, setCoverLetterCopied] = useState(false);
+  // Once the candidate has reviewed the CV + feedback panels, "Skip to
+  // Results" collapses this down to just the CV + downloads — a clean
+  // finishing screen instead of leaving the feedback panels visible forever.
+  const [showFinalResults, setShowFinalResults] = useState(false);
 
   async function handleFileUpload(e) {
     const file = e.target.files?.[0];
@@ -301,7 +301,7 @@ export default function CVImproverWorkspace() {
         setStructured(data.structured);
         setSuggestionState({});
         setActiveView('improved');
-        setCoverLetter('');
+        setShowFinalResults(false);
         setStatus('✅ Your CV has been improved — review the CV and the Professional Review below before downloading.');
         pushCvToWorkspace(data.structured, template);
       } else {
@@ -320,14 +320,19 @@ export default function CVImproverWorkspace() {
     setStructured(null);
     setSuggestionState({});
     setActiveView('improved');
-    setCoverLetter('');
+    setShowFinalResults(false);
     setStatus('');
     setError('');
   }
+  // "Start Over" is the explicit "I'm done with this application" action —
+  // the one place in this tool that counts as starting a new application,
+  // so it clears the Career Session too rather than leaving stale job
+  // context around for whatever gets typed in next.
   function startOver() {
     setStructured(null); setCvText(''); setTargetPosition(''); setJobDescription('');
-    setSuggestionState({}); setActiveView('improved'); setStatus(''); setError(''); setUploadedName('');
-    setCoverLetter(''); setCoverLetterCompanyName('');
+    setCompanyName(''); setIndustry('');
+    setSuggestionState({}); setActiveView('improved'); setShowFinalResults(false); setStatus(''); setError(''); setUploadedName('');
+    clearCareerSession();
   }
 
   function suggestionStatus(i) {
@@ -469,37 +474,28 @@ export default function CVImproverWorkspace() {
     window.location.href = '/resume-builder';
   }
 
-  async function generateCoverLetter() {
-    if (!structured) return;
-    if (!coverLetterCompanyName.trim()) { setCoverLetterError('Please enter the company name.'); return; }
-    setCoverLetterBusy(true); setCoverLetterError('');
-    try {
-      const res = await fetch('/api/cover-letter-writer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          yourName: structured.name,
-          jobTitle: targetPosition,
-          companyName: coverLetterCompanyName,
-          background: structuredToPlainText(structured),
-          jobDescription,
-          tone: coverLetterTone,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Something went wrong.');
-      setCoverLetter(data.letter || '');
-    } catch (err) {
-      setCoverLetterError(err.message);
-    } finally {
-      setCoverLetterBusy(false);
-    }
+  // Saves everything Cover Letter Writer needs into the Career Session so
+  // it never has to ask for job title, company, job description, industry,
+  // or the CV content again — then hands off to the standalone tool, which
+  // reads this same session on mount. Used both by "Continue to Cover
+  // Letter →" and by the "Generate Cover Letter" action on the final
+  // results screen, since both cases reuse the identical context.
+  function continueToCoverLetter() {
+    saveCareerSession({
+      sourceTool: 'cv-improver',
+      applicantName: structured.name,
+      jobTitle: targetPosition,
+      targetRole: targetPosition,
+      companyName,
+      industry,
+      jobDescription,
+      cvPlainText: structuredToPlainText(structured),
+    });
+    window.location.href = '/cover-letter';
   }
-  function copyCoverLetter() {
-    if (!coverLetter) return;
-    navigator.clipboard.writeText(coverLetter);
-    setCoverLetterCopied(true);
-    setTimeout(() => setCoverLetterCopied(false), 2000);
+
+  function skipToResults() {
+    setShowFinalResults(true);
   }
 
   const pendingSuggestions = structured?.suggestions?.filter((_, i) => suggestionStatus(i) !== 'dismissed') || [];
@@ -549,6 +545,20 @@ export default function CVImproverWorkspace() {
           </div>
 
           <div style={{ marginBottom: 20 }} className="no-print">
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 200px' }}>
+                <label style={labelStyle}>Company Name (Optional)</label>
+                <input type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="e.g. Acme Manufacturing Ltd" style={inputStyle} />
+              </div>
+              <div style={{ flex: '1 1 200px' }}>
+                <label style={labelStyle}>Industry (Optional)</label>
+                <input type="text" value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="e.g. Manufacturing, Fintech, Healthcare" style={inputStyle} />
+              </div>
+            </div>
+            <p style={helperStyle}>Add these now if you already know them — they'll carry over automatically if you continue to a cover letter afterward, so you won't be asked again.</p>
+          </div>
+
+          <div style={{ marginBottom: 20 }} className="no-print">
             <label style={labelStyle}>Job Description / Requirements (Optional)</label>
             <textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)}
               placeholder="Paste the job advertisement, responsibilities or requirements..."
@@ -574,7 +584,6 @@ export default function CVImproverWorkspace() {
             <div style={{ display: 'flex', gap: 8 }}>
               <button style={pillStyle(activeView === 'improved')} onClick={() => setActiveView('improved')}>Improved CV</button>
               <button style={pillStyle(activeView === 'original')} onClick={() => setActiveView('original')}>Original CV</button>
-              <button style={pillStyle(activeView === 'coverLetter')} onClick={() => setActiveView('coverLetter')}>Cover Letter</button>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button className="btn btn-ghost" onClick={restoreOriginal}>↺ Restore Original</button>
@@ -585,37 +594,6 @@ export default function CVImproverWorkspace() {
           {activeView === 'original' && (
             <div className="no-print" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 12, padding: 18, whiteSpace: 'pre-wrap', fontSize: '0.85rem', lineHeight: 1.7, color: '#334155', maxHeight: 600, overflow: 'auto' }}>
               {cvText}
-            </div>
-          )}
-
-          {activeView === 'coverLetter' && (
-            <div className="no-print">
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
-                <div style={{ flex: '1 1 220px' }}>
-                  <label style={labelStyle}>Company Name</label>
-                  <input type="text" value={coverLetterCompanyName} onChange={(e) => setCoverLetterCompanyName(e.target.value)} placeholder="e.g. Acme Manufacturing Ltd" style={inputStyle} />
-                </div>
-                <div style={{ flex: '0 1 180px' }}>
-                  <label style={labelStyle}>Tone</label>
-                  <select value={coverLetterTone} onChange={(e) => setCoverLetterTone(e.target.value)} style={inputStyle}>
-                    {COVER_LETTER_TONES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
-                <button className="btn btn-primary" disabled={coverLetterBusy} onClick={generateCoverLetter}>
-                  {coverLetterBusy ? '✦ Writing your cover letter…' : coverLetter ? '↻ Regenerate Cover Letter' : '✦ Generate Cover Letter'}
-                </button>
-                {coverLetter && (
-                  <button className="btn btn-ghost" onClick={copyCoverLetter}>{coverLetterCopied ? '✓ Copied' : 'Copy Text'}</button>
-                )}
-              </div>
-              {coverLetterError && <div className="status error">{coverLetterError}</div>}
-              {coverLetter && (
-                <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 12, padding: 24, whiteSpace: 'pre-wrap', fontSize: '0.88rem', lineHeight: 1.75, color: '#1E293B', maxWidth: 720 }}>
-                  {coverLetter}
-                </div>
-              )}
             </div>
           )}
 
@@ -663,6 +641,8 @@ export default function CVImproverWorkspace() {
                 </div>
               )}
 
+              {!showFinalResults && (
+              <>
               {/* ============================================================
                   OUTPUT B — Professional Review. Kept entirely separate from
                   the CV rendered above; nothing here is ever inserted into it.
@@ -835,6 +815,41 @@ export default function CVImproverWorkspace() {
                         </div>
                       );
                     })}
+                  </div>
+                </section>
+              )}
+              </>
+              )}
+
+              {/* ============================================================
+                  Post-review handoff — the moment the candidate decides
+                  what's next. "Continue to Cover Letter" saves everything
+                  Cover Letter Writer needs into the Career Session so it
+                  never re-asks for job title, company, industry, or the CV
+                  itself. "Skip to Results" just declutters this screen down
+                  to the CV + downloads; a cover letter can still be
+                  generated later from here, reusing the same session.
+                  ============================================================ */}
+              {!showFinalResults ? (
+                <section className="no-print" style={{ marginTop: 34, padding: 20, borderRadius: 12, background: '#F0F5FF', border: '1px solid #D0DCF5', textAlign: 'center' }}>
+                  <p style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0F172A', margin: '0 0 4px' }}>What's next?</p>
+                  <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '0 auto 16px', maxWidth: 480 }}>
+                    Write a matching cover letter now — it'll automatically reuse this CV and your job details, so you won't have to re-enter anything. Or wrap up here and generate one later.
+                  </p>
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <button className="btn btn-primary" onClick={continueToCoverLetter}>Continue to Cover Letter →</button>
+                    <button className="btn btn-ghost" onClick={skipToResults}>Skip to Results</button>
+                  </div>
+                </section>
+              ) : (
+                <section className="no-print" style={{ marginTop: 34, padding: 20, borderRadius: 12, background: '#F8FAFC', border: '1px solid #E2E8F0', textAlign: 'center' }}>
+                  <p style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0F172A', margin: '0 0 4px' }}>✓ Your CV is ready</p>
+                  <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '0 0 16px' }}>
+                    Download it above whenever you're ready, or generate a matching cover letter — it'll reuse everything from this session automatically.
+                  </p>
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <button className="btn btn-primary" onClick={continueToCoverLetter}>✉️ Generate Cover Letter</button>
+                    <button className="btn btn-ghost" onClick={() => setShowFinalResults(false)}>← Return to Edit</button>
                   </div>
                 </section>
               )}

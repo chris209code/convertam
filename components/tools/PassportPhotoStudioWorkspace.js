@@ -205,7 +205,7 @@ export default function PassportPhotoStudioWorkspace() {
     if (!out) return;
     out.width = targetW; out.height = targetH;
     out.getContext('2d').putImageData(imageData, 0, 0);
-    setBackgroundCheck(bgSpec && bgSpec.type === 'color' ? checkBackgroundMatch(imageData, bgSpec.hex) : null);
+    setBackgroundCheck(bgSpec && bgSpec.type === 'color' ? checkBackgroundMatch(imageData, bgSpec.hex, personMaskRef.current) : null);
   }, [workingImg, targetW, targetH, pan, drawnW, drawnH, brightness, contrast, warmth, sharpen, bgRemoveEnabled, bgOption, bgCustomColor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const recomposeTimer = useRef(null);
@@ -473,7 +473,7 @@ export default function PassportPhotoStudioWorkspace() {
               {maskStatus === 'unavailable' && (
                 <p style={{ fontSize: '0.75rem', color: '#B45309', marginBottom: 10 }}>⚠ Automatic detection isn't available right now — nothing has been removed. Use the manual tools below if you'd like to remove the background yourself.</p>
               )}
-              {maskStatus === 'done' && backgroundCheck && (
+              {maskStatus === 'done' && backgroundCheck && !backgroundCheck.insufficientBackground && (
                 <p style={{ fontSize: '0.72rem', color: backgroundCheck.matches ? '#059669' : '#B45309', marginBottom: 10 }}>
                   {backgroundCheck.matches ? '✓ Background verified as matching' : '⚠ Background doesn\'t fully match yet'} — sampled edge color {backgroundCheck.avgHex}.
                 </p>

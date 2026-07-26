@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Script from 'next/script';
 import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptToModernProfessionalData, RESUME_PRINT_STYLES, downloadResumePdf, DOWNLOAD_STAGE_LABELS, downloadResumeDocx, DOCX_DOWNLOAD_STAGE_LABELS } from './resumeTemplates';
 import { extractTextFromFile } from '@/lib/extractDocText';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
-import { saveCareerSession, clearCareerSession } from '@/lib/careerSession';
+import { getCareerSession, saveCareerSession, clearCareerSession } from '@/lib/careerSession';
 
 const inputStyle = { width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' };
 const labelStyle = { fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' };
@@ -178,6 +178,29 @@ export default function CVImproverWorkspace() {
   // Results" collapses this down to just the CV + downloads — a clean
   // finishing screen instead of leaving the feedback panels visible forever.
   const [showFinalResults, setShowFinalResults] = useState(false);
+
+  // Inherits an active Career Session — set either by importing a job
+  // posting on the Career Studio hub, or by a previous CV Improver /
+  // Cover Letter Writer / LinkedIn Optimizer run — so the target role,
+  // company, industry, and job description never need retyping here.
+  const [inheritedFromSession, setInheritedFromSession] = useState(false);
+  useEffect(() => {
+    const session = getCareerSession();
+    if (!session) return;
+    const hasContext = session.jobTitle || session.targetRole || session.companyName || session.industry || session.jobDescription;
+    if (!hasContext) return;
+    setTargetPosition(session.jobTitle || session.targetRole || '');
+    setCompanyName(session.companyName || '');
+    setIndustry(session.industry || '');
+    setJobDescription(session.jobDescription || '');
+    setInheritedFromSession(true);
+  }, []);
+
+  function clearInheritedSession() {
+    clearCareerSession();
+    setInheritedFromSession(false);
+    setTargetPosition(''); setCompanyName(''); setIndustry(''); setJobDescription('');
+  }
 
   async function handleFileUpload(e) {
     const file = e.target.files?.[0];
@@ -508,6 +531,16 @@ export default function CVImproverWorkspace() {
 
       {!structured && (
         <>
+          {inheritedFromSession && (
+            <div className="no-print" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 16, padding: '10px 14px', borderRadius: 10, background: '#ECFDF5', border: '1px solid #C9F1DE' }}>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: '#065F46' }}>
+                ✓ Continuing your Career Studio session — target role, company, industry, and job description are already filled in below.
+              </p>
+              <button onClick={clearInheritedSession} style={{ fontSize: '0.78rem', fontWeight: 600, color: '#065F46', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+                Not this job? Start fresh
+              </button>
+            </div>
+          )}
           <div className="no-print" style={{ marginBottom: 16, border: '2px dashed #CBD5E1', borderRadius: 12, padding: '18px 16px', textAlign: 'center', background: '#F8FAFC' }}>
             <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Upload your CV (optional)</p>
             <p style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: 10 }}>PDF, DOCX, or TXT — we'll extract the text below so you can review and edit it before continuing.</p>

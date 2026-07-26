@@ -37,6 +37,8 @@ export default function PassportPhotoStudioWorkspace() {
   const [bgRemoveEnabled, setBgRemoveEnabled] = useState(true);
   const [bgOption, setBgOption] = useState(defaultBackgroundOption(preset));
   const [bgCustomColor, setBgCustomColor] = useState('#FFFFFF');
+  const [edgeSoftness, setEdgeSoftness] = useState(1.5); // px, feathers the mask boundary (0-5)
+  const [spillRemoval, setSpillRemoval] = useState(60); // %, decontaminates old-background color fringing (0-100)
   const [brightness, setBrightness] = useState(0);
   const [contrast, setContrast] = useState(0);
   const [warmth, setWarmth] = useState(0);
@@ -199,14 +201,14 @@ export default function PassportPhotoStudioWorkspace() {
     let bgSpec = null;
     if (bgRemoveEnabled && personMaskRef.current) {
       bgSpec = resolveBgSpec();
-      imageData = compositeWithBackground(imageData, personMaskRef.current, bgSpec);
+      imageData = compositeWithBackground(imageData, personMaskRef.current, bgSpec, { featherPx: edgeSoftness, spillAmount: spillRemoval / 100 });
     }
     const out = processedCanvasRef.current;
     if (!out) return;
     out.width = targetW; out.height = targetH;
     out.getContext('2d').putImageData(imageData, 0, 0);
     setBackgroundCheck(bgSpec && bgSpec.type === 'color' ? checkBackgroundMatch(imageData, bgSpec.hex, personMaskRef.current) : null);
-  }, [workingImg, targetW, targetH, pan, drawnW, drawnH, brightness, contrast, warmth, sharpen, bgRemoveEnabled, bgOption, bgCustomColor]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [workingImg, targetW, targetH, pan, drawnW, drawnH, brightness, contrast, warmth, sharpen, bgRemoveEnabled, bgOption, bgCustomColor, edgeSoftness, spillRemoval]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const recomposeTimer = useRef(null);
   useEffect(() => {
@@ -465,6 +467,12 @@ export default function PassportPhotoStudioWorkspace() {
               {bgOption === 'transparent' && fileFormat !== 'png' && (
                 <p style={{ fontSize: '0.7rem', color: '#B45309', marginBottom: 8 }}>Transparent backgrounds are only preserved in PNG exports — JPG and PDF will use white instead.</p>
               )}
+
+              <label style={labelStyle}>Edge softness (feathering) — {edgeSoftness.toFixed(1)}px</label>
+              <input type="range" min="0" max="5" step="0.5" value={edgeSoftness} onChange={(e) => setEdgeSoftness(Number(e.target.value))} style={{ width: '100%', marginBottom: 8 }} />
+              <label style={labelStyle}>Fringe / colour spill removal — {spillRemoval}%</label>
+              <input type="range" min="0" max="100" step="5" value={spillRemoval} onChange={(e) => setSpillRemoval(Number(e.target.value))} style={{ width: '100%', marginBottom: 4 }} />
+              <p style={{ fontSize: '0.7rem', color: '#94A3B8', marginBottom: 10 }}>Smooths the cutout edge and cleans up leftover colour from the original background around hair and clothing. Lower softness for sharp jacket edges, raise spill removal if you still see a faint halo.</p>
 
               {maskStatus === 'running' && <p style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: 10 }}>Detecting the full person…</p>}
               {maskStatus === 'low-confidence' && (

@@ -1,21 +1,20 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { PRESETS, getPreset, presetPixelSize } from '@/lib/passportPhoto/presets';
-import { detectBackgroundMask, applyBackgroundColor, applyAdjustments, checkBackgroundMatch } from '@/lib/passportPhoto/imageProcessing';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { PRESETS, getPreset, presetPixelSize, BACKGROUND_OPTIONS, defaultBackgroundOption } from '@/lib/passportPhoto/presets';
+import { compositeWithBackground, applyAdjustments, checkBackgroundMatch } from '@/lib/passportPhoto/imageProcessing';
+import { segmentPerson, ambiguousRatio, LOW_CONFIDENCE_THRESHOLD } from '@/lib/passportPhoto/segmentation';
+import { paintBrush, cloneMask, createMaskHistory, pushMaskHistory, undoMaskHistory, redoMaskHistory } from '@/lib/passportPhoto/maskEditor';
 import { computeSheetLayout, renderSheetCanvas, downloadCanvasAsImage, downloadCanvasAsPdf } from '@/lib/passportPhoto/exportSheet';
 
 const PREVIEW_MAX = 300;
-const BG_COLOR_CHOICES = [
-  { label: 'White', hex: '#FFFFFF' },
-  { label: 'Off-white', hex: '#F5F5F5' },
-  { label: 'Light grey', hex: '#F1F0EC' },
-];
 
 function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
 const labelStyle = { fontSize: '0.78rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: 4 };
 const inputStyle = { width: '100%', padding: '9px 11px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.85rem' };
 const sectionTitle = { fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#2563EB', margin: '0 0 10px' };
+const ghostBtn = { flex: 1, padding: '8px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 };
+const CHECKERBOARD_BG = { backgroundImage: 'repeating-conic-gradient(#E2E8F0 0% 25%, #F8FAFC 0% 50%)', backgroundSize: '16px 16px' };
 
 export default function PassportPhotoStudioWorkspace() {
   const [img, setImg] = useState(null);
@@ -36,23 +35,43 @@ export default function PassportPhotoStudioWorkspace() {
   const dragGuideRef = useRef(null);
 
   const [bgRemoveEnabled, setBgRemoveEnabled] = useState(true);
-  const [bgTolerance, setBgTolerance] = useState(38);
-  const [bgColorHex, setBgColorHex] = useState(preset.background.hex);
+  const [bgOption, setBgOption] = useState(defaultBackgroundOption(preset));
+  const [bgCustomColor, setBgCustomColor] = useState('#FFFFFF');
   const [brightness, setBrightness] = useState(0);
   const [contrast, setContrast] = useState(0);
   const [warmth, setWarmth] = useState(0);
   const [sharpen, setSharpen] = useState(20);
 
-  const [layout, setLayout] = useState('single'); // single | sheet4 | sheet8
-  const [fileFormat, setFileFormat] = useState('jpg'); // jpg | png | pdf
+  // The working mask is a mutable ref (not React state) so brush strokes
+  // can mutate it in place at pointer-move frequency without a re-render
+  // per pixel-paint call — `maskVersion` is bumped only at meaningful
+  // checkpoints (segmentation finished, stroke ended, undo/redo/reset) to
+  // trigger recomposition and update button-enabled state.
+  const personMaskRef = useRef(null);
+  const autoMaskRef = useRef(null);
+  const maskHistoryRef = useRef(null);
+  const segmentationGenRef = useRef(0);
+  const lastSegmentedSignatureRef = useRef('');
+  const [maskVersion, setMaskVersion] = useState(0);
+  const [maskStatus, setMaskStatus] = useState('idle'); // idle | running | done | low-confidence | unavailable
+  const [showMaskEditor, setShowMaskEditor] = useState(false);
+  const [brushMode, setBrushMode] = useState('remove'); // remove | restore
+  const [brushSizePct, setBrushSizePct] = useState(40);
+
+  const [layout, setLayout] = useState('single');
+  const [fileFormat, setFileFormat] = useState('jpg');
   const [busy, setBusy] = useState(false);
 
   const dragPanRef = useRef(null);
+  const paintingRef = useRef(false);
   const rawCanvasRef = useRef(null);
   const processedCanvasRef = useRef(null);
   const [backgroundCheck, setBackgroundCheck] = useState(null);
 
-  useEffect(() => { setBgColorHex(preset.background.hex); setHeadGuide({ crownPct: 12, chinPct: 12 + midHeadPct }); }, [presetId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    setBgOption(defaultBackgroundOption(preset));
+    setHeadGuide({ crownPct: 12, chinPct: 12 + midHeadPct });
+  }, [presetId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleUpload(e) {
     const file = e.target.files?.[0];
@@ -74,9 +93,8 @@ export default function PassportPhotoStudioWorkspace() {
 
   // Best-effort only: the browser-native Face Detector API is experimental
   // and only available in some Chromium builds. When present, it's used
-  // purely to auto-center/zoom the crop — a real capability when it works,
-  // silently skipped everywhere else in favor of the manual guide below,
-  // which is what actually gets validated.
+  // purely to auto-center/zoom the crop — background removal below is
+  // handled entirely separately by full-person segmentation, not this.
   async function attemptFaceDetect(image) {
     if (typeof window === 'undefined' || !('FaceDetector' in window)) {
       setFaceDetectStatus('unsupported');
@@ -163,30 +181,80 @@ export default function PassportPhotoStudioWorkspace() {
     return canvas;
   }
 
-  // Full-res processed pass (bg removal + adjustments) — output size for
-  // these presets is modest (well under 1000px per side), so recomputing on
-  // every settings change is fast enough to feel live once debounced.
-  const processTimer = useRef(null);
-  useEffect(() => {
+  function resolveBgSpec() {
+    if (bgOption === 'transparent') return { type: 'transparent' };
+    const opt = BACKGROUND_OPTIONS.find((o) => o.id === bgOption);
+    return { type: 'color', hex: bgOption === 'custom' ? bgCustomColor : opt.hex };
+  }
+
+  // Fast path: adjustments + compositing against whatever mask is
+  // currently held (auto-detected or hand-edited) — cheap enough to call
+  // directly on every brush-paint frame, not just via the debounced effect.
+  const recomposite = useCallback(() => {
     if (!workingImg) return;
-    clearTimeout(processTimer.current);
-    processTimer.current = setTimeout(() => {
+    const source = composeFullResCanvas();
+    const ctx = source.getContext('2d');
+    let imageData = ctx.getImageData(0, 0, targetW, targetH);
+    imageData = applyAdjustments(imageData, { brightness, contrast, warmth, sharpen });
+    let bgSpec = null;
+    if (bgRemoveEnabled && personMaskRef.current) {
+      bgSpec = resolveBgSpec();
+      imageData = compositeWithBackground(imageData, personMaskRef.current, bgSpec);
+    }
+    const out = processedCanvasRef.current;
+    if (!out) return;
+    out.width = targetW; out.height = targetH;
+    out.getContext('2d').putImageData(imageData, 0, 0);
+    setBackgroundCheck(bgSpec && bgSpec.type === 'color' ? checkBackgroundMatch(imageData, bgSpec.hex) : null);
+  }, [workingImg, targetW, targetH, pan, drawnW, drawnH, brightness, contrast, warmth, sharpen, bgRemoveEnabled, bgOption, bgCustomColor]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const recomposeTimer = useRef(null);
+  useEffect(() => {
+    clearTimeout(recomposeTimer.current);
+    recomposeTimer.current = setTimeout(recomposite, 80);
+    return () => clearTimeout(recomposeTimer.current);
+  }, [recomposite, maskVersion]);
+
+  // Slow path: full-person segmentation, only re-run when the crop actually
+  // changes (or the toggle is switched on for the first time) — never on
+  // every adjustment/background-color change, which recomposite() alone
+  // already handles cheaply against the existing mask.
+  useEffect(() => {
+    if (!workingImg || !bgRemoveEnabled) return;
+    const signature = `${targetW}x${targetH}|${pan.x.toFixed(1)},${pan.y.toFixed(1)}|${drawnW.toFixed(1)}x${drawnH.toFixed(1)}`;
+    if (signature === lastSegmentedSignatureRef.current && personMaskRef.current) return;
+
+    const timer = setTimeout(async () => {
+      const myGen = ++segmentationGenRef.current;
+      setMaskStatus('running');
       const source = composeFullResCanvas();
-      const ctx = source.getContext('2d');
-      let imageData = ctx.getImageData(0, 0, targetW, targetH);
-      if (bgRemoveEnabled) {
-        const mask = detectBackgroundMask(imageData, { tolerance: bgTolerance });
-        imageData = applyBackgroundColor(imageData, mask, bgColorHex);
+      try {
+        const rawMask = await segmentPerson(source, targetW, targetH);
+        if (myGen !== segmentationGenRef.current) return; // a newer crop superseded this result
+        const ratio = ambiguousRatio(rawMask);
+        personMaskRef.current = rawMask;
+        autoMaskRef.current = cloneMask(rawMask);
+        maskHistoryRef.current = createMaskHistory(rawMask);
+        lastSegmentedSignatureRef.current = signature;
+        const lowConfidence = ratio > LOW_CONFIDENCE_THRESHOLD;
+        setMaskStatus(lowConfidence ? 'low-confidence' : 'done');
+        if (lowConfidence) setShowMaskEditor(true);
+        setMaskVersion((v) => v + 1);
+      } catch {
+        if (myGen !== segmentationGenRef.current) return;
+        const fallback = new Uint8ClampedArray(targetW * targetH).fill(255); // keep everything — never silently remove
+        personMaskRef.current = fallback;
+        autoMaskRef.current = cloneMask(fallback);
+        maskHistoryRef.current = createMaskHistory(fallback);
+        lastSegmentedSignatureRef.current = signature;
+        setMaskStatus('unavailable');
+        setShowMaskEditor(true);
+        setMaskVersion((v) => v + 1);
       }
-      imageData = applyAdjustments(imageData, { brightness, contrast, warmth, sharpen });
-      const out = processedCanvasRef.current;
-      if (!out) return;
-      out.width = targetW; out.height = targetH;
-      out.getContext('2d').putImageData(imageData, 0, 0);
-      setBackgroundCheck(checkBackgroundMatch(imageData, bgColorHex));
-    }, 180);
-    return () => clearTimeout(processTimer.current);
-  }, [workingImg, pan, drawnW, drawnH, bgRemoveEnabled, bgTolerance, bgColorHex, brightness, contrast, warmth, sharpen, targetW, targetH]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, 500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workingImg, bgRemoveEnabled, targetW, targetH, pan, drawnW, drawnH]);
 
   function onPointerDown(e) {
     dragPanRef.current = { startX: e.clientX, startY: e.clientY, startPan: { ...pan } };
@@ -230,14 +298,80 @@ export default function PassportPhotoStudioWorkspace() {
     window.removeEventListener('pointerup', onGuideUp);
   }
 
+  // Manual mask brush — active only while the refinement toolbar is open.
+  function maskPointFromEvent(e) {
+    const canvas = processedCanvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    return { x: (e.clientX - rect.left) / previewScale, y: (e.clientY - rect.top) / previewScale };
+  }
+  function paintAt(e) {
+    if (!personMaskRef.current) return;
+    const { x, y } = maskPointFromEvent(e);
+    const radius = (brushSizePct / 100) * targetW * 0.25;
+    paintBrush(personMaskRef.current, targetW, targetH, x, y, radius, brushMode === 'restore' ? 255 : 0);
+    recomposite();
+  }
+  function onMaskPointerDown(e) {
+    if (!showMaskEditor || !bgRemoveEnabled) return;
+    e.stopPropagation();
+    paintingRef.current = true;
+    paintAt(e);
+    window.addEventListener('pointermove', onMaskPointerMove);
+    window.addEventListener('pointerup', onMaskPointerUp);
+  }
+  function onMaskPointerMove(e) { if (paintingRef.current) paintAt(e); }
+  function onMaskPointerUp() {
+    paintingRef.current = false;
+    window.removeEventListener('pointermove', onMaskPointerMove);
+    window.removeEventListener('pointerup', onMaskPointerUp);
+    if (personMaskRef.current && maskHistoryRef.current) {
+      maskHistoryRef.current = pushMaskHistory(maskHistoryRef.current, personMaskRef.current);
+      setMaskVersion((v) => v + 1);
+    }
+  }
+
+  function handleUndo() {
+    const result = maskHistoryRef.current && undoMaskHistory(maskHistoryRef.current);
+    if (!result) return;
+    maskHistoryRef.current = result.history;
+    personMaskRef.current = result.mask;
+    setMaskVersion((v) => v + 1);
+  }
+  function handleRedo() {
+    const result = maskHistoryRef.current && redoMaskHistory(maskHistoryRef.current);
+    if (!result) return;
+    maskHistoryRef.current = result.history;
+    personMaskRef.current = result.mask;
+    setMaskVersion((v) => v + 1);
+  }
+  function handleResetMask() {
+    if (!autoMaskRef.current) return;
+    personMaskRef.current = cloneMask(autoMaskRef.current);
+    maskHistoryRef.current = pushMaskHistory(maskHistoryRef.current, personMaskRef.current);
+    setMaskVersion((v) => v + 1);
+  }
+  const canUndo = !!maskHistoryRef.current && maskHistoryRef.current.index > 0;
+  const canRedo = !!maskHistoryRef.current && maskHistoryRef.current.index < maskHistoryRef.current.stack.length - 1;
+
   const headHeightPct = headGuide.chinPct - headGuide.crownPct;
   const headHeightOk = headHeightPct >= preset.headHeightMinPct && headHeightPct <= preset.headHeightMaxPct;
+
+  function flattenIfNeeded(canvas) {
+    if (!(bgRemoveEnabled && bgOption === 'transparent' && fileFormat !== 'png')) return canvas;
+    const flat = document.createElement('canvas');
+    flat.width = canvas.width; flat.height = canvas.height;
+    const ctx = flat.getContext('2d');
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, flat.width, flat.height);
+    ctx.drawImage(canvas, 0, 0);
+    return flat;
+  }
 
   async function handleExport() {
     if (!processedCanvasRef.current) return;
     setBusy(true);
     try {
-      const photoCanvas = processedCanvasRef.current;
+      const photoCanvas = flattenIfNeeded(processedCanvasRef.current);
       const baseName = `${preset.country.toLowerCase().replace(/\s+/g, '-')}-${preset.documentLabel.toLowerCase().replace(/\s+/g, '-')}`;
       if (layout === 'single') {
         if (fileFormat === 'pdf') await downloadCanvasAsPdf(photoCanvas, preset.widthMm, preset.heightMm, `${baseName}.pdf`);
@@ -303,22 +437,67 @@ export default function PassportPhotoStudioWorkspace() {
 
           <p style={sectionTitle}>3. Background &amp; Adjustments</p>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: '#334155', marginBottom: 10, cursor: 'pointer' }}>
-            <input type="checkbox" checked={bgRemoveEnabled} onChange={(e) => setBgRemoveEnabled(e.target.checked)} /> Remove &amp; replace background
+            <input type="checkbox" checked={bgRemoveEnabled} onChange={(e) => setBgRemoveEnabled(e.target.checked)} /> Remove background (detects the full person — hair, clothing and all)
           </label>
           {bgRemoveEnabled && (
             <>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-                {BG_COLOR_CHOICES.map((c) => (
-                  <button key={c.hex} onClick={() => setBgColorHex(c.hex)} title={c.label} style={{ width: 32, height: 32, borderRadius: 8, background: c.hex, border: bgColorHex === c.hex ? '3px solid #2563EB' : '1px solid #E2E8F0', cursor: 'pointer' }} />
+              <label style={labelStyle}>Replace background with</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                {BACKGROUND_OPTIONS.map((o) => (
+                  <button
+                    key={o.id}
+                    onClick={() => setBgOption(o.id)}
+                    title={o.label}
+                    style={{
+                      padding: o.id === 'custom' ? '6px 10px' : 0,
+                      width: o.id === 'custom' ? 'auto' : 32, height: 32, borderRadius: 8,
+                      background: o.id === 'transparent' ? 'repeating-conic-gradient(#CBD5E1 0% 25%, #F8FAFC 0% 50%)' : (o.id === 'custom' ? 'white' : o.hex),
+                      backgroundSize: o.id === 'transparent' ? '8px 8px' : undefined,
+                      border: bgOption === o.id ? '3px solid #2563EB' : '1px solid #E2E8F0',
+                      cursor: 'pointer', fontSize: '0.68rem', fontWeight: 700, color: '#475569',
+                    }}
+                  >{o.id === 'custom' ? 'Custom' : ''}</button>
                 ))}
+                {bgOption === 'custom' && (
+                  <input type="color" value={bgCustomColor} onChange={(e) => setBgCustomColor(e.target.value)} style={{ width: 32, height: 32, padding: 0, border: '1px solid #E2E8F0', borderRadius: 8 }} />
+                )}
               </div>
-              <label style={labelStyle}>Removal sensitivity</label>
-              <input type="range" min="15" max="70" value={bgTolerance} onChange={(e) => setBgTolerance(Number(e.target.value))} style={{ width: '100%', marginBottom: 10 }} />
-              <p style={{ fontSize: '0.7rem', color: '#94A3B8', marginBottom: 10 }}>Works best against a plain, evenly lit background. Busy or textured backgrounds may not remove cleanly.</p>
-              {backgroundCheck && (
-                <p style={{ fontSize: '0.72rem', color: backgroundCheck.matches ? '#059669' : '#B45309', marginBottom: 14 }}>
+              {bgOption === 'transparent' && fileFormat !== 'png' && (
+                <p style={{ fontSize: '0.7rem', color: '#B45309', marginBottom: 8 }}>Transparent backgrounds are only preserved in PNG exports — JPG and PDF will use white instead.</p>
+              )}
+
+              {maskStatus === 'running' && <p style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: 10 }}>Detecting the full person…</p>}
+              {maskStatus === 'low-confidence' && (
+                <p style={{ fontSize: '0.75rem', color: '#B45309', marginBottom: 10 }}>⚠ We could not cleanly separate the subject from the background. Refine the mask manually.</p>
+              )}
+              {maskStatus === 'unavailable' && (
+                <p style={{ fontSize: '0.75rem', color: '#B45309', marginBottom: 10 }}>⚠ Automatic detection isn't available right now — nothing has been removed. Use the manual tools below if you'd like to remove the background yourself.</p>
+              )}
+              {maskStatus === 'done' && backgroundCheck && (
+                <p style={{ fontSize: '0.72rem', color: backgroundCheck.matches ? '#059669' : '#B45309', marginBottom: 10 }}>
                   {backgroundCheck.matches ? '✓ Background verified as matching' : '⚠ Background doesn\'t fully match yet'} — sampled edge color {backgroundCheck.avgHex}.
                 </p>
+              )}
+
+              <button onClick={() => setShowMaskEditor((v) => !v)} style={{ fontSize: '0.76rem', color: '#2563EB', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0, marginBottom: 10 }}>
+                {showMaskEditor ? 'Hide' : 'Fine-tune'} mask manually
+              </button>
+
+              {showMaskEditor && (
+                <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 10, padding: 12, marginBottom: 14 }}>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                    <button onClick={() => setBrushMode('restore')} style={{ ...ghostBtn, background: brushMode === 'restore' ? '#EFF6FF' : 'white', borderColor: brushMode === 'restore' ? '#2563EB' : '#E2E8F0' }}>+ Restore subject</button>
+                    <button onClick={() => setBrushMode('remove')} style={{ ...ghostBtn, background: brushMode === 'remove' ? '#EFF6FF' : 'white', borderColor: brushMode === 'remove' ? '#2563EB' : '#E2E8F0' }}>− Remove background</button>
+                  </div>
+                  <label style={labelStyle}>Brush size</label>
+                  <input type="range" min="8" max="100" value={brushSizePct} onChange={(e) => setBrushSizePct(Number(e.target.value))} style={{ width: '100%', marginBottom: 10 }} />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={handleUndo} disabled={!canUndo} style={{ ...ghostBtn, opacity: canUndo ? 1 : 0.5 }}>↶ Undo</button>
+                    <button onClick={handleRedo} disabled={!canRedo} style={{ ...ghostBtn, opacity: canRedo ? 1 : 0.5 }}>↷ Redo</button>
+                    <button onClick={handleResetMask} style={ghostBtn}>Reset mask</button>
+                  </div>
+                  <p style={{ fontSize: '0.7rem', color: '#94A3B8', margin: '10px 0 0' }}>Paint directly on the "Final result" preview to the right — restore hides a spot that got removed by mistake, remove takes away background the detector missed.</p>
+                </div>
               )}
             </>
           )}
@@ -369,7 +548,13 @@ export default function PassportPhotoStudioWorkspace() {
 
           <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textAlign: 'center', margin: '0 0 8px' }}>Final result (with background &amp; adjustments)</p>
           <div style={{ display: 'flex', justifyContent: 'center', background: '#F8FAFC', borderRadius: 16, padding: 16 }}>
-            <canvas ref={processedCanvasRef} style={{ width: previewW, height: previewH, borderRadius: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }} />
+            <div style={{ width: previewW, height: previewH, borderRadius: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', ...(bgRemoveEnabled && bgOption === 'transparent' ? CHECKERBOARD_BG : {}) }}>
+              <canvas
+                ref={processedCanvasRef}
+                onPointerDown={onMaskPointerDown}
+                style={{ width: previewW, height: previewH, borderRadius: 4, display: 'block', cursor: showMaskEditor && bgRemoveEnabled ? 'crosshair' : 'default', touchAction: 'none' }}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -378,5 +563,3 @@ export default function PassportPhotoStudioWorkspace() {
     </div>
   );
 }
-
-const ghostBtn = { flex: 1, padding: '8px', borderRadius: 8, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 };

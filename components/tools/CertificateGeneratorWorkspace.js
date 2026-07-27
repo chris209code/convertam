@@ -1037,7 +1037,7 @@ export default function CertificateGeneratorWorkspace() {
         <section className="cert-control-section cert-actions">
           <button type="button" onClick={handleDownload} disabled={downloading}>{downloading ? 'Preparing PDF…' : 'Download PDF'}</button>
           <p style={{ fontSize: '0.72rem', color: '#64748B', margin: '4px 0 0', lineHeight: 1.5 }}>
-            The signature area leaves a blank line for a real pen signature if you're printing. Sending this digitally instead? Use <strong>Sign PDF</strong> (under PDF Editor) after downloading to add an actual signature without printing.
+            The signature area leaves a blank line for a real pen signature if you're printing. Sending this digitally instead? Use <strong>Sign Documents</strong> (under Business Tools) after downloading to add an actual signature without printing.
           </p>
           <button type="button" onClick={resetSample}>Reset Sample Text</button>
         </section>

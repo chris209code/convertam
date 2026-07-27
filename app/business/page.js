@@ -3,7 +3,7 @@ import { BusinessIcon, CATEGORY_ACCENTS, relatedSuites } from '../../components/
 import { buildOgMeta } from '../../lib/pageMetadata';
 
 const TITLE = 'Business Tools — Convertam';
-const DESCRIPTION = 'Free business document tools. Create invoices, quotations, delivery notes, waybills and ID cards. No login required.';
+const DESCRIPTION = 'Free business document tools. Create invoices, quotations, delivery notes and waybills, sign contracts, compare document versions, and design ID cards. No login required.';
 
 export const metadata = {
   title: TITLE,
@@ -15,6 +15,7 @@ export const metadata = {
 const EDITORIAL = {
   intro: [
     'Every small business runs on the same handful of documents — a quotation to win the work, an invoice to get paid, a delivery note or waybill to prove goods moved, and an ID card for staff or event access. The Business Suite covers that whole cycle from one place, so client and item details you type once carry forward automatically as a deal progresses, instead of retyping the same name and address into four separate documents.',
+    "Once a document is ready, business usually means getting it approved and signed, not just created — so Sign Documents and Compare Documents live here too: sign a contract or agreement without printing it, and see exactly what changed between two drafts before you commit to a final version.",
     "Every document generated here is completely free, downloads as a polished PDF, and requires no account — fill in your details, download, and send. Nothing is stored on Convertam's servers once you close the tab.",
   ],
   whoFor: [
@@ -22,6 +23,7 @@ const EDITORIAL = {
     'Anyone who needs to quote a price before starting work',
     'Businesses that ship physical goods and need proof of delivery',
     'Organizations issuing staff, school, or event ID cards',
+    'Anyone who needs to review, sign, or approve a contract or agreement',
   ],
   learnLinks: [
     { title: 'Invoice vs. Quotation vs. Delivery Note', href: '/learn/business-documents/invoice-vs-quotation-vs-delivery-note' },
@@ -51,6 +53,10 @@ const FAQS = [
     q: 'Can I add my company logo and branding?',
     a: 'Yes — upload your logo or letterhead once and it carries across every document type and template, so your invoices, quotations, and delivery notes all look consistent.',
   },
+  {
+    q: 'Can I sign a contract or compare two document versions here too?',
+    a: 'Yes — Sign Documents and Compare Documents live in Business Suite alongside the document generators, since approving a business document usually means reviewing, signing, and sending it, not just creating it in the first place.',
+  },
 ];
 
 const SECTIONS = [
@@ -63,6 +69,15 @@ const SECTIONS = [
       { slug: 'invoice-generator', title: 'Invoice Generator', desc: 'Create a professional, itemized invoice to request payment', icon: '🧾', badge: 'free' },
       { slug: 'quotation-generator', title: 'Quotation Generator', desc: 'Send a proposed price before any payment is owed', icon: '📋', badge: 'free' },
       { slug: 'delivery-note-waybill', title: 'Delivery Note & Waybill', desc: 'Confirm what was delivered, or document goods in transit', icon: '📦', badge: 'free' },
+    ],
+  },
+  {
+    id: 'sign-review',
+    label: 'Sign & Review',
+    icon: '🖊️',
+    tools: [
+      { slug: 'sign-documents', title: 'Sign Documents', desc: 'Sign a PDF, Word document, or photo of a printed page — no printing required', icon: '✒️', badge: 'free' },
+      { slug: 'compare-pdf', title: 'Compare Documents', desc: 'See what changed between two versions of a document before approving it', icon: '🔍', badge: 'free' },
     ],
   },
   {
@@ -97,7 +112,7 @@ export default function BusinessPage() {
         accent={CATEGORY_ACCENTS.business}
         icon={BusinessIcon}
         title="Business Tools"
-        subtitle="Professional business documents — invoices, quotations, delivery notes and ID cards."
+        subtitle="Professional business documents — invoices, quotations, delivery notes, signatures and ID cards."
         editorial={EDITORIAL}
         sections={SECTIONS_WITH_HREF}
         faqs={FAQS}

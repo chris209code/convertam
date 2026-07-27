@@ -169,7 +169,7 @@ export default function ComparePdfWorkspace() {
         truncate(e.textB || ''),
       ]);
       await generateFinancialReportPdf({
-        toolName: 'PDF Compare',
+        toolName: 'Compare Documents',
         fileName: `compare-report-${safeName(fileA?.name)}-vs-${safeName(fileB?.name)}.pdf`,
         hero: { label: 'Detected Differences', value: String(result.changes.length), sub: `${result.summary.pagesAffectedCount} page(s) affected` },
         statCards: [

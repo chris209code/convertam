@@ -130,7 +130,7 @@ const ALL_TOOLS = [
   { name: 'Protect PDF', href: '/protect-pdf' },
   { name: 'Images to PDF', href: '/images-to-pdf' },
   { name: 'Extract PDF Images', href: '/extract-pdf-images' },
-  { name: 'PDF Compare', href: '/compare-pdf' },
+  { name: 'Compare Documents', href: '/compare-pdf' },
   { name: 'Redact & Edit PDF', href: '/redact-pdf' },
   { name: 'PDF Overlay', href: '/pdf-overlay' },
   { name: 'PDF to Images', href: '/pdf-to-png' },
@@ -196,6 +196,8 @@ const CATEGORIES = [
     viewAllHref: '/business',
     tools: [
       { name: 'Business Document Studio', href: '/business-document-studio' },
+      { name: 'Sign Documents', href: '/sign-documents' },
+      { name: 'Compare Documents', href: '/compare-pdf' },
       { name: 'Quotation Generator', href: '/quotation-generator' },
       { name: 'Delivery Note & Waybill', href: '/delivery-note-waybill' },
       { name: 'ID Card Generator', href: '/id-card-generator' },

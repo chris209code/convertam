@@ -31,7 +31,7 @@ export const metadata = {
     template: '%s | Convertam',
   },
   description:
-    'Free online file conversion — PDF to Word, Word to PDF, Excel, PowerPoint, Merge PDF, Sign PDF, Invoice Generator and more. No login, no watermark, no subscription.',
+    'Free online file conversion — PDF to Word, Word to PDF, Excel, PowerPoint, Merge PDF, Sign Documents, Invoice Generator and more. No login, no watermark, no subscription.',
   keywords: [
     'pdf to word', 'word to pdf', 'pdf converter', 'free pdf converter',
     'merge pdf', 'split pdf', 'compress pdf', 'sign pdf', 'invoice generator',

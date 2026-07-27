@@ -13,7 +13,11 @@ export function generateStaticParams() {
 export function generateMetadata({ params }) {
   const tool = getTool(params.tool);
   if (!tool || tool.basePath) return {};
-  const title = `${tool.title} — Free, No Login`;
+  // metaTitle lets a tool target broader search terms in the <title> tag
+  // (e.g. "Sign PDF, Word & Documents") while the on-page H1 stays the
+  // short product name (tool.title) users actually see and click through
+  // navigation with — see lib/tools-config.js.
+  const title = tool.metaTitle || `${tool.title} — Free, No Login`;
   return {
     title,
     description: tool.description,

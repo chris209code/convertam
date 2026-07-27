@@ -8,7 +8,7 @@ import HomePageClient from '@/components/HomePageClient';
 export const metadata = {
   title: 'Convertam — Free File Conversion. No Login. No Watermark.',
   description:
-    'Free online file conversion — PDF to Word, Word to PDF, Excel, PowerPoint, Merge PDF, Sign PDF, Invoice Generator and more. No login, no watermark, no subscription.',
+    'Free online file conversion — PDF to Word, Word to PDF, Excel, PowerPoint, Merge PDF, Sign Documents, Invoice Generator and more. No login, no watermark, no subscription.',
   alternates: { canonical: '/' },
   openGraph: {
     title: 'Convertam — Free File Conversion. No Login. No Watermark.',

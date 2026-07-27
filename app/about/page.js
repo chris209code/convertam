@@ -13,7 +13,7 @@ export const metadata = {
 const ABOUT_FAQS = [
   {
     q: 'Is Convertam really free?',
-    a: 'Most tools on Convertam are completely free with no limits — including all PDF utilities, image tools, Sign PDF, Watermark PDF, Reorder Pages, Smart AI Converter, Receipt Scanner, and Invoice Generator. A small fee applies for document format conversions (PDF↔Word, PDF↔Excel, PDF↔PowerPoint, Compress PDF) to cover the cost of the conversion engine.',
+    a: 'Most tools on Convertam are completely free with no limits — including all PDF utilities, image tools, Sign Documents, Watermark PDF, Reorder Pages, Smart AI Converter, Receipt Scanner, and Invoice Generator. A small fee applies for document format conversions (PDF↔Word, PDF↔Excel, PDF↔PowerPoint, Compress PDF) to cover the cost of the conversion engine.',
   },
   {
     q: 'Do I need to create an account?',
@@ -136,7 +136,7 @@ export default function AboutPage() {
           <div className="rounded-xl p-5" style={{ background: '#fffefb', border: '1px solid #e2dcc9' }}>
             <h3 className="font-semibold text-ink mb-2">🔒 Files are never stored</h3>
             <p className="text-sm text-ink-soft">
-              For browser-based tools (Merge PDF, Split PDF, Sign PDF, Image tools, etc.),
+              For browser-based tools (Merge PDF, Split PDF, Sign Documents, Image tools, etc.),
               your files never leave your device at all — everything happens locally in your browser.
               For server-based tools (PDF to Word, Smart AI Converter, etc.), your files are
               transmitted securely and deleted immediately after conversion. We do not keep copies.

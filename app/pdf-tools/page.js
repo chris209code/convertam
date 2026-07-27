@@ -14,14 +14,14 @@ export const metadata = {
 
 const EDITORIAL = {
   intro: [
-    "PDF is the one format almost every important document eventually becomes — a signed contract, a submitted application, an invoice you need to keep exactly as sent. The PDF Suite covers the entire lifecycle of that file: turning it into something else (Word, Excel, PowerPoint, images), reshaping it (merging, splitting, reordering, extracting pages), marking it up (signing, watermarking, adding page numbers), and locking it down (password protection).",
+    "PDF is the one format almost every important document eventually becomes — a submitted application, an invoice you need to keep exactly as sent, a report ready to share. The PDF Suite covers the entire lifecycle of that file: turning it into something else (Word, Excel, PowerPoint, images), reshaping it (merging, splitting, reordering, extracting pages), marking it up (watermarking, adding page numbers, redacting), and locking it down (password protection). Signing a document or comparing two versions of one now live in Business Suite, since those are things you do to a contract, not to a PDF specifically.",
     "Most of these 27 tools run entirely in your browser, so your file is processed on your own device and never touches a server — a genuine privacy guarantee, not a policy promise. A handful of format conversions (PDF to Word/Excel/PowerPoint, and Compress PDF) need a dedicated conversion engine and carry a small per-use fee, shown upfront before you pay anything.",
   ],
   whoFor: [
     'Students and job seekers assembling application documents',
     'Small business owners preparing contracts, invoices and reports',
     'Anyone who received a scan and needs it in an editable format',
-    'Teams that need to sign, watermark or password-protect files before sending',
+    'Teams that need to watermark, redact or password-protect files before sending',
   ],
   learnLinks: [
     { title: 'How to Merge PDF Files Without Losing Quality', href: '/learn/pdf-guides/how-to-merge-pdf-files-without-losing-quality' },
@@ -41,7 +41,7 @@ const FAQS = [
   },
   {
     q: 'Are my files secure?',
-    a: 'Browser-based tools (Merge PDF, Split PDF, Sign Documents, and most others) process everything locally on your device — your file never leaves your browser. Tools that require server-side processing use encrypted transfer and delete your file immediately after the job completes.',
+    a: 'Browser-based tools (Merge PDF, Split PDF, Redact & Edit PDF, and most others) process everything locally on your device — your file never leaves your browser. Tools that require server-side processing use encrypted transfer and delete your file immediately after the job completes.',
   },
   {
     q: 'What\'s the maximum file size?',
@@ -83,7 +83,6 @@ const SECTIONS = [
     tools: [
       { slug: 'write-on-pdf', title: 'Write on PDF', desc: 'Click anywhere on any PDF and type text on it', icon: '✍️', badge: 'free' },
       { slug: 'fill-pdf', title: 'Fill PDF Forms', desc: 'Fill digital PDF forms with built-in fields', icon: '🗒️', badge: 'free' },
-      { slug: 'sign-documents', title: 'Sign Documents', desc: 'Place your signature anywhere on your document', icon: '✒️', badge: 'free' },
       { slug: 'watermark-pdf', title: 'Watermark PDF', desc: 'Add custom text watermarks to your PDF', icon: '💧', badge: 'free' },
       { slug: 'reorder-pdf', title: 'Reorder Pages', desc: 'Drag and drop pages into any order', icon: '🔀', badge: 'free' },
       { slug: 'redact-pdf', title: 'Redact & Edit PDF', desc: 'Permanently redact sensitive info, or whiteout and correct mistakes', icon: '⬛', badge: 'free' },
@@ -102,7 +101,6 @@ const SECTIONS = [
       { slug: 'extract-pdf-pages', title: 'Extract Pages', desc: 'Pull specific pages into a new PDF', icon: '📤', badge: 'free' },
       { slug: 'add-page-numbers', title: 'Add Page Numbers', desc: 'Stamp page numbers onto every page', icon: '#️⃣', badge: 'free' },
       { slug: 'extract-pdf-images', title: 'Extract PDF Images', desc: 'Pull the embedded images out of a PDF', icon: '🖼️', badge: 'free' },
-      { slug: 'compare-pdf', title: 'PDF Compare', desc: 'See what changed between two versions of a PDF — side by side, overlaid, or in an exportable report', icon: '🔍', badge: 'free' },
     ],
   },
   {

@@ -5,11 +5,16 @@ import { callGemini, AIError, CATEGORY_MESSAGES } from '@/lib/geminiClient';
 import { validateCoverLetter } from '@/lib/cvValidation';
 
 function buildPrompt({ yourName, jobTitle, companyName, background, jobDescription, tone }) {
+  const hasRole = !!jobTitle?.trim();
+  const hasCompany = !!companyName?.trim();
+  const targetLine = (hasRole || hasCompany)
+    ? `Job title applying for: ${hasRole ? jobTitle : '(not specified — write generally about fit for this type of role, do not invent a title)'}\nCompany: ${hasCompany ? companyName : '(not specified — do not invent a company name; use "Dear Hiring Manager," and keep the letter company-agnostic)'}`
+    : 'No specific job title or company was given — write a strong, general cover letter that showcases the candidate\'s background and could reasonably be sent to any employer in their field. Do not invent a job title or company name.';
+
   return `You are an expert career writer. Write a complete, ready-to-send cover letter for the following applicant.
 
 Candidate name: ${yourName || '(not provided — omit a signature name or use "Sincerely," with no name)'}
-Job title applying for: ${jobTitle}
-Company: ${companyName}
+${targetLine}
 Tone: ${tone}
 
 Candidate's background, experience, and skills (use only real information from this — never invent specific employers, dates, or achievements not mentioned here):
@@ -46,9 +51,12 @@ export async function POST(request) {
   }
   try {
     const { yourName, jobTitle, companyName, background, jobDescription, tone } = await request.json();
-    if (!jobTitle || !companyName || !background) {
-      return Response.json({ error: 'Job title, company name, and background are required.' }, { status: 400 });
+    if (!background?.trim()) {
+      return Response.json({ error: 'Please add your background, experience, and skills first.' }, { status: 400 });
     }
+    // Job title and company are both optional — a general cover letter
+    // works fine without either; buildPrompt() below adapts its framing
+    // when they're missing rather than inventing a role or employer.
     const promptOpts = { yourName, jobTitle, companyName, background, jobDescription, tone: tone || 'Professional' };
 
     // 4096 tokens gives a generous margin over what a 3-4 paragraph letter

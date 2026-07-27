@@ -1,5 +1,4 @@
 import CategoryLandingClient from '../../components/CategoryLandingClient';
-import JobImportPanel from '../../components/tools/JobImportPanel';
 import { CareerIcon, CATEGORY_ACCENTS, relatedSuites } from '../../components/categoryVisuals';
 import { buildOgMeta } from '../../lib/pageMetadata';
 
@@ -85,7 +84,6 @@ export default function CareerStudioPage() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
-      <JobImportPanel />
       <CategoryLandingClient
         accent={CATEGORY_ACCENTS.career}
         icon={CareerIcon}

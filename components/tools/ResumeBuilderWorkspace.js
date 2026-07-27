@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptToModernProfessionalData, RESUME_PRINT_STYLES, downloadResumePdf, DOWNLOAD_STAGE_LABELS, downloadResumeDocx, DOCX_DOWNLOAD_STAGE_LABELS } from './resumeTemplates';
+import JobVacancyImport from './JobVacancyImport';
 
 async function callAI(action, payload) {
   const res = await fetch('/api/resume-ai', {
@@ -53,7 +54,22 @@ export default function ResumeBuilderWorkspace() {
   const [careerLevel, setCareerLevel] = useState('');
   const [targetRole, setTargetRole] = useState('');
   const [customRole, setCustomRole] = useState('');
+  const [jobDescription, setJobDescription] = useState('');
   const [template, setTemplate] = useState('mpSidebar');
+
+  // Driven by <JobVacancyImport> below the target-role picker — see the
+  // merge-policy comment in CVImproverWorkspace.js's handleJobChange. An
+  // imported job title always goes into customRole (free text) rather than
+  // the targetRole preset chips, and takes priority since it's the more
+  // specific, just-confirmed value.
+  function handleJobChange(job) {
+    if (!job) {
+      setTargetRole(''); setCustomRole(''); setJobDescription('');
+      return;
+    }
+    if (job.title) { setTargetRole(''); setCustomRole(job.title); }
+    setJobDescription(job.description || '');
+  }
 
   const [form, setForm] = useState({ fullName: '', jobTitle: '', email: '', phone: '', location: '', linkedin: '', summary: '' });
   const [importBanner, setImportBanner] = useState(false);
@@ -213,7 +229,7 @@ export default function ResumeBuilderWorkspace() {
   async function handleGenerateSummary() {
     setError(''); setGeneratingSummary(true);
     try {
-      const { summary } = await callAI('summary', { careerLevel, targetRole: role, experienceText: experienceContextText(), educationText: educationContextText(), skillsText: skills });
+      const { summary } = await callAI('summary', { careerLevel, targetRole: role, jobDescription, experienceText: experienceContextText(), educationText: educationContextText(), skillsText: skills });
       updateForm('summary', summary);
     } catch (err) { setError(err.message); } finally { setGeneratingSummary(false); }
   }
@@ -237,7 +253,7 @@ export default function ResumeBuilderWorkspace() {
   async function handleSuggestSkills() {
     setError(''); setSuggestingSkills(true);
     try {
-      const result = await callAI('skills', { targetRole: role, experienceText: experienceContextText(), educationText: educationContextText() });
+      const result = await callAI('skills', { targetRole: role, jobDescription, experienceText: experienceContextText(), educationText: educationContextText() });
       setSkillSuggestions(result);
     } catch (err) { setError(err.message); } finally { setSuggestingSkills(false); }
   }
@@ -314,7 +330,10 @@ export default function ResumeBuilderWorkspace() {
             ))}
           </div>
           <input style={inputStyle} placeholder="Or type your own target role…" value={customRole} onChange={e => { setCustomRole(e.target.value); setTargetRole(''); }} />
-          <button className="btn btn-primary" style={{ marginTop: 20 }} disabled={!careerLevel} onClick={() => setStep(1)}>Continue →</button>
+
+          <JobVacancyImport sourceTool="cv-builder" onJobChange={handleJobChange} />
+
+          <button className="btn btn-primary" style={{ marginTop: 4 }} disabled={!careerLevel} onClick={() => setStep(1)}>Continue →</button>
         </div>
       )}
 

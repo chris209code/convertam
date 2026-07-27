@@ -6,7 +6,8 @@ import { Icon, TEMPLATES, TEMPLATE_LABELS, TemplatePicker, useResumeData, adaptT
 import { extractTextFromFile } from '@/lib/extractDocText';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
-import { getCareerSession, saveCareerSession, clearCareerSession } from '@/lib/careerSession';
+import JobVacancyImport from './JobVacancyImport';
+import { saveCareerSession, clearCareerSession } from '@/lib/careerSession';
 
 const inputStyle = { width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none' };
 const labelStyle = { fontSize: '0.75rem', fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' };
@@ -182,27 +183,23 @@ export default function CVImproverWorkspace() {
   // finishing screen instead of leaving the feedback panels visible forever.
   const [showFinalResults, setShowFinalResults] = useState(false);
 
-  // Inherits an active Career Session — set either by importing a job
-  // posting on the Career Studio hub, or by a previous CV Improver /
-  // Cover Letter Writer / LinkedIn Optimizer run — so the target role,
-  // company, industry, and job description never need retyping here.
-  const [inheritedFromSession, setInheritedFromSession] = useState(false);
-  useEffect(() => {
-    const session = getCareerSession();
-    if (!session) return;
-    const hasContext = session.jobTitle || session.targetRole || session.companyName || session.industry || session.jobDescription;
-    if (!hasContext) return;
-    setTargetPosition(session.jobTitle || session.targetRole || '');
-    setCompanyName(session.companyName || '');
-    setIndustry(session.industry || '');
-    setJobDescription(session.jobDescription || '');
-    setInheritedFromSession(true);
-  }, []);
-
-  function clearInheritedSession() {
-    clearCareerSession();
-    setInheritedFromSession(false);
-    setTargetPosition(''); setCompanyName(''); setIndustry(''); setJobDescription('');
+  // Driven by <JobVacancyImport> below the Target Position field — fires
+  // once on mount if an active Career Session already has job info (set by
+  // this tool, Cover Letter Writer, CV Builder, or LinkedIn Optimizer), and
+  // again whenever the candidate imports/pastes/edits or clears a vacancy.
+  // Title/company only overwrite when the import actually provided one, so
+  // pasting a vacancy description alone never wipes a manually-typed Target
+  // Position; the description is always a full replace since it IS the
+  // vacancy content this block manages.
+  function handleJobChange(job) {
+    if (!job) {
+      setTargetPosition(''); setCompanyName(''); setIndustry(''); setJobDescription('');
+      return;
+    }
+    if (job.title) setTargetPosition(job.title);
+    if (job.company) setCompanyName(job.company);
+    if (job.industry) setIndustry(job.industry);
+    setJobDescription(job.description || '');
   }
 
   async function handleFileUpload(e) {
@@ -541,16 +538,6 @@ export default function CVImproverWorkspace() {
 
       {!structured && (
         <>
-          {inheritedFromSession && (
-            <div className="no-print" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 16, padding: '10px 14px', borderRadius: 10, background: '#ECFDF5', border: '1px solid #C9F1DE' }}>
-              <p style={{ margin: 0, fontSize: '0.82rem', color: '#065F46' }}>
-                ✓ Continuing your Career Studio session — target role, company, industry, and job description are already filled in below.
-              </p>
-              <button onClick={clearInheritedSession} style={{ fontSize: '0.78rem', fontWeight: 600, color: '#065F46', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
-                Not this job? Start fresh
-              </button>
-            </div>
-          )}
           <div className="no-print" style={{ marginBottom: 16, border: '2px dashed #CBD5E1', borderRadius: 12, padding: '18px 16px', textAlign: 'center', background: '#F8FAFC' }}>
             <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Upload your CV (optional)</p>
             <p style={{ fontSize: '0.75rem', color: '#64748B', marginBottom: 10 }}>PDF, DOCX, or TXT — we'll extract the text below so you can review and edit it before continuing.</p>
@@ -591,6 +578,8 @@ export default function CVImproverWorkspace() {
             </div>
           </div>
 
+          <JobVacancyImport sourceTool="cv-improver" onJobChange={handleJobChange} />
+
           <div style={{ marginBottom: 20 }} className="no-print">
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <div style={{ flex: '1 1 200px' }}>
@@ -602,15 +591,7 @@ export default function CVImproverWorkspace() {
                 <input type="text" value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="e.g. Manufacturing, Fintech, Healthcare" style={inputStyle} />
               </div>
             </div>
-            <p style={helperStyle}>Add these now if you already know them — they'll carry over automatically if you continue to a cover letter afterward, so you won't be asked again.</p>
-          </div>
-
-          <div style={{ marginBottom: 20 }} className="no-print">
-            <label style={labelStyle}>Job Description / Requirements (Optional)</label>
-            <textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)}
-              placeholder="Paste the job advertisement, responsibilities or requirements..."
-              style={{ ...inputStyle, minHeight: 110, resize: 'vertical', lineHeight: 1.6 }} />
-            <p style={helperStyle}>Optional — paste the job advertisement to help tailor your CV and keywords even more precisely. If you skip Target Position too, we'll use this to infer the type of role. Leave both empty and we'll still improve your CV based on its own content.</p>
+            <p style={helperStyle}>Add these now if you already know them, or they'll be filled in automatically from an imported vacancy above — they'll carry over if you continue to a cover letter afterward, so you won't be asked again.</p>
           </div>
 
           <div className="actions no-print" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>

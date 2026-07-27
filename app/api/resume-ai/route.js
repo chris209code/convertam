@@ -23,11 +23,12 @@ Did they supervise or train anyone: ${supervised || '(not given)'}
 Write 2-4 bullet points, each starting with a strong past-tense action verb, professional tone, no first-person pronouns. Return ONLY a JSON array of strings, nothing else.`;
 }
 
-function buildSummaryPrompt({ careerLevel, targetRole, experienceText, educationText, skillsText }) {
+function buildSummaryPrompt({ careerLevel, targetRole, jobDescription, experienceText, educationText, skillsText }) {
   return `You are an expert CV writer. Write a 2-4 sentence professional summary for a CV.
 
 Career stage: ${careerLevel || 'not specified'}
 Target role: ${targetRole || 'not specified'}
+${jobDescription?.trim() ? `Vacancy details to tailor toward (pull in natural, relevant keywords without stuffing):\n${jobDescription.trim()}\n` : ''}
 Work/volunteer/NYSC/internship experience (may be empty if none):
 ${experienceText || '(none provided)'}
 Education:
@@ -41,10 +42,11 @@ If there is no work experience listed, do NOT invent any — write an honest ent
 Return ONLY the summary text, nothing else — no heading, no quotes, no markdown.`;
 }
 
-function buildSkillsPrompt({ targetRole, experienceText, educationText }) {
+function buildSkillsPrompt({ targetRole, jobDescription, experienceText, educationText }) {
   return `Based on the target role and background below, suggest relevant CV skills, grouped into three categories: technical skills, tools/software, and professional (soft) skills. Only suggest skills that are plausible given the actual background provided — do not suggest anything wildly unrelated to what's described.
 
 Target role: ${targetRole || 'not specified'}
+${jobDescription?.trim() ? `Vacancy details (favor skills/keywords relevant to this, without inventing anything not plausible from the background below):\n${jobDescription.trim()}\n` : ''}
 Background:
 ${experienceText || ''}
 ${educationText || ''}

@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { getCareerSession, saveCareerSession, clearCareerSession } from '@/lib/careerSession';
+import { useState, useEffect, useRef } from 'react';
+import JobVacancyImport from './JobVacancyImport';
+import { getCareerSession, saveCareerSession } from '@/lib/careerSession';
 
 const TONES = ['Professional', 'Friendly', 'Enthusiastic', 'Formal'];
+const BACKGROUND_REQUIRED_MESSAGE = 'Add your background, experience, and skills before continuing.';
 
 export default function CoverLetterWriterWorkspace() {
   const [yourName, setYourName] = useState('');
@@ -12,6 +14,7 @@ export default function CoverLetterWriterWorkspace() {
   const [background, setBackground] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [tone, setTone] = useState('Professional');
+  const backgroundFieldRef = useRef(null);
 
   const [letter, setLetter] = useState('');
   const [busy, setBusy] = useState(false);
@@ -19,34 +22,43 @@ export default function CoverLetterWriterWorkspace() {
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
-  // Inherits an active Career Session (from CV Improver, or any future
-  // Career Studio tool) so the candidate never has to retype the job
-  // title, company, job description, or their own background/CV — this is
-  // the entire point of "Continue to Cover Letter" and "Generate Cover
-  // Letter" both landing here. Runs once on mount; if no session exists
-  // (someone opened this tool directly), every field just stays blank and
-  // the tool works exactly as it always has.
-  const [inheritedFromSession, setInheritedFromSession] = useState(false);
+  // Inherits the candidate's own name/background from an active Career
+  // Session on mount — the job title/company/description side of that same
+  // session is instead handled by <JobVacancyImport> below (shared with CV
+  // Improver and CV Builder), which also fires on mount if a session is
+  // already active. Runs once; if no session exists (someone opened this
+  // tool directly), every field just stays blank and the tool works exactly
+  // as it always has.
   useEffect(() => {
     const session = getCareerSession();
     if (!session) return;
     if (session.applicantName) setYourName(session.applicantName);
-    if (session.jobTitle || session.targetRole) setJobTitle(session.jobTitle || session.targetRole);
-    if (session.companyName) setCompanyName(session.companyName);
     if (session.cvPlainText) setBackground(session.cvPlainText);
-    setJobDescription(session.industry ? `Industry: ${session.industry}${session.jobDescription ? `\n\n${session.jobDescription}` : ''}` : (session.jobDescription || ''));
-    setInheritedFromSession(true);
   }, []);
 
-  function clearInheritedSession() {
-    clearCareerSession();
-    setInheritedFromSession(false);
-    setYourName(''); setJobTitle(''); setCompanyName(''); setBackground(''); setJobDescription('');
+  // Driven by <JobVacancyImport> — see the merge-policy comment in
+  // CVImproverWorkspace.js's handleJobChange for why title/company only
+  // overwrite when actually provided, while description is a full replace.
+  function handleJobChange(job) {
+    if (!job) {
+      setJobTitle(''); setCompanyName(''); setJobDescription('');
+      return;
+    }
+    if (job.title) setJobTitle(job.title);
+    if (job.company) setCompanyName(job.company);
+    setJobDescription(job.description || '');
   }
 
   async function handleGenerate() {
-    if (!jobTitle || !companyName || !background) {
-      setError('Please fill in the job title, company name, and your background at minimum.');
+    // Job title and company are both optional — a candidate can generate a
+    // general letter with just their background. Background is the one
+    // essential input, same principle as CV Improver's CV text: missing it
+    // must never just leave the button inert, so it gets a specific message
+    // plus focus/scroll to the field instead.
+    if (!background.trim()) {
+      setError(BACKGROUND_REQUIRED_MESSAGE);
+      backgroundFieldRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      backgroundFieldRef.current?.focus();
       return;
     }
     setBusy(true);
@@ -152,16 +164,6 @@ export default function CoverLetterWriterWorkspace() {
 
   return (
     <div className="panel">
-      {inheritedFromSession && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 18, padding: '10px 14px', borderRadius: 10, background: '#ECFDF5', border: '1px solid #C9F1DE' }}>
-          <p style={{ margin: 0, fontSize: '0.82rem', color: '#065F46' }}>
-            ✓ Continuing from CV Improver — your job details and CV are already filled in below.
-          </p>
-          <button onClick={clearInheritedSession} style={{ fontSize: '0.78rem', fontWeight: 600, color: '#065F46', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
-            Not this job? Start fresh
-          </button>
-        </div>
-      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) minmax(280px, 1.1fr)', gap: 28 }}>
         <div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -179,23 +181,23 @@ export default function CoverLetterWriterWorkspace() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div style={fieldWrap}>
-              <label style={labelStyle}>Job title you're applying for</label>
+              <label style={labelStyle}>Job title you're applying for (Optional)</label>
               <input style={inputStyle} value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} placeholder="Marketing Manager" />
             </div>
             <div style={fieldWrap}>
-              <label style={labelStyle}>Company name</label>
+              <label style={labelStyle}>Company name (Optional)</label>
               <input style={inputStyle} value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Acme Corp" />
             </div>
           </div>
 
-          <div style={fieldWrap}>
-            <label style={labelStyle}>Your background — experience, skills, what makes you a fit</label>
-            <textarea rows={6} style={{ ...inputStyle, resize: 'vertical' }} value={background} onChange={(e) => setBackground(e.target.value)} placeholder="Paste from your CV, or just describe your relevant experience and strengths in a few sentences." />
-          </div>
+          <JobVacancyImport sourceTool="cover-letter" onJobChange={handleJobChange} />
 
           <div style={fieldWrap}>
-            <label style={labelStyle}>Job description (optional, but improves the result)</label>
-            <textarea rows={4} style={{ ...inputStyle, resize: 'vertical' }} value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} placeholder="Paste the job posting here so the letter can speak directly to what they're looking for." />
+            <label style={labelStyle}>Your background — experience, skills, what makes you a fit</label>
+            <textarea ref={backgroundFieldRef} rows={6}
+              style={{ ...inputStyle, resize: 'vertical', ...(error === BACKGROUND_REQUIRED_MESSAGE ? { border: '1px solid #DC2626', boxShadow: '0 0 0 1px #DC2626' } : {}) }}
+              value={background} onChange={(e) => { setBackground(e.target.value); if (error === BACKGROUND_REQUIRED_MESSAGE) setError(''); }}
+              placeholder="Paste from your CV, or just describe your relevant experience and strengths in a few sentences." />
           </div>
 
           <button
@@ -205,7 +207,7 @@ export default function CoverLetterWriterWorkspace() {
           >
             {busy ? 'Writing your cover letter…' : '✨ Write Cover Letter'}
           </button>
-          {error && <p style={{ color: '#DC2626', fontSize: '0.85rem', marginTop: 10 }}>{error}</p>}
+          {error && <p style={{ color: '#DC2626', fontSize: '0.85rem', marginTop: 10, fontWeight: error === BACKGROUND_REQUIRED_MESSAGE ? 600 : 400 }}>{error === BACKGROUND_REQUIRED_MESSAGE ? `⚠ ${error}` : error}</p>}
         </div>
 
         <div>

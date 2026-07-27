@@ -103,12 +103,33 @@ const cvSchema = {
 };
 
 function buildPrompt({ cvText, targetPosition, jobDescription }) {
-  return `You are an experienced professional CV consultant — not a chatbot. A candidate has given you their current CV and the exact role they are applying for. Produce two completely separate things: (A) a stronger, more competitive, ATS-friendly, ready-to-send CV, and (B) a private consulting review that the candidate will see in a separate panel, never inside the CV itself. Return everything as one structured JSON object.
+  const hasTarget = !!targetPosition?.trim();
+  const hasJobDesc = !!jobDescription?.trim();
 
-TARGET POSITION (drives tailoring — see title rule below for the one place it must NOT be used):
-${targetPosition}
+  const candidateContext = hasTarget
+    ? 'their current CV and the exact role they are applying for'
+    : hasJobDesc
+      ? 'their current CV and a job description they are interested in, but no exact target job title — infer the likely role from the job description yourself'
+      : 'their current CV, with no specific target role or job description';
 
-${jobDescription?.trim() ? `JOB DESCRIPTION / REQUIREMENTS (use this to tailor even more precisely — pull in its natural, relevant keywords without stuffing):\n${jobDescription.trim()}\n` : ''}
+  const targetingGuidance = hasTarget
+    ? 'The candidate has told you the exact role they are applying for — target the summary, skills and experience wording at it precisely (see title rule below for the one place it must NOT be used).'
+    : hasJobDesc
+      ? 'The candidate has not stated an exact target job title, but has given you a real job description below — infer the likely role/title from it yourself and tailor the summary, skills and experience wording toward that inferred role and its stated requirements.'
+      : 'The candidate has not specified a target role or job description. Improve the CV in general terms: strengthen wording, structure, clarity, quantify achievements only where real numbers already exist, keep tense consistent, and improve general ATS compatibility (standard section headings, natural keyword presence for the candidate\'s own evident field and seniority). Do not invent or assume a specific target job, and do not force the CV toward any role that isn\'t already implied by the candidate\'s own experience.';
+
+  const keywordSource = hasTarget
+    ? 'the target position and job description'
+    : hasJobDesc
+      ? 'the job description'
+      : "the candidate's own field and seniority, as evident from their CV";
+
+  return `You are an experienced professional CV consultant — not a chatbot. A candidate has given you ${candidateContext}. Produce two completely separate things: (A) a stronger, more competitive, ATS-friendly, ready-to-send CV, and (B) a private consulting review that the candidate will see in a separate panel, never inside the CV itself. Return everything as one structured JSON object.
+
+${targetingGuidance}
+
+${hasTarget ? `TARGET POSITION (drives tailoring — see title rule below for the one place it must NOT be used):\n${targetPosition.trim()}\n` : ''}
+${hasJobDesc ? `JOB DESCRIPTION / REQUIREMENTS (use this to tailor even more precisely — pull in its natural, relevant keywords without stuffing):\n${jobDescription.trim()}\n` : ''}
 
 ====================================================
 ABSOLUTE RULE — NEVER FABRICATE
@@ -149,18 +170,18 @@ Instead, generate a polished professional identity based on the candidate's CURR
 - Quality Assurance Lead -> Quality Assurance & Process Improvement Specialist
 - Production Supervisor -> Production Operations Specialist
 
-The target position may ONLY be used to tailor the Professional Summary, Skills, and Experience wording — never to replace or appear directly in the title line itself. If the candidate has little or no work experience, generate a suitable entry-level professional title instead (e.g. "Aspiring Quality Assurance Professional", "Entry-Level Production Technician") rather than leaving it blank or using the target title.
+${hasTarget || hasJobDesc ? 'The target position/job description may ONLY be used to tailor the Professional Summary, Skills, and Experience wording — never to replace or appear directly in the title line itself.' : 'Base the title purely on the candidate\'s own current or most recent role — there is no target position to avoid leaking into it here.'} If the candidate has little or no work experience, generate a suitable entry-level professional title instead (e.g. "Aspiring Quality Assurance Professional", "Entry-Level Production Technician") rather than leaving it blank or using a target title.
 
 ====================================================
 HOW TO IMPROVE THE CV (Output A)
 ====================================================
-- Strengthen the professional summary and tailor it toward the target position (language and emphasis only — see title rule above).
+- Strengthen the professional summary${hasTarget ? ' and tailor it toward the target position' : hasJobDesc ? ' and tailor it toward the role inferred from the job description' : ", drawing out the candidate's own strongest and most relevant experience"} (language and emphasis only — see title rule above).
 - Rewrite weak, passive responsibility statements into stronger professional language while keeping them as responsibilities — see the section below for exactly how responsibilities and achievements must be classified, tensed, and kept separate; never blend the two into one merged statement.
-- Highlight transferable skills relevant to the target position.
+- Highlight transferable skills${hasTarget || hasJobDesc ? ' relevant to the target position' : " that best support the candidate's own apparent career direction"}.
 - Improve action verbs and overall wording.
-- Prioritize and, where beneficial, reorder content so the most relevant experience for this role stands out.
+- Prioritize and, where beneficial, reorder content so the most relevant experience${hasTarget || hasJobDesc ? ' for this role' : ''} stands out.
 - Strengthen measurable achievements ONLY where the underlying numbers already exist in the source CV.
-- Use standard CV section headings, and naturally weave in keywords from the target position and job description for stronger ATS compatibility — never keyword-stuff, never sacrifice readability.
+- Use standard CV section headings, and naturally weave in keywords from ${keywordSource} for stronger ATS compatibility — never keyword-stuff, never sacrifice readability.
 - Include ALL experience entries, ALL education entries, ALL skills from the original — do not truncate, drop, or cut anything off.
 - Extract and use ONLY real information already in the CV — names, contacts, companies, dates. If something is missing, omit that field entirely or use an empty string. Never invent placeholders like "[Your Name]" or "[Company Name]" — a placeholder left in a document meant to be sent to an employer is a serious defect.
 - Do not unnecessarily redesign the CV's substance — preserve company names, job titles, dates, and qualifications exactly; only improve classification (responsibility vs. achievement), tense, wording, clarity, and impact.
@@ -173,13 +194,13 @@ The CV fields must contain ONLY finished, professional, ready-to-send content. N
 ====================================================
 THE PROFESSIONAL REVIEW (Output B — the "review" field, never part of the CV)
 ====================================================
-- atsScore: your honest estimate (0-100) of how well this CV would parse and rank in an Applicant Tracking System for the target position.
+- atsScore: your honest estimate (0-100) of how well this CV would parse and rank in an Applicant Tracking System${hasTarget ? ' for the target position' : hasJobDesc ? ' for the inferred role' : ", in general, for the candidate's apparent field"}.
 - recruiterReadiness: one short label describing overall readiness (e.g. "Strong", "Needs Work", "Excellent", "Not Ready Yet").
-- strengths: genuine strengths of this CV for this specific role.
+- strengths: genuine strengths of this CV${hasTarget || hasJobDesc ? ' for this specific role' : ''}.
 - weaknesses: genuine weaknesses or gaps.
 - missingAchievements: specific things a strong version of this CV would ideally include but this one doesn't yet (e.g. "No quantified results in the most recent role") — describe the gap, do not invent a fake achievement to fill it.
-- keywordsMatched: real keywords from the target position / job description that ARE already reflected in the improved CV.
-- keywordsMissing: real, relevant keywords from the target position / job description that are NOT yet reflected.
+- keywordsMatched: real keywords from ${keywordSource} that ARE already reflected in the improved CV.
+- keywordsMissing: real, relevant keywords from ${keywordSource} that are NOT yet reflected. Return an empty array if there is no target position or job description to compare against.
 - interviewReadiness: one short assessment of how ready this candidate likely is for an interview based on what's on the CV.
 - topImprovements: a short list of concrete improvements you actually made to the CV (plain, specific sentences — not generic praise).
 Do not invent a fabricated-sounding false-precision score presented as fact from a real scoring algorithm — atsScore is your qualitative estimate, treat it and present it as such.
@@ -210,9 +231,9 @@ export async function POST(request) {
     if (!cvText?.trim()) {
       return Response.json({ error: 'No CV text provided.' }, { status: 400 });
     }
-    if (!targetPosition?.trim()) {
-      return Response.json({ error: 'Please enter the position you want your CV optimized for.' }, { status: 400 });
-    }
+    // targetPosition and jobDescription are both optional — when neither is
+    // given, buildPrompt() switches to a general-improvement mode instead of
+    // rejecting the request or forcing the candidate to invent a role.
 
     const prompt = buildPrompt({ cvText, targetPosition, jobDescription });
     let { parsed } = await callGemini({ apiKey, toolName: 'cv-improver', routeName: '/api/cv-improver', parts: [{ text: prompt }], schema: cvSchema, maxOutputTokens: 65536, inputSizeApprox: prompt.length });

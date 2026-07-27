@@ -25,6 +25,8 @@ function tagStyle(bg, fg) {
 
 const POSITION_EXAMPLES = ['Quality Assurance Manager', 'Production Supervisor', 'Brewing Manager', 'Shift Manager', 'Operations Manager', 'Financial Analyst', 'Software Engineer'];
 
+const CV_REQUIRED_MESSAGE = 'Upload or paste your CV before continuing.';
+
 export const RESUME_BUILDER_IMPORT_KEY = 'convertam_cv_builder_import';
 
 // Converts the AI's structured CV output into the same raw shape the shared
@@ -155,6 +157,7 @@ export default function CVImproverWorkspace() {
   const [companyName, setCompanyName] = useState('');
   const [industry, setIndustry] = useState('');
   const [structured, setStructured] = useState(null);
+  const cvFieldRef = useRef(null);
 
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -309,8 +312,15 @@ export default function CVImproverWorkspace() {
   }
 
   async function handleImprove() {
-    if (!cvText.trim()) { setError('Please paste or upload your CV first.'); return; }
-    if (!targetPosition.trim()) { setError('Please enter the position you want your CV optimized for.'); return; }
+    if (!cvText.trim()) {
+      setError(CV_REQUIRED_MESSAGE);
+      cvFieldRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      cvFieldRef.current?.focus();
+      return;
+    }
+    // Target Position and Job Description are both optional — when neither
+    // is given the API falls back to general CV improvement rather than
+    // blocking the request or inventing a role.
     setBusy(true); setError(''); setStatus('');
     try {
       const res = await fetch('/api/cv-improver', {
@@ -560,16 +570,20 @@ export default function CVImproverWorkspace() {
 
           <div style={{ marginBottom: 20 }} className="no-print">
             <label style={labelStyle}>Paste Your CV / Resume Text</label>
-            <textarea value={cvText} onChange={(e) => setCvText(e.target.value)}
+            <textarea ref={cvFieldRef} value={cvText} onChange={(e) => { setCvText(e.target.value); if (error === CV_REQUIRED_MESSAGE) setError(''); }}
               placeholder="Paste your full CV here, or upload one above. Include your name, contact details, experience, education, skills..."
-              style={{ ...inputStyle, minHeight: 220, resize: 'vertical', lineHeight: 1.6 }} />
-            <p style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: 4 }}>{cvText.length} characters — no limit</p>
+              style={{ ...inputStyle, minHeight: 220, resize: 'vertical', lineHeight: 1.6, ...(error === CV_REQUIRED_MESSAGE ? { border: '1px solid #DC2626', boxShadow: '0 0 0 1px #DC2626' } : {}) }} />
+            {error === CV_REQUIRED_MESSAGE ? (
+              <p style={{ fontSize: '0.75rem', color: '#DC2626', fontWeight: 600, marginTop: 4 }}>⚠ {CV_REQUIRED_MESSAGE}</p>
+            ) : (
+              <p style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: 4 }}>{cvText.length} characters — no limit</p>
+            )}
           </div>
 
           <div style={{ marginBottom: 20 }} className="no-print">
-            <label style={labelStyle}>🎯 Target Position</label>
+            <label style={labelStyle}>🎯 Target Position (Optional)</label>
             <input type="text" value={targetPosition} onChange={(e) => setTargetPosition(e.target.value)} placeholder="e.g. Quality Assurance Manager" style={inputStyle} />
-            <p style={helperStyle}>Enter the exact role you want your CV optimized for. This tailors your summary, skills and experience wording — your professional title stays based on your own career, not this role.</p>
+            <p style={helperStyle}>Optional — add a target role to tailor your summary, skills and experience wording to a specific job. Leave this blank and we'll still improve your CV based on its own content — wording, structure, clarity, achievements and general ATS compatibility. Either way, your professional title stays based on your own career, not this role.</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
               {POSITION_EXAMPLES.map((ex) => (
                 <button key={ex} type="button" onClick={() => setTargetPosition(ex)} style={{ fontSize: '0.72rem', padding: '4px 10px', borderRadius: 999, border: '1px solid #E2E8F0', background: 'white', color: '#475569', cursor: 'pointer', fontFamily: 'inherit' }}>{ex}</button>
@@ -596,11 +610,11 @@ export default function CVImproverWorkspace() {
             <textarea value={jobDescription} onChange={(e) => setJobDescription(e.target.value)}
               placeholder="Paste the job advertisement, responsibilities or requirements..."
               style={{ ...inputStyle, minHeight: 110, resize: 'vertical', lineHeight: 1.6 }} />
-            <p style={helperStyle}>Paste the job advertisement, responsibilities or requirements to help the AI tailor your CV even more accurately. Leave this empty and we'll still optimize using just your Target Position.</p>
+            <p style={helperStyle}>Optional — paste the job advertisement to help tailor your CV and keywords even more precisely. If you skip Target Position too, we'll use this to infer the type of role. Leave both empty and we'll still improve your CV based on its own content.</p>
           </div>
 
           <div className="actions no-print" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button className="btn btn-primary" disabled={busy || !cvText.trim() || !targetPosition.trim()} onClick={handleImprove}>
+            <button className="btn btn-primary" disabled={busy} onClick={handleImprove}>
               {busy ? '✦ AI is improving your CV…' : '✦ Improve My CV'}
             </button>
             {error && !busy && <button className="btn btn-ghost" onClick={handleImprove}>Retry</button>}

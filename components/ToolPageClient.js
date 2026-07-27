@@ -51,7 +51,6 @@ import MemeGeneratorWorkspace from '@/components/tools/MemeGeneratorWorkspace';
 import ResumeBuilderWorkspace from '@/components/tools/ResumeBuilderWorkspace';
 import IdCardGeneratorWorkspace from '@/components/tools/IdCardGeneratorWorkspace';
 import DocumentEnhancerWorkspace from '@/components/tools/DocumentEnhancerWorkspace';
-import ScreenshotStudioWorkspace from '@/components/tools/ScreenshotStudioWorkspace';
 import PaymentGate from '@/components/PaymentGate';
 import ComingSoon from '@/components/tools/ComingSoon';
 import Link from 'next/link';
@@ -77,8 +76,7 @@ const isFree = (mode) =>
    'expense-budget-calculator', 'break-even-calculator', 'savings-goal-calculator',
    'utilities-hub', 'cv-improver', 'resume-builder', 'ask-solve-ai', 'document-translator', 'qr-code-studio',
    'cover-letter', 'linkedin-optimizer', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'presentation-generator', 'data-analyst',
-   'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio', 'password-studio',
-   'screenshot-studio'].includes(mode);
+   'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio', 'password-studio'].includes(mode);
 
 function getPriceBadge(mode) {
   if (isFree(mode)) return 'Free';
@@ -213,7 +211,6 @@ export default function ToolPageClient({ tool }) {
         {tool.mode === 'id-card-generator' && <IdCardGeneratorWorkspace />}
         {tool.mode === 'document-enhancer' && <DocumentEnhancerWorkspace />}
         {tool.mode === 'delivery-note-waybill' && <BusinessDocumentStudioWorkspace initialDocType="delivery-note" />}
-        {tool.mode === 'screenshot-studio' && <ScreenshotStudioWorkspace />}
         {tool.mode === 'soon' && <ComingSoon title={tool.title} note={tool.note} />}
 
         {tool.mode !== 'password-studio' && (

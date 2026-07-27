@@ -1,9 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Poppins, Inter, Caveat } from 'next/font/google';
-import { setHandoffImage } from '@/lib/screenshotStudio/handoff';
 import { emptyDoc, addDaysIso } from '@/lib/invoice-studio/sectionsModel';
 import { stylesFor, TEMPLATE_GALLERY } from '@/lib/invoice-studio/styleTokens';
 import { computeInvoiceTotals } from '@/lib/invoice-studio/calculations';
@@ -44,7 +42,6 @@ const HISTORY_LIMIT = 60;
 // /business-document-studio route passes nothing, so the workspace opens
 // on the entry screen instead (Start a Flow / Create a Single Document).
 export default function BusinessDocumentStudioWorkspace({ initialDocType = null }) {
-  const router = useRouter();
   const startDocType = initialDocType || 'invoice';
   const [view, setView] = useState(initialDocType ? 'gallery' : 'entry');
   const [docType, setDocType] = useState(startDocType);
@@ -58,7 +55,6 @@ export default function BusinessDocumentStudioWorkspace({ initialDocType = null 
   const [toast, setToast] = useState('');
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [isCreatingShowcase, setIsCreatingShowcase] = useState(false);
   const [panelTab, setPanelTab] = useState('content');
 
   const docRef = useRef(doc);
@@ -449,27 +445,6 @@ export default function BusinessDocumentStudioWorkspace({ initialDocType = null 
     }
   }, [doc, style, totals, wordsText, showToast, docConfig]);
 
-  // Hands the same on-screen render Download PNG uses straight to Social
-  // Posts — a "we just automated this" marketing image, arriving already
-  // loaded, no re-upload needed. See lib/screenshotStudio/handoff.js.
-  const handleCreateShowcase = useCallback(async () => {
-    setIsCreatingShowcase(true);
-    try {
-      const node = document.querySelector('.cs-flow-pages');
-      if (!node) return;
-      showToast('Preparing marketing image…');
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(node, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
-      setHandoffImage(canvas.toDataURL('image/png'));
-      router.push('/screenshot-studio?ws=social&handoff=1');
-    } catch (err) {
-      console.error(err);
-      showToast('Could not prepare the marketing image — please try again.', 15000);
-    } finally {
-      setIsCreatingShowcase(false);
-    }
-  }, [showToast, router]);
-
   const templateName = (TEMPLATE_GALLERY.find((t) => t.id === templateId)?.name || docConfig.label) + ' Template';
   const letterhead = doc.sections.letterhead;
 
@@ -516,8 +491,6 @@ export default function BusinessDocumentStudioWorkspace({ initialDocType = null 
             onResetToFit={resetToFit}
             onDownload={handleDownload}
             isDownloading={isDownloading}
-            onCreateShowcase={handleCreateShowcase}
-            isCreatingShowcase={isCreatingShowcase}
             onBack={goToGallery}
             docType={docType}
             docTypeOptions={docTypeOptions}

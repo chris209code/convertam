@@ -133,7 +133,6 @@ export default function Toolbar({
   templateName, canUndo, canRedo, onUndo, onRedo,
   zoom, onZoomIn, onZoomOut, onResetToFit, onDownload, onBack, isDownloading,
   docTypeOptions, docType, onSwitchDocType, convertTargetLabel, onConvert,
-  onCreateShowcase, isCreatingShowcase,
 }) {
   return (
     <div style={{
@@ -186,17 +185,6 @@ export default function Toolbar({
         </button>
         <IconBtn onClick={onZoomIn} disabled={zoom >= ZOOM_MAX} title="Zoom in"><Plus size={16} /></IconBtn>
       </div>
-
-      {onCreateShowcase && (
-        <button
-          onClick={onCreateShowcase}
-          disabled={isCreatingShowcase}
-          title="Create a marketing image from this document"
-          style={{ height: 36, padding: '0 12px', borderRadius: 8, border: '1px solid #E2E6ED', background: '#fff', color: '#5B6472', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700, cursor: isCreatingShowcase ? 'default' : 'pointer', whiteSpace: 'nowrap' }}
-        >
-          <ImageIcon size={15} /> {isCreatingShowcase ? 'Preparing…' : 'Marketing Image'}
-        </button>
-      )}
 
       <DownloadMenu onDownload={onDownload} isDownloading={isDownloading} />
     </div>

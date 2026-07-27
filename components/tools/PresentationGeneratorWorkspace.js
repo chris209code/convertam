@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import Script from 'next/script';
 import { buildPptxFromOutline, PPTX_THEMES } from '@/lib/buildPptxFromOutline';
 
@@ -451,15 +450,12 @@ export default function PresentationGeneratorWorkspace() {
           ))}
         </div>
 
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 12 }}>
           <button className="btn btn-ghost" onClick={startOver}>Start Over</button>
           <button className="btn btn-ghost" onClick={() => setPhase('settings')}>← Edit Settings</button>
           <button className="btn btn-primary" disabled={downloading} onClick={handleDownload}>
             {downloading ? (loadingLabels[loadingStage] || 'Building…') : '⬇️ Download PowerPoint (.pptx)'}
           </button>
-          <Link href="/screenshot-studio?ws=website" className="btn btn-ghost" style={{ marginLeft: 'auto' }}>
-            🖼️ Create a product showcase
-          </Link>
         </div>
       </div>
     );

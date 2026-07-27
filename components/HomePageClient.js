@@ -131,7 +131,6 @@ const ALL_TOOLS = [
   { name: 'Images to PDF', href: '/images-to-pdf' },
   { name: 'Extract PDF Images', href: '/extract-pdf-images' },
   { name: 'PDF Compare', href: '/compare-pdf' },
-  { name: 'Screenshot Studio', href: '/screenshot-studio' },
   { name: 'Redact & Edit PDF', href: '/redact-pdf' },
   { name: 'PDF Overlay', href: '/pdf-overlay' },
   { name: 'PDF to Images', href: '/pdf-to-png' },

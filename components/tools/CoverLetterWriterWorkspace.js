@@ -11,9 +11,13 @@ export default function CoverLetterWriterWorkspace() {
   const [yourName, setYourName] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [companyUrl, setCompanyUrl] = useState('');
   const [background, setBackground] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [tone, setTone] = useState('Professional');
+  // Cached text from a previous successful company-website lookup this
+  // session — reused on regenerate instead of re-fetching the same site.
+  const [companyResearchText, setCompanyResearchText] = useState('');
   const backgroundFieldRef = useRef(null);
 
   const [letter, setLetter] = useState('');
@@ -34,18 +38,23 @@ export default function CoverLetterWriterWorkspace() {
     if (!session) return;
     if (session.applicantName) setYourName(session.applicantName);
     if (session.cvPlainText) setBackground(session.cvPlainText);
+    if (session.companyResearchText) setCompanyResearchText(session.companyResearchText);
   }, []);
 
   // Driven by <JobVacancyImport> — see the merge-policy comment in
   // CVImproverWorkspace.js's handleJobChange for why title/company only
   // overwrite when actually provided, while description is a full replace.
+  // Any job change clears cached company research — it was fetched for
+  // whatever company was active before, which this change may no longer be.
   function handleJobChange(job) {
+    setCompanyResearchText('');
     if (!job) {
-      setJobTitle(''); setCompanyName(''); setJobDescription('');
+      setJobTitle(''); setCompanyName(''); setCompanyUrl(''); setJobDescription('');
       return;
     }
     if (job.title) setJobTitle(job.title);
     if (job.company) setCompanyName(job.company);
+    if (job.companyUrl) setCompanyUrl(job.companyUrl);
     setJobDescription(job.description || '');
   }
 
@@ -69,7 +78,7 @@ export default function CoverLetterWriterWorkspace() {
       const res = await fetch('/api/cover-letter-writer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ yourName, jobTitle, companyName, background, jobDescription, tone }),
+        body: JSON.stringify({ yourName, jobTitle, companyName, companyUrl, background, jobDescription, tone, cachedCompanyResearch: companyResearchText || undefined }),
       });
       const data = await res.json();
 
@@ -80,11 +89,15 @@ export default function CoverLetterWriterWorkspace() {
       }
 
       setLetter(data.letter || '');
+      if (data.companyResearchText) setCompanyResearchText(data.companyResearchText);
       // Refreshes the Career Session with whatever the candidate actually
       // used (including any edits made here) and extends its idle timeout —
       // so a future tool (e.g. an ATS Match checker) sees the latest values,
       // and the session stays alive while Career Studio work continues.
-      saveCareerSession({ sourceTool: 'cover-letter', applicantName: yourName, jobTitle, targetRole: jobTitle, companyName, jobDescription, cvPlainText: background });
+      // companyResearchText is cached here too, so a regenerate (or
+      // reopening this tool from the same session) never re-fetches the
+      // same company's website for identical information.
+      saveCareerSession({ sourceTool: 'cover-letter', applicantName: yourName, jobTitle, targetRole: jobTitle, companyName, companyUrl, jobDescription, cvPlainText: background, companyResearchText: data.companyResearchText || '' });
     } catch (err) {
       console.error(err);
       setError('Something went wrong. Please try again.');

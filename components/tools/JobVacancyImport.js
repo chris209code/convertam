@@ -9,13 +9,14 @@ const helperStyle = { fontSize: '0.7rem', color: '#64748B', marginTop: 6, lineHe
 const linkBtnStyle = { fontSize: '0.74rem', fontWeight: 600, color: '#2563EB', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', padding: 0 };
 const smallBtnStyle = { fontSize: '0.78rem', fontWeight: 700, padding: '7px 12px', borderRadius: 7, border: '1px solid #CBD5E1', background: 'white', color: '#334155', cursor: 'pointer', fontFamily: 'inherit' };
 
-const EMPTY_JOB = { title: '', company: '', location: '', employmentType: '', industry: '', experienceLevel: '', description: '' };
+const EMPTY_JOB = { title: '', company: '', companyUrl: '', location: '', employmentType: '', industry: '', experienceLevel: '', description: '' };
 
 function jobFromSession(session) {
   if (!session || !(session.jobTitle || session.jobDescription)) return null;
   return {
     title: session.jobTitle || session.targetRole || '',
     company: session.companyName || '',
+    companyUrl: session.companyUrl || '',
     location: session.location || '',
     employmentType: session.employmentType || '',
     industry: session.industry || '',
@@ -77,7 +78,7 @@ export default function JobVacancyImport({ sourceTool, onJobChange }) {
       }
       setProviderName(data.providerName || '');
       setReviewJob({
-        title: data.job.title || '', company: data.job.company || '', location: data.job.location || '',
+        title: data.job.title || '', company: data.job.company || '', companyUrl: data.job.companyUrl || '', location: data.job.location || '',
         employmentType: data.job.employmentType || '', industry: data.job.industry || '', experienceLevel: data.job.experienceLevel || '',
         description: data.job.description || '',
       });
@@ -111,11 +112,15 @@ export default function JobVacancyImport({ sourceTool, onJobChange }) {
       jobTitle: job.title,
       targetRole: job.title,
       companyName: job.company,
+      companyUrl: job.companyUrl || '',
       location: job.location.trim(),
       employmentType: job.employmentType.trim(),
       industry: job.industry.trim(),
       experienceLevel: job.experienceLevel.trim(),
       jobDescription: job.description,
+      // A newly confirmed vacancy invalidates any company research cached
+      // from a previous (possibly different) company.
+      companyResearchText: '',
     });
     setReviewJob(job);
     setPhase('active');

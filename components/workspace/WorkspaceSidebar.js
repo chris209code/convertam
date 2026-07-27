@@ -33,6 +33,25 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// "Download Current PDF" was confusing in two ways: it named the file type
+// even when the session document wasn't a PDF (e.g. a translated .docx),
+// and it never told the user WHAT they were downloading — just "the
+// current one." This makes the label reflect the actual document instead:
+// Career Studio tools get their real document name (a CV isn't naturally
+// thought of as "a PDF" even when the file itself is one), everything else
+// is named by its real file type rather than assuming PDF.
+const CV_TOOL_SLUGS = ['cv-improver', 'resume-builder'];
+const COVER_LETTER_TOOL_SLUGS = ['cover-letter'];
+
+function downloadButtonLabel(session) {
+  const doc = session.document;
+  if (!doc) return 'Download File';
+  if (CV_TOOL_SLUGS.includes(session.currentTool)) return 'Download CV';
+  if (COVER_LETTER_TOOL_SLUGS.includes(session.currentTool)) return 'Download Cover Letter';
+  const ext = (doc.name || '').split('.').pop();
+  return `Download ${ext && ext.length <= 5 ? ext.toUpperCase() : 'File'}`;
+}
+
 function downloadCurrentDocument(session) {
   if (!session.document) return;
   const blob = new Blob([session.document.bytes], { type: session.document.mimeType });
@@ -158,7 +177,7 @@ function SidebarContent({ session, onNavigate, onClose, onRestoreOriginal }) {
           onClick={() => downloadCurrentDocument(session)}
           style={{ padding: '9px 12px', borderRadius: 9, border: 'none', background: '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit' }}
         >
-          ⬇ Download Current PDF
+          ⬇ {downloadButtonLabel(session)}
         </button>
         <button
           onClick={onClose}
@@ -268,7 +287,7 @@ function DesktopRail({ session, onClose, onRestoreOriginal }) {
           onClick={() => downloadCurrentDocument(session)}
           style={{ padding: '9px 12px', borderRadius: 9, border: 'none', background: '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit' }}
         >
-          ⬇ Download Current PDF
+          ⬇ {downloadButtonLabel(session)}
         </button>
         <button
           onClick={onClose}

@@ -172,4 +172,21 @@ textarea:focus-visible,
   .range-input { @apply border px-3 py-2 text-sm w-full max-w-xs; border-color: var(--cvt-color-rule); border-radius: var(--cvt-radius-sm); }
   .range-input:focus { border-color: var(--cvt-color-primary); box-shadow: var(--cvt-focus-ring); outline: none; }
   .privacy-note { @apply text-xs text-ink-soft mt-4; }
+
+  @media (min-width: 1101px) {
+    .qr-studio-body {
+      flex-wrap: wrap;
+    }
+
+    .qr-studio-body .qr-studio-right {
+      width: 320px !important;
+      min-width: 320px;
+      flex: 0 0 320px !important;
+      box-sizing: border-box;
+    }
+
+    .qr-studio-body .qr-studio-center {
+      min-width: 0;
+    }
+  }
 }

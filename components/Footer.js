@@ -5,14 +5,14 @@ export default function Footer() {
   return (
     <footer style={{
       width: '100%',
-      background: '#F8FBFF',
-      borderTop: '1px solid #E5EDF8',
+      background: 'var(--cvt-color-bg-soft)',
+      borderTop: '1px solid var(--cvt-color-rule)',
       padding: '24px 0',
     }}>
       <style>{`
-        .footer-inner { max-width: 1600px; margin: 0 auto; padding: 0 64px; }
+        .footer-inner { max-width: 1600px; margin: 0 auto; padding: 0 var(--cvt-space-page-x); }
         @media (max-width: 768px) {
-          .footer-inner { padding: 0 24px; }
+          .footer-inner { padding: 0 var(--cvt-space-page-x); }
         }
       `}</style>
 
@@ -23,10 +23,10 @@ export default function Footer() {
             target="_blank" rel="noopener noreferrer"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px',
-              padding: '7px 14px', borderRadius: '99px',
-              fontSize: '0.78rem', fontWeight: 600,
-              background: '#EFF6FF', color: '#2563EB',
-              border: '1px solid #BFDBFE', textDecoration: 'none',
+              padding: '7px 14px', borderRadius: 'var(--cvt-radius-pill)',
+              fontSize: '0.78rem', fontWeight: 700,
+              background: 'var(--cvt-color-primary-soft)', color: 'var(--cvt-color-primary)',
+              border: '1px solid var(--cvt-color-primary-rule)', textDecoration: 'none',
             }}>
             ❤️ Support Convertam
           </a>
@@ -37,10 +37,10 @@ export default function Footer() {
             }}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px',
-              padding: '7px 14px', borderRadius: '99px',
-              fontSize: '0.78rem', fontWeight: 600,
-              background: '#FFFBEB', color: '#D97706',
-              border: '1px solid #FDE68A', cursor: 'pointer',
+              padding: '7px 14px', borderRadius: 'var(--cvt-radius-pill)',
+              fontSize: '0.78rem', fontWeight: 700,
+              background: 'var(--cvt-color-warning-soft)', color: 'var(--cvt-color-warning)',
+              border: '1px solid var(--cvt-color-warning-rule)', cursor: 'pointer',
             }}>
             💡 Suggest a Tool
           </button>
@@ -88,12 +88,12 @@ export default function Footer() {
           ))}
         </div>
 
-        <div style={{ borderTop: '1px solid #E5EDF8', paddingTop: '12px', textAlign: 'center' }}>
-          <p style={{ fontSize: '0.72rem', color: '#94A3B8', margin: '0 0 4px' }}>
+        <div style={{ borderTop: '1px solid var(--cvt-color-rule)', paddingTop: '12px', textAlign: 'center' }}>
+          <p style={{ fontSize: '0.72rem', color: 'var(--cvt-color-ink-soft)', margin: '0 0 4px' }}>
             Built out of frustration. Made for everyone.{' '}
             <Link href="/about" style={{ color: '#2563EB', textDecoration: 'underline' }}>Our story →</Link>
           </p>
-          <p style={{ fontSize: '0.72rem', color: '#94A3B8', margin: 0 }}>
+          <p style={{ fontSize: '0.72rem', color: 'var(--cvt-color-ink-soft)', margin: 0 }}>
             convertam.app is free to use. Tolerate the ads or{' '}
             <a href="https://paystack.shop/pay/kilvwot5rx" target="_blank" rel="noopener noreferrer"
               style={{ color: '#2563EB', textDecoration: 'underline' }}>leave a tip</a>.

@@ -7,14 +7,24 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        canvas: '#f3efe2',
-        paper: '#fffefb',
-        ink: '#1c2333',
-        'ink-soft': '#5b6275',
-        'stamp-blue': '#3a63b8',
-        'stamp-amber': '#e2962c',
-        success: '#2f8f5b',
-        error: '#c84f3a',
+        canvas: 'var(--cvt-color-bg)',
+        paper: 'var(--cvt-color-surface)',
+        ink: 'var(--cvt-color-ink)',
+        'ink-soft': 'var(--cvt-color-ink-muted)',
+        'stamp-blue': 'var(--cvt-color-primary)',
+        'stamp-amber': 'var(--cvt-color-warning)',
+        success: 'var(--cvt-color-success)',
+        error: 'var(--cvt-color-danger)',
+      },
+      borderRadius: {
+        cvt: 'var(--cvt-radius-md)',
+        'cvt-lg': 'var(--cvt-radius-lg)',
+        'cvt-xl': 'var(--cvt-radius-xl)',
+      },
+      boxShadow: {
+        cvt: 'var(--cvt-shadow-sm)',
+        'cvt-md': 'var(--cvt-shadow-md)',
+        'cvt-lg': 'var(--cvt-shadow-lg)',
       },
       fontFamily: {
         display: ['var(--font-display)'],

@@ -3,66 +3,150 @@
 @tailwind utilities;
 
 :root {
-  --rule-light: #E2E8F0;
+  --cvt-color-bg: #F6F8FC;
+  --cvt-color-bg-soft: #F8FBFF;
+  --cvt-color-surface: #FFFFFF;
+  --cvt-color-surface-raised: #FEFEFE;
+  --cvt-color-surface-tint: #F1F6FF;
+  --cvt-color-ink: #132033;
+  --cvt-color-ink-muted: #526075;
+  --cvt-color-ink-soft: #718098;
+  --cvt-color-rule: #E3EAF3;
+  --cvt-color-rule-strong: #CBD8E8;
+  --cvt-color-primary: #2563EB;
+  --cvt-color-primary-strong: #1D4ED8;
+  --cvt-color-primary-soft: #EFF6FF;
+  --cvt-color-primary-rule: #BFDBFE;
+  --cvt-color-success: #059669;
+  --cvt-color-success-soft: #ECFDF5;
+  --cvt-color-success-rule: #A7F3D0;
+  --cvt-color-warning: #D97706;
+  --cvt-color-warning-soft: #FFFBEB;
+  --cvt-color-warning-rule: #FDE68A;
+  --cvt-color-danger: #DC2626;
+  --cvt-color-danger-soft: #FEF2F2;
+  --cvt-color-danger-rule: #FECACA;
+  --cvt-space-page-x: clamp(20px, 4vw, 64px);
+  --cvt-space-section-y: clamp(32px, 5vw, 64px);
+  --cvt-radius-xs: 6px;
+  --cvt-radius-sm: 8px;
+  --cvt-radius-md: 10px;
+  --cvt-radius-lg: 12px;
+  --cvt-radius-xl: 16px;
+  --cvt-radius-pill: 999px;
+  --cvt-shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --cvt-shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.06);
+  --cvt-shadow-md: 0 12px 28px rgba(15, 23, 42, 0.09);
+  --cvt-shadow-lg: 0 18px 42px rgba(15, 23, 42, 0.12);
+  --cvt-shadow-primary: 0 12px 26px rgba(37, 99, 235, 0.22);
+  --cvt-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.18);
+  --cvt-transition-fast: 150ms ease;
+  --cvt-transition-base: 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  --rule-light: var(--cvt-color-rule);
 }
 
 body {
   background:
     radial-gradient(circle at top right,
-      rgba(37,99,235,.06) 0%,
+      rgba(37,99,235,.05) 0%,
       rgba(37,99,235,0) 35%),
     radial-gradient(circle at bottom left,
       rgba(16,185,129,.05) 0%,
       rgba(16,185,129,0) 40%),
     linear-gradient(
       180deg,
-      #F6FAFF 0%,
-      #FFFFFF 22%,
-      #FBFCFE 55%,
-      #F8FAFC 100%
+      var(--cvt-color-bg-soft) 0%,
+      var(--cvt-color-surface) 24%,
+      #FBFCFE 58%,
+      var(--cvt-color-bg) 100%
     );
-  color: #0F172A;
+  color: var(--cvt-color-ink);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a,
+button,
+input,
+select,
+textarea {
+  transition:
+    color var(--cvt-transition-fast),
+    background-color var(--cvt-transition-fast),
+    border-color var(--cvt-transition-fast),
+    box-shadow var(--cvt-transition-fast),
+    transform var(--cvt-transition-base),
+    opacity var(--cvt-transition-fast);
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible {
+  outline: none;
+  box-shadow: var(--cvt-focus-ring);
+}
+
+::selection {
+  background: rgba(37, 99, 235, 0.16);
 }
 
 @layer components {
   .panel {
-    @apply bg-white text-ink rounded-2xl p-6 md:p-10;
-    border: 1px solid #E4EBF4;
-    box-shadow: 0 2px 8px rgba(15,23,42,0.04);
+    @apply bg-white text-ink p-6 md:p-10;
+    border: 1px solid var(--cvt-color-rule);
+    border-radius: var(--cvt-radius-xl);
+    box-shadow: var(--cvt-shadow-sm);
   }
   .dropzone {
-    @apply border-2 border-dashed rounded-xl p-9 text-center cursor-pointer transition-colors;
-    background: #F8FBFF;
-    border-color: #E2E8F0;
+    @apply border-2 border-dashed p-9 text-center cursor-pointer;
+    background: var(--cvt-color-bg-soft);
+    border-color: var(--cvt-color-rule);
+    border-radius: var(--cvt-radius-xl);
   }
   .dropzone.drag,
   .dropzone:hover {
-    border-color: #2563EB;
-    background: #EFF6FF;
+    border-color: var(--cvt-color-primary);
+    background: var(--cvt-color-primary-soft);
+    box-shadow: var(--cvt-focus-ring);
   }
   .dz-icon { @apply font-mono text-xs text-ink-soft tracking-wide; }
   .dz-main { @apply font-semibold mt-1.5 mb-1; }
   .dz-sub { @apply text-xs text-ink-soft; }
   .file-list { @apply mt-4 flex flex-col gap-2; }
   .file-row {
-    @apply flex items-center gap-2.5 bg-white border rounded-lg px-3 py-2 text-sm;
-    border-color: #E4EBF4;
+    @apply flex items-center gap-2.5 bg-white border px-3 py-2 text-sm;
+    border-color: var(--cvt-color-rule);
+    border-radius: var(--cvt-radius-sm);
   }
-  .badge { @apply font-mono text-[10px] bg-ink text-white px-1.5 py-0.5 rounded; }
+  .badge { @apply font-mono text-[10px] bg-ink text-white px-1.5 py-0.5; border-radius: var(--cvt-radius-xs); }
   .file-row .name { @apply flex-1 truncate; }
   .file-row .remove { @apply text-error font-mono text-base leading-none bg-transparent border-none cursor-pointer; }
   .actions { @apply mt-5 flex gap-3 items-center flex-wrap; }
-  .btn { @apply font-semibold text-sm rounded-lg px-5 py-3 cursor-pointer transition-all; }
+  .btn {
+    @apply font-semibold text-sm px-5 py-3 cursor-pointer;
+    border-radius: var(--cvt-radius-md);
+  }
   .btn-primary {
     @apply text-white;
-    background: linear-gradient(135deg, #2563EB, #1D4ED8);
-    box-shadow: 0 10px 24px rgba(37,99,235,0.25);
+    background: linear-gradient(135deg, var(--cvt-color-primary), var(--cvt-color-primary-strong));
+    box-shadow: var(--cvt-shadow-primary);
   }
-  .btn-primary:hover { box-shadow: 0 14px 28px rgba(37,99,235,0.35); }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 16px 32px rgba(37,99,235,0.30); }
+  .btn-primary:active { transform: translateY(0); box-shadow: 0 8px 18px rgba(37,99,235,0.24); }
   .btn-primary:disabled { @apply bg-[#c7cede] cursor-not-allowed; box-shadow: none; }
-  .btn-ghost { @apply bg-transparent border text-ink-soft; border-color: #E4EBF4; }
-  .btn-ghost-sm { @apply text-xs border rounded-md px-3 py-1.5 bg-transparent cursor-pointer; border-color: #E4EBF4; }
-  .active-choice { border-color: #2563EB; color: #2563EB; background: #EFF6FF; }
+  .btn-ghost { @apply bg-transparent border text-ink-soft; border-color: var(--cvt-color-rule); }
+  .btn-ghost:hover { background: var(--cvt-color-bg-soft); border-color: var(--cvt-color-rule-strong); color: var(--cvt-color-ink); }
+  .btn-ghost-sm { @apply text-xs border px-3 py-1.5 bg-transparent cursor-pointer; border-color: var(--cvt-color-rule); border-radius: var(--cvt-radius-sm); }
+  .btn-ghost-sm:hover { background: var(--cvt-color-bg-soft); border-color: var(--cvt-color-rule-strong); }
+  .active-choice { border-color: var(--cvt-color-primary); color: var(--cvt-color-primary); background: var(--cvt-color-primary-soft); }
   .status { @apply font-mono text-xs mt-3.5; }
   .status.success { @apply text-success; }
   .status.error { @apply text-error; }
@@ -71,19 +155,21 @@ body {
     transform: rotate(-3deg);
   }
   .tool-card {
-    @apply flex items-center justify-between border rounded-xl px-4 py-3.5 text-sm font-medium transition-all;
-    background: #FFFFFF;
-    border-color: #E4EBF4;
-    box-shadow: 0 2px 8px rgba(15,23,42,0.04);
+    @apply flex items-center justify-between border px-4 py-3.5 text-sm font-medium;
+    background: var(--cvt-color-surface);
+    border-color: var(--cvt-color-rule);
+    border-radius: var(--cvt-radius-lg);
+    box-shadow: var(--cvt-shadow-sm);
   }
   .tool-card:hover {
-    transform: translateY(-3px);
-    border-color: #C7D8F7;
-    box-shadow: 0 14px 28px rgba(37,99,235,0.10);
+    transform: translateY(-2px);
+    border-color: var(--cvt-color-primary-rule);
+    box-shadow: var(--cvt-shadow-md);
   }
-  .tool-card-badge { @apply font-mono text-[10px] px-1.5 py-0.5 rounded; }
-  .tool-card-badge.live { color: #10B981; background: rgba(16,185,129,0.15); }
-  .tool-card-badge.soon { color: #F59E0B; background: rgba(245,158,11,0.15); }
-  .range-input { @apply border rounded-lg px-3 py-2 text-sm w-full max-w-xs; border-color: #E4EBF4; }
+  .tool-card-badge { @apply font-mono text-[10px] px-1.5 py-0.5; border-radius: var(--cvt-radius-xs); }
+  .tool-card-badge.live { color: var(--cvt-color-success); background: var(--cvt-color-success-soft); }
+  .tool-card-badge.soon { color: var(--cvt-color-warning); background: var(--cvt-color-warning-soft); }
+  .range-input { @apply border px-3 py-2 text-sm w-full max-w-xs; border-color: var(--cvt-color-rule); border-radius: var(--cvt-radius-sm); }
+  .range-input:focus { border-color: var(--cvt-color-primary); box-shadow: var(--cvt-focus-ring); outline: none; }
   .privacy-note { @apply text-xs text-ink-soft mt-4; }
 }

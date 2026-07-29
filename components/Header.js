@@ -8,33 +8,38 @@ export default function Header() {
   return (
     <header style={{
       width: '100%',
-      background: 'white',
-      borderBottom: '1px solid #E5E7EB',
-      boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
+      background: 'rgba(255,255,255,0.94)',
+      borderBottom: '1px solid var(--cvt-color-rule)',
+      boxShadow: 'var(--cvt-shadow-xs)',
+      backdropFilter: 'blur(12px)',
       position: 'sticky', top: 0, zIndex: 50,
     }}>
       <style>{`
         .nav-links { display: flex; align-items: center; gap: 32px; }
-        .nav-link { font-size: 0.875rem; font-weight: 500; color: #6B7280; text-decoration: none; }
-        .nav-link:hover { color: #111827; }
+        .nav-link { font-size: 0.875rem; font-weight: 600; color: var(--cvt-color-ink-muted); text-decoration: none; padding: 8px 2px; border-radius: var(--cvt-radius-xs); }
+        .nav-link:hover { color: var(--cvt-color-ink); }
         .menu-btn {
           display: none;
-          background: #EBF3FF; border: 1px solid #BFDBFE;
-          color: #2563EB; font-size: 0.875rem; font-weight: 700;
-          padding: 8px 16px; border-radius: 10px; cursor: pointer;
+          background: var(--cvt-color-primary-soft); border: 1px solid var(--cvt-color-primary-rule);
+          color: var(--cvt-color-primary); font-size: 0.875rem; font-weight: 700;
+          padding: 8px 16px; border-radius: var(--cvt-radius-md); cursor: pointer;
         }
+        .menu-btn:hover { background: #DBEAFE; border-color: #93C5FD; }
+        .menu-btn:active { transform: translateY(1px); }
         .mobile-menu {
           display: none; flex-direction: column;
-          background: white; border-top: 1px solid #E5E7EB;
-          padding: 16px 5%; gap: 4px;
+          background: var(--cvt-color-surface); border-top: 1px solid var(--cvt-color-rule);
+          padding: 12px 5% 16px; gap: 2px;
         }
         .mobile-menu.open { display: flex; }
         .mobile-nav-link {
-          font-size: 0.95rem; font-weight: 500; color: #374151;
-          text-decoration: none; padding: 10px 0;
-          border-bottom: 1px solid #F3F4F6;
+          font-size: 0.95rem; font-weight: 600; color: var(--cvt-color-ink-muted);
+          text-decoration: none; padding: 11px 10px;
+          border-bottom: 1px solid #F3F6FA;
+          border-radius: var(--cvt-radius-sm);
           display: flex; align-items: center; gap: 8px;
         }
+        .mobile-nav-link:hover { background: var(--cvt-color-bg-soft); color: var(--cvt-color-ink); }
         .mobile-nav-link:last-child { border-bottom: none; }
         @media (max-width: 768px) {
           .nav-links { display: none; }
@@ -43,7 +48,7 @@ export default function Header() {
       `}</style>
 
       <div style={{
-        width: '100%', padding: '0 4%', height: '64px',
+        width: '100%', padding: '0 var(--cvt-space-page-x)', height: '64px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <Link href="/">

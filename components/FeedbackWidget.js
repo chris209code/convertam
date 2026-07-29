@@ -54,17 +54,17 @@ export default function FeedbackWidget() {
             right: 0,
             top: '50%',
             transform: 'translateY(-50%)',
-            background: '#3a63b8',
+            background: 'var(--cvt-color-primary)',
             color: 'white',
             border: 'none',
-            borderRadius: '8px 0 0 8px',
+            borderRadius: 'var(--cvt-radius-sm) 0 0 var(--cvt-radius-sm)',
             padding: '14px 10px',
             fontSize: '11px',
             fontWeight: 700,
             cursor: 'pointer',
             zIndex: 1000,
             letterSpacing: '0.05em',
-            boxShadow: '-3px 0 12px rgba(0,0,0,0.2)',
+            boxShadow: 'var(--cvt-shadow-md)',
             writingMode: 'vertical-rl',
             textOrientation: 'mixed',
             display: 'flex',
@@ -88,13 +88,13 @@ export default function FeedbackWidget() {
             bottom: 0,
             width: '320px',
             zIndex: 1000,
-            borderRadius: '12px 0 0 0',
+            borderRadius: 'var(--cvt-radius-lg) 0 0 0',
             overflow: 'hidden',
-            boxShadow: '-4px -4px 24px rgba(0,0,0,0.15)',
+            boxShadow: 'var(--cvt-shadow-lg)',
           }}
         >
           {/* Header */}
-          <div style={{ background: '#3a63b8', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ background: 'var(--cvt-color-primary)', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <div style={{ color: 'white', fontWeight: 700, fontSize: 14 }}>💬 Share your feedback</div>
               <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 2 }}>Help us improve Convertam</div>
@@ -106,17 +106,17 @@ export default function FeedbackWidget() {
           </div>
 
           {/* Body */}
-          <div style={{ background: '#fffefb', padding: '16px' }}>
+          <div style={{ background: 'var(--cvt-color-surface)', padding: '16px', border: '1px solid var(--cvt-color-rule)', borderTop: 'none' }}>
             {status === 'success' ? (
               <div style={{ textAlign: 'center', padding: '20px 0' }}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>🙏</div>
-                <div style={{ fontWeight: 700, color: '#1c2333', marginBottom: 4 }}>Thank you!</div>
-                <div style={{ fontSize: 12, color: '#6b6560' }}>Your feedback has been received.</div>
+                <div style={{ fontWeight: 700, color: 'var(--cvt-color-ink)', marginBottom: 4 }}>Thank you!</div>
+                <div style={{ fontSize: 12, color: 'var(--cvt-color-ink-muted)' }}>Your feedback has been received.</div>
               </div>
             ) : (
               <form onSubmit={handleSubmit}>
                 <div style={{ marginBottom: 10 }}>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: '#6b6560', display: 'block', marginBottom: 4 }}>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--cvt-color-ink-muted)', display: 'block', marginBottom: 4 }}>
                     What's on your mind? *
                   </label>
                   <textarea
@@ -126,15 +126,15 @@ export default function FeedbackWidget() {
                     required
                     rows={4}
                     style={{
-                      width: '100%', border: '1px solid #e2dcc9', borderRadius: 8,
+                      width: '100%', border: '1px solid var(--cvt-color-rule)', borderRadius: 'var(--cvt-radius-sm)',
                       padding: '8px 10px', fontSize: 12, resize: 'vertical',
-                      background: '#f7f4ec', color: '#1c2333', outline: 'none',
+                      background: 'var(--cvt-color-bg-soft)', color: 'var(--cvt-color-ink)', outline: 'none',
                       boxSizing: 'border-box',
                     }}
                   />
                 </div>
                 <div style={{ marginBottom: 12 }}>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: '#6b6560', display: 'block', marginBottom: 4 }}>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--cvt-color-ink-muted)', display: 'block', marginBottom: 4 }}>
                     Your email <span style={{ fontWeight: 400 }}>(optional — if you want a reply)</span>
                   </label>
                   <input
@@ -143,15 +143,15 @@ export default function FeedbackWidget() {
                     onChange={e => setEmail(e.target.value)}
                     placeholder="you@example.com"
                     style={{
-                      width: '100%', border: '1px solid #e2dcc9', borderRadius: 8,
-                      padding: '8px 10px', fontSize: 12, background: '#f7f4ec',
-                      color: '#1c2333', outline: 'none', boxSizing: 'border-box',
+                      width: '100%', border: '1px solid var(--cvt-color-rule)', borderRadius: 'var(--cvt-radius-sm)',
+                      padding: '8px 10px', fontSize: 12, background: 'var(--cvt-color-bg-soft)',
+                      color: 'var(--cvt-color-ink)', outline: 'none', boxSizing: 'border-box',
                     }}
                   />
                 </div>
 
                 {status === 'error' && (
-                  <div style={{ fontSize: 11, color: '#cc4444', marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: 'var(--cvt-color-danger)', marginBottom: 8 }}>
                     Something went wrong. Please try again.
                   </div>
                 )}
@@ -160,8 +160,8 @@ export default function FeedbackWidget() {
                   type="submit"
                   disabled={status === 'sending' || !message.trim()}
                   style={{
-                    width: '100%', background: '#3a63b8', color: 'white',
-                    border: 'none', borderRadius: 8, padding: '10px',
+                    width: '100%', background: 'var(--cvt-color-primary)', color: 'white',
+                    border: 'none', borderRadius: 'var(--cvt-radius-sm)', padding: '10px',
                     fontSize: 13, fontWeight: 700, cursor: 'pointer',
                     opacity: status === 'sending' || !message.trim() ? 0.6 : 1,
                   }}

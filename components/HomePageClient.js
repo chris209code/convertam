@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 // Google's SearchAction schema needs a real URL target that actually
 // performs a search — "/?q={search_term_string}" plus this effect (which
@@ -175,6 +176,7 @@ const CATEGORIES = [
     dotColor: '#EF4444',
     accentText: '#DC2626',
     icon: 'fileText',
+    artwork: '/category-art/pdf-suite.jpg',
     viewAllHref: '/pdf-tools',
     tools: [
       { name: 'PDF to Word', href: '/pdf-to-word' },
@@ -193,6 +195,7 @@ const CATEGORIES = [
     dotColor: '#10B981',
     accentText: '#059669',
     icon: 'briefcase',
+    artwork: '/category-art/business-suite.jpg',
     viewAllHref: '/business',
     tools: [
       { name: 'Business Document Studio', href: '/business-document-studio' },
@@ -211,6 +214,7 @@ const CATEGORIES = [
     dotColor: '#38BDF8',
     accentText: '#0369A1',
     icon: 'careerStudio',
+    artwork: '/category-art/career-studio.jpg',
     viewAllHref: '/career-studio',
     tools: [
       { name: 'CV Improver', href: '/cv-improver' },
@@ -226,6 +230,7 @@ const CATEGORIES = [
     dotColor: '#8B5CF6',
     accentText: '#7C3AED',
     icon: 'sparkles',
+    artwork: '/category-art/ai-workspace.jpg',
     viewAllHref: '/ai-tools',
     tools: [
       { name: 'AI Data Analyst', href: '/data-analyst' },
@@ -244,6 +249,7 @@ const CATEGORIES = [
     dotColor: '#F59E0B',
     accentText: '#EA580C',
     icon: 'image',
+    artwork: '/category-art/image-studio.jpg',
     viewAllHref: '/image-tools',
     tools: [
       { name: 'Image Compressor', href: '/image-compressor' },
@@ -262,6 +268,7 @@ const CATEGORIES = [
     dotColor: '#2563EB',
     accentText: '#2563EB',
     icon: 'calculator',
+    artwork: '/category-art/calculators.jpg',
     viewAllHref: '/calculator-hub',
     tools: [
       { name: 'Salary Calculator', href: '/salary-calculator' },
@@ -281,6 +288,7 @@ const CATEGORIES = [
     dotColor: '#64748B',
     accentText: '#475569',
     icon: 'grid',
+    artwork: '/category-art/utilities.jpg',
     viewAllHref: '/utilities',
     tools: [
       { name: 'QR Code Generator', href: '/qr-code-generator' },
@@ -386,7 +394,7 @@ export default function HomePageClient() {
           text children (e.g. ' -> &#x27;) but <style> is a raw-text element per the
           HTML spec, so the browser never decodes that entity back — a guaranteed
           hydration mismatch for any rule with a quote character, like the
-          font-family: 'Inter' below or .cvt-cat-header::after's content: ''.
+          font-family: 'Inter' below or .cvt-cat-art::before's content: ''.
           dangerouslySetInnerHTML sets raw HTML identically server and client. */}
       <style dangerouslySetInnerHTML={{ __html: `
         .cvt-home { position: relative; background: linear-gradient(180deg, #FFFFFF 0%, #F4F7FB 55%, #EFF3F8 100%); overflow: hidden; padding: 20px 32px 40px; font-family: 'Inter', Helvetica, Arial, sans-serif; }
@@ -444,17 +452,17 @@ export default function HomePageClient() {
           .cvt-trending { margin-bottom: 14px; gap: 6px; }
           .cvt-chip { padding: 4px 11px; font-size: 12.5px; }
           .cvt-cat-grid { gap: 16px; }
-          .cvt-cat-header { padding: 14px 20px; }
+          .cvt-cat-art { height: 128px; }
           .cvt-cat-body { padding: 16px 20px 14px; }
         }
 
         .cvt-cat-card { border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 12px 24px rgba(15,23,42,0.06); transition: transform 200ms ease, box-shadow 200ms ease; }
         .cvt-cat-card:hover { transform: translateY(-3px); box-shadow: 0 1px 2px rgba(15,23,42,0.05), 0 20px 34px rgba(15,23,42,0.11); }
-        .cvt-cat-header { padding: 15px 18px; display: flex; align-items: center; gap: 10px; position: relative; overflow: hidden; }
-        .cvt-cat-header::after { content: ''; position: absolute; top: -30%; right: -6%; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,0.08); }
-        .cvt-cat-icon-chip { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(160deg, rgba(255,255,255,0.32), rgba(255,255,255,0.14)); box-shadow: inset 0 1px 1px rgba(255,255,255,0.5), inset 0 -6px 10px rgba(0,0,0,0.08); display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative; }
-        .cvt-cat-header h3 { margin: 0; color: #fff; font-size: 16px; font-weight: 700; letter-spacing: -0.01em; position: relative; }
+        .cvt-cat-art { height: 148px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, var(--art-tint), #fff); border-bottom: 1px solid rgba(226,232,240,0.78); }
+        .cvt-cat-art::before { content: ''; position: absolute; top: 10px; right: 12px; width: 70px; height: 46px; background-image: radial-gradient(var(--art-accent) 1px, transparent 1px); background-size: 8px 8px; opacity: 0.18; }
+        .cvt-cat-art-img { width: 100%; height: 100%; object-fit: cover; object-position: center; position: relative; z-index: 1; filter: saturate(1.04) contrast(1.01); transform: scale(1.06); }
         .cvt-cat-body { padding: 16px 18px 15px; }
+        .cvt-cat-title { margin: 0 0 12px; font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
         .cvt-cat-eyebrow { font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
         .cvt-cat-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; margin-bottom: 12px; min-width: 0; }
         @media (max-width: 420px) { .cvt-cat-tools { grid-template-columns: 1fr; } }
@@ -530,11 +538,19 @@ export default function HomePageClient() {
         <div className="cvt-cat-grid">
           {CATEGORIES.map((cat) => (
             <div key={cat.name} className="cvt-cat-card" style={{ background: cat.bodyTint, border: `1px solid ${cat.borderColor}` }}>
-              <div className="cvt-cat-header" style={{ background: cat.gradient }}>
-                <div className="cvt-cat-icon-chip">{ICONS[cat.icon]}</div>
-                <h3>{cat.name}</h3>
+              <div className="cvt-cat-art" style={{ '--art-tint': cat.bodyTint, '--art-accent': cat.dotColor }}>
+                <Image
+                  src={cat.artwork}
+                  alt=""
+                  width={360}
+                  height={220}
+                  className="cvt-cat-art-img"
+                  loading="eager"
+                  sizes="(max-width: 639px) 100vw, (max-width: 879px) 50vw, (max-width: 1180px) 33vw, 25vw"
+                />
               </div>
               <div className="cvt-cat-body">
+                <h3 className="cvt-cat-title" style={{ color: cat.accentText }}>{cat.name}</h3>
                 <div className="cvt-cat-eyebrow">Popular Tools</div>
                 <div className="cvt-cat-tools">
                   {cat.tools.map((tool) => (

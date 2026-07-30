@@ -19,6 +19,7 @@ import ReorderPdfWorkspace from '@/components/tools/ReorderPdfWorkspace';
 import WatermarkPdfWorkspace from '@/components/tools/WatermarkPdfWorkspace';
 import BusinessDocumentStudioWorkspace from '@/components/tools/invoice-studio/BusinessDocumentStudioWorkspace';
 import RemovePagesWorkspace from '@/components/tools/RemovePagesWorkspace';
+import CropPdfWorkspace from '@/components/tools/CropPdfWorkspace';
 import AddPageNumbersWorkspace from '@/components/tools/AddPageNumbersWorkspace';
 import ProtectPdfWorkspace from '@/components/tools/ProtectPdfWorkspace';
 import HtmlToPdfWorkspace from '@/components/tools/HtmlToPdfWorkspace';
@@ -78,7 +79,7 @@ const isFree = (mode) =>
    'expense-budget-calculator', 'break-even-calculator', 'savings-goal-calculator',
    'utilities-hub', 'cv-improver', 'resume-builder', 'ask-solve-ai', 'document-translator', 'qr-code-studio',
    'cover-letter', 'linkedin-optimizer', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'presentation-generator', 'data-analyst',
-   'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio', 'password-studio'].includes(mode);
+   'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio', 'password-studio', 'crop-pdf'].includes(mode);
 
 function getPriceBadge(mode) {
   if (isFree(mode)) return 'Free';
@@ -180,6 +181,7 @@ export default function ToolPageClient({ tool }) {
         {tool.mode === 'invoice' && <BusinessDocumentStudioWorkspace initialDocType="invoice" />}
         {tool.mode === 'business-document-studio' && <BusinessDocumentStudioWorkspace />}
         {tool.mode === 'remove-pages' && <RemovePagesWorkspace />}
+        {tool.mode === 'crop-pdf' && <CropPdfWorkspace />}
         {tool.mode === 'add-page-numbers' && <AddPageNumbersWorkspace />}
         {tool.mode === 'protect-pdf' && <ProtectPdfWorkspace />}
         {tool.mode === 'html-to-pdf' && <HtmlToPdfWorkspace />}

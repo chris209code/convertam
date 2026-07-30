@@ -5,6 +5,7 @@ import OfficeConvertWorkspace from '@/components/tools/OfficeConvertWorkspace';
 import PdfToImageWorkspace from '@/components/tools/PdfToImageWorkspace';
 import ImagesToPdfWorkspace from '@/components/tools/ImagesToPdfWorkspace';
 import ExtractPdfImagesWorkspace from '@/components/tools/ExtractPdfImagesWorkspace';
+import PdfToTextWorkspace from '@/components/tools/PdfToTextWorkspace';
 import ComparePdfWorkspace from '@/components/tools/ComparePdfWorkspace';
 import RedactPdfWorkspace from '@/components/tools/RedactPdfWorkspace';
 import PdfOverlayWorkspace from '@/components/tools/PdfOverlayWorkspace';
@@ -71,7 +72,7 @@ import SmartWorkflowStepBanner from '@/components/smart-workflows/SmartWorkflowS
 
 const isFree = (mode) =>
   ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice',
-   'images-to-pdf', 'extract-pdf-images', 'compare-pdf', 'redact-pdf', 'pdf-overlay', 'convert-image-format', 'heic-to-jpg', 'meme-generator',
+   'images-to-pdf', 'extract-pdf-images', 'pdf-to-text', 'compare-pdf', 'redact-pdf', 'pdf-overlay', 'convert-image-format', 'heic-to-jpg', 'meme-generator',
    'remove-pages', 'add-page-numbers', 'protect-pdf', 'html-to-pdf', 'ocr-pdf', 'summarize',
    'fill', 'write-on-pdf', 'quotation', 'salary-calculator', 'loan-calculator', 'vat-calculator', 'profit-margin', 'discount-calculator', 'age-calculator',
    'expense-budget-calculator', 'break-even-calculator', 'savings-goal-calculator',
@@ -163,6 +164,7 @@ export default function ToolPageClient({ tool }) {
         {tool.mode === 'pdf-to-image' && <PdfToImageWorkspace format={tool.imageFormat} />}
         {tool.mode === 'images-to-pdf' && <ImagesToPdfWorkspace />}
         {tool.mode === 'extract-pdf-images' && <ExtractPdfImagesWorkspace />}
+        {tool.mode === 'pdf-to-text' && <PdfToTextWorkspace />}
         {tool.mode === 'compare-pdf' && <ComparePdfWorkspace />}
         {tool.mode === 'redact-pdf' && <RedactPdfWorkspace />}
         {tool.mode === 'pdf-overlay' && <PdfOverlayWorkspace />}

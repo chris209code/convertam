@@ -16,7 +16,7 @@ export const metadata = {
 const EDITORIAL = {
   intro: [
     "PDF is the one format almost every important document eventually becomes — a submitted application, an invoice you need to keep exactly as sent, a report ready to share. The PDF Suite covers the entire lifecycle of that file: turning it into something else (Word, Excel, PowerPoint, images), reshaping it (merging, splitting, reordering, extracting pages), marking it up (watermarking, adding page numbers, redacting), and locking it down (password protection). Signing a document or comparing two versions of one now live in Business Suite, since those are things you do to a contract, not to a PDF specifically.",
-    "Most of these 27 tools run entirely in your browser, so your file is processed on your own device and never touches a server — a genuine privacy guarantee, not a policy promise. A handful of format conversions (PDF to Word/Excel/PowerPoint, and Compress PDF) need a dedicated conversion engine and carry a small per-use fee, shown upfront before you pay anything.",
+    "Most of these 26 tools run entirely in your browser, so your file is processed on your own device and never touches a server — a genuine privacy guarantee, not a policy promise. A handful of format conversions (PDF to Word/Excel/PowerPoint, and Compress PDF) need a dedicated conversion engine and carry a small per-use fee, shown upfront before you pay anything.",
   ],
   whoFor: [
     'Students and job seekers assembling application documents',

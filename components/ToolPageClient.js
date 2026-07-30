@@ -23,6 +23,7 @@ import CropPdfWorkspace from '@/components/tools/CropPdfWorkspace';
 import AddPageNumbersWorkspace from '@/components/tools/AddPageNumbersWorkspace';
 import ProtectPdfWorkspace from '@/components/tools/ProtectPdfWorkspace';
 import UnlockPdfWorkspace from '@/components/tools/UnlockPdfWorkspace';
+import RemovePdfMetadataWorkspace from '@/components/tools/RemovePdfMetadataWorkspace';
 import HtmlToPdfWorkspace from '@/components/tools/HtmlToPdfWorkspace';
 import OcrPdfWorkspace from '@/components/tools/OcrPdfWorkspace';
 import OverlayTextWorkspace from '@/components/tools/OverlayTextWorkspace';
@@ -80,7 +81,7 @@ const isFree = (mode) =>
    'expense-budget-calculator', 'break-even-calculator', 'savings-goal-calculator',
    'utilities-hub', 'cv-improver', 'resume-builder', 'ask-solve-ai', 'document-translator', 'qr-code-studio',
    'cover-letter', 'linkedin-optimizer', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'presentation-generator', 'data-analyst',
-   'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio', 'password-studio', 'crop-pdf', 'unlock-pdf'].includes(mode);
+   'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio', 'password-studio', 'crop-pdf', 'unlock-pdf', 'remove-pdf-metadata'].includes(mode);
 
 function getPriceBadge(mode) {
   if (isFree(mode)) return 'Free';
@@ -186,6 +187,7 @@ export default function ToolPageClient({ tool }) {
         {tool.mode === 'add-page-numbers' && <AddPageNumbersWorkspace />}
         {tool.mode === 'protect-pdf' && <ProtectPdfWorkspace />}
         {tool.mode === 'unlock-pdf' && <UnlockPdfWorkspace />}
+        {tool.mode === 'remove-pdf-metadata' && <RemovePdfMetadataWorkspace />}
         {tool.mode === 'html-to-pdf' && <HtmlToPdfWorkspace />}
         {tool.mode === 'ocr-pdf' && <OcrPdfWorkspace />}
         {tool.mode === 'quotation' && <BusinessDocumentStudioWorkspace initialDocType="quotation" />}

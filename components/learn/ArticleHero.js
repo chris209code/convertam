@@ -1,13 +1,15 @@
 import Link from 'next/link';
-import { LEARN_ILLUSTRATIONS } from './illustrations';
+import Image from 'next/image';
+import { ARTICLE_ART } from './illustrations/learnArt';
 
 // Article page hero: the approved hybrid style — a Convertam-branded
 // gradient banner (category accent + category icon) with a contextual,
-// topic-specific flat-vector illustration, then a meta row on white below
-// showing reading time / last updated / difficulty (category itself is the
-// badge link inside the banner, so it isn't repeated in the meta row).
+// topic-specific illustration, then a meta row on white below showing
+// reading time / last updated / difficulty (category itself is the badge
+// link inside the banner, so it isn't repeated in the meta row).
 export default function ArticleHero({ article, category, accent, categoryIcon, readingTime }) {
-  const Illustration = LEARN_ILLUSTRATIONS[article.illustration];
+  const art = ARTICLE_ART[article.illustration];
+  const displayWidth = 190;
   const updatedLabel = new Date(article.updatedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
@@ -21,9 +23,14 @@ export default function ArticleHero({ article, category, accent, categoryIcon, r
             </Link>
             <h1 className="lrn-article-hero-title">{article.title}</h1>
           </div>
-          {Illustration && (
+          {art && (
             <div className="lrn-article-illustration">
-              <Illustration size={104} width={190} />
+              <Image
+                src={art.src}
+                alt=""
+                width={displayWidth}
+                height={Math.round((art.height / art.width) * displayWidth)}
+              />
             </div>
           )}
         </div>

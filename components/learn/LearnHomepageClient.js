@@ -1,15 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { LEARN_CATEGORIES } from '@/lib/learn/categories';
-import { CATEGORY_ACCENTS, PdfIcon, BusinessIcon, AiIcon, ImageIcon, CalculatorIcon, UtilitiesIcon, WorkflowIcon } from '@/components/categoryVisuals';
 import { getFeaturedArticles, getPopularArticles, getLatestArticles, getArticlesByCategory } from '@/lib/learn';
 import { LEARN_CSS } from './learnStyles';
 import ArticleCard from './ArticleCard';
 import LearnSearch from './LearnSearch';
-import LearnHeroIllustration from './LearnHeroIllustration';
-
-const CATEGORY_ICONS = { pdf: PdfIcon, business: BusinessIcon, ai: AiIcon, image: ImageIcon, calculator: CalculatorIcon, utilities: UtilitiesIcon, workflow: WorkflowIcon };
+import { LEARN_HERO_ART, CATEGORY_ART } from './illustrations/learnArt';
 
 export default function LearnHomepageClient() {
   const featured = getFeaturedArticles();
@@ -33,7 +31,7 @@ export default function LearnHomepageClient() {
             <LearnSearch />
           </div>
           <div className="lrn-hero-art" aria-hidden="true">
-            <LearnHeroIllustration width={420} />
+            <Image src={LEARN_HERO_ART.src} alt="" width={LEARN_HERO_ART.width} height={LEARN_HERO_ART.height} priority />
           </div>
         </div>
       </div>
@@ -70,11 +68,13 @@ export default function LearnHomepageClient() {
           <p className="lrn-section-label">Browse by Category</p>
           <div className="lrn-cat-grid">
             {LEARN_CATEGORIES.map((cat) => {
-              const accent = CATEGORY_ACCENTS[cat.accentKey];
+              const art = CATEGORY_ART[cat.accentKey];
               const count = getArticlesByCategory(cat.slug).length;
               return (
                 <Link key={cat.slug} href={`/learn/${cat.slug}`} className="lrn-cat-card">
-                  <span className="lrn-cat-icon" style={{ background: accent.gradient }}>{CATEGORY_ICONS[cat.accentKey]}</span>
+                  <span className="lrn-cat-icon">
+                    {art && <Image src={art.src} alt="" width={56} height={56} loading="lazy" />}
+                  </span>
                   <div>
                     <p className="lrn-cat-title">{cat.title}</p>
                     <p className="lrn-cat-count">{count} guide{count === 1 ? '' : 's'}</p>

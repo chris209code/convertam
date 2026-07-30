@@ -1,15 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { CATEGORY_ACCENTS, PdfIcon, BusinessIcon, AiIcon, ImageIcon, CalculatorIcon, UtilitiesIcon, WorkflowIcon } from '@/components/categoryVisuals';
+import Image from 'next/image';
+import { CATEGORY_ACCENTS } from '@/components/categoryVisuals';
 import { getArticlesByCategory } from '@/lib/learn';
 import { LEARN_CSS } from './learnStyles';
 import ArticleCard from './ArticleCard';
-
-const CATEGORY_ICONS = { pdf: PdfIcon, business: BusinessIcon, ai: AiIcon, image: ImageIcon, calculator: CalculatorIcon, utilities: UtilitiesIcon, workflow: WorkflowIcon };
+import { CATEGORY_ART } from './illustrations/learnArt';
 
 export default function LearnCategoryClient({ category }) {
   const accent = CATEGORY_ACCENTS[category.accentKey];
+  const art = CATEGORY_ART[category.accentKey];
   const articles = getArticlesByCategory(category.slug);
 
   return (
@@ -20,7 +21,9 @@ export default function LearnCategoryClient({ category }) {
         <div className="lrn-inner">
           <Link href="/learn" className="lrn-back" style={{ color: accent.accentText }}>← Back to Learn</Link>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <span className="lrn-cat-header-icon" style={{ background: accent.gradient }}>{CATEGORY_ICONS[category.accentKey]}</span>
+            <span className="lrn-cat-header-icon">
+              {art && <Image src={art.src} alt="" width={56} height={56} priority />}
+            </span>
             <div>
               <h1 className="lrn-cat-header-title">{category.title}</h1>
               <p className="lrn-cat-header-sub">{category.description}</p>

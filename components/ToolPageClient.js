@@ -8,6 +8,7 @@ import ExtractPdfImagesWorkspace from '@/components/tools/ExtractPdfImagesWorksp
 import PdfToTextWorkspace from '@/components/tools/PdfToTextWorkspace';
 import ComparePdfWorkspace from '@/components/tools/ComparePdfWorkspace';
 import RedactPdfWorkspace from '@/components/tools/RedactPdfWorkspace';
+import AnnotatePdfWorkspace from '@/components/tools/AnnotatePdfWorkspace';
 import PdfOverlayWorkspace from '@/components/tools/PdfOverlayWorkspace';
 import SmartConverterWorkspace from '@/components/tools/SmartConverterWorkspace';
 import SummarizePdfWorkspace from '@/components/tools/SummarizePdfWorkspace';
@@ -82,7 +83,7 @@ const isFree = (mode) =>
    'expense-budget-calculator', 'break-even-calculator', 'savings-goal-calculator',
    'utilities-hub', 'cv-improver', 'resume-builder', 'ask-solve-ai', 'document-translator', 'qr-code-studio',
    'cover-letter', 'linkedin-optimizer', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'presentation-generator', 'data-analyst',
-   'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio', 'password-studio', 'crop-pdf', 'unlock-pdf', 'remove-pdf-metadata', 'webp-to-jpg'].includes(mode);
+   'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio', 'password-studio', 'crop-pdf', 'unlock-pdf', 'remove-pdf-metadata', 'webp-to-jpg', 'annotate-pdf'].includes(mode);
 
 function getPriceBadge(mode) {
   if (isFree(mode)) return 'Free';
@@ -171,6 +172,7 @@ export default function ToolPageClient({ tool }) {
         {tool.mode === 'pdf-to-text' && <PdfToTextWorkspace />}
         {tool.mode === 'compare-pdf' && <ComparePdfWorkspace />}
         {tool.mode === 'redact-pdf' && <RedactPdfWorkspace />}
+        {tool.mode === 'annotate-pdf' && <AnnotatePdfWorkspace />}
         {tool.mode === 'pdf-overlay' && <PdfOverlayWorkspace />}
         {tool.mode === 'smart' && <SmartConverterWorkspace />}
         {tool.mode === 'summarize' && <SummarizePdfWorkspace />}

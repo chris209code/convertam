@@ -1,6 +1,7 @@
 import CategoryLandingClient from '../../components/CategoryLandingClient';
 import { AiIcon, CATEGORY_ACCENTS, relatedSuites } from '../../components/categoryVisuals';
 import { buildOgMeta } from '../../lib/pageMetadata';
+import { SECTIONS } from '../../lib/toolSections/ai';
 
 const TITLE = 'AI Tools — Convertam';
 const DESCRIPTION = 'AI-powered tools that read, summarize, translate and analyze your documents. Powered by Google Gemini. Free, no login required.';
@@ -45,25 +46,6 @@ const FAQS = [
   {
     q: 'Can these tools read handwriting or photographs, not just typed text?',
     a: 'Yes — Smart AI Converter, OCR PDF, Receipt & Invoice Scanner, and Contract Summarizer can all work from a clear photo, not just a digitally created file.',
-  },
-];
-
-const SECTIONS = [
-  {
-    id: 'all',
-    label: 'All AI Tools',
-    icon: '🤖',
-    tools: [
-      { slug: 'summarize-pdf', title: 'Summarize PDF', desc: 'Get an AI summary, key points, or simplified version of a PDF', icon: '📚', badge: 'free' },
-      { slug: 'smart-converter', title: 'Smart AI Converter', desc: 'Photograph a document and get a clean Word file or Excel table', icon: '📸', badge: 'free' },
-      { slug: 'receipt-scanner', title: 'Receipt & Invoice Scanner', desc: 'Photograph a receipt and extract vendor, items and totals to Excel', icon: '🧾', badge: 'free' },
-      { slug: 'ocr-pdf', title: 'OCR PDF', desc: 'Extract text from scanned PDFs and images, including handwriting', icon: '🔎', badge: 'free' },
-      { slug: 'document-translator', title: 'Document Translator', desc: 'Translate a document with a side-by-side preview of the original', icon: '🌐', badge: 'free' },
-      { slug: 'contract-summarizer', title: 'Contract Summarizer', desc: 'Get a plain-language breakdown of a contract\'s key terms', icon: '📜', badge: 'free' },
-      { slug: 'ask-solve-ai', title: 'Ask & Solve AI', desc: 'Get clear answers to math or general questions, typed or photographed', icon: '💡', badge: 'free' },
-      { slug: 'presentation-generator', title: 'AI Presentation Generator', desc: 'Turn documents or notes into an editable PowerPoint deck', icon: '🎞️', badge: 'free' },
-      { slug: 'data-analyst', title: 'AI Data Analyst', desc: 'Upload data and get automatic charts, insights and a written report', icon: '📊', badge: 'free' },
-    ],
   },
 ];
 

@@ -63,6 +63,7 @@ export default function Header() {
         <div className="nav-links">
           <Link href="/" className="nav-link">Home</Link>
           <Link href="/learn" className="nav-link">Learn</Link>
+          <Link href="/favorites" className="nav-link">★ Favorites</Link>
           <Link href="/about" className="nav-link">Our Story</Link>
         </div>
 
@@ -79,6 +80,9 @@ export default function Header() {
         </Link>
         <Link href="/learn" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>
           📚 Learn
+        </Link>
+        <Link href="/favorites" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>
+          ★ Favorites
         </Link>
         <Link href="/about" className="mobile-nav-link" onClick={() => setMenuOpen(false)}>
           Our Story

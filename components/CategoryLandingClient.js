@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import SmartWorkflowPrompt from './smart-workflows/SmartWorkflowPrompt';
 import SmartWorkflowStepBanner from './smart-workflows/SmartWorkflowStepBanner';
+import StarIcon from './icons/StarIcon';
+import { useFavoriteTools } from '../lib/favoriteTools';
 
 // Reusable Category Landing Page framework — one layout, driven entirely by
 // props, meant to power every category hub (PDF Tools, Business Documents,
@@ -19,10 +21,16 @@ import SmartWorkflowStepBanner from './smart-workflows/SmartWorkflowStepBanner';
 // Popular Workflows block) — the editorial intro leads straight into the
 // tool grid so it's reachable with minimal scrolling.
 
-function ToolCard({ tool, accent }) {
+export function ToolCard({ tool, accent, isFavorite, onToggleFavorite }) {
   const disabled = tool.available === false;
+  const favorited = !!isFavorite;
   return (
-    <Link href={disabled ? '#' : tool.href} className={`th-card${disabled ? ' th-card-soon' : ''}`} aria-disabled={disabled}>
+    <Link
+      href={disabled ? '#' : tool.href}
+      className={`th-card${disabled ? ' th-card-soon' : ''}`}
+      aria-disabled={disabled}
+      style={{ '--card-border': accent.borderColor, '--card-accent': accent.accentText }}
+    >
       <span className="th-card-icon" aria-hidden="true" style={disabled ? undefined : { background: accent.badgeFreeBg }}>{tool.icon}</span>
       <div className="th-card-body">
         <div className="th-card-title-row">
@@ -36,6 +44,18 @@ function ToolCard({ tool, accent }) {
         </div>
         <p className="th-card-desc">{tool.desc}</p>
       </div>
+      {!disabled && onToggleFavorite && (
+        <button
+          type="button"
+          className={`th-card-fav${favorited ? ' th-card-fav-active' : ''}`}
+          aria-pressed={favorited}
+          aria-label={favorited ? `Remove ${tool.title} from favorites` : `Add ${tool.title} to favorites`}
+          title={favorited ? 'Remove from favorites' : 'Add to favorites'}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(tool.slug); }}
+        >
+          <StarIcon filled={favorited} size={15} />
+        </button>
+      )}
       {!disabled && <span className="th-card-arrow" aria-hidden="true">→</span>}
     </Link>
   );
@@ -56,6 +76,7 @@ function FaqItem({ q, a }) {
 
 export default function CategoryLandingClient({ accent, icon, title, subtitle, editorial, sections, faqs, relatedCategories }) {
   const showNav = sections.length > 1;
+  const { isFavorite, toggle: toggleFavorite } = useFavoriteTools();
 
   function scrollToSection(id) {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -68,7 +89,26 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, e
           HTML spec, so the browser never decodes that entity back — a guaranteed
           hydration mismatch for any rule here with a quote character. */}
       <style dangerouslySetInnerHTML={{ __html: `
-        .page-inner { width: 100%; padding: 0 4%; }
+        .page-inner { width: 100%; max-width: 1240px; margin: 0 auto; padding: 0 4%; }
+
+        .cl-fav-shortcut {
+          display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: 22px;
+          border: 1px solid #EEF1F5; border-radius: 12px; background: #FEFEFE; text-decoration: none;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 2px rgba(15,23,42,0.04);
+          transition: transform 0.2s cubic-bezier(0.16,1,0.3,1), box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+        .cl-fav-shortcut:hover {
+          transform: translateY(-2px); border-color: ${accent.borderColor};
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 10px 24px rgba(15,23,42,0.08);
+        }
+        .cl-fav-shortcut-icon {
+          flex-shrink: 0; width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+          background: #FEF3C7; color: #D99400;
+        }
+        .cl-fav-shortcut-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+        .cl-fav-shortcut-title { font-size: 0.86rem; font-weight: 700; color: #0F172A; }
+        .cl-fav-shortcut-desc { font-size: 0.76rem; color: #64748B; }
+        .cl-fav-shortcut-cta { flex-shrink: 0; font-size: 0.78rem; font-weight: 700; color: ${accent.accentText}; white-space: nowrap; }
 
         .th-nav { display: flex; gap: 8px; flex-wrap: wrap; }
         .th-nav-btn {
@@ -82,30 +122,44 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, e
 
         .cl-section-label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #94A3B8; margin: 0 0 8px; }
 
-        .th-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+        .th-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(248px, 1fr)); gap: 12px; }
         .th-card {
-          position: relative; display: flex; align-items: flex-start; gap: 14px; padding: 18px; border-radius: 16px;
+          position: relative; display: flex; align-items: flex-start; gap: 12px; padding: 15px; border-radius: 16px;
+          max-width: 340px; width: 100%; margin: 0 auto;
           border: 1px solid #EEF1F5; background: #FEFEFE; text-decoration: none;
           box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 1px 2px rgba(15,23,42,0.04), 0 8px 20px rgba(15,23,42,0.06);
           transition: transform 0.25s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s ease, background 0.25s ease, border-color 0.25s ease;
         }
         .th-card:hover {
-          transform: translateY(-3px); background: #FFFFFF; border-color: ${accent.borderColor};
+          transform: translateY(-3px); background: #FFFFFF; border-color: var(--card-border, ${accent.borderColor});
           box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 2px 6px rgba(15,23,42,0.06), 0 18px 36px rgba(15,23,42,0.10);
         }
-        .th-card:hover .th-card-arrow { opacity: 1; transform: translateX(0); }
+        .th-card:hover .th-card-arrow { opacity: 1; transform: translateY(-50%) translateX(0); }
         .th-card-icon {
-          font-size: 1.3rem; flex-shrink: 0; line-height: 1; width: 40px; height: 40px; border-radius: 11px;
+          font-size: 1.2rem; flex-shrink: 0; line-height: 1; width: 36px; height: 36px; border-radius: 10px;
           display: flex; align-items: center; justify-content: center; background: #F1F5F9;
         }
-        .th-card-body { flex: 1; min-width: 0; padding-right: 14px; }
+        .th-card-body { flex: 1; min-width: 0; padding-right: 30px; }
         .th-card-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
-        .th-card-title { font-size: 0.9rem; font-weight: 700; color: #0F172A; }
-        .th-card-desc { font-size: 0.78rem; color: #64748B; line-height: 1.45; margin: 0; }
-        .th-card-arrow { position: absolute; right: 16px; top: 18px; color: ${accent.accentText}; font-size: 0.9rem; opacity: 0; transform: translateX(-4px); transition: all 0.18s ease; }
+        .th-card-title { font-size: 0.88rem; font-weight: 700; color: #0F172A; }
+        .th-card-desc { font-size: 0.77rem; color: #64748B; line-height: 1.42; margin: 0; }
+        .th-card-arrow {
+          position: absolute; right: 14px; top: 50%; color: var(--card-accent, ${accent.accentText}); font-size: 0.9rem;
+          opacity: 0; transform: translateY(-50%) translateX(-4px); transition: opacity 0.18s ease, transform 0.18s ease;
+        }
+        .th-card-fav {
+          position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; border-radius: 7px; z-index: 2;
+          display: flex; align-items: center; justify-content: center; border: none; background: transparent; padding: 0;
+          color: #B9C2CF; cursor: pointer; transition: color 0.18s ease, background 0.18s ease, transform 0.12s ease;
+        }
+        .th-card-fav:hover { color: #94A3B8; background: #F1F5F9; }
+        .th-card-fav:active { transform: scale(0.9); }
+        .th-card-fav:focus-visible { outline: 2px solid var(--card-accent, ${accent.accentText}); outline-offset: 1px; }
+        .th-card-fav-active { color: #F5B300; }
+        .th-card-fav-active:hover { color: #D99400; background: #FEF3C7; }
         .th-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 0.63rem; font-weight: 700; letter-spacing: 0.02em; color: #64748B; white-space: nowrap; }
         .th-badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
-        .th-badge-free { color: ${accent.accentText}; }
+        .th-badge-free { color: var(--card-accent, ${accent.accentText}); }
         .th-badge-paid { color: #B45309; }
         .th-badge-soon { color: #94A3B8; }
         .th-badge-new { color: #2563EB; }
@@ -165,14 +219,14 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, e
           .cl-related-grid { grid-template-columns: repeat(3, 1fr); }
           .cl-editorial { grid-template-columns: 1fr; }
         }
-        @media (max-width: 860px) {
-          .th-grid { grid-template-columns: repeat(2, 1fr); }
-        }
         @media (max-width: 640px) {
           .page-inner { padding: 0 5%; }
           .th-grid { grid-template-columns: 1fr; }
+          .th-card { max-width: none; }
           .cl-faq-grid { grid-template-columns: 1fr; }
           .cl-related-grid { grid-template-columns: repeat(2, 1fr); }
+          .cl-fav-shortcut { flex-wrap: wrap; }
+          .cl-fav-shortcut-cta { width: 100%; padding-left: 46px; }
         }
       ` }} />
 
@@ -230,12 +284,29 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, e
           </div>
         )}
 
+        <Link href="/favorites" className="cl-fav-shortcut">
+          <span className="cl-fav-shortcut-icon"><StarIcon filled size={17} /></span>
+          <span className="cl-fav-shortcut-text">
+            <span className="cl-fav-shortcut-title">Your Favorite Tools</span>
+            <span className="cl-fav-shortcut-desc">Access the tools you have saved for quick use.</span>
+          </span>
+          <span className="cl-fav-shortcut-cta">View favorites →</span>
+        </Link>
+
         <p className="cl-section-label">All {title}</p>
         {sections.map((s) => (
           <div key={s.id} style={{ marginBottom: 28 }}>
             <h2 id={s.id} className="th-section-title">{s.icon} {s.label}</h2>
             <div className="th-grid">
-              {s.tools.map((tool) => <ToolCard key={tool.slug} tool={tool} accent={accent} />)}
+              {s.tools.map((tool) => (
+                <ToolCard
+                  key={tool.slug}
+                  tool={tool}
+                  accent={accent}
+                  isFavorite={isFavorite(tool.slug)}
+                  onToggleFavorite={toggleFavorite}
+                />
+              ))}
             </div>
           </div>
         ))}

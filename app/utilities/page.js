@@ -1,6 +1,7 @@
 import CategoryLandingClient from '@/components/CategoryLandingClient';
 import { UtilitiesIcon, CATEGORY_ACCENTS, relatedSuites } from '@/components/categoryVisuals';
 import { buildOgMeta } from '@/lib/pageMetadata';
+import { SECTIONS } from '@/lib/toolSections/utilities';
 
 const TITLE = 'Utilities — Convertam';
 const DESCRIPTION = 'Free everyday utilities. Custom QR code generator, secure password generator and text case converter. No login required.';
@@ -40,19 +41,6 @@ const FAQS = [
   {
     q: 'Can I customize the look of a QR code, or is it just a plain black-and-white grid?',
     a: 'QR Code Studio supports gradients, custom module and corner shapes, a center logo, and a caption — with built-in scan validation to confirm it still reads reliably after styling.',
-  },
-];
-
-const SECTIONS = [
-  {
-    id: 'all',
-    label: 'All Utilities',
-    icon: '⚙️',
-    tools: [
-      { slug: 'qr-code-generator', title: 'QR Code Studio', desc: 'Create fully customizable QR codes with logos, gradients and scan validation', icon: '📱', badge: 'free' },
-      { slug: 'password-generator', title: 'Password Studio', desc: 'Generate secure passwords with live strength and entropy analysis', icon: '🔐', badge: 'free' },
-      { slug: 'text-case-converter', title: 'Text Case Converter', desc: 'Instantly convert text into UPPERCASE, camelCase, snake_case and more', icon: '🔤', badge: 'free' },
-    ],
   },
 ];
 

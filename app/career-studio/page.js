@@ -1,6 +1,7 @@
 import CategoryLandingClient from '../../components/CategoryLandingClient';
 import { CareerIcon, CATEGORY_ACCENTS, relatedSuites } from '../../components/categoryVisuals';
 import { buildOgMeta } from '../../lib/pageMetadata';
+import { SECTIONS } from '../../lib/toolSections/careerStudio';
 
 const TITLE = 'Career Studio — Convertam';
 const DESCRIPTION = 'AI-assisted CV, resume, cover letter and LinkedIn tools. Build or improve your CV, generate a matching cover letter, and optimize your LinkedIn profile. Free, no login required.';
@@ -49,20 +50,6 @@ const FAQS = [
   {
     q: 'Does LinkedIn Optimizer need my whole profile, or can I optimize one section at a time?',
     a: 'Either — paste just your headline, your About section, your experience, or your skills and optimize only that section, or fill in everything and optimize your entire profile in one pass.',
-  },
-];
-
-const SECTIONS = [
-  {
-    id: 'all',
-    label: 'Career Studio Tools',
-    icon: '🎯',
-    tools: [
-      { slug: 'cv-improver', title: 'CV Improver', desc: 'Upload your existing CV and AI tailors it into a stronger, ATS-friendly version', icon: '📄', badge: 'free' },
-      { slug: 'resume-builder', title: 'Resume Builder', desc: 'A guided, AI-assisted CV builder for starting from scratch', icon: '🛠️', badge: 'free' },
-      { slug: 'cover-letter', title: 'Cover Letter Writer', desc: 'Generate a tailored, professional cover letter with AI', icon: '✉️', badge: 'free' },
-      { slug: 'linkedin-optimizer', title: 'LinkedIn Optimizer', desc: 'Strengthen your headline, About, experience and skills with AI', icon: '💼', badge: 'free' },
-    ],
   },
 ];
 

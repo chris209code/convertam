@@ -2,10 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import SmartWorkflowPrompt from './smart-workflows/SmartWorkflowPrompt';
 import SmartWorkflowStepBanner from './smart-workflows/SmartWorkflowStepBanner';
 import StarIcon from './icons/StarIcon';
 import { useFavoriteTools } from '../lib/favoriteTools';
+import { TOOL_CARD_ARTWORK } from './toolCardArtwork';
 
 // Reusable Category Landing Page framework — one layout, driven entirely by
 // props, meant to power every category hub (PDF Tools, Business Documents,
@@ -24,6 +26,7 @@ import { useFavoriteTools } from '../lib/favoriteTools';
 export function ToolCard({ tool, accent, isFavorite, onToggleFavorite }) {
   const disabled = tool.available === false;
   const favorited = !!isFavorite;
+  const artwork = TOOL_CARD_ARTWORK[tool.slug];
   return (
     <Link
       href={disabled ? '#' : tool.href}
@@ -31,7 +34,13 @@ export function ToolCard({ tool, accent, isFavorite, onToggleFavorite }) {
       aria-disabled={disabled}
       style={{ '--card-border': accent.borderColor, '--card-accent': accent.accentText }}
     >
-      <span className="th-card-icon" aria-hidden="true" style={disabled ? undefined : { background: accent.badgeFreeBg }}>{tool.icon}</span>
+      {artwork ? (
+        <span className="th-card-art" aria-hidden="true">
+          <Image src={artwork.src} alt={artwork.alt} width={112} height={112} sizes="(max-width: 640px) 48px, 56px" loading="lazy" />
+        </span>
+      ) : (
+        <span className="th-card-icon" aria-hidden="true" style={disabled ? undefined : { background: accent.badgeFreeBg }}>{tool.icon}</span>
+      )}
       <div className="th-card-body">
         <div className="th-card-title-row">
           <span className="th-card-title">{tool.title}</span>
@@ -139,6 +148,12 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, e
           font-size: 1.2rem; flex-shrink: 0; line-height: 1; width: 36px; height: 36px; border-radius: 10px;
           display: flex; align-items: center; justify-content: center; background: #F1F5F9;
         }
+        .th-card-art {
+          flex-shrink: 0; width: 56px; height: 56px; border-radius: 14px; overflow: hidden;
+          display: flex; align-items: center; justify-content: center; background: #F1F5F9;
+          border: 1px solid rgba(15, 23, 42, 0.06);
+        }
+        .th-card-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .th-card-body { flex: 1; min-width: 0; padding-right: 30px; }
         .th-card-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
         .th-card-title { font-size: 0.88rem; font-weight: 700; color: #0F172A; }
@@ -166,6 +181,7 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, e
         .th-badge-popular { color: #B45309; }
         .th-card-soon { cursor: default; }
         .th-card-soon .th-card-icon { background: #F1F5F9; filter: grayscale(0.4); opacity: 0.7; }
+        .th-card-soon .th-card-art { filter: grayscale(0.4); opacity: 0.7; }
         .th-card-soon .th-card-title { color: #94A3B8; }
         .th-card-soon .th-card-desc { color: #B0B8C4; }
         .th-card-soon:hover {
@@ -223,6 +239,7 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, e
           .page-inner { padding: 0 5%; }
           .th-grid { grid-template-columns: 1fr; }
           .th-card { max-width: none; }
+          .th-card-art { width: 48px; height: 48px; border-radius: 12px; }
           .cl-faq-grid { grid-template-columns: 1fr; }
           .cl-related-grid { grid-template-columns: repeat(2, 1fr); }
           .cl-fav-shortcut { flex-wrap: wrap; }

@@ -52,6 +52,7 @@ import ImageResizerCropperWorkspace from '@/components/tools/ImageResizerCropper
 import WatermarkImageWorkspace from '@/components/tools/WatermarkImageWorkspace';
 import ImageFormatConverterWorkspace from '@/components/tools/ImageFormatConverterWorkspace';
 import HeicToJpgWorkspace from '@/components/tools/HeicToJpgWorkspace';
+import WebpToJpgWorkspace from '@/components/tools/WebpToJpgWorkspace';
 import MemeGeneratorWorkspace from '@/components/tools/MemeGeneratorWorkspace';
 import ResumeBuilderWorkspace from '@/components/tools/ResumeBuilderWorkspace';
 import IdCardGeneratorWorkspace from '@/components/tools/IdCardGeneratorWorkspace';
@@ -81,7 +82,7 @@ const isFree = (mode) =>
    'expense-budget-calculator', 'break-even-calculator', 'savings-goal-calculator',
    'utilities-hub', 'cv-improver', 'resume-builder', 'ask-solve-ai', 'document-translator', 'qr-code-studio',
    'cover-letter', 'linkedin-optimizer', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'presentation-generator', 'data-analyst',
-   'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio', 'password-studio', 'crop-pdf', 'unlock-pdf', 'remove-pdf-metadata'].includes(mode);
+   'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio', 'password-studio', 'crop-pdf', 'unlock-pdf', 'remove-pdf-metadata', 'webp-to-jpg'].includes(mode);
 
 function getPriceBadge(mode) {
   if (isFree(mode)) return 'Free';
@@ -216,6 +217,7 @@ export default function ToolPageClient({ tool }) {
         {tool.mode === 'watermark-image' && <WatermarkImageWorkspace />}
         {tool.mode === 'convert-image-format' && <ImageFormatConverterWorkspace />}
         {tool.mode === 'heic-to-jpg' && <HeicToJpgWorkspace />}
+        {tool.mode === 'webp-to-jpg' && <WebpToJpgWorkspace />}
         {tool.mode === 'meme-generator' && <MemeGeneratorWorkspace />}
         {tool.mode === 'resume-builder' && <ResumeBuilderWorkspace />}
         {tool.mode === 'id-card-generator' && <IdCardGeneratorWorkspace />}

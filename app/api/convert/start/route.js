@@ -25,6 +25,9 @@ export async function POST(request) {
     if (operation === 'encrypt' && !password) {
       return Response.json({ error: 'Missing password.' }, { status: 400 });
     }
+    if (operation === 'decrypt' && !password) {
+      return Response.json({ error: 'Missing password.' }, { status: 400 });
+    }
 
     // Idempotency guard — opt-in via paymentReference, so free tools that
     // never send one (compress-pdf, protect-pdf) are completely unaffected.
@@ -66,6 +69,17 @@ export async function POST(request) {
             input: 'upload-file',
             input_format: 'pdf',
             set_password: password,
+          }
+        : operation === 'decrypt'
+        ? {
+            // CloudConvert's mirror task for encrypt — opens the PDF with
+            // the given password and outputs an unencrypted copy. Same
+            // reasoning as encrypt: pdf-lib in this app can't decrypt
+            // password-protected content streams client-side at all.
+            operation: 'decrypt',
+            input: 'upload-file',
+            input_format: 'pdf',
+            password,
           }
         : { operation: 'convert', input: 'upload-file', output_format: to };
 

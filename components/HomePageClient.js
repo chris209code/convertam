@@ -418,9 +418,24 @@ export default function HomePageClient() {
         .cvt-hero p { font-size: 15px; line-height: 1.4; color: #475569; max-width: 580px; margin: 0 auto 18px; font-weight: 500; }
         @media (max-width: 640px) { .cvt-hero h1 { font-size: 1.9rem; } }
 
+        /* Decorative hero device illustration — only shown once the viewport
+           is wide enough for the right-side gutter beyond the centered
+           780px hero column to hold it without crowding the text or
+           reaching the category cards below (see cvt-cat-grid). Hidden
+           below that so smaller desktop/laptop widths keep today's
+           centered layout untouched. */
+        .cvt-hero-art { display: none; }
+        @media (min-width: 1440px) {
+          .cvt-hero-art {
+            display: block; position: absolute; top: 18px; right: 32px;
+            width: clamp(240px, 19vw, 400px); height: auto; pointer-events: none; z-index: 1;
+          }
+          .cvt-hero-art img { width: 100%; height: auto; display: block; }
+        }
+
         .cvt-search-wrap { max-width: 760px; margin: 0 auto 14px; position: relative; }
         .cvt-search-form { display: flex; align-items: center; gap: 8px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; box-shadow: 0 10px 30px rgba(15,23,42,0.07), 0 1px 2px rgba(15,23,42,0.04); padding: 6px 6px 6px 18px; }
-        .cvt-search-form input { flex: 1; border: none; outline: none; font-size: 15px; font-family: inherit; color: #0F172A; background: transparent; padding: 8px 0; }
+        .cvt-search-form input { flex: 1; min-width: 0; border: none; outline: none; font-size: 15px; font-family: inherit; color: #0F172A; background: transparent; padding: 8px 0; }
         .cvt-search-btn { display: flex; align-items: center; gap: 8px; background: #2563EB; color: #fff; border: none; border-radius: 11px; padding: 10px 22px; font-size: 14.5px; font-weight: 600; font-family: inherit; cursor: pointer; flex-shrink: 0; transition: background 180ms ease; }
         .cvt-search-btn:hover { background: #1D4ED8; }
         .cvt-search-results { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: #fff; border: 1px solid #E2E8F0; border-radius: 14px; box-shadow: 0 10px 30px rgba(15,23,42,0.1); overflow: hidden; z-index: 20; }
@@ -487,6 +502,17 @@ export default function HomePageClient() {
       <div className="cvt-blob-3" />
       <div className="cvt-blob-4" />
       <div className="cvt-dots" />
+
+      <div className="cvt-hero-art" aria-hidden="true">
+        <Image
+          src="/hero/convertam-hero-devices.webp"
+          alt=""
+          width={1536}
+          height={1024}
+          sizes="400px"
+          priority
+        />
+      </div>
 
       <div className="cvt-inner">
         <div className="cvt-hero">

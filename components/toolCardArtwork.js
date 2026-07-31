@@ -13,6 +13,7 @@ const toolArtworkSlugs = [
   'crop-pdf',
   'cv-improver',
   'data-analyst',
+  'data-converter',
   'base64-encode-decode',
   'csv-cleaner',
   'csv-formatter',

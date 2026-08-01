@@ -5,10 +5,25 @@ import { useDocumentSession } from '@/components/document-session/DocumentSessio
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
 
 const RENDER_SCALE = 1.5;
-const NOTE_RADIUS = 13;
+const NOTE_SIZE = 170; // default square sticky-note size, in canvas px
 
 const HIGHLIGHT_COLORS = ['#FDE047', '#86EFAC', '#93C5FD', '#F9A8D4'];
 const INK_COLORS = ['#DC2626', '#2563EB', '#059669', '#0F172A'];
+
+// Soft pastel sticky-note background per ink color, so the note's paper
+// color follows whichever swatch is selected instead of using the full-
+// saturation ink color as a background (which would look like a bold
+// colored card, not a Post-it). Dark maps to the classic sticky-note
+// yellow since it's the default ink color and has no color of its own.
+const NOTE_BG_COLORS = {
+  '#DC2626': '#FECACA',
+  '#2563EB': '#BFDBFE',
+  '#059669': '#BBF7D0',
+  '#0F172A': '#FEF08A',
+};
+function noteBg(color) {
+  return NOTE_BG_COLORS[color] || '#FEF08A';
+}
 
 const TOOLS = [
   { id: 'highlight', label: 'Highlight', icon: '🖍️' },
@@ -34,6 +49,44 @@ function truncateToWidth(ctx, text, maxWidth) {
   return t + '…';
 }
 
+function roundedRectPath(ctx, x, y, w, h, r) {
+  if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); return; }
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// Wraps note text into lines that fit maxWidth, honoring explicit line
+// breaks from the multi-line textarea (unlike the single-line truncation
+// truncateToWidth does for the old text/callout labels).
+function wrapNoteText(ctx, text, maxWidth) {
+  const lines = [];
+  text.split('\n').forEach((paragraph) => {
+    if (!paragraph) { lines.push(''); return; }
+    const words = paragraph.split(/\s+/).filter(Boolean);
+    let line = '';
+    words.forEach((word) => {
+      const candidate = line ? `${line} ${word}` : word;
+      if (line && ctx.measureText(candidate).width > maxWidth) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = candidate;
+      }
+    });
+    lines.push(line);
+  });
+  return lines;
+}
+
 function drawObject(ctx, o) {
   if (o.type === 'highlight') {
     ctx.save();
@@ -54,37 +107,35 @@ function drawObject(ctx, o) {
     ctx.stroke();
     ctx.restore();
   } else if (o.type === 'note') {
+    const w = o.w || NOTE_SIZE;
+    const h = o.h || NOTE_SIZE;
+    const pad = 12;
+
     ctx.save();
-    ctx.fillStyle = o.color;
-    ctx.beginPath();
-    ctx.arc(o.x, o.y, NOTE_RADIUS, 0, Math.PI * 2);
+    ctx.shadowColor = 'rgba(15,23,42,0.28)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 4;
+    ctx.fillStyle = noteBg(o.color);
+    roundedRectPath(ctx, o.x, o.y, w, h, 4);
     ctx.fill();
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 15px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('!', o.x, o.y + 1);
-    ctx.textAlign = 'left';
-    if (o.text) {
-      const maxW = 240;
-      const label = truncateToWidth(ctx, o.text, maxW - 16);
-      const boxX = o.x + NOTE_RADIUS + 8;
-      const boxY = o.y - 16;
-      const w = Math.min(maxW, ctx.measureText(label).width + 16);
-      ctx.fillStyle = '#FFFFFF';
-      ctx.strokeStyle = o.color;
-      ctx.lineWidth = 1.5;
-      ctx.fillRect(boxX, boxY, w, 32);
-      ctx.strokeRect(boxX, boxY, w, 32);
-      ctx.fillStyle = '#1E293B';
-      ctx.font = '13px sans-serif';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(label, boxX + 8, boxY + 16);
-    }
     ctx.restore();
+
+    if (o.text) {
+      ctx.save();
+      ctx.fillStyle = '#1E293B';
+      ctx.font = '15px sans-serif';
+      ctx.textBaseline = 'top';
+      const lineHeight = 19;
+      const maxTextW = w - pad * 2;
+      const maxLines = Math.max(1, Math.floor((h - pad * 2) / lineHeight));
+      let lines = wrapNoteText(ctx, o.text, maxTextW);
+      if (lines.length > maxLines) {
+        lines = lines.slice(0, maxLines);
+        lines[maxLines - 1] = truncateToWidth(ctx, lines[maxLines - 1], maxTextW);
+      }
+      lines.forEach((line, i) => ctx.fillText(line, o.x + pad, o.y + pad + i * lineHeight));
+      ctx.restore();
+    }
   } else if (o.type === 'text') {
     if (!o.text) return;
     ctx.save();
@@ -125,7 +176,7 @@ export default function AnnotatePdfWorkspace() {
 
   const [activeTool, setActiveTool] = useState('highlight');
   const [highlightColor, setHighlightColor] = useState(HIGHLIGHT_COLORS[0]);
-  const [inkColor, setInkColor] = useState(INK_COLORS[0]);
+  const [inkColor, setInkColor] = useState(INK_COLORS[3]);
   const [selected, setSelected] = useState(null);
   const [displayScale, setDisplayScale] = useState(1);
   const [editor, setEditor] = useState(null); // { id, x, y, value }
@@ -282,8 +333,7 @@ export default function AnnotatePdfWorkspace() {
     for (let i = currentObjects.length - 1; i >= 0; i--) {
       const o = currentObjects[i];
       if (o.type === 'note') {
-        const dx = pos.x - o.x, dy = pos.y - o.y;
-        if (Math.sqrt(dx * dx + dy * dy) <= NOTE_RADIUS + 5) return o;
+        if (pointInRect(pos, { x: o.x, y: o.y, w: o.w || NOTE_SIZE, h: o.h || NOTE_SIZE })) return o;
       } else if (o.type === 'text') {
         const b = textBounds(ctx, o);
         if (pointInRect(pos, { x: b.x - 4, y: b.y - 4, w: b.w + 8, h: b.h + 8 })) return o;
@@ -321,7 +371,7 @@ export default function AnnotatePdfWorkspace() {
       dragRef.current = { type: 'draw' };
       liveObjectRef.current = { id: null, type: 'draw', points: [pos], color: inkColor };
     } else if (activeTool === 'note') {
-      const obj = { id: nextIdRef.current++, type: 'note', x: pos.x, y: pos.y, color: inkColor, text: '' };
+      const obj = { id: nextIdRef.current++, type: 'note', x: pos.x, y: pos.y, w: NOTE_SIZE, h: NOTE_SIZE, color: inkColor, text: '' };
       commitObjects([...currentObjects, obj]);
       openEditor(obj);
     } else if (activeTool === 'text') {
@@ -517,13 +567,38 @@ export default function AnnotatePdfWorkspace() {
           onMouseUp={onPointerUp}
           onMouseLeave={onPointerUp}
         />
-        {editor && editorPos && (
+        {editor && editorPos && editorObj?.type === 'note' && (
+          <div style={{ position: 'absolute', left: editorPos.left, top: editorPos.top, zIndex: 20 }}>
+            <textarea
+              autoFocus
+              value={editor.value}
+              onChange={(e) => setEditor({ ...editor, value: e.target.value })}
+              placeholder="Type a comment…"
+              style={{
+                display: 'block',
+                minWidth: 160, minHeight: 160,
+                width: (editorObj.w || NOTE_SIZE) * displayScale,
+                height: (editorObj.h || NOTE_SIZE) * displayScale,
+                background: noteBg(editorObj.color),
+                border: 'none', outline: 'none', resize: 'both',
+                borderRadius: 4,
+                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1)',
+                padding: 12, fontFamily: 'inherit', fontSize: '0.9rem', lineHeight: 1.5, color: '#1E293B',
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 6 }}>
+              <button onClick={deleteEditorObject} style={{ ...smallBtn(false, true), padding: '5px 10px', fontSize: '0.72rem' }}>Delete</button>
+              <button onClick={commitEditor} style={{ padding: '5px 12px', borderRadius: 6, border: 'none', background: '#1E293B', color: 'white', fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer' }}>Done</button>
+            </div>
+          </div>
+        )}
+        {editor && editorPos && editorObj?.type === 'text' && (
           <div style={{ position: 'absolute', left: editorPos.left, top: editorPos.top, zIndex: 20, background: 'white', border: '1px solid #E2E8F0', borderRadius: 10, padding: 10, boxShadow: '0 8px 24px rgba(15,23,42,0.18)', width: 220 }}>
             <textarea
               autoFocus
               value={editor.value}
               onChange={(e) => setEditor({ ...editor, value: e.target.value })}
-              placeholder={editorObj?.type === 'note' ? 'Type a comment…' : 'Type text…'}
+              placeholder="Type text…"
               style={{ width: '100%', minHeight: 60, padding: 8, borderRadius: 6, border: '1px solid #E2E8F0', fontFamily: 'inherit', fontSize: '0.85rem', resize: 'vertical' }}
             />
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>

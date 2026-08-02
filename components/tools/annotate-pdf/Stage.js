@@ -343,7 +343,7 @@ export default function Stage({
     }
 
     if (activeTool === 'shape' && shapeKind === 'polygon') {
-      clickStartRef.current = pos;
+      clickStartRef.current = { pos, clientX: e.clientX, clientY: e.clientY };
       return;
     }
 
@@ -484,8 +484,16 @@ export default function Stage({
       const start = clickStartRef.current;
       clickStartRef.current = null;
       if (start) {
-        const pos = getPos(e);
-        if (Math.hypot(pos.x - start.x, pos.y - start.y) < 4) setPolygonPoints((pts) => [...pts, pos]);
+        // Compared in screen (client) pixels, not page-space units: the page
+        // is usually displayed well below 100% (displayScale < 1) to fit the
+        // panel, so a page-space threshold is effectively much stricter than
+        // it looks — a few px of ordinary mouse/touch tremor between
+        // pointerdown and pointerup (a fraction of a real screen pixel once
+        // scaled) was enough to blow past a "< 4" page-space check on every
+        // real click, silently dropping the point. Screen-space keeps the
+        // click-vs-drag tolerance constant regardless of zoom level.
+        const screenDist = Math.hypot(e.clientX - start.clientX, e.clientY - start.clientY);
+        if (screenDist < 6) setPolygonPoints((pts) => [...pts, start.pos]);
       }
       return;
     }

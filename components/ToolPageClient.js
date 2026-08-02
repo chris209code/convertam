@@ -8,7 +8,7 @@ import ExtractPdfImagesWorkspace from '@/components/tools/ExtractPdfImagesWorksp
 import PdfToTextWorkspace from '@/components/tools/PdfToTextWorkspace';
 import ComparePdfWorkspace from '@/components/tools/ComparePdfWorkspace';
 import RedactPdfWorkspace from '@/components/tools/RedactPdfWorkspace';
-import AnnotatePdfWorkspace from '@/components/tools/AnnotatePdfWorkspace';
+import AnnotatePdfWorkspace from '@/components/tools/annotate-pdf/AnnotatePdfWorkspace';
 import PdfOverlayWorkspace from '@/components/tools/PdfOverlayWorkspace';
 import SmartConverterWorkspace from '@/components/tools/SmartConverterWorkspace';
 import SummarizePdfWorkspace from '@/components/tools/SummarizePdfWorkspace';

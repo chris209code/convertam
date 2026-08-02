@@ -104,7 +104,7 @@ function drawHeader(doc, toolName, generatedDate) {
   doc.line(MARGIN, HEADER_H - 2, PAGE_W - MARGIN, HEADER_H - 2);
 }
 
-function drawFooter(doc, pageNum, pageCount) {
+function drawFooter(doc, pageNum, pageCount, footerNote) {
   const y = PAGE_H - FOOTER_H + 4;
   doc.setDrawColor(...BORDER);
   doc.setLineWidth(0.3);
@@ -113,7 +113,7 @@ function drawFooter(doc, pageNum, pageCount) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...INK_SOFT);
-  doc.text('Convertam — free, no-login financial tools', MARGIN, y);
+  doc.text(footerNote || 'Convertam — free, no-login financial tools', MARGIN, y);
   doc.text(`Page ${pageNum} of ${pageCount}`, PAGE_W - MARGIN, y, { align: 'right' });
 }
 
@@ -297,7 +297,7 @@ async function drawTables(doc, autoTable, y, tables, toolName, generatedDate) {
 // optional — a calculator only passes what it actually has, and nothing
 // invented is ever rendered (an omitted section just doesn't appear).
 export async function generateFinancialReportPdf({
-  toolName, fileName, generatedDate, hero, statCards, chart, insights, tables, privacyNote,
+  toolName, fileName, generatedDate, hero, statCards, chart, insights, tables, privacyNote, footerNote,
 }) {
   const [{ jsPDF }, autoTableModule] = await Promise.all([
     import('jspdf'),
@@ -328,7 +328,7 @@ export async function generateFinancialReportPdf({
   const pageCount = doc.internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
-    drawFooter(doc, i, pageCount);
+    drawFooter(doc, i, pageCount, footerNote);
   }
 
   doc.save(fileName || 'convertam-report.pdf');

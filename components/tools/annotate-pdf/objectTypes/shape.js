@@ -17,8 +17,13 @@ function drawCloud(ctx, x, y, w, h) {
   // Classic "cloud" markup: a ring of overlapping arcs traced around the
   // bounding box perimeter instead of a plain rounded rect — arc size scales
   // with the box so small clouds don't get an unreadably lumpy outline.
-  const bumps = Math.max(6, Math.round((w + h) / 40));
-  const r = Math.min(w, h) / bumps;
+  const bumps = Math.max(6, Math.round((Math.abs(w) + Math.abs(h)) / 40));
+  // Floored to a minimum of 1px: during a live drag, a perfectly horizontal
+  // or vertical stroke makes w or h exactly 0, which would make r 0 too —
+  // dividing by that below sends segBumps to Infinity and the loop after it
+  // never terminates, hanging the tab. The floor keeps r positive no matter
+  // how degenerate the in-progress drag rectangle is.
+  const r = Math.max(1, Math.min(Math.abs(w), Math.abs(h)) / bumps);
   ctx.beginPath();
   const perimeterPoints = [];
   const top = [[x, y], [x + w, y]];
@@ -26,7 +31,10 @@ function drawCloud(ctx, x, y, w, h) {
   const bottom = [[x + w, y + h], [x, y + h]];
   const left = [[x, y + h], [x, y]];
   [top, right, bottom, left].forEach(([[x1, y1], [x2, y2]]) => {
-    const segBumps = Math.max(2, Math.round(Math.hypot(x2 - x1, y2 - y1) / (r * 1.6)));
+    // Capped at 300: an additional safety net against runaway loops if a
+    // shape is ever dragged out extremely long and thin (bumps scaling
+    // alone can't fully prevent that combination).
+    const segBumps = Math.min(300, Math.max(2, Math.round(Math.hypot(x2 - x1, y2 - y1) / (r * 1.6))));
     for (let i = 0; i < segBumps; i++) {
       const t = (i + 0.5) / segBumps;
       perimeterPoints.push({ x: x1 + (x2 - x1) * t, y: y1 + (y2 - y1) * t });

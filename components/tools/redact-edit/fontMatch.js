@@ -14,8 +14,28 @@
 function normalizeFontFamily(raw) {
   const s = (raw || '').toLowerCase();
   if (s.includes('courier') || s.includes('mono')) return 'mono';
+  // Checked before the generic serif test: pdf.js's public getTextContent()
+  // reports plain (non-embedded-name) fonts via a generic CSS fallback
+  // family, and "sans-serif" itself contains the substring "serif" — without
+  // this check first, ordinary Helvetica/Arial text would be misclassified
+  // as the serif bucket.
+  if (s.includes('sans')) return 'sans';
   if (s.includes('times') || s.includes('georgia') || s.includes('serif')) return 'serif';
   return 'sans';
+}
+
+// Embedded fonts are frequently subsetted with the source font's name still
+// visible in the PDF font resource name (e.g. "ABCDEE+Arial-BoldMT"), so a
+// keyword check against both the font's declared name and its reported
+// family string is a real (if imperfect) signal — clearly better than a
+// fixed "never bold" default, without pretending to reliably detect every
+// case (a font using a genuinely custom/renamed bold variant won't match).
+function detectWeightStyle(fontName, fontFamilyRaw) {
+  const s = `${fontName || ''} ${fontFamilyRaw || ''}`.toLowerCase();
+  return {
+    bold: /bold|black|heavy|semibold/.test(s),
+    italic: /italic|oblique/.test(s),
+  };
 }
 
 // Reads a small patch of pixels and returns the darkest (lowest-luminance)
@@ -83,6 +103,7 @@ export function sampleStyleNear(posPage, textContent, pageCanvas, pageHeightPx, 
 
   const styleInfo = textContent.styles?.[best.item.fontName];
   const fontFamily = normalizeFontFamily(styleInfo?.fontFamily);
+  const { bold, italic } = detectWeightStyle(best.item.fontName, styleInfo?.fontFamily);
 
   let color = '#111827';
   if (pageCanvas) {
@@ -91,10 +112,37 @@ export function sampleStyleNear(posPage, textContent, pageCanvas, pageHeightPx, 
     color = sampleColorPatch(pageCanvas, sampleCanvasX, sampleCanvasY, 4);
   }
 
+  // best.y0 is the PDF-space (bottom-left origin) baseline of the matched
+  // text item — converting it to page-space (canvas px, top-left origin,
+  // the same space annotation/placement code already works in) lets a
+  // caller snap a new text object's insertion point to it, so typed text
+  // sits on the same visual line as its neighbor instead of at the raw
+  // click position.
+  const baselinePageSpaceY = pageHeightPx - best.y0 * renderScale;
+
+  // Page-space (canvas px, top-left origin) bounding box of the matched text
+  // item itself — used by callers that need to visually cover the original
+  // run (e.g. a "cover and replace" patch), not just snap to its baseline.
+  // A couple of page-space px of padding on each side accounts for anti-
+  // aliased glyph edges and the fact that item.width/heightPdf are the
+  // glyph metrics, not a rendered-ink bounding box.
+  const PAD = 2;
+  const box = {
+    x: best.x0 * renderScale - PAD,
+    y: pageHeightPx - (best.y0 + best.heightPdf) * renderScale - PAD,
+    w: (best.item.width || 0) * renderScale + PAD * 2,
+    h: best.heightPdf * renderScale + PAD * 2,
+  };
+
   return {
     fontFamily,
+    bold,
+    italic,
     fontSizePx: Math.round(clampReasonable(best.fontSizePdf * renderScale)),
     color,
+    baselinePageSpaceY,
+    box,
+    distancePdf: bestDist,
   };
 }
 

@@ -7,11 +7,12 @@ function isEditableTarget(target) {
   return tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable;
 }
 
-// Global keyboard shortcuts for the workspace. Disabled while focus is in a
-// text input/textarea (typing a note/text/callout's contents, a color hex
-// field in the Properties panel, etc.) so shortcuts don't fight with normal
-// typing — the same isEditableTarget guard Stage.js already uses for the
-// Space-to-pan shortcut.
+// Global keyboard shortcuts for a canvas-based document workspace. Disabled
+// while focus is in a text input/textarea (typing an object's contents, a
+// color hex field, etc.) so shortcuts don't fight with normal typing.
+//
+// Originally built for Annotate PDF (components/tools/annotate-pdf/), moved
+// here once Write on PDF needed the identical hook.
 export function useKeyboardShortcuts({
   onUndo, onRedo, onDelete, onDuplicate, onSelectAll, onDeselect, onNudge,
   onBringForward, onSendBackward, onBringToFront, onSendToBack,

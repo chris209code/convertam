@@ -28,7 +28,7 @@ import RemovePdfMetadataWorkspace from '@/components/tools/RemovePdfMetadataWork
 import HtmlToPdfWorkspace from '@/components/tools/HtmlToPdfWorkspace';
 import MarkdownToPdfWorkspace from '@/components/tools/MarkdownToPdfWorkspace';
 import OcrPdfWorkspace from '@/components/tools/OcrPdfWorkspace';
-import OverlayTextWorkspace from '@/components/tools/OverlayTextWorkspace';
+import WriteOnPdfWorkspace from '@/components/tools/write-on-pdf/WriteOnPdfWorkspace';
 import SalaryCalculator from '@/components/tools/salary-calculator/SalaryCalculator';
 import LoanCalculatorWorkspace from '@/components/tools/calculators/LoanCalculatorWorkspace';
 import VatCalculatorWorkspace from '@/components/tools/calculators/VatCalculatorWorkspace';
@@ -180,7 +180,7 @@ export default function ToolPageClient({ tool }) {
         {tool.mode === 'receipt' && <ReceiptScanWorkspace />}
         {tool.mode === 'compress' && <PaymentGate toolName={tool.slug}><CompressPdfWorkspace /></PaymentGate>}
         {tool.mode === 'fill' && <FillPdfWorkspace />}
-        {tool.mode === 'write-on-pdf' && <OverlayTextWorkspace />}
+        {tool.mode === 'write-on-pdf' && <WriteOnPdfWorkspace />}
         {tool.mode === 'sign' && <SignDocumentsWorkspace />}
         {tool.mode === 'reorder' && <ReorderPdfWorkspace />}
         {tool.mode === 'watermark' && <WatermarkPdfWorkspace />}

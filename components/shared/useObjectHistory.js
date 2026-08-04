@@ -6,17 +6,21 @@ import { useCallback, useRef, useState } from 'react';
 // grow the undo stack unboundedly; old entries just fall off the back.
 const MAX_HISTORY = 80;
 
-// Undo/redo for the annotation workspace: one flat array of annotation
+// Undo/redo for a canvas-based document workspace: one flat array of
 // objects (each tagged with a `page` field) per history entry, rather than
 // per-page nested arrays. A flat model is what lets cross-page features
-// (Review Panel grouped-by-page, copy/paste across pages, thumbnail
-// reordering) work without restructuring storage later. Snapshots are full
-// shallow-array copies rather than a command/diff log — deliberately, this
-// is a client-side single-user session-scoped tool, and cloning an array of
-// a few hundred small plain objects per commit is not the bottleneck; the
+// (grouped-by-page panels, copy/paste across pages, thumbnail reordering)
+// work without restructuring storage later. Snapshots are full shallow-array
+// copies rather than a command/diff log — deliberately, this is a
+// client-side single-user session-scoped tool, and cloning an array of a
+// few hundred small plain objects per commit is not the bottleneck; the
 // thing that actually keeps interactions smooth is callers batching related
 // mutations into one commit() instead of one per touched object.
-export function useAnnotationHistory() {
+//
+// Originally built for Annotate PDF (components/tools/annotate-pdf/), moved
+// here once Write on PDF needed the identical hook — both tools' object
+// models share the same {id, type, page, z, ...} shape.
+export function useObjectHistory() {
   const [history, setHistory] = useState({ stack: [[]], index: 0 });
   const nextIdRef = useRef(1);
   const nextZRef = useRef(1);

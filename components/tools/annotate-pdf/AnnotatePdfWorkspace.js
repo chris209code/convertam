@@ -8,8 +8,8 @@ import { boundsOf, drawObject } from './objectTypes';
 import { loadImageElement } from './objectTypes/image';
 import { renderStampDataUrl } from './StampLibrary';
 import { alignObjects, distributeObjects, translateObject } from './alignment';
-import { useAnnotationHistory } from './useAnnotationHistory';
-import { useKeyboardShortcuts } from './useKeyboardShortcuts';
+import { useObjectHistory } from '@/components/shared/useObjectHistory';
+import { useKeyboardShortcuts } from '@/components/shared/useKeyboardShortcuts';
 import { rotateCanvas } from './rotateCanvas';
 import { downloadCommentsOnlyPdf, downloadReviewSummaryPdf, downloadReviewSummaryWord } from './reviewSummaryExport';
 import Toolbar from './Toolbar';
@@ -49,7 +49,7 @@ export default function AnnotatePdfWorkspace() {
   const [favoriteTools, setFavoriteTools] = useState(DEFAULT_FAVORITE_TOOLS);
   const [numberingCounter, setNumberingCounter] = useState(1);
 
-  const { objects, commit, undo: rawUndo, redo: rawRedo, canUndo, canRedo, reset: resetHistory, nextId, nextZ } = useAnnotationHistory();
+  const { objects, commit, undo: rawUndo, redo: rawRedo, canUndo, canRedo, reset: resetHistory, nextId, nextZ } = useObjectHistory();
 
   const pageObjects = objects.filter((o) => o.page === activePage);
   const selectedObjects = pageObjects.filter((o) => selectedIds.has(o.id));

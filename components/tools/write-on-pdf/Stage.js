@@ -135,14 +135,15 @@ export default function Stage({
     if (style) {
       const fontSize = style.fontSizePx;
       const h = Math.max(18, Math.round(fontSize * 1.4));
-      // Same vertical-centering heuristic export uses (h*0.5 + fontSize*0.32
-      // from the box top lands roughly on the baseline) — solved for the
-      // box's y given a *real* detected baseline instead of guessing one.
-      obj = {
-        ...obj,
-        y: style.baselinePageSpaceY - h * 0.5 - fontSize * 0.32,
-        h, fontSize, fontFamily: style.fontFamily, bold: style.bold, italic: style.italic, color: style.color,
-      };
+      obj = { ...obj, h, fontSize, fontFamily: style.fontFamily, bold: style.bold, italic: style.italic, color: style.color };
+      // Only a specific nearby match carries a real detected baseline
+      // (the page-wide dominant-style fallback has no single line to snap
+      // to) — same vertical-centering heuristic export uses (h*0.5 +
+      // fontSize*0.32 from the box top lands roughly on the baseline),
+      // solved for the box's y given that real baseline.
+      if (Number.isFinite(style.baselinePageSpaceY)) {
+        obj.y = style.baselinePageSpaceY - h * 0.5 - fontSize * 0.32;
+      }
     }
     commitPageObjects([...pageObjects, obj]);
     setSelectedId(obj.id);
@@ -224,17 +225,17 @@ export default function Stage({
       // the insertion point to its detected baseline so typed text sits on
       // the same visual line as its neighbor. See styleMatchPreview.js for
       // why the chip never claims "Font matched" outright.
-      const { style, chipText } = detectStyleAt(pos, page);
+      const { style, chipText, isSpecificMatch } = detectStyleAt(pos, page);
 
-      // A real nearby text item was found — honest click-to-replace means
-      // asking what the user wants instead of silently picking a behavior
-      // (see clickMenu.js). Scanned pages and genuinely empty spots have
-      // nothing to "replace", so they skip straight to free placement.
-      if (style) {
+      // Only a specific nearby text item makes the click-to-replace menu
+      // meaningful (see clickMenu.js) — the page-wide dominant-style
+      // fallback and the scanned/empty-page cases have no single item to
+      // "replace", so they go straight to free placement.
+      if (isSpecificMatch) {
         setPendingMenu({ pos, style, chipText });
         return;
       }
-      placeStyledText(pos, null, chipText);
+      placeStyledText(pos, style, chipText);
       return;
     }
     setSelectedId(null);

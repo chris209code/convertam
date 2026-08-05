@@ -10,6 +10,7 @@ import { INK_COLORS, RENDER_SCALE } from './constants';
 import { createFontEmbedCache, measureTextWidthPagePx, warmMeasurementFonts } from './fontResolver';
 import { applyFormFieldValues, detectFormFields } from './formFields';
 import Toolbar, { DATE_FORMATS } from './Toolbar';
+import TextProperties from './TextProperties';
 import Stage from './Stage';
 
 const MAX_FILE_BYTES = 100 * 1024 * 1024;
@@ -95,6 +96,7 @@ export default function WriteOnPdfWorkspace() {
 
   const { objects, commit, undo: rawUndo, redo: rawRedo, canUndo, canRedo, reset: resetHistory, nextId, nextZ } = useObjectHistory();
   const pageObjects = objects.filter((o) => o.page === activePage);
+  const selectedObject = pageObjects.find((o) => o.id === selectedId) || null;
 
   function commitPageObjects(nextPageObjects) {
     const others = objects.filter((o) => o.page !== activePage);
@@ -125,6 +127,10 @@ export default function WriteOnPdfWorkspace() {
   function nudgeSelected(dx, dy) {
     if (!selectedId) return;
     commitPageObjects(pageObjects.map((o) => (o.id === selectedId ? { ...o, x: o.x + dx, y: o.y + dy, updatedAt: Date.now() } : o)));
+  }
+  function updateSelectedObject(patch) {
+    if (!selectedId) return;
+    commitPageObjects(pageObjects.map((o) => (o.id === selectedId ? { ...o, ...patch, updatedAt: Date.now() } : o)));
   }
   function deselectAll() {
     setSelectedId(null);
@@ -513,6 +519,10 @@ export default function WriteOnPdfWorkspace() {
       />
 
       {showSignaturePad && <SignaturePad onCapture={insertSignatureCapture} />}
+
+      {selectedObject?.type === 'text' && (
+        <TextProperties obj={selectedObject} onChange={updateSelectedObject} />
+      )}
 
       {activePageFields.length > 0 && (
         <p className="text-xs mb-3" style={{ color: '#1D4ED8' }}>

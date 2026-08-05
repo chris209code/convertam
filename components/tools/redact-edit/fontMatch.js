@@ -11,7 +11,7 @@
 // guessing — the spec explicitly allows "intelligently approximate"
 // over promising perfect detection.
 
-function normalizeFontFamily(raw) {
+export function normalizeFontFamily(raw) {
   const s = (raw || '').toLowerCase();
   if (s.includes('courier') || s.includes('mono')) return 'mono';
   // Checked before the generic serif test: pdf.js's public getTextContent()
@@ -30,7 +30,7 @@ function normalizeFontFamily(raw) {
 // family string is a real (if imperfect) signal — clearly better than a
 // fixed "never bold" default, without pretending to reliably detect every
 // case (a font using a genuinely custom/renamed bold variant won't match).
-function detectWeightStyle(fontName, fontFamilyRaw) {
+export function detectWeightStyle(fontName, fontFamilyRaw) {
   const s = `${fontName || ''} ${fontFamilyRaw || ''}`.toLowerCase();
   return {
     bold: /bold|black|heavy|semibold/.test(s),
@@ -148,4 +148,37 @@ export function sampleStyleNear(posPage, textContent, pageCanvas, pageHeightPx, 
 
 function clampReasonable(px) {
   return Math.min(120, Math.max(8, px));
+}
+
+// A page-wide fallback for when a click lands nowhere near any specific
+// text item (sampleStyleNear's ~70pt cutoff, or a click in genuine empty
+// space) — rather than a single hardcoded default (which is what produced
+// a mismatched font/size when the page's own body text used something
+// else entirely), this picks whichever {family, size} combination appears
+// most often across the page's own text. Still an approximation (most
+// pages mix a few sizes for headings/body/footers), but far more often
+// right than one fixed guess, and it's what a manual override in the UI
+// then corrects the remaining cases.
+export function detectDominantPageStyle(textContent) {
+  if (!textContent || !textContent.items?.length) return null;
+  const counts = new Map(); // "family|bold|italic|roundedSize" -> { count, fontFamily, bold, italic, fontSizePdf }
+  for (const item of textContent.items) {
+    if (!item.str || !item.str.trim()) continue;
+    const [a, b] = item.transform;
+    const fontSizePdf = Math.hypot(a, b) || 10;
+    const styleInfo = textContent.styles?.[item.fontName];
+    const fontFamily = normalizeFontFamily(styleInfo?.fontFamily);
+    const { bold, italic } = detectWeightStyle(item.fontName, styleInfo?.fontFamily);
+    const roundedSize = Math.round(fontSizePdf);
+    const key = `${fontFamily}|${bold}|${italic}|${roundedSize}`;
+    const existing = counts.get(key);
+    if (existing) existing.count += item.str.length;
+    else counts.set(key, { count: item.str.length, fontFamily, bold, italic, fontSizePdf: roundedSize });
+  }
+  if (!counts.size) return null;
+  let best = null;
+  for (const entry of counts.values()) {
+    if (!best || entry.count > best.count) best = entry;
+  }
+  return { fontFamily: best.fontFamily, bold: best.bold, italic: best.italic, fontSizePdf: best.fontSizePdf };
 }

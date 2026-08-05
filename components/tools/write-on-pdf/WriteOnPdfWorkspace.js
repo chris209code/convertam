@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import { useDocumentSession, useAutoContinueSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
 import { useObjectHistory } from '@/components/shared/useObjectHistory';
 import { useKeyboardShortcuts } from '@/components/shared/useKeyboardShortcuts';
@@ -308,6 +308,12 @@ export default function WriteOnPdfWorkspace() {
     const f = getDocumentAsFile();
     await loadPdfIntoWorkspace(f, { fromSession: true });
   }
+
+  // Arriving here via a Workspace Handoff (e.g. "Continue in Write on PDF"
+  // from Redact & Edit PDF's completion screen) loads the document
+  // immediately instead of waiting on the manual "Continue with {name}"
+  // banner click below — that's what makes the transition feel instant.
+  useAutoContinueSession('write-on-pdf', continueWithSessionDocument);
 
   function handleFileInput(e) {
     loadPdfIntoWorkspace(e.target.files?.[0]);

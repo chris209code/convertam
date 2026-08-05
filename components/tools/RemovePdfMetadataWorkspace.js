@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import UploadBox from '@/components/UploadBox';
 import { readPdfMetadata, removeMetadata } from '@/lib/pdf-tools';
-import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import { useDocumentSession, useAutoContinueSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
 
 const FIELDS = [
@@ -77,6 +77,7 @@ export default function RemovePdfMetadataWorkspace() {
     const f = getDocumentAsFile();
     await handleFiles([f], { fromSession: true });
   }
+  useAutoContinueSession('remove-pdf-metadata', continueWithSessionDocument);
 
   const hasAnyMetadata = metadata && (
     FIELDS.some((f) => metadata[f.key]) || metadata.creationDate || metadata.modificationDate

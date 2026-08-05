@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect } from 'react';
 import Script from 'next/script';
 import { PDFDocument } from 'pdf-lib';
-import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import { useDocumentSession, useAutoContinueSession } from '@/components/document-session/DocumentSessionProvider';
+import { waitForPdfjs } from '@/lib/workspace/waitForPdfjs';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
 
 function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
@@ -518,6 +519,8 @@ export default function SignDocumentsWorkspace() {
     );
     e.target.value = '';
   }
+
+  useAutoContinueSession('sign-documents', async () => { await waitForPdfjs(); continueWithSessionPdf(); });
 
   async function continueWithSessionPdf() {
     const file = getDocumentAsFile();

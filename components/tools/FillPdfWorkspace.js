@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { PDFDocument } from 'pdf-lib';
-import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import { useDocumentSession, useAutoContinueSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
 
 function downloadBlob(blob, filename) {
@@ -87,6 +87,7 @@ export default function FillPdfWorkspace() {
     const f = getDocumentAsFile();
     await loadFile(f, { fromSession: true });
   }
+  useAutoContinueSession('fill-pdf', continueWithSessionDocument);
 
   async function handleApply() {
     if (!file) return;

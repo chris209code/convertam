@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import { useDocumentSession, useAutoContinueSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
 import { DEFAULT_FAVORITE_TOOLS, FAVORITES_STORAGE_KEY, HIGHLIGHT_COLORS, INK_COLORS, RENDER_SCALE } from './constants';
 import { boundsOf, drawObject } from './objectTypes';
@@ -403,6 +403,7 @@ export default function AnnotatePdfWorkspace() {
     const f = getDocumentAsFile();
     await loadPdfIntoWorkspace(f, { fromSession: true });
   }
+  useAutoContinueSession('annotate-pdf', continueWithSessionDocument);
 
   function handleFileInput(e) {
     loadPdfIntoWorkspace(e.target.files?.[0]);

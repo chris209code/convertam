@@ -3,7 +3,8 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
 import Script from 'next/script';
 import { Document, Packer, Paragraph } from 'docx';
-import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import { useDocumentSession, useAutoContinueSession } from '@/components/document-session/DocumentSessionProvider';
+import { waitForPdfjs } from '@/lib/workspace/waitForPdfjs';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
 import { validateFileSize, validateTextLength, validatePageCount, MAX_CHARACTERS } from '@/lib/documentTranslate/limits';
 import { extractBlocks, reinjectBlocks } from '@/lib/documentTranslate/htmlBlocks';
@@ -298,6 +299,7 @@ export default function DocumentTranslatorWorkspace() {
     const f = getDocumentAsFile();
     if (f) handleFile(f, { fromSession: true });
   }
+  useAutoContinueSession('document-translator', async () => { await waitForPdfjs(); continueWithSessionDocument(); });
 
   function switchToPaste() {
     resetPreview();

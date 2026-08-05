@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import { useDocumentSession, useAutoContinueSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
 
 export default function RemovePagesWorkspace() {
@@ -39,6 +39,7 @@ export default function RemovePagesWorkspace() {
     const f = getDocumentAsFile();
     await handleFile(f, { fromSession: true });
   }
+  useAutoContinueSession('remove-pdf-pages', continueWithSessionDocument);
   async function renderThumbs(buffer) {
     const pdfjsLib = await import('pdfjs-dist');
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;

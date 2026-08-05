@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import { useDocumentSession, useAutoContinueSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
 
 export default function PdfOverlayWorkspace() {
@@ -17,6 +17,8 @@ export default function PdfOverlayWorkspace() {
   // Per the workspace's compatibility rule for multi-input tools: the active
   // session document, if any, prefills the base slot automatically — only
   // the additional (overlay) document needs a manual upload.
+  useAutoContinueSession('pdf-overlay', () => setBase(getDocumentAsFile(), true));
+
   function setBase(f, fromSession = false) {
     setBaseFile(f);
     setUsingSessionDoc(fromSession);

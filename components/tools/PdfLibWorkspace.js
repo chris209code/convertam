@@ -11,7 +11,7 @@ import {
   imagesToPdf,
   getPdfPageCount,
 } from '@/lib/pdf-tools';
-import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import { useDocumentSession, useAutoContinueSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
 
 async function loadPdfjs() {
@@ -148,6 +148,10 @@ export default function PdfLibWorkspace({ mode, accept: acceptProp }) {
     setUsingSessionDoc(true);
     setResultBytes(null);
   }
+  // merge is multi-input, so a handoff there prefills the base slot
+  // (pullSessionAsFirstFile) rather than fully loading like the single-file
+  // modes — same distinction the manual "Continue" button already makes.
+  useAutoContinueSession(sessionToolSlug, mode === 'merge' ? pullSessionAsFirstFile : continueWithSessionDocument);
 
   function removeFile(i) {
     setFiles(files.filter((_, idx) => idx !== i));

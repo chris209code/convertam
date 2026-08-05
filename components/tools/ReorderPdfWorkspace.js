@@ -3,7 +3,8 @@
 import { useState, useRef } from 'react';
 import Script from 'next/script';
 import { PDFDocument } from 'pdf-lib';
-import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import { useDocumentSession, useAutoContinueSession } from '@/components/document-session/DocumentSessionProvider';
+import { waitForPdfjs } from '@/lib/workspace/waitForPdfjs';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
 
 function downloadBlob(blob, filename) {
@@ -80,6 +81,7 @@ export default function ReorderPdfWorkspace() {
     const f = getDocumentAsFile();
     await loadPdfFile(f, { fromSession: true });
   }
+  useAutoContinueSession('reorder-pdf', async () => { await waitForPdfjs(); continueWithSessionDocument(); });
   // Drag and drop reordering
   function onDragStart(i) {
     dragItem.current = i;

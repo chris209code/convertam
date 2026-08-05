@@ -7,7 +7,8 @@ import { FONT_OPTIONS, DEFAULT_TEXT_STYLE } from './redact-edit/constants';
 import { sampleStyleNear, sampleColorAt } from './redact-edit/fontMatch';
 import { drawTextObjectToCanvas } from './redact-edit/renderText';
 import { clamp, handleSize, pointInRect, handleAt, resizeRect } from './redact-edit/geometry';
-import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import { useDocumentSession, useAutoContinueSession } from '@/components/document-session/DocumentSessionProvider';
+import { waitForPdfjs } from '@/lib/workspace/waitForPdfjs';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
 
 const RENDER_SCALE = 1.5;
@@ -139,6 +140,7 @@ export default function RedactPdfWorkspace() {
     const f = getDocumentAsFile();
     await loadPdfIntoWorkspace(f, { fromSession: true });
   }
+  useAutoContinueSession('redact-pdf', async () => { await waitForPdfjs(); continueWithSessionDocument(); });
 
   function newId() {
     return nextIdRef.current++;

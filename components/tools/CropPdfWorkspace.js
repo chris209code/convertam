@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import UploadBox from '@/components/UploadBox';
 import { cropPdf } from '@/lib/pdf-tools';
-import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import { useDocumentSession, useAutoContinueSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
 
 const PRESETS = [
@@ -85,6 +85,7 @@ export default function CropPdfWorkspace() {
     const f = getDocumentAsFile();
     await handleFiles([f], { fromSession: true });
   }
+  useAutoContinueSession('crop-pdf', continueWithSessionDocument);
 
   function setMargin(side, raw) {
     setCrop((prev) => ({ ...prev, [side]: clampMargin(Number(raw)) }));

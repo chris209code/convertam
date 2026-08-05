@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { runCloudConvertJob, downloadBlob } from '@/lib/cloudconvert-client';
-import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import { useDocumentSession, useAutoContinueSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
 
 export default function UnlockPdfWorkspace() {
@@ -36,6 +36,7 @@ export default function UnlockPdfWorkspace() {
     const f = getDocumentAsFile();
     if (f) handleFile(f, { fromSession: true });
   }
+  useAutoContinueSession('unlock-pdf', continueWithSessionDocument);
 
   async function unlock() {
     if (!password) { setStatus('Please enter the PDF\'s current password.'); return; }

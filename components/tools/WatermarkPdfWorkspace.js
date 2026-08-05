@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { PDFDocument, rgb, degrees } from 'pdf-lib';
 import UploadBox from '@/components/UploadBox';
-import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
+import { useDocumentSession, useAutoContinueSession } from '@/components/document-session/DocumentSessionProvider';
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
 
 function downloadBlob(blob, filename) {
@@ -157,6 +157,7 @@ export default function WatermarkPdfWorkspace() {
     const f = getDocumentAsFile();
     if (f) await handleFiles([f], { fromSession: true });
   }
+  useAutoContinueSession('watermark-pdf', continueWithSessionDocument);
   function getCanvasPos(e) {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();

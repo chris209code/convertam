@@ -165,6 +165,7 @@ const ALL_TOOLS = [
   { name: 'QR Code Generator', href: '/qr-code-generator' },
   { name: 'Password Studio', href: '/password-generator' },
   { name: 'Text Case Converter', href: '/text-case-converter' },
+  { name: 'Morse Code Translator', href: '/morse-code-translator' },
 ];
 
 const CATEGORIES = [
@@ -294,6 +295,7 @@ const CATEGORIES = [
       { name: 'QR Code Generator', href: '/qr-code-generator' },
       { name: 'Password Studio', href: '/password-generator' },
       { name: 'Text Case Converter', href: '/text-case-converter' },
+      { name: 'Morse Code Translator', href: '/morse-code-translator' },
     ],
   },
   // Data Workspace category card is temporarily hidden from the homepage

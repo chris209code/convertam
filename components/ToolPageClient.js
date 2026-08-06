@@ -39,6 +39,7 @@ import ExpenseBudgetCalculator from '@/components/tools/expense-budget-calculato
 import BreakEvenCalculatorWorkspace from '@/components/tools/calculators/BreakEvenCalculatorWorkspace';
 import SavingsGoalCalculatorWorkspace from '@/components/tools/calculators/SavingsGoalCalculatorWorkspace';
 import UtilitiesWorkspace from '@/components/tools/UtilitiesWorkspace';
+import MorseTranslatorWorkspace from '@/components/tools/morse-translator/MorseTranslatorWorkspace';
 import PasswordStudioWorkspace from '@/components/tools/password-studio/PasswordStudioWorkspace';
 import CVImproverWorkspace from '@/components/tools/CVImproverWorkspace';
 import QrCodeStudioWorkspace from '@/components/tools/QrCodeStudioWorkspace';
@@ -84,7 +85,7 @@ const isFree = (mode) =>
    'expense-budget-calculator', 'break-even-calculator', 'savings-goal-calculator',
    'utilities-hub', 'cv-improver', 'resume-builder', 'ask-solve-ai', 'document-translator', 'qr-code-studio',
    'cover-letter', 'linkedin-optimizer', 'contract-summarizer', 'image-compressor', 'resize-image', 'watermark-image', 'presentation-generator', 'data-analyst',
-   'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio', 'password-studio', 'crop-pdf', 'unlock-pdf', 'remove-pdf-metadata', 'webp-to-jpg', 'annotate-pdf', 'markdown-to-pdf'].includes(mode);
+   'id-card-generator', 'document-enhancer', 'delivery-note-waybill', 'business-document-studio', 'password-studio', 'crop-pdf', 'unlock-pdf', 'remove-pdf-metadata', 'webp-to-jpg', 'annotate-pdf', 'markdown-to-pdf', 'morse-translator'].includes(mode);
 
 function getPriceBadge(mode) {
   if (isFree(mode)) return 'Free';
@@ -206,6 +207,7 @@ export default function ToolPageClient({ tool }) {
         {tool.mode === 'break-even-calculator' && <BreakEvenCalculatorWorkspace />}
         {tool.mode === 'savings-goal-calculator' && <SavingsGoalCalculatorWorkspace />}
         {tool.mode === 'utilities-hub' && <UtilitiesWorkspace />}
+        {tool.mode === 'morse-translator' && <MorseTranslatorWorkspace />}
         {tool.mode === 'password-studio' && <PasswordStudioWorkspace />}
         {tool.mode === 'cv-improver' && <CVImproverWorkspace />}
         {tool.mode === 'qr-code-studio' && <QrCodeStudioWorkspace />}

@@ -1,20 +1,10 @@
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-import { GEMINI_MODEL_URL as GEMINI_URL } from '@/lib/geminiModel';
-
-const PROMPTS = {
-  summary: `You are a document summarizer. Read the following document text and provide:
-1. A brief overview (2-3 sentences)
-2. Key points (5-7 bullet points)
-3. Main conclusions or takeaways
-
-Be concise and clear. Use plain English.`,
-
-  keypoints: `You are a document analyst. Extract only the most important facts, figures, dates, names, and decisions from the following document. Present them as a clean numbered list. Be brief and factual.`,
-
-  simplify: `You are a plain language expert. Rewrite the following document in simple, everyday English that anyone can understand. Remove legal jargon, technical terms, and complex sentences. Keep all the important information but make it easy to read.`,
-};
+import { AIError, CATEGORY_MESSAGES } from '@/lib/geminiClient';
+import { summarizeDocument, summarizeChapters } from '@/lib/pdfSummarize/pipeline';
+import { validateSelection, resolveSelection } from '@/lib/pdfSummarize/limits';
+import { SUMMARY_TYPES, FOCUS_AREAS } from '@/lib/pdfSummarize/schema';
 
 export async function POST(request) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -23,45 +13,59 @@ export async function POST(request) {
   }
 
   try {
-    const { text, mode } = await request.json();
+    const { pages, type, length, selection, focusAreas } = await request.json();
 
-    if (!text || !text.trim()) {
-      return Response.json({ error: 'No text received from PDF.' }, { status: 400 });
+    if (!Array.isArray(pages) || pages.length === 0) {
+      return Response.json({ error: 'No pages received from PDF.' }, { status: 400 });
     }
 
-    if (!PROMPTS[mode]) {
-      return Response.json({ error: 'Invalid mode.' }, { status: 400 });
+    const summaryType = type === 'chapter' || SUMMARY_TYPES[type] ? type : 'smart';
+    const cleanFocusAreas = Array.isArray(focusAreas) ? focusAreas.filter((f) => FOCUS_AREAS.includes(f)) : [];
+
+    const { start, end } = resolveSelection(pages.length, selection);
+    const selectedPages = pages.slice(start - 1, end);
+    const totalCharacters = selectedPages.reduce((sum, p) => sum + (p.text?.length || 0), 0);
+
+    const limitError = validateSelection({ pageCount: pages.length, selection, totalCharacters });
+    if (limitError) {
+      return Response.json({ error: limitError }, { status: 400 });
     }
 
-    // Limit text to avoid token limits — ~50,000 chars covers most documents
-    const truncated = text.length > 50000 ? text.slice(0, 50000) + '\n\n[Document truncated due to length]' : text;
+    const combinedLength = selectedPages.reduce((sum, p) => sum + (p.text?.trim()?.length || 0), 0);
+    if (combinedLength < 50) {
+      return Response.json({ error: 'Could not extract usable text from the selected pages. This PDF may be a scanned image — try OCR PDF instead.' }, { status: 400 });
+    }
 
-    const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          role: 'user',
-          parts: [{ text: `${PROMPTS[mode]}\n\n---\n\n${truncated}` }],
-        }],
-        generationConfig: { temperature: 0.3 },
-      }),
+    if (summaryType === 'chapter') {
+      const result = await summarizeChapters({ apiKey, pages: selectedPages, focusAreas: cleanFocusAreas });
+      const wordCount = result.chapters.reduce((sum, c) => sum + (c.summary?.trim().split(/\s+/).filter(Boolean).length || 0), 0);
+      return Response.json({
+        type: 'chapter',
+        chapters: result.chapters,
+        chapterCount: result.chapterCount,
+        wordCount,
+        readingTimeMinutes: Math.max(1, Math.ceil(wordCount / 200)),
+      });
+    }
+
+    const result = await summarizeDocument({ apiKey, pages: selectedPages, type: summaryType, length, focusAreas: cleanFocusAreas });
+
+    return Response.json({
+      type: summaryType,
+      summary: result.summary,
+      wordCount: result.wordCount,
+      readingTimeMinutes: Math.max(1, Math.ceil(result.wordCount / 200)),
+      chunkCount: result.chunkCount,
     });
-
-    const data = await res.json();
-    if (!res.ok) {
-      console.error('Gemini summarize error:', data);
-      return Response.json({ error: 'AI could not process this document. Please try again.' }, { status: 502 });
-    }
-
-    const result = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!result) {
-      return Response.json({ error: 'No response from AI. Please try again.' }, { status: 422 });
-    }
-
-    return Response.json({ result });
   } catch (err) {
+    if (err instanceof AIError) {
+      console.error(`Summarize PDF error [${err.requestId}] category=${err.category}:`, err.message);
+      return Response.json(
+        { error: CATEGORY_MESSAGES[err.category] || CATEGORY_MESSAGES.unexpected, requestId: err.requestId, category: err.category, retryAfterSeconds: err.retryAfterSeconds },
+        { status: 502 }
+      );
+    }
     console.error('Summarize PDF error:', err);
-    return Response.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
+    return Response.json({ error: err.message || 'Something went wrong. Please try again.' }, { status: 500 });
   }
 }

@@ -95,7 +95,8 @@ function structuredToPlainText(structured) {
       if (achievements.length && responsibilities.length) {
         lines.push('Responsibilities:');
         responsibilities.forEach((b) => lines.push(`- ${b}`));
-        lines.push('Key Achievements:');
+        lines.push('');
+        lines.push('Achievements:');
         achievements.forEach((b) => lines.push(`- ${b}`));
       } else {
         responsibilities.forEach((b) => lines.push(`- ${b}`));
@@ -145,6 +146,59 @@ function ClassificationBulletRow({ text, moveLabel, onMove, onEdit, onDelete }) 
         <button onClick={() => setEditing(true)} style={smallActionBtn('#64748B')}>Edit</button>
         <button onClick={onDelete} style={smallActionBtn('#DC2626')}>Remove</button>
       </div>
+    </div>
+  );
+}
+
+// One AI-suggested achievement draft — same interaction shape as
+// ClassificationBulletRow (inline edit with Save/Cancel) but with Keep as
+// the primary action instead of Move, since accepting a draft here means
+// "make this a real achievement," not reclassifying existing content.
+function SuggestedAchievementRow({ text, onKeep, onEdit, onRemove }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(text);
+  if (editing) {
+    return (
+      <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', marginBottom: 6 }}>
+        <textarea value={draft} onChange={(e) => setDraft(e.target.value)} style={{ ...inputStyle, minHeight: 54, flex: 1 }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <button onClick={() => { onEdit(draft.trim()); setEditing(false); }} style={smallActionBtn('#16A34A')}>Save</button>
+          <button onClick={() => { setDraft(text); setEditing(false); }} style={smallActionBtn('#94A3B8')}>Cancel</button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 6 }}>
+      <p style={{ fontSize: '0.84rem', color: '#334155', margin: 0, flex: 1, lineHeight: 1.5 }}>{text}</p>
+      <div style={{ display: 'flex', gap: 5, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <button onClick={onKeep} style={smallActionBtn('#16A34A')}>✓ Keep</button>
+        <button onClick={() => setEditing(true)} style={smallActionBtn('#64748B')}>✏️ Edit</button>
+        <button onClick={onRemove} style={smallActionBtn('#DC2626')}>🗑 Remove</button>
+      </div>
+    </div>
+  );
+}
+
+// Free-text "write your own" row, always available alongside the AI's
+// drafts — a candidate who doesn't like any suggestion shouldn't be stuck
+// choosing the least-bad one.
+function AddAchievementInput({ onAdd }) {
+  const [text, setText] = useState('');
+  function submit() {
+    if (!text.trim()) return;
+    onAdd(text);
+    setText('');
+  }
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', marginTop: 8 }}>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="➕ Add your own achievement for this role…"
+        style={{ ...inputStyle, minHeight: 40, flex: 1 }}
+      />
+      <button onClick={submit} disabled={!text.trim()} style={smallActionBtn('#2563EB', !text.trim())}>Add</button>
     </div>
   );
 }
@@ -477,6 +531,64 @@ export default function CVImproverWorkspace() {
     setTimeout(() => { if (structured) pushCvToWorkspace(structured, template); }, 0);
   }
 
+  // ==========================================================================
+  // AI Suggested Achievements — only generated for roles the source CV had
+  // no achievements for at all (see route.js). Never inserted into the real
+  // "achievements" array automatically; each draft sits here until the
+  // candidate explicitly keeps it (moving it into achievements, where it
+  // then renders on the CV and every download), edits its wording first, or
+  // removes it outright. "Add your own" is the same target array, for a
+  // candidate who'd rather write one from scratch than accept a draft.
+  // ==========================================================================
+  function keepSuggestedAchievement(expIdx, suggIdx) {
+    setStructured((prev) => {
+      const experience = [...prev.experience];
+      const exp = { ...experience[expIdx] };
+      const suggested = [...(exp.suggestedAchievements || [])];
+      const [kept] = suggested.splice(suggIdx, 1);
+      if (kept == null) return prev;
+      exp.suggestedAchievements = suggested;
+      exp.achievements = [...(exp.achievements || []), kept];
+      experience[expIdx] = exp;
+      return { ...prev, experience };
+    });
+    syncStructuredToWorkspace();
+  }
+  function editSuggestedAchievement(expIdx, suggIdx, text) {
+    setStructured((prev) => {
+      const experience = [...prev.experience];
+      const exp = { ...experience[expIdx] };
+      const suggested = [...(exp.suggestedAchievements || [])];
+      suggested[suggIdx] = text;
+      exp.suggestedAchievements = suggested;
+      experience[expIdx] = exp;
+      return { ...prev, experience };
+    });
+  }
+  function removeSuggestedAchievement(expIdx, suggIdx) {
+    setStructured((prev) => {
+      const experience = [...prev.experience];
+      const exp = { ...experience[expIdx] };
+      const suggested = [...(exp.suggestedAchievements || [])];
+      suggested.splice(suggIdx, 1);
+      exp.suggestedAchievements = suggested;
+      experience[expIdx] = exp;
+      return { ...prev, experience };
+    });
+  }
+  function addOwnAchievement(expIdx, text) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setStructured((prev) => {
+      const experience = [...prev.experience];
+      const exp = { ...experience[expIdx] };
+      exp.achievements = [...(exp.achievements || []), trimmed];
+      experience[expIdx] = exp;
+      return { ...prev, experience };
+    });
+    syncStructuredToWorkspace();
+  }
+
   const templateInput = structured ? adaptStructuredToTemplateInput(structured) : null;
   const resumeData = templateInput
     ? useResumeData({ form: templateInput.form, targetRole: targetPosition, experience: templateInput.experience, education: templateInput.education, certifications: templateInput.certifications, skills: templateInput.skills })
@@ -781,7 +893,7 @@ export default function CVImproverWorkspace() {
                           />
                         ))}
 
-                        <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#B45309', textTransform: 'uppercase', margin: '14px 0 6px' }}>Key Achievements</p>
+                        <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#B45309', textTransform: 'uppercase', margin: '14px 0 6px' }}>Achievements</p>
                         {!(exp.achievements || []).length && <p style={{ fontSize: '0.78rem', color: '#94A3B8', fontStyle: 'italic', margin: 0 }}>None detected</p>}
                         {(exp.achievements || []).map((b, bulletIdx) => (
                           <ClassificationBulletRow
@@ -795,6 +907,46 @@ export default function CVImproverWorkspace() {
                         ))}
                       </div>
                     ))}
+                  </div>
+                </section>
+              )}
+
+              {/* ============================================================
+                  AI Suggested Achievements — only ever generated for a role
+                  whose source CV had no achievements at all (see route.js).
+                  Nothing here is on the CV yet: each draft needs an explicit
+                  Keep before it becomes a real achievement. Roles that
+                  already had genuine achievements never show up here at
+                  all, since nothing gets suggested for them.
+                  ============================================================ */}
+              {structured.experience?.some((exp) => (exp.suggestedAchievements || []).length > 0) && (
+                <section className="no-print" style={{ marginTop: 30 }}>
+                  <h3 style={sectionTitle}>✨ AI Suggested Achievements</h3>
+                  <p style={{ fontSize: '0.78rem', color: '#64748B', marginBottom: 12 }}>
+                    These roles had no achievements in your original CV, so here are draft suggestions based on the responsibilities and seniority of each — nothing is added to your CV until you keep one. Edit a draft to personalize it first, or write your own instead.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {structured.experience.map((exp, expIdx) => {
+                      const suggestions = exp.suggestedAchievements || [];
+                      if (!suggestions.length) return null;
+                      return (
+                        <div key={expIdx} style={{ border: '1px solid #FDE68A', background: '#FFFBEB', borderRadius: 10, padding: 14 }}>
+                          <p style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0F172A', margin: '0 0 10px' }}>
+                            {exp.role} <span style={{ fontWeight: 500, color: '#64748B' }}>· {exp.company}</span>
+                          </p>
+                          {suggestions.map((s, suggIdx) => (
+                            <SuggestedAchievementRow
+                              key={suggIdx}
+                              text={s}
+                              onKeep={() => keepSuggestedAchievement(expIdx, suggIdx)}
+                              onEdit={(t) => editSuggestedAchievement(expIdx, suggIdx, t)}
+                              onRemove={() => removeSuggestedAchievement(expIdx, suggIdx)}
+                            />
+                          ))}
+                          <AddAchievementInput onAdd={(t) => addOwnAchievement(expIdx, t)} />
+                        </div>
+                      );
+                    })}
                   </div>
                 </section>
               )}

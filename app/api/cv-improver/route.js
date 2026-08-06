@@ -34,11 +34,21 @@ const cvFields = {
         // past tense for every previous role. Never a quantified result.
         responsibilities: { type: 'ARRAY', items: { type: 'STRING' } },
         // Quantified results, completed initiatives, recognition, or
-        // measurable business impact — never a routine daily duty. Empty
-        // array is correct when a role genuinely has no achievements.
+        // measurable business impact — ONLY when the source CV already
+        // describes one for this role. Never a routine daily duty, and
+        // never populated with an invented result just to fill the array —
+        // see suggestedAchievements below for what happens when a role
+        // genuinely has none.
         achievements: { type: 'ARRAY', items: { type: 'STRING' } },
+        // Populated ONLY when achievements above is empty for this role —
+        // 2 to 5 plausible, realistic achievement drafts the candidate can
+        // review, edit, keep, or discard individually. Never rendered into
+        // the CV itself and never a substitute for a real achievement that
+        // already exists in the source text. Empty array whenever
+        // achievements already has content for this role.
+        suggestedAchievements: { type: 'ARRAY', items: { type: 'STRING' } },
       },
-      required: ['role', 'company', 'isCurrentRole', 'responsibilities', 'achievements'],
+      required: ['role', 'company', 'isCurrentRole', 'responsibilities', 'achievements', 'suggestedAchievements'],
     },
   },
   education: {
@@ -160,6 +170,17 @@ If a single bullet from the source CV contains both an ongoing duty and a measur
 Do not duplicate the same fact in both arrays — each real fact from the source CV appears exactly once, in whichever array actually describes it.
 
 ====================================================
+SUGGESTED ACHIEVEMENTS FOR ROLES WITH NONE (the "suggestedAchievements" field, per experience entry)
+====================================================
+First check whether this role's source content already describes any measurable result, completed initiative, recognition, or business impact. If it does, that content belongs in "achievements" per the rules above, and "suggestedAchievements" for this role MUST be an empty array — never generate additional suggestions for a role that already has real ones.
+
+Only when a role's "achievements" is genuinely empty (the source CV describes no measurable impact for that role at all), populate "suggestedAchievements" with 2 to 5 realistic, professional achievement drafts a person with that job title, seniority, and those responsibilities could plausibly have accomplished. These are editable drafts for the candidate to review and personalize before they ever appear on the CV — not verified facts — so:
+- Write each as a complete, well-formed professional bullet, using the same tense rules as achievements above.
+- Base every suggestion strictly on the role's actual responsibilities, industry, and seniority already stated in the CV — never suggest impact in an area the CV gives no evidence for.
+- Never invent a specific number, percentage, or statistic and present it as if it already happened — that crosses from "plausible suggestion" into fabricated fact, exactly what the ABSOLUTE RULE above forbids. Prefer realistic, generic impact language instead (e.g. "Contributed to a measurable reduction in processing time for routine quality checks" rather than inventing "Reduced processing time by 34%"). It is fine for a suggestion to imply a metric exists without stating a fabricated one.
+- If a role's "achievements" is non-empty, "suggestedAchievements" for that role must be [].
+
+====================================================
 PROFESSIONAL TITLE RULES (the "title" field)
 ====================================================
 The title is the candidate's professional identity line, shown directly under their name. It must NEVER be the target job title with "Applicant" tacked on, and must NEVER contain the words: Applicant, Candidate, Seeking, Applying For, Looking For, or Job Seeker. Wrong: "Packaging Technical Trainee Applicant", "Quality Assurance Applicant", "Production Manager Applicant".
@@ -187,7 +208,7 @@ HOW TO IMPROVE THE CV (Output A)
 - Do not unnecessarily redesign the CV's substance — preserve company names, job titles, dates, and qualifications exactly; only improve classification (responsibility vs. achievement), tense, wording, clarity, and impact.
 
 ====================================================
-WHAT MUST NEVER APPEAR ANYWHERE IN THE CV FIELDS (name, title, summary, experience responsibilities/achievements, skills, certifications)
+WHAT MUST NEVER APPEAR ANYWHERE IN THE CV FIELDS (name, title, summary, experience responsibilities/achievements/suggestedAchievements, skills, certifications)
 ====================================================
 The CV fields must contain ONLY finished, professional, ready-to-send content. NEVER include, anywhere in those fields: AI suggestions, AI reasoning, editing notes, recommendations, prompt instructions, ATS explanations, bracketed placeholders, or any sentence that reads as an instruction addressed to the candidate rather than a statement of fact about their work — for example sentences beginning with "Consider...", "Elaborate on...", "Mention...", "Include...", "Quantify...", "Provide...", "Insert...", "Add...", "Expand on...", or "Explain...". Advice and suggestions belong ONLY in the "suggestions" and "review" fields below, never inside the CV itself. The finished CV must never reveal that AI generated or edited it.
 

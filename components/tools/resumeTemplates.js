@@ -105,8 +105,16 @@ function BulletList({ lines, keyPrefix, className, style, liStyle }) {
 // results, kept separate from its day-to-day duties) — Resume Builder's own
 // hand-typed entries never set it, so this renders exactly the single flat
 // list it always has when achievements is empty, and only adds the
-// "Responsibilities" / "Key Achievements" split when there's something to
+// "Responsibilities" / "Achievements" split when there's something to
 // split. No template's own JSX needed to change for this.
+//
+// Achievements deliberately get more than a smaller heading: a wider top
+// gap, a left accent bar in the same amber already used for the label, and
+// a heading a size larger than "Responsibilities" — so a scanning
+// recruiter's eye lands on measurable impact instead of reading it as just
+// more bullets under the job. The whole block is break-inside:avoid so
+// Puppeteer's PDF pagination can't split it mid-list and strand a couple of
+// achievement bullets alone at the top of the next page.
 export function ExpBullets({ exp, className, style, liStyle }) {
   const responsibilityLines = normalizeBulletLines(exp);
   const achievementLines = Array.isArray(exp.achievements) ? exp.achievements.map((a) => String(a).trim()).filter(Boolean) : [];
@@ -116,8 +124,9 @@ export function ExpBullets({ exp, className, style, liStyle }) {
   }
   if (!responsibilityLines.length && !achievementLines.length) return null;
 
-  const subHeadSize = liStyle?.fontSize ? liStyle.fontSize - 2 : 10;
-  const subHead = { fontSize: subHeadSize, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', margin: '10px 0 2px' };
+  const baseSize = liStyle?.fontSize ? liStyle.fontSize - 2 : 10;
+  const achievementAccent = '#B45309';
+  const subHead = { fontSize: baseSize, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', margin: '10px 0 2px' };
   return (
     <div>
       {responsibilityLines.length > 0 && (
@@ -126,8 +135,10 @@ export function ExpBullets({ exp, className, style, liStyle }) {
           <BulletList lines={responsibilityLines} keyPrefix="r" className={className} style={style} liStyle={liStyle} />
         </>
       )}
-      <p style={{ ...subHead, color: '#B45309' }}>Key Achievements</p>
-      <BulletList lines={achievementLines} keyPrefix="a" className={className} style={style} liStyle={liStyle} />
+      <div className="cv-achievements-block" style={{ marginTop: 20, borderLeft: `2.5px solid ${achievementAccent}`, paddingLeft: 10, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+        <p style={{ ...subHead, fontSize: baseSize + 1, color: achievementAccent, margin: '0 0 4px' }}>Achievements</p>
+        <BulletList lines={achievementLines} keyPrefix="a" className={className} style={style} liStyle={liStyle} />
+      </div>
     </div>
   );
 }

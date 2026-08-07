@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { TYPE_LABELS } from './objectTypes';
 
-function actionBtn(danger) {
+function actionBtn(danger, disabled) {
   return {
     padding: '6px 8px', borderRadius: 6, border: '1px solid', borderColor: danger ? '#FECACA' : '#E2E8F0',
-    background: danger ? '#FEF2F2' : 'white', color: danger ? '#DC2626' : '#334155', cursor: 'pointer',
+    background: danger ? '#FEF2F2' : 'white', color: disabled ? '#CBD5E1' : danger ? '#DC2626' : '#334155',
+    cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.6 : 1,
     fontFamily: 'inherit', fontSize: '0.72rem', fontWeight: 600, flex: 1,
   };
 }
@@ -86,22 +87,34 @@ export default function LayersPanel({
         })}
       </div>
 
-      {selectedId && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={() => onReorderZ('front')} title="Bring to Front" style={actionBtn(false)}>⤒ Front</button>
-            <button onClick={() => onReorderZ('forward')} title="Bring Forward" style={actionBtn(false)}>▲ Forward</button>
+      {selectedId && (() => {
+        // Reordering only changes stacking AMONG objects on this page — it
+        // can't move anything "behind" the real PDF page itself, which
+        // always renders beneath every placed object regardless of z. With
+        // a single object (or the selection already at that end of the
+        // stack), Front/Back genuinely have nothing to do; disabling them
+        // here says so, instead of looking broken when clicked.
+        const sorted = [...pageObjects].sort((a, b) => a.z - b.z);
+        const index = sorted.findIndex((o) => o.id === selectedId);
+        const isTop = index === sorted.length - 1;
+        const isBottom = index === 0;
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => onReorderZ('front')} disabled={isTop} title="Bring to Front" style={actionBtn(false, isTop)}>⤒ Front</button>
+              <button onClick={() => onReorderZ('forward')} disabled={isTop} title="Bring Forward" style={actionBtn(false, isTop)}>▲ Forward</button>
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => onReorderZ('back')} disabled={isBottom} title="Send to Back" style={actionBtn(false, isBottom)}>⤓ Back</button>
+              <button onClick={() => onReorderZ('backward')} disabled={isBottom} title="Send Backward" style={actionBtn(false, isBottom)}>▼ Backward</button>
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={onDuplicateSelected} style={actionBtn(false, false)}>⧉ Duplicate</button>
+              <button onClick={onDeleteSelected} style={actionBtn(true, false)}>🗑 Delete</button>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={() => onReorderZ('back')} title="Send to Back" style={actionBtn(false)}>⤓ Back</button>
-            <button onClick={() => onReorderZ('backward')} title="Send Backward" style={actionBtn(false)}>▼ Backward</button>
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={onDuplicateSelected} style={actionBtn(false)}>⧉ Duplicate</button>
-            <button onClick={onDeleteSelected} style={actionBtn(true)}>🗑 Delete</button>
-          </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

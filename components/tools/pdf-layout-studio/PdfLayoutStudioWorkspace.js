@@ -296,8 +296,15 @@ export default function PdfLayoutStudioWorkspace() {
   function placeLetterhead(src, naturalWidth, naturalHeight) {
     const page = pages[activePage];
     if (!page) return;
+    // Capped on BOTH axes, not just width — a letterhead graphic whose
+    // natural aspect ratio is closer to a full page than a header strip
+    // (a common real-world asset) would otherwise scale to nearly the
+    // page's full height too, visually swallowing the document by default.
+    // The user can still resize it larger themselves; this only controls
+    // the size it lands at on insert.
     const maxW = page.width * 0.7;
-    const scale = Math.min(1, maxW / naturalWidth);
+    const maxH = page.height * 0.3;
+    const scale = Math.min(1, maxW / naturalWidth, maxH / naturalHeight);
     const w = naturalWidth * scale;
     const h = naturalHeight * scale;
     const obj = createObject('letterhead', {
@@ -585,14 +592,13 @@ export default function PdfLayoutStudioWorkspace() {
         />
 
         <div style={{ flex: 1, minWidth: 320 }}>
-          {pages.length > 1 && (
-            <div className="flex items-center gap-2 mb-2">
-              <button className="btn-ghost-sm" disabled={activePage === 0} onClick={() => goToPage(activePage - 1)}>← Prev</button>
-              <span className="text-xs text-ink-soft">Page {activePage + 1} of {pages.length}</span>
-              <button className="btn-ghost-sm" disabled={activePage === pages.length - 1} onClick={() => goToPage(activePage + 1)}>Next →</button>
-            </div>
-          )}
           <Toolbar
+            showPageNav={pages.length > 1}
+            pageLabel={`Page ${activePage + 1} of ${pages.length}`}
+            canGoPrev={activePage > 0}
+            canGoNext={activePage < pages.length - 1}
+            onPrevPage={() => goToPage(activePage - 1)}
+            onNextPage={() => goToPage(activePage + 1)}
             canUndo={canUndo}
             canRedo={canRedo}
             onUndo={undo}

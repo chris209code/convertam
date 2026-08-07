@@ -5,9 +5,9 @@ import { useDocumentSession, useAutoContinueSession } from '@/components/documen
 import ContinueWorkingPanel from '@/components/workspace/ContinueWorkingPanel';
 import { useObjectHistory } from '@/components/shared/useObjectHistory';
 import { useKeyboardShortcuts } from '@/components/shared/useKeyboardShortcuts';
-import SignaturePad from '../annotate-pdf/SignaturePad';
+import SignaturePad from '@/components/shared/SignaturePad';
 import { INK_COLORS, RENDER_SCALE } from './constants';
-import { createFontEmbedCache, measureTextWidthPagePx, warmMeasurementFonts } from './fontResolver';
+import { createFontEmbedCache, measureTextWidthPagePx, warmMeasurementFonts } from '@/components/shared/fontResolver';
 import { applyFormFieldValues, detectFormFields } from './formFields';
 import Toolbar, { DATE_FORMATS } from './Toolbar';
 import TextProperties from './TextProperties';
@@ -375,7 +375,7 @@ export default function WriteOnPdfWorkspace() {
           // don't vary by which document embedded it. This is what keeps
           // center/right alignment from visibly disagreeing between the
           // preview and the downloaded PDF.
-          const widthPx = measureTextWidthPagePx(font, displayText, o.fontSize);
+          const widthPx = measureTextWidthPagePx(font, displayText, o.fontSize, RENDER_SCALE);
           if (o.align === 'center') xPx = o.x + (o.w - widthPx) / 2;
           else if (o.align === 'right') xPx = o.x + o.w - widthPx;
           const { r, g, b } = hexToRgbFractions(o.color);

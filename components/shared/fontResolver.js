@@ -1,6 +1,5 @@
 import { StandardFonts } from 'pdf-lib';
-import { cssFontFamily } from '../redact-edit/constants';
-import { RENDER_SCALE } from './constants';
+import { cssFontFamily } from '@/components/tools/redact-edit/constants';
 
 // Maps {family bucket, bold, italic} to a pdf-lib StandardFonts entry for
 // export, and (via the re-exported cssFontFamily) to a CSS font-family
@@ -11,6 +10,13 @@ import { RENDER_SCALE } from './constants';
 // reuse would be dishonest. Matching the source document's family/weight/
 // style bucket this closely is the realistic ceiling, and it's exactly the
 // fallback behavior real font-matching tools describe as the common case.
+//
+// Originally built for Write on PDF, moved here (matching the precedent
+// already set by useObjectHistory.js/useKeyboardShortcuts.js/
+// coordinateTransform.js/ThumbnailRail.js) once PDF Layout Studio needed
+// the identical resolver. The one thing that varies by caller — each tool's
+// own page-render scale — is now a parameter instead of an import, so this
+// module has no dependency on any one tool's constants.
 const STANDARD_FONT_TABLE = {
   sans: {
     regular: StandardFonts.Helvetica, bold: StandardFonts.HelveticaBold,
@@ -95,14 +101,16 @@ export function getCachedMeasureFont(style) {
 }
 
 // The single source of truth for "how wide is this text," in page-space
-// (RENDER_SCALE-multiplied) pixels — used identically by the on-screen
+// (renderScale-multiplied) pixels — used identically by the on-screen
 // preview (via getCachedMeasureFont) and the real export path (via the
 // document-specific font from createFontEmbedCache), since a StandardFonts
-// entry's metrics don't vary by which document embedded it.
-export function measureTextWidthPagePx(font, text, fontSizePagePx) {
+// entry's metrics don't vary by which document embedded it. `renderScale`
+// defaults to 1.5 (every current caller's page-render scale) but is a
+// parameter, not an import, so this module stays caller-agnostic.
+export function measureTextWidthPagePx(font, text, fontSizePagePx, renderScale = 1.5) {
   if (!font || !text) return 0;
-  const sizePt = fontSizePagePx / RENDER_SCALE;
-  return font.widthOfTextAtSize(text, sizePt) * RENDER_SCALE;
+  const sizePt = fontSizePagePx / renderScale;
+  return font.widthOfTextAtSize(text, sizePt) * renderScale;
 }
 
 export { cssFontFamily };

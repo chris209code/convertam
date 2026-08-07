@@ -4,7 +4,7 @@ import { HIGHLIGHT_COLORS, INK_COLORS, SHAPE_KIND_ICONS, TOOLS } from './constan
 import { SHAPE_KINDS } from './objectTypes/shape';
 import NumberingTool from './NumberingTool';
 import StampPickerRow from './StampLibrary';
-import SignaturePad from './SignaturePad';
+import SignaturePad from '@/components/shared/SignaturePad';
 
 function smallBtn(active, danger) {
   return {

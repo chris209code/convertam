@@ -14,7 +14,7 @@ import { rotateCanvas } from './rotateCanvas';
 import { downloadCommentsOnlyPdf, downloadReviewSummaryPdf, downloadReviewSummaryWord } from './reviewSummaryExport';
 import Toolbar from './Toolbar';
 import Stage from './Stage';
-import ThumbnailRail from './ThumbnailRail';
+import ThumbnailRail from '@/components/shared/ThumbnailRail';
 import PropertiesPanel from './PropertiesPanel';
 
 // Orchestrator: owns document/session loading, the annotation history, and

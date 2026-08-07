@@ -22,7 +22,14 @@ export default function TransformableBox({
   obj, scale, isSelected, isEditing,
   onSelect, onStartEdit, onCommitTransform, onLiveTransform,
   minW = 24, minH = 18,
-  resizable = true, rotatable = true,
+  resizable = true, rotatable = true, locked = false,
+  // Optional live-drag position override, called only during a MOVE drag
+  // (not resize/rotate) with the unsnapped candidate {x,y,w,h,rotation} —
+  // return {x, y} to override where the box actually lands (e.g. snapped to
+  // a page/other-object guide line). Has no opinion on what a "guide" is;
+  // that's entirely the caller's concern (see PDF Layout Studio's
+  // snapping.js) — this component only applies whatever position it's told.
+  getSnap,
   children,
 }) {
   const [live, setLive] = useState(null);
@@ -31,6 +38,8 @@ export default function TransformableBox({
   const boxRef = useRef(null);
 
   const display = live || obj;
+  const effectiveResizable = resizable && !locked;
+  const effectiveRotatable = rotatable && !locked;
 
   function endDrag() {
     window.removeEventListener('pointermove', onDragMove);
@@ -46,6 +55,10 @@ export default function TransformableBox({
       const dx = (e.clientX - drag.startX) / scale;
       const dy = (e.clientY - drag.startY) / scale;
       next = { ...drag.orig, x: drag.orig.x + dx, y: drag.orig.y + dy };
+      if (getSnap) {
+        const snapped = getSnap(next);
+        if (snapped) next = { ...next, x: snapped.x, y: snapped.y };
+      }
     } else if (drag.type === 'resize') {
       const dx = (e.clientX - drag.startX) / scale;
       const dy = (e.clientY - drag.startY) / scale;
@@ -74,6 +87,7 @@ export default function TransformableBox({
     e.stopPropagation();
     e.preventDefault();
     onSelect();
+    if (locked) return;
     dragRef.current = { type: 'move', startX: e.clientX, startY: e.clientY, orig: { x: obj.x, y: obj.y, w: obj.w, h: obj.h, rotation: obj.rotation || 0 } };
     window.addEventListener('pointermove', onDragMove);
     window.addEventListener('pointerup', onDragEnd);
@@ -120,7 +134,7 @@ export default function TransformableBox({
     >
       {children(display, { isEditing })}
 
-      {isSelected && !isEditing && resizable && HANDLES.map((h) => {
+      {isSelected && !isEditing && effectiveResizable && HANDLES.map((h) => {
         const pos = {
           nw: { left: -6, top: -6 }, ne: { right: -6, top: -6 },
           sw: { left: -6, bottom: -6 }, se: { right: -6, bottom: -6 },
@@ -137,7 +151,7 @@ export default function TransformableBox({
           />
         );
       })}
-      {isSelected && !isEditing && rotatable && (
+      {isSelected && !isEditing && effectiveRotatable && (
         <>
           <div
             onPointerDown={beginRotate}

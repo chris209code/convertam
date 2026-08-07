@@ -31,10 +31,14 @@ function Thumbnail({ page, rotation }) {
 }
 
 // Left panel: one thumbnail per page, in the user's chosen display order
-// (pageOrder — a list of original page indices, decoupled from the objects
-// array so reordering never has to touch annotation data). Click jumps to
-// a page; drag-and-drop reorders it (native HTML5 DnD — no library, same
-// "hand-roll it with browser primitives" approach as the rest of this tool).
+// (pageOrder — a list of original page indices, decoupled from any
+// object/annotation array so reordering never has to touch that data).
+// Click jumps to a page; drag-and-drop reorders it (native HTML5 DnD — no
+// library).
+//
+// Originally built for Annotate PDF, moved here (matching the precedent set
+// by useObjectHistory.js and useKeyboardShortcuts.js) once PDF Layout
+// Studio needed the identical rail.
 export default function ThumbnailRail({ pages, pageOrder, activePage, pageRotations, onSelectPage, onReorder }) {
   const [dragPos, setDragPos] = useState(null);
 

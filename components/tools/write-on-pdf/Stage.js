@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import TransformableBox from '@/components/shared/TransformableBox';
-import { computeFitToWidthScale, getPointerPageSpace } from '../annotate-pdf/coordinateTransform';
+import { computeFitToWidthScale, getPointerPageSpace } from '@/components/shared/coordinateTransform';
 import { contentFor, createObject } from './objectTypes';
 import { FormFieldNode } from './formFields';
 import { detectStyleAt, sampleBackgroundColor, StyleMatchChip } from './styleMatchPreview';

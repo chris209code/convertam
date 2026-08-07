@@ -100,6 +100,11 @@ function DrawCanvas({ width, height, onChange }) {
 // lib/signatureIsolation.js). Calls onCapture(dataUrl, kind) once when the
 // user confirms — placement/resizing on the page happens the same way as
 // any other raster annotation from there.
+//
+// Originally built for Annotate PDF, then reused by Write on PDF, then
+// moved here (matching the precedent set by useObjectHistory.js/
+// useKeyboardShortcuts.js/coordinateTransform.js/ThumbnailRail.js/
+// fontResolver.js) once PDF Layout Studio needed the identical pad.
 export default function SignaturePad({ onCapture }) {
   const [kind, setKind] = useState('signature'); // 'signature' | 'initials'
   const [method, setMethod] = useState('type'); // 'type' | 'draw' | 'upload'

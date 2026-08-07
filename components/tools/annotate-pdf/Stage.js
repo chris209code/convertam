@@ -5,7 +5,7 @@ import { handleAt, handleSize, resizeRect } from '../redact-edit/geometry';
 import { boundsOf, createObject, drawObject, hitTestAt, interactionOf, stampShared } from './objectTypes';
 import { noteBg, NOTE_SIZE } from './objectTypes/note';
 import { translateObject } from './alignment';
-import { computeFitToWidthScale, getPointerPageSpace, pageSpaceToWrapperOffset } from './coordinateTransform';
+import { computeFitToWidthScale, getPointerPageSpace, pageSpaceToWrapperOffset } from '@/components/shared/coordinateTransform';
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 3;

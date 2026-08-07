@@ -21,15 +21,15 @@ function downloadBlob(blob, filename) {
 // the exact same export pipeline the single-document Apply Layout button
 // uses), so there's exactly one implementation of "how a layout gets
 // applied to a PDF," not a second copy that could quietly drift from it.
-// Rule objects (Page Numbers/Letterhead/Watermark/Footer/QR Code) resolve
-// their own target pages against each batch file's own page count, so
-// "All pages"/"Odd pages"/etc. adapt correctly even when a batch file has
-// a different page count than the main document; single-page objects
-// (text/image/shape/stamp) apply to the same page INDEX in each batch
-// file and are silently skipped on files too short to have that page —
-// see pdfExport.js's per-object `pagesInfo[o.page]` guard.
+// Rule objects (Page Numbers/Watermark/Footer/QR Code) resolve their own
+// target pages against each batch file's own page count, so "All pages"/
+// "Odd pages"/etc. adapt correctly even when a batch file has a different
+// page count than the main document; single-page objects (text/image/
+// shape/stamp) apply to the same page INDEX in each batch file and are
+// silently skipped on files too short to have that page — see
+// pdfExport.js's per-object `pagesInfo[o.page]` guard.
 export default function BatchPanel({ hasLayout, onProcessFile }) {
-  const [queue, setQueue] = useState([]); // [{ file, status: 'pending'|'processing'|'done'|'error', bytes, warning, error }]
+  const [queue, setQueue] = useState([]); // [{ file, status: 'pending'|'processing'|'done'|'error', bytes, error }]
   const [busy, setBusy] = useState(false);
 
   function addFiles(fileList) {
@@ -48,8 +48,8 @@ export default function BatchPanel({ hasLayout, onProcessFile }) {
       if (queue[i].status === 'done') continue;
       setQueue((q) => q.map((item, idx) => (idx === i ? { ...item, status: 'processing' } : item)));
       try {
-        const { bytes, warning } = await onProcessFile(queue[i].file);
-        setQueue((q) => q.map((item, idx) => (idx === i ? { ...item, status: 'done', bytes, warning } : item)));
+        const { bytes } = await onProcessFile(queue[i].file);
+        setQueue((q) => q.map((item, idx) => (idx === i ? { ...item, status: 'done', bytes } : item)));
       } catch (err) {
         console.error(err);
         setQueue((q) => q.map((item, idx) => (idx === i ? { ...item, status: 'error', error: 'Could not process this file.' } : item)));
@@ -83,7 +83,7 @@ export default function BatchPanel({ hasLayout, onProcessFile }) {
     <div style={{ marginTop: 16, border: '1px solid #E2E8F0', borderRadius: 12, padding: 14 }}>
       <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', margin: '0 0 4px' }}>Batch: apply this layout to more PDFs</p>
       <p style={{ fontSize: '0.74rem', color: '#64748B', margin: '0 0 10px' }}>
-        Upload other PDFs to stamp with the exact same elements you just built — same letterhead, watermark, stamps, page numbers, and QR codes.
+        Upload other PDFs to stamp with the exact same elements you just built — same watermark, stamps, page numbers, and QR codes.
       </p>
 
       <label className="dropzone block cursor-pointer" style={{ padding: '14px', textAlign: 'center', opacity: hasLayout ? 1 : 0.6 }}>
@@ -113,12 +113,6 @@ export default function BatchPanel({ hasLayout, onProcessFile }) {
             </div>
           ))}
         </div>
-      )}
-
-      {queue.some((i) => i.warning) && (
-        <p style={{ fontSize: '0.68rem', color: '#92400E', marginTop: 8 }}>
-          Smart Layout skipped the letterhead on some pages in at least one file — not enough clear space to place it without covering existing text.
-        </p>
       )}
 
       {queue.length > 0 && (

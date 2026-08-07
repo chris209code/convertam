@@ -3,7 +3,7 @@
 import { STAMP_PRESETS } from '../constants';
 
 // Professional Stamps — a single-page placement (not a page-spanning rule
-// object, unlike Watermark/Page Numbers/Letterhead) since a stamp usually
+// object, unlike Watermark/Page Numbers) since a stamp usually
 // marks one specific page (e.g. the signature page), not the whole
 // document. Rendered as a bordered box with centered label text rather
 // than a pre-rendered bitmap, so color/size/rotation stay fully editable —

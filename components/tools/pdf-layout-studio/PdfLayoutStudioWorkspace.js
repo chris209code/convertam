@@ -10,7 +10,6 @@ import SignaturePad from '@/components/shared/SignaturePad';
 import { warmMeasurementFonts } from '@/components/shared/fontResolver';
 import { MAX_FILE_BYTES, RENDER_SCALE, DATE_FORMATS } from './constants';
 import { createObject } from './objectTypes';
-import { extractTextBoxes } from './letterheadDetection';
 import { generateQrDataUrl } from '@/lib/invoice-studio/qrGenerate';
 import { applyLayoutToPdf, extractPageInfo } from './pdfExport';
 import ElementsPanel from './ElementsPanel';
@@ -72,7 +71,6 @@ export default function PdfLayoutStudioWorkspace() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [resultBytes, setResultBytes] = useState(null);
-  const [letterheadWarning, setLetterheadWarning] = useState('');
 
   const [selectedId, setSelectedId] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -288,43 +286,6 @@ export default function PdfLayoutStudioWorkspace() {
     setSelectedId(obj.id);
   }
 
-  // Letterhead is placed flush near the top of the page by default (a
-  // header graphic, not a centered decoration) — unlike Image/Logo's
-  // page-centered placement. Its w/h here is the "reference" size that
-  // Overlay uses verbatim and Scale-to-Fit/Smart Layout use as their band
-  // size ceiling (see objectTypes/letterhead.js and handleApply below).
-  function placeLetterhead(src, naturalWidth, naturalHeight) {
-    const page = pages[activePage];
-    if (!page) return;
-    // Capped on BOTH axes, not just width — a letterhead graphic whose
-    // natural aspect ratio is closer to a full page than a header strip
-    // (a common real-world asset) would otherwise scale to nearly the
-    // page's full height too, visually swallowing the document by default.
-    // The user can still resize it larger themselves; this only controls
-    // the size it lands at on insert.
-    const maxW = page.width * 0.7;
-    const maxH = page.height * 0.3;
-    const scale = Math.min(1, maxW / naturalWidth, maxH / naturalHeight);
-    const w = naturalWidth * scale;
-    const h = naturalHeight * scale;
-    const obj = createObject('letterhead', {
-      page: activePage, x: (page.width - w) / 2, y: 16, nextId, nextZ,
-      src, w, h, naturalWidth, naturalHeight,
-    });
-    commitPageObjects([...pageObjects, obj]);
-    setSelectedId(obj.id);
-  }
-
-  async function addLetterheadFile(file) {
-    if (!file || !file.type.startsWith('image/')) return;
-    try {
-      const { dataUrl, naturalWidth, naturalHeight } = await fileToPngDataUrl(file);
-      placeLetterhead(dataUrl, naturalWidth, naturalHeight);
-    } catch {
-      setError('Could not insert that letterhead. Please try a different file.');
-    }
-  }
-
   function addWatermark() {
     const page = pages[activePage];
     if (!page) return;
@@ -433,12 +394,7 @@ export default function PdfLayoutStudioWorkspace() {
         canvas.width = viewport.width;
         canvas.height = viewport.height;
         await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-        // Captured once per page for the Letterhead element's Smart Layout
-        // mode (see letterheadDetection.js) — cheap to compute now, alongside
-        // the render pass, rather than re-reading the PDF at export time.
-        const textContent = await page.getTextContent();
-        const textBoxes = extractTextBoxes(textContent, viewport.height, RENDER_SCALE);
-        loadedPages.push({ canvas, width: viewport.width, height: viewport.height, textBoxes });
+        loadedPages.push({ canvas, width: viewport.width, height: viewport.height });
       }
       setPages(loadedPages);
       setPageOrder(loadedPages.map((_, i) => i));
@@ -477,15 +433,10 @@ export default function PdfLayoutStudioWorkspace() {
   async function handleApply() {
     setBusy(true);
     setError('');
-    setLetterheadWarning('');
     try {
       const buf = await file.arrayBuffer();
-      const pagesInfo = pages.map((p) => ({ width: p.width, height: p.height, textBoxes: p.textBoxes }));
-      const { bytes, skippedLetterheadPages } = await applyLayoutToPdf(buf, objects, pagesInfo);
-      if (skippedLetterheadPages.length) {
-        const pageList = [...new Set(skippedLetterheadPages)].sort((a, b) => a - b).join(', ');
-        setLetterheadWarning(`Smart Layout skipped page${skippedLetterheadPages.length > 1 ? 's' : ''} ${pageList} — not enough clear space to place the letterhead without covering existing text.`);
-      }
+      const pagesInfo = pages.map((p) => ({ width: p.width, height: p.height }));
+      const { bytes } = await applyLayoutToPdf(buf, objects, pagesInfo);
       setResultBytes(bytes);
       await updateDocument(bytes, { toolSlug: 'pdf-overlay', label: 'Layout applied' });
     } catch (err) {
@@ -509,8 +460,8 @@ export default function PdfLayoutStudioWorkspace() {
     // PDFDocument.load() afterward.
     const pagesInfo = await extractPageInfo(await batchFile.arrayBuffer());
     const buf = await batchFile.arrayBuffer();
-    const { bytes, skippedLetterheadPages } = await applyLayoutToPdf(buf, objectsRef.current, pagesInfo);
-    return { bytes, warning: skippedLetterheadPages.length > 0 };
+    const { bytes } = await applyLayoutToPdf(buf, objectsRef.current, pagesInfo);
+    return { bytes };
   }
 
   function downloadResult() {
@@ -527,7 +478,6 @@ export default function PdfLayoutStudioWorkspace() {
     setEditingId(null);
     setResultBytes(null);
     setError('');
-    setLetterheadWarning('');
   }
 
   if (!pages.length) {
@@ -548,7 +498,7 @@ export default function PdfLayoutStudioWorkspace() {
           </div>
         )}
         <p className="text-sm text-ink-soft mb-4">
-          Upload a PDF and build a professional layout on top of it — add text, images, logos, signatures, shapes, dates, and page numbers directly on the page. Watermarks, stamps, QR codes, and an intelligent letterhead system are on the way.
+          Upload a PDF and build a professional layout on top of it — add text, images, logos, signatures, shapes, dates, page numbers, watermarks, stamps, and QR codes directly on the page.
         </p>
         <label className="dropzone block cursor-pointer"
           onDragOver={(e) => e.preventDefault()}
@@ -575,22 +525,21 @@ export default function PdfLayoutStudioWorkspace() {
         <button className="btn-ghost-sm" onClick={reset}>Change file</button>
       </div>
 
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <ElementsPanel
-          onAddText={addText}
-          onChooseImage={(e) => addImageFile(e.target.files?.[0])}
-          onChooseLogo={(e) => addLogoFile(e.target.files?.[0])}
-          onToggleSignaturePad={() => setShowSignaturePad((v) => !v)}
-          onInsertDateTime={insertDateTime}
-          onAddShape={addShape}
-          onAddPageNumber={addPageNumber}
-          onChooseLetterhead={(e) => addLetterheadFile(e.target.files?.[0])}
-          onAddWatermark={addWatermark}
-          onAddStamp={addStamp}
-          onAddFooter={addFooter}
-          onAddQrCode={addQrCode}
-        />
+      <ElementsPanel
+        onAddText={addText}
+        onChooseImage={(e) => addImageFile(e.target.files?.[0])}
+        onChooseLogo={(e) => addLogoFile(e.target.files?.[0])}
+        onToggleSignaturePad={() => setShowSignaturePad((v) => !v)}
+        onInsertDateTime={insertDateTime}
+        onAddShape={addShape}
+        onAddPageNumber={addPageNumber}
+        onAddWatermark={addWatermark}
+        onAddStamp={addStamp}
+        onAddFooter={addFooter}
+        onAddQrCode={addQrCode}
+      />
 
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 320 }}>
           <Toolbar
             showPageNav={pages.length > 1}
@@ -660,11 +609,6 @@ export default function PdfLayoutStudioWorkspace() {
       </div>
 
       {error && <div className="status error mt-3">{error}</div>}
-      {letterheadWarning && (
-        <div style={{ marginTop: 12, background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: '10px 14px', fontSize: '0.78rem', color: '#92400E' }}>
-          {letterheadWarning}
-        </div>
-      )}
 
       {!resultBytes ? (
         <div className="actions mt-3">

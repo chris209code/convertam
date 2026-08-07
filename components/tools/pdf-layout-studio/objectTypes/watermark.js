@@ -1,17 +1,17 @@
 'use client';
 
 // Watermark is a page-spanning "rule" object, architecturally the same as
-// pageNumber.js and letterhead.js — one placed object applies its text to
-// every page it targets (pagesRule), drawn once per matching page at
-// export. Deliberately lighter-weight than the standalone Watermark PDF
-// tool (components/tools/WatermarkPdfWorkspace.js): rather than its own
+// pageNumber.js — one placed object applies its text to every page it
+// targets (pagesRule), drawn once per matching page at export.
+// Deliberately lighter-weight than the standalone Watermark PDF tool
+// (components/tools/WatermarkPdfWorkspace.js): rather than its own
 // color-swatch/opacity-preset/click-to-position UI, this element reuses
 // the Properties panel's already-generic Position/Rotation/Opacity
 // controls (every object type gets those for free) — its own type-specific
 // fields are just the text and color. The real differentiator from the
 // standalone tool isn't more watermark features, it's composability: this
-// version lives on the same canvas as text, images, letterheads, and
-// stamps, undoes/redoes with them, and exports as one combined layout.
+// version lives on the same canvas as text, images, and stamps, undoes/
+// redoes with them, and exports as one combined layout.
 export const interaction = 'edit';
 
 export function createDefaults({ color = '#94A3B8', text = 'CONFIDENTIAL' } = {}) {

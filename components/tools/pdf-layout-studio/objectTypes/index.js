@@ -13,13 +13,12 @@ import * as image from './image';
 import * as signature from './signature';
 import * as shape from './shape';
 import * as pageNumber from './pageNumber';
-import * as letterhead from './letterhead';
 import * as watermark from './watermark';
 import * as stamp from './stamp';
 import * as footer from './footer';
 import * as qrcode from './qrcode';
 
-export const OBJECT_TYPES = { text, image, signature, shape, pageNumber, letterhead, watermark, stamp, footer, qrcode };
+export const OBJECT_TYPES = { text, image, signature, shape, pageNumber, watermark, stamp, footer, qrcode };
 
 export function contentFor(type) {
   return OBJECT_TYPES[type]?.Content;
@@ -29,7 +28,7 @@ export function contentFor(type) {
 // object doesn't have a user-given `name` (the common case; renaming is
 // opt-in).
 export const TYPE_LABELS = {
-  text: 'Text', image: 'Image', signature: 'Signature', shape: 'Shape', pageNumber: 'Page numbers', letterhead: 'Letterhead',
+  text: 'Text', image: 'Image', signature: 'Signature', shape: 'Shape', pageNumber: 'Page numbers',
   watermark: 'Watermark', stamp: 'Stamp', footer: 'Footer', qrcode: 'QR code',
 };
 

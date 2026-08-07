@@ -4,7 +4,6 @@ import { createFontEmbedCache, measureTextWidthPagePx } from '@/components/share
 import { RENDER_SCALE } from './constants';
 import { formatPageNumberText } from './objectTypes/pageNumber';
 import { buildFooterText } from './objectTypes/footer';
-import { detectSafeZoneHeight, extractTextBoxes } from './letterheadDetection';
 import { resolveTargetPages } from './pageSelection';
 
 // The full object-layout export pipeline, extracted out of
@@ -15,10 +14,10 @@ import { resolveTargetPages } from './pageSelection';
 // consumer needs the identical code" rule. Takes the already-loaded
 // pdf-lib PDFDocument's bytes plus the SAME `objects` template used on the
 // currently open document, and a `pagesInfo` array describing each of
-// THIS pdfBytes's own pages ({ width, height, textBoxes }, page-space px
-// matching RENDER_SCALE) — for the main document pagesInfo is just a thin
-// map over the already-loaded `pages` state; for a batch file it comes
-// from extractPageInfo() below, which does the pdf.js render pass fresh.
+// THIS pdfBytes's own pages ({ width, height }, page-space px matching
+// RENDER_SCALE) — for the main document pagesInfo is just a thin map over
+// the already-loaded `pages` state; for a batch file it comes from
+// extractPageInfo() below, which does the pdf.js render pass fresh.
 function hexToRgbFractions(hex) {
   const clean = (hex || '#111827').replace('#', '');
   const r = parseInt(clean.substring(0, 2), 16) / 255;
@@ -56,9 +55,8 @@ function rotateVector(vx, vy, angleDeg) {
 }
 
 // Renders every page of a PDF with pdf.js just far enough to know its
-// page-space dimensions and text-item boxes (for Letterhead's Smart
-// Layout mode) — no canvas bitmap is retained, since batch files are never
-// displayed on the Stage. Mirrors the per-page loop in
+// page-space dimensions — no canvas bitmap is retained, since batch files
+// are never displayed on the Stage. Mirrors the per-page loop in
 // PdfLayoutStudioWorkspace.js's loadPdfIntoWorkspace(), minus the render
 // step that produces the on-screen thumbnail.
 export async function extractPageInfo(pdfBytes) {
@@ -69,17 +67,13 @@ export async function extractPageInfo(pdfBytes) {
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const viewport = page.getViewport({ scale: RENDER_SCALE });
-    const textContent = await page.getTextContent();
-    const textBoxes = extractTextBoxes(textContent, viewport.height, RENDER_SCALE);
-    pagesInfo.push({ width: viewport.width, height: viewport.height, textBoxes });
+    pagesInfo.push({ width: viewport.width, height: viewport.height });
   }
   return pagesInfo;
 }
 
 // Applies the full `objects` layout to one PDF's bytes and returns the
-// resulting PDF bytes plus any Smart Layout letterhead pages that had to
-// be skipped (1-based page numbers, for the caller to surface as a
-// warning). Every draw call below is a direct port of what
+// resulting PDF bytes. Every draw call below is a direct port of what
 // PdfLayoutStudioWorkspace.js's old inline handleApply() did — see that
 // file's git history for the original, single-document-only version if
 // you need the diff.
@@ -99,7 +93,7 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
   }
 
   for (const o of objects) {
-    if (o.type === 'pageNumber' || o.type === 'letterhead' || o.type === 'watermark' || o.type === 'footer' || o.type === 'qrcode') continue; // handled separately below — these can span many pages
+    if (o.type === 'pageNumber' || o.type === 'watermark' || o.type === 'footer' || o.type === 'qrcode') continue; // handled separately below — these can span many pages
     const pdfPage = pdfPages[o.page];
     if (!pdfPage) continue;
     const pageInfoForObject = pagesInfo[o.page];
@@ -237,49 +231,7 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
     }
   }
 
-  // Letterhead, third pass — like Page Numbers, a rule object that can
-  // apply to many pages, but each mode decides differently HOW it's
-  // placed per page (see objectTypes/letterhead.js's header comment).
-  const letterheadObjects = objects.filter((o) => o.type === 'letterhead');
-  const skippedLetterheadPages = [];
-  for (const o of letterheadObjects) {
-    if (!o.src) continue;
-    const embedded = await embedImage(o.src);
-    const targetPages = resolveTargetPages(o.pagesRule, o.customRange, o.page, pdfPages.length);
-    for (const pageIdx of targetPages) {
-      const pdfPage = pdfPages[pageIdx];
-      const pageInfo = pagesInfo[pageIdx];
-      if (!pdfPage || !pageInfo) continue;
-
-      let wPx = o.w;
-      let hPx = o.h;
-      let yPx;
-      if (o.mode === 'overlay') {
-        yPx = o.y;
-      } else if (o.mode === 'scaleToFit') {
-        yPx = o.zone === 'bottom' ? pageInfo.height - hPx : 0;
-      } else {
-        const safeHeight = detectSafeZoneHeight(pageInfo.textBoxes, pageInfo.height, o.zone);
-        const MIN_USABLE_PX = 16;
-        if (safeHeight < MIN_USABLE_PX) {
-          skippedLetterheadPages.push(pageIdx + 1);
-          continue;
-        }
-        const scale = Math.min(1, safeHeight / o.h);
-        hPx = o.h * scale;
-        wPx = o.w * scale;
-        yPx = o.zone === 'bottom' ? pageInfo.height - hPx : 0;
-      }
-
-      const wPt = wPx / RENDER_SCALE;
-      const hPt = hPx / RENDER_SCALE;
-      const pdfX = o.x / RENDER_SCALE;
-      const pdfBottomY = (pageInfo.height - (yPx + hPx)) / RENDER_SCALE;
-      pdfPage.drawImage(embedded, { x: pdfX, y: pdfBottomY, width: wPt, height: hPt, opacity: o.opacity ?? 1 });
-    }
-  }
-
-  // Watermark, fourth pass — a rule object like Page Numbers/Letterhead:
+  // Watermark, third pass — a rule object like Page Numbers:
   // the object's own x/y/w/h (wherever it was dragged/resized/rotated)
   // is stamped identically onto every target page, using the exact same
   // rotation-anchor math as text.js's export branch above.
@@ -312,7 +264,7 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
     }
   }
 
-  // Footer, fifth pass — a rule object like Page Numbers, but with
+  // Footer, fourth pass — a rule object like Page Numbers, but with
   // user-authored text (optionally combined with a live page-number
   // suffix and a divider line) rather than Page Numbers' fixed format.
   const footerObjects = objects.filter((o) => o.type === 'footer');
@@ -350,10 +302,10 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
     }
   }
 
-  // QR Code, sixth pass — a rule object like Letterhead's Overlay mode:
-  // the same fixed x/y/w/h is stamped onto every target page (no Smart
-  // Layout/Scale-to-Fit equivalent — a QR code is small enough that a
-  // consistent, unconditional placement is the sensible default).
+  // QR Code, fifth pass — a rule object like Page Numbers/Watermark/Footer:
+  // the same fixed x/y/w/h is stamped onto every target page — a QR code
+  // is small enough that a consistent, unconditional placement is the
+  // sensible default.
   const qrCodeObjects = objects.filter((o) => o.type === 'qrcode');
   for (const o of qrCodeObjects) {
     if (!o.dataUrl) continue;
@@ -372,5 +324,5 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
   }
 
   const bytes = await pdfDoc.save();
-  return { bytes, skippedLetterheadPages };
+  return { bytes };
 }

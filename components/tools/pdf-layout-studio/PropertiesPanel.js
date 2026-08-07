@@ -44,10 +44,10 @@ function toggleBtn(active, onClick, content) {
 }
 
 // Shared "Page Selection" control for every rule-object element type (Page
-// Numbers, Letterhead, Watermark, Footer, QR Code) — all five now resolve
-// their target pages through pageSelection.js's resolveTargetPages(), so
-// they share this one selector+custom-range-input UI instead of each
-// duplicating the same five-option <select>.
+// Numbers, Watermark, Footer, QR Code) — all four resolve their target
+// pages through pageSelection.js's resolveTargetPages(), so they share this
+// one selector+custom-range-input UI instead of each duplicating the same
+// five-option <select>.
 function pagesRuleControl(o, onChange) {
   return (
     <>
@@ -223,41 +223,13 @@ export default function PropertiesPanel({
         </>
       )}
 
-      {(o.type === 'image' || o.type === 'signature' || o.type === 'letterhead') && (
+      {(o.type === 'image' || o.type === 'signature') && (
         <>
           {label('Aspect ratio')}
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#475569', cursor: 'pointer' }}>
             <input type="checkbox" checked={!!o.lockAspect} onChange={(e) => onChange({ lockAspect: e.target.checked })} />
             Lock aspect ratio
           </label>
-        </>
-      )}
-
-      {o.type === 'letterhead' && (
-        <>
-          {pagesRuleControl(o, onChange)}
-
-          {label('Mode')}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {toggleBtn(o.mode === 'overlay', () => onChange({ mode: 'overlay' }), 'Overlay')}
-            {toggleBtn(o.mode === 'scaleToFit', () => onChange({ mode: 'scaleToFit' }), 'Scale to Fit')}
-            {toggleBtn(o.mode === 'smartLayout', () => onChange({ mode: 'smartLayout' }), 'Smart Layout')}
-          </div>
-          <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '4px 0 0' }}>
-            {o.mode === 'overlay' && 'Placed exactly where you position it, on every page it applies to.'}
-            {o.mode === 'scaleToFit' && "Fit to a fixed band flush against the page's top or bottom edge, the same size on every page."}
-            {o.mode === 'smartLayout' && 'Detects clear space on each page and shrinks to fit it, skipping pages without enough room.'}
-          </p>
-
-          {o.mode !== 'overlay' && (
-            <>
-              {label('Edge')}
-              <div style={{ display: 'flex', gap: 6 }}>
-                {toggleBtn(o.zone === 'top', () => onChange({ zone: 'top' }), 'Top')}
-                {toggleBtn(o.zone === 'bottom', () => onChange({ zone: 'bottom' }), 'Bottom')}
-              </div>
-            </>
-          )}
         </>
       )}
 

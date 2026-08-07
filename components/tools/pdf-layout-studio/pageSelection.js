@@ -1,9 +1,9 @@
 // Shared "Page Selection" resolver for every rule-object element type
-// (Page Numbers, Letterhead, Watermark, Footer, QR Code) — the one place
-// all five now go through for "which pages does this apply to", replacing
-// each type's own ad hoc all/current-only check (see each type module's
-// earlier header comments, which explicitly deferred odd/even/custom
-// support to this cross-cutting pass rather than half-building it five
+// (Page Numbers, Watermark, Footer, QR Code) — the one place all four now
+// go through for "which pages does this apply to", replacing each type's
+// own ad hoc all/current-only check (see each type module's earlier header
+// comments, which explicitly deferred odd/even/custom support to this
+// cross-cutting pass rather than half-building it four
 // separate times). Consolidating here is what makes it cheap to have added
 // odd/even/custom-range support once for every element type at once.
 

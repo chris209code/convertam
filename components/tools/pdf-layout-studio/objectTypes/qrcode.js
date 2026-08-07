@@ -1,13 +1,11 @@
 'use client';
 
-// QR Code is a page-spanning "rule" object like pageNumber.js/letterhead.js
-// — one placed object can apply to many pages via pagesRule (see
-// ../pageSelection.js), unlike Image/Logo which are always single-page.
-// Unlike Letterhead, it always uses the same fixed x/y/w/h on every target
-// page (no Smart Layout/Scale-to-Fit modes) — a QR code is small and
-// meant to sit in a consistent spot (e.g. bottom-right), so there's no
-// real "avoid overlapping content" problem worth solving here the way
-// there is for a full-width letterhead graphic.
+// QR Code is a page-spanning "rule" object like pageNumber.js — one placed
+// object can apply to many pages via pagesRule (see ../pageSelection.js),
+// unlike Image/Logo which are always single-page. It always uses the same
+// fixed x/y/w/h on every target page — a QR code is small and meant to sit
+// in a consistent spot (e.g. bottom-right), so there's no real "avoid
+// overlapping content" problem worth solving here.
 //
 // The actual QR matrix is generated client-side via the same
 // qr-code-styling + generateQrDataUrl() helper already used by Invoice

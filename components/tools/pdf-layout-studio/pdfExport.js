@@ -138,7 +138,16 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
       const padding = 18;
       const bottom = Math.max(0, minY - padding);
       const top = Math.min(pageHeightPt, maxY + padding);
-      return top > bottom ? { bottom, top } : null;
+      if (!(top > bottom)) return null;
+      // A crop that comes out implausibly thin relative to the page is a
+      // sign the detection misfired (e.g. an invisible/OCR text layer whose
+      // positions don't line up with what's actually visible on the page)
+      // rather than a genuinely short letter — trusting it could crop out
+      // real visible content. Discarding it here falls back to treating the
+      // whole page as the content, same as before this detection existed,
+      // which is always safe even if less tightly cropped.
+      if (top - bottom < pageHeightPt * 0.1) return null;
+      return { bottom, top };
     } catch {
       return null;
     }
@@ -193,10 +202,22 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
       if (o.mode === 'pushDown') {
         const originalPage = pdfDoc.getPage(pageIdx);
         const { width: pageWidthPt, height: pageHeightPt } = originalPage.getSize();
-        const contentBoundsPt = await detectTextContentBoundsPt(pageIdx, pageHeightPt);
-        const embeddedOriginal = contentBoundsPt
-          ? await pdfDoc.embedPage(originalPage, { left: 0, right: pageWidthPt, bottom: contentBoundsPt.bottom, top: contentBoundsPt.top })
-          : await pdfDoc.embedPage(originalPage);
+        let contentBoundsPt = await detectTextContentBoundsPt(pageIdx, pageHeightPt);
+        // The cropped embed is attempted first, but never trusted blindly —
+        // if pdf-lib rejects the bounds, or silently hands back something
+        // degenerate for a PDF whose structure this detection didn't
+        // anticipate, falling back to embedding the FULL page (the always-
+        // safe, previously-shipped behavior) guarantees the letter's
+        // content is never the thing that goes missing.
+        let embeddedOriginal;
+        try {
+          embeddedOriginal = contentBoundsPt
+            ? await pdfDoc.embedPage(originalPage, { left: 0, right: pageWidthPt, bottom: contentBoundsPt.bottom, top: contentBoundsPt.top })
+            : await pdfDoc.embedPage(originalPage);
+        } catch {
+          contentBoundsPt = null;
+          embeddedOriginal = await pdfDoc.embedPage(originalPage);
+        }
         const contentHeightPt = contentBoundsPt ? contentBoundsPt.top - contentBoundsPt.bottom : pageHeightPt;
         const newPage = pdfDoc.insertPage(pageIdx, [pageWidthPt, pageHeightPt]);
         // bands' heights are measured in the letterhead IMAGE's own natural
@@ -205,9 +226,14 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
         // scaling by how much the user actually stretched it (o.h vs. the
         // natural height it was detected against) keeps the reserved bands
         // matching what's really drawn on the page.
-        const bandScale = bands ? o.h / bands.naturalHeight : 1;
-        const topPt = (bands ? bands.topContentHeight * bandScale : o.h) / RENDER_SCALE;
-        const bottomPt = (bands ? bands.bottomContentHeight * bandScale : 0) / RENDER_SCALE;
+        const bandScale = bands && bands.naturalHeight ? o.h / bands.naturalHeight : 1;
+        let topPt = (bands ? bands.topContentHeight * bandScale : o.h) / RENDER_SCALE;
+        let bottomPt = (bands ? bands.bottomContentHeight * bandScale : 0) / RENDER_SCALE;
+        // Guards against a degenerate band size (e.g. a corrupt/zero
+        // naturalHeight) ever collapsing the reserved space to something
+        // that would make the content below unreadable or invisible.
+        if (!isFinite(topPt) || topPt < 0) topPt = o.h / RENDER_SCALE;
+        if (!isFinite(bottomPt) || bottomPt < 0) bottomPt = 0;
         const availableHeightPt = Math.max(0, pageHeightPt - topPt - bottomPt);
 
         if (o.shrinkToFit !== false && pageHeightPt > 0 && contentHeightPt > 0) {

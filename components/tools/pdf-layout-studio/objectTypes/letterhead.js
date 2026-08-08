@@ -33,10 +33,10 @@ export const interaction = 'select';
 
 export function createDefaults({ src, w, h, naturalWidth, naturalHeight } = {}) {
   return {
-    src, w, h, naturalWidth: naturalWidth || w, naturalHeight: naturalHeight || h,
+    src, originalSrc: src, w, h, naturalWidth: naturalWidth || w, naturalHeight: naturalHeight || h,
     lockAspect: true, mode: 'overlay', pagesRule: 'all', opacity: 1,
     solidBackground: false, backgroundColor: '#FFFFFF',
-    shrinkToFit: true,
+    shrinkToFit: true, bgRemoved: false,
   };
 }
 

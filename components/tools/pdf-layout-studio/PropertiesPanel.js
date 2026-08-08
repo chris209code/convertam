@@ -87,6 +87,7 @@ export default function PropertiesPanel({
   onToggleLockById, onToggleHideById, onRenameObject,
   onReorderZ, onDuplicateSelected, onDeleteSelected,
   onRegenerateQrCode,
+  onToggleLetterheadBackgroundRemoval, bgRemovingId,
 }) {
   const [tab, setTab] = useState('properties');
   const o = selectedObject;
@@ -235,6 +236,22 @@ export default function PropertiesPanel({
 
       {o.type === 'letterhead' && (
         <>
+          {label('Background')}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#475569', cursor: bgRemovingId === o.id ? 'default' : 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={!!o.bgRemoved}
+              disabled={bgRemovingId === o.id}
+              onChange={(e) => onToggleLetterheadBackgroundRemoval(o.id, e.target.checked)}
+            />
+            {bgRemovingId === o.id ? 'Removing background…' : 'Remove white background'}
+          </label>
+          <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '4px 0 0' }}>
+            {o.bgRemoved
+              ? 'Areas that were near-white are now transparent, so content underneath can show through in Overlay mode.'
+              : 'If the image you uploaded has a plain white background, this makes it transparent so it doesn’t block content underneath.'}
+          </p>
+
           {pagesRuleControl(o, onChange)}
 
           {label('Mode')}

@@ -12,6 +12,7 @@ import { MAX_FILE_BYTES, RENDER_SCALE, DATE_FORMATS } from './constants';
 import { createObject } from './objectTypes';
 import { generateQrDataUrl } from '@/lib/invoice-studio/qrGenerate';
 import { applyLayoutToPdf, extractPageInfo } from './pdfExport';
+import { removeWhiteBackground } from './removeWhiteBackground';
 import ElementsPanel from './ElementsPanel';
 import PropertiesPanel from './PropertiesPanel';
 import Toolbar from './Toolbar';
@@ -75,6 +76,7 @@ export default function PdfLayoutStudioWorkspace() {
   const [selectedId, setSelectedId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
+  const [bgRemovingId, setBgRemovingId] = useState(null);
   const [dateFormatId, setDateFormatId] = useState(() => {
     if (typeof window === 'undefined') return DATE_FORMATS[0].id;
     return window.localStorage.getItem(DATE_FORMAT_STORAGE_KEY) || DATE_FORMATS[0].id;
@@ -397,6 +399,32 @@ export default function PdfLayoutStudioWorkspace() {
     }
   }
 
+  // Strips a near-white background from an uploaded letterhead image on
+  // request (see removeWhiteBackground.js) — most letterhead files people
+  // download are flat JPGs/PNGs with an opaque white canvas baked in, which
+  // otherwise blocks whatever's underneath in Overlay mode. Keeps the
+  // original upload around as `originalSrc` so turning the toggle back off
+  // restores it exactly, instead of re-processing or re-uploading.
+  async function toggleLetterheadBackgroundRemoval(id, enabled) {
+    const obj = objectsRef.current.find((o) => o.id === id);
+    if (!obj) return;
+    if (!enabled) {
+      commit(objectsRef.current.map((o) => (o.id === id ? { ...o, src: o.originalSrc, bgRemoved: false, updatedAt: Date.now() } : o)));
+      setResultBytes(null);
+      return;
+    }
+    setBgRemovingId(id);
+    try {
+      const src = await removeWhiteBackground(obj.originalSrc || obj.src);
+      commit(objectsRef.current.map((o) => (o.id === id ? { ...o, src, bgRemoved: true, updatedAt: Date.now() } : o)));
+      setResultBytes(null);
+    } catch {
+      setError('Could not remove the background from that image. Please try again.');
+    } finally {
+      setBgRemovingId(null);
+    }
+  }
+
   useKeyboardShortcuts({
     enabled: pages.length > 0,
     onUndo: undo,
@@ -655,6 +683,8 @@ export default function PdfLayoutStudioWorkspace() {
           onDuplicateSelected={duplicateSelected}
           onDeleteSelected={deleteSelected}
           onRegenerateQrCode={regenerateQrCode}
+          onToggleLetterheadBackgroundRemoval={toggleLetterheadBackgroundRemoval}
+          bgRemovingId={bgRemovingId}
         />
       </div>
 

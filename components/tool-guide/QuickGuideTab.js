@@ -25,7 +25,7 @@ const seenKey = (toolSlug) => `convertam:guide-seen:${toolSlug}`;
 // closed — however it was opened — that key is set, so it never auto-opens
 // again on that tool for that visitor. Every other tool with its own guide
 // gets its own independent first-visit moment.
-export default function QuickGuideTab({ guide, toolSlug, children }) {
+export default function QuickGuideTab({ guide, toolSlug, children, disableAutoOpen = false }) {
   const [open, setOpen] = useState(false);
   const autoOpenTimer = useRef(null);
 
@@ -39,7 +39,11 @@ export default function QuickGuideTab({ guide, toolSlug, children }) {
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!guide || !toolSlug) return;
+    // Canvas/editor-style workspaces (e.g. PDF Layout Studio) need their full
+    // width the moment the page loads — auto-popping a 420px guide panel over
+    // that would undercut the very thing the workspace is trying to give the
+    // user. The manual "Quick Guide" pill trigger stays available either way.
+    if (disableAutoOpen || !guide || !toolSlug) return;
     try {
       if (localStorage.getItem(seenKey(toolSlug))) return;
     } catch {
@@ -51,7 +55,7 @@ export default function QuickGuideTab({ guide, toolSlug, children }) {
       } catch {}
     }, 900);
     return () => clearTimeout(autoOpenTimer.current);
-  }, [guide, toolSlug]);
+  }, [guide, toolSlug, disableAutoOpen]);
 
   function close() {
     setOpen(false);

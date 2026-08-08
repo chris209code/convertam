@@ -115,8 +115,16 @@ export default function ToolPageClient({ tool }) {
 
   return (
     <WorkspaceLayoutShell>
-    <QuickGuideTab guide={guide} toolSlug={tool.slug}>
-      <main className="max-w-5xl mx-auto px-5 md:px-10 py-10">
+    <QuickGuideTab guide={guide} toolSlug={tool.slug} disableAutoOpen={tool.mode === 'pdf-overlay'}>
+      {/* PDF Layout Studio is a Canva-like canvas editor — the standard
+          max-w-5xl reading-width cap (shared by every other, mostly
+          form/text tool page) was quietly capping its total width to
+          ~1024px regardless of viewport size or whether the Quick Guide
+          panel was open, which is what kept leaving dead space beside the
+          document even after the canvas's own fit-to-width scale was
+          raised. Only this tool drops the cap; every other tool page is
+          unaffected. */}
+      <main className={`${tool.mode === 'pdf-overlay' ? 'w-full' : 'max-w-5xl mx-auto'} px-5 md:px-10 py-10`}>
         {hub ? (
           <Link href={`/${hub.slug}`} className="inline-block font-mono text-xs text-stamp-amber tracking-wide mb-2 hover:underline">
             {tool.category.toUpperCase()}

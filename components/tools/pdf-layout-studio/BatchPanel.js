@@ -31,6 +31,12 @@ function downloadBlob(blob, filename) {
 export default function BatchPanel({ hasLayout, onProcessFile }) {
   const [queue, setQueue] = useState([]); // [{ file, status: 'pending'|'processing'|'done'|'error', bytes, error }]
   const [busy, setBusy] = useState(false);
+  // A truly `disabled` Process button gives zero feedback on click — the
+  // exact "I clicked and nothing happened" complaint this tool already had
+  // once (see batch upload). So the button always stays clickable; clicking
+  // it while there's no layout yet surfaces this instead of silently doing
+  // nothing, and clears itself once an element gets added.
+  const [blockedAttempt, setBlockedAttempt] = useState(false);
 
   function addFiles(fileList) {
     const files = Array.from(fileList || []).filter((f) => f.type === 'application/pdf');
@@ -40,6 +46,15 @@ export default function BatchPanel({ hasLayout, onProcessFile }) {
 
   function removeAt(index) {
     setQueue((q) => q.filter((_, i) => i !== index));
+  }
+
+  function handleProcessClick() {
+    if (!hasLayout) {
+      setBlockedAttempt(true);
+      return;
+    }
+    setBlockedAttempt(false);
+    processAll();
   }
 
   async function processAll() {
@@ -91,9 +106,19 @@ export default function BatchPanel({ hasLayout, onProcessFile }) {
         <span style={{ fontSize: '0.78rem', color: '#334155' }}>Click to add PDFs, or drag them here</span>
       </label>
       {!hasLayout && (
-        <p style={{ fontSize: '0.7rem', color: '#B45309', margin: '6px 0 0' }}>
-          You can queue files now, but add at least one element above (letterhead, watermark, stamp, etc.) before processing — otherwise there&apos;s nothing to stamp them with.
-        </p>
+        <div style={{
+          marginTop: 8, padding: '8px 10px', borderRadius: 8,
+          background: blockedAttempt ? '#FEF3C7' : '#F8FAFC',
+          border: `1px solid ${blockedAttempt ? '#F59E0B' : '#E2E8F0'}`,
+          display: 'flex', alignItems: 'flex-start', gap: 6,
+        }}>
+          <span aria-hidden="true">{blockedAttempt ? '⚠️' : 'ℹ️'}</span>
+          <p style={{ fontSize: '0.74rem', color: blockedAttempt ? '#92400E' : '#64748B', margin: 0, fontWeight: blockedAttempt ? 700 : 400 }}>
+            {blockedAttempt
+              ? "Nothing to process yet — add at least one element above (letterhead, watermark, stamp, etc.) first, then click Process again."
+              : "You can queue files now, but add at least one element above (letterhead, watermark, stamp, etc.) before processing — otherwise there's nothing to stamp them with."}
+          </p>
+        </div>
       )}
 
       {queue.length > 0 && (
@@ -121,10 +146,10 @@ export default function BatchPanel({ hasLayout, onProcessFile }) {
       {queue.length > 0 && (
         <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
           <button
-            onClick={processAll}
-            disabled={busy || remainingCount === 0 || !hasLayout}
+            onClick={handleProcessClick}
+            disabled={busy || remainingCount === 0}
             title={!hasLayout ? 'Add at least one element to the layout above first' : undefined}
-            style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.78rem', cursor: (remainingCount === 0 || !hasLayout) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: busy || remainingCount === 0 || !hasLayout ? 0.7 : 1 }}
+            style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.78rem', cursor: remainingCount === 0 ? 'default' : 'pointer', fontFamily: 'inherit', opacity: busy || remainingCount === 0 ? 0.7 : 1 }}
           >
             {busy ? 'Processing…' : `Process ${remainingCount} file${remainingCount !== 1 ? 's' : ''}`}
           </button>

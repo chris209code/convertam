@@ -86,12 +86,15 @@ export default function BatchPanel({ hasLayout, onProcessFile }) {
         Upload other PDFs to stamp with the exact same elements you just built — same letterhead, watermark, stamps, page numbers, and QR codes.
       </p>
 
-      <label className="dropzone block cursor-pointer" style={{ padding: '14px', textAlign: 'center', opacity: hasLayout ? 1 : 0.6 }}>
-        <input type="file" accept="application/pdf" multiple hidden disabled={!hasLayout} onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
-        <span style={{ fontSize: '0.78rem', color: hasLayout ? '#334155' : '#94A3B8' }}>
-          {hasLayout ? 'Click to add PDFs, or drag them here' : 'Add at least one element to the layout first'}
-        </span>
+      <label className="dropzone block cursor-pointer" style={{ padding: '14px', textAlign: 'center' }}>
+        <input type="file" accept="application/pdf" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
+        <span style={{ fontSize: '0.78rem', color: '#334155' }}>Click to add PDFs, or drag them here</span>
       </label>
+      {!hasLayout && (
+        <p style={{ fontSize: '0.7rem', color: '#B45309', margin: '6px 0 0' }}>
+          You can queue files now, but add at least one element above (letterhead, watermark, stamp, etc.) before processing — otherwise there&apos;s nothing to stamp them with.
+        </p>
+      )}
 
       {queue.length > 0 && (
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto' }}>
@@ -119,8 +122,9 @@ export default function BatchPanel({ hasLayout, onProcessFile }) {
         <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
           <button
             onClick={processAll}
-            disabled={busy || remainingCount === 0}
-            style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.78rem', cursor: remainingCount === 0 ? 'default' : 'pointer', fontFamily: 'inherit', opacity: busy || remainingCount === 0 ? 0.7 : 1 }}
+            disabled={busy || remainingCount === 0 || !hasLayout}
+            title={!hasLayout ? 'Add at least one element to the layout above first' : undefined}
+            style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.78rem', cursor: (remainingCount === 0 || !hasLayout) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: busy || remainingCount === 0 || !hasLayout ? 0.7 : 1 }}
           >
             {busy ? 'Processing…' : `Process ${remainingCount} file${remainingCount !== 1 ? 's' : ''}`}
           </button>

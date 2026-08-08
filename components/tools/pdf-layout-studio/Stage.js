@@ -52,7 +52,12 @@ export default function Stage({
     if (!page || !wrapper) return;
     function recompute() {
       const available = Math.max(120, wrapper.clientWidth - 32);
-      setBaseScale(computeFitToWidthScale(page.width, available));
+      // Default max is 1 (never upscale) — too conservative now that the
+      // Elements panel moved to a top bar and freed up real width here;
+      // without raising this, a page narrower than the available column
+      // just sits at native size with dead space beside it instead of
+      // actually using the room it was given.
+      setBaseScale(computeFitToWidthScale(page.width, available, { max: 2.5 }));
     }
     recompute();
     const ro = new ResizeObserver(recompute);

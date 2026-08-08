@@ -558,7 +558,20 @@ export default function PdfLayoutStudioWorkspace() {
           <p className="font-semibold text-ink text-sm">{file?.name}</p>
           <p className="text-xs text-ink-soft">{pages.length} page{pages.length !== 1 ? 's' : ''}</p>
         </div>
-        <button className="btn-ghost-sm" onClick={reset}>Change file</button>
+        {/* Primary action pinned up here (not just at the bottom, past a
+            potentially tall page canvas) so it's visible without scrolling
+            regardless of how the document is zoomed or how many elements
+            are on the page. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {resultBytes ? (
+            <button className="btn btn-primary" onClick={downloadResult}>Download PDF</button>
+          ) : (
+            <button className="btn btn-primary" disabled={busy || objects.length === 0} onClick={handleApply}>
+              {busy ? 'Generating…' : 'Apply Layout'}
+            </button>
+          )}
+          <button className="btn-ghost-sm" onClick={reset}>Change file</button>
+        </div>
       </div>
 
       <ElementsPanel

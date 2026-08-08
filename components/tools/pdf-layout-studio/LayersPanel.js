@@ -15,7 +15,7 @@ function actionBtn(danger, disabled) {
 function typeIcon(o) {
   if (o.type === 'shape') return { rectangle: '▭', ellipse: '⬭', line: '➖' }[o.shapeKind] || '⬛';
   if (o.type === 'image') return o.kind === 'logo' ? '🏷️' : '🖼️';
-  return { text: '🅣', signature: '✍️', pageNumber: '#️⃣', watermark: '💧', stamp: '🖋️', footer: '📏', qrcode: '🔳' }[o.type] || '•';
+  return { text: '🅣', signature: '✍️', pageNumber: '#️⃣', letterhead: '📰', watermark: '💧', stamp: '🖋️', footer: '📏', qrcode: '🔳' }[o.type] || '•';
 }
 
 // Layers tab content: every object on the current page, front-to-back

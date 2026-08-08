@@ -21,7 +21,7 @@ function downloadBlob(blob, filename) {
 // the exact same export pipeline the single-document Apply Layout button
 // uses), so there's exactly one implementation of "how a layout gets
 // applied to a PDF," not a second copy that could quietly drift from it.
-// Rule objects (Page Numbers/Watermark/Footer/QR Code) resolve their own
+// Rule objects (Page Numbers/Letterhead/Watermark/Footer/QR Code) resolve their own
 // target pages against each batch file's own page count, so "All pages"/
 // "Odd pages"/etc. adapt correctly even when a batch file has a different
 // page count than the main document; single-page objects (text/image/
@@ -83,7 +83,7 @@ export default function BatchPanel({ hasLayout, onProcessFile }) {
     <div style={{ marginTop: 16, border: '1px solid #E2E8F0', borderRadius: 12, padding: 14 }}>
       <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0F172A', margin: '0 0 4px' }}>Batch: apply this layout to more PDFs</p>
       <p style={{ fontSize: '0.74rem', color: '#64748B', margin: '0 0 10px' }}>
-        Upload other PDFs to stamp with the exact same elements you just built — same watermark, stamps, page numbers, and QR codes.
+        Upload other PDFs to stamp with the exact same elements you just built — same letterhead, watermark, stamps, page numbers, and QR codes.
       </p>
 
       <label className="dropzone block cursor-pointer" style={{ padding: '14px', textAlign: 'center', opacity: hasLayout ? 1 : 0.6 }}>

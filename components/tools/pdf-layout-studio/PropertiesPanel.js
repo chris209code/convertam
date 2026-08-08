@@ -44,10 +44,10 @@ function toggleBtn(active, onClick, content) {
 }
 
 // Shared "Page Selection" control for every rule-object element type (Page
-// Numbers, Watermark, Footer, QR Code) — all four resolve their target
-// pages through pageSelection.js's resolveTargetPages(), so they share this
-// one selector+custom-range-input UI instead of each duplicating the same
-// five-option <select>.
+// Numbers, Letterhead, Watermark, Footer, QR Code) — all five resolve
+// their target pages through pageSelection.js's resolveTargetPages(), so
+// they share this one selector+custom-range-input UI instead of each
+// duplicating the same five-option <select>.
 function pagesRuleControl(o, onChange) {
   return (
     <>
@@ -135,7 +135,7 @@ export default function PropertiesPanel({
         <div>
           <span style={{ fontSize: '0.68rem', color: '#94A3B8' }}>Width</span>
           {numberField(o.w, (v) => {
-            if ((o.type === 'image' || o.type === 'signature') && o.lockAspect && o.naturalWidth) {
+            if ((o.type === 'image' || o.type === 'signature' || o.type === 'letterhead') && o.lockAspect && o.naturalWidth) {
               onChange({ w: v, h: Math.round((v / o.naturalWidth) * o.naturalHeight) });
             } else onChange({ w: v });
           }, { min: 8 })}
@@ -143,7 +143,7 @@ export default function PropertiesPanel({
         <div>
           <span style={{ fontSize: '0.68rem', color: '#94A3B8' }}>Height</span>
           {numberField(o.h, (v) => {
-            if ((o.type === 'image' || o.type === 'signature') && o.lockAspect && o.naturalHeight) {
+            if ((o.type === 'image' || o.type === 'signature' || o.type === 'letterhead') && o.lockAspect && o.naturalHeight) {
               onChange({ h: v, w: Math.round((v / o.naturalHeight) * o.naturalWidth) });
             } else onChange({ h: v });
           }, { min: 8 })}
@@ -223,13 +223,64 @@ export default function PropertiesPanel({
         </>
       )}
 
-      {(o.type === 'image' || o.type === 'signature') && (
+      {(o.type === 'image' || o.type === 'signature' || o.type === 'letterhead') && (
         <>
           {label('Aspect ratio')}
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#475569', cursor: 'pointer' }}>
             <input type="checkbox" checked={!!o.lockAspect} onChange={(e) => onChange({ lockAspect: e.target.checked })} />
             Lock aspect ratio
           </label>
+        </>
+      )}
+
+      {o.type === 'letterhead' && (
+        <>
+          {pagesRuleControl(o, onChange)}
+
+          {label('Mode')}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {toggleBtn(o.mode === 'overlay', () => onChange({ mode: 'overlay' }), 'Overlay')}
+            {toggleBtn(o.mode === 'pushDown', () => onChange({ mode: 'pushDown' }), 'Push Content Down')}
+          </div>
+
+          {o.mode === 'overlay' && (
+            <>
+              <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '4px 0 0' }}>
+                Placed exactly where you position it, on every page it applies to. Whatever is underneath stays exactly where it is.
+              </p>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#475569', cursor: 'pointer', marginTop: 8 }}>
+                <input type="checkbox" checked={!!o.solidBackground} onChange={(e) => onChange({ solidBackground: e.target.checked })} />
+                Add a solid background behind it
+              </label>
+              {o.solidBackground && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                  <input type="color" value={o.backgroundColor} onChange={(e) => onChange({ backgroundColor: e.target.value })} style={{ width: 22, height: 22, padding: 0, border: 'none', cursor: 'pointer' }} />
+                  <span style={{ fontSize: '0.72rem', color: '#64748B' }}>Fills in any transparent areas of the image so nothing shows through.</span>
+                </div>
+              )}
+            </>
+          )}
+
+          {o.mode === 'pushDown' && (
+            <>
+              <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '4px 0 0' }}>
+                Reserves this element's height as a band at the top of each page, and shifts the page&apos;s own content down to make room — the letterhead never covers existing text. Other elements you&apos;ve placed here (text, stamps, etc.) keep their own position and aren&apos;t shifted along with it.
+              </p>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#475569', cursor: 'pointer', marginTop: 8 }}>
+                <input type="checkbox" checked={o.shrinkToFit !== false} onChange={(e) => onChange({ shrinkToFit: e.target.checked })} />
+                Shrink content to fit (recommended)
+              </label>
+              {o.shrinkToFit === false ? (
+                <p style={{ fontSize: '0.68rem', color: '#B45309', margin: '6px 0 0' }}>
+                  ⚠️ With this off, content near the bottom of a page can be pushed past the page edge and lost. Turn it on to guarantee nothing is cut off.
+                </p>
+              ) : (
+                <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '6px 0 0' }}>
+                  The page&apos;s content is scaled down just enough to fit below the letterhead, so nothing is lost.
+                </p>
+              )}
+            </>
+          )}
         </>
       )}
 

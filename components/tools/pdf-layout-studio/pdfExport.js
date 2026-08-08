@@ -81,7 +81,6 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
   const { PDFDocument, degrees, rgb } = await import('pdf-lib');
   const pdfDoc = await PDFDocument.load(pdfBytes);
   const embedFor = createFontEmbedCache(pdfDoc);
-  const pdfPages = pdfDoc.getPages();
   const imageEmbedCache = new Map();
 
   async function embedImage(src) {
@@ -92,8 +91,70 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
     return imageEmbedCache.get(src);
   }
 
+  // Letterhead, first pass — runs before everything else, and before
+  // `pdfPages` below is captured, because Push Down mode can REPLACE a
+  // target page's underlying PDFPage object (see applyLetterheadToPage()),
+  // which would leave a `pdfPages` array grabbed earlier pointing at
+  // stale/orphaned pages for every pass that runs after it.
+  //
+  // Push Down works by treating the page's own pre-existing content as one
+  // atomic block via pdf-lib's embedPage/drawPage — not true per-paragraph
+  // reflow, which no tool can do reliably for an arbitrary PDF. The whole
+  // block is shifted down by the letterhead's height (reserved as a band
+  // at the page's top edge) and, if shrinkToFit is on (the default),
+  // scaled down just enough to still fit in the remaining space so nothing
+  // is lost; with it off, content already close to the bottom of the page
+  // can be pushed past the page edge — disclosed in the Properties panel,
+  // not silently swallowed. Other placed objects (text, stamps, page
+  // numbers, ...) are NOT part of this shifted block; they keep their own
+  // position regardless of a letterhead's mode.
+  const letterheadObjects = objects.filter((o) => o.type === 'letterhead');
+  for (const o of letterheadObjects) {
+    if (!o.src) continue;
+    const embedded = await embedImage(o.src);
+    const targetPages = resolveTargetPages(o.pagesRule, o.customRange, o.page, pdfDoc.getPageCount());
+    const wPt = o.w / RENDER_SCALE;
+    const hPt = o.h / RENDER_SCALE;
+    const pdfX = o.x / RENDER_SCALE;
+
+    for (const pageIdx of targetPages) {
+      const pageInfo = pagesInfo[pageIdx];
+      if (!pageInfo) continue;
+
+      if (o.mode === 'pushDown') {
+        const originalPage = pdfDoc.getPage(pageIdx);
+        const { width: pageWidthPt, height: pageHeightPt } = originalPage.getSize();
+        const embeddedOriginal = await pdfDoc.embedPage(originalPage);
+        const newPage = pdfDoc.insertPage(pageIdx, [pageWidthPt, pageHeightPt]);
+        const availableHeightPt = Math.max(0, pageHeightPt - hPt);
+
+        if (o.shrinkToFit !== false && pageHeightPt > 0) {
+          const scale = availableHeightPt / pageHeightPt;
+          const drawnWidth = pageWidthPt * scale;
+          const drawnHeight = pageHeightPt * scale;
+          newPage.drawPage(embeddedOriginal, { x: (pageWidthPt - drawnWidth) / 2, y: 0, width: drawnWidth, height: drawnHeight });
+        } else {
+          newPage.drawPage(embeddedOriginal, { x: 0, y: -hPt, width: pageWidthPt, height: pageHeightPt });
+        }
+
+        newPage.drawImage(embedded, { x: pdfX, y: pageHeightPt - hPt, width: wPt, height: hPt, opacity: o.opacity ?? 1 });
+        pdfDoc.removePage(pageIdx + 1); // the original page, now shifted one index later
+      } else {
+        const pdfPage = pdfDoc.getPage(pageIdx);
+        const pdfBottomY = (pageInfo.height - (o.y + o.h)) / RENDER_SCALE;
+        if (o.solidBackground) {
+          const bg = hexToRgbFractions(o.backgroundColor);
+          pdfPage.drawRectangle({ x: pdfX, y: pdfBottomY, width: wPt, height: hPt, color: rgb(bg.r, bg.g, bg.b) });
+        }
+        pdfPage.drawImage(embedded, { x: pdfX, y: pdfBottomY, width: wPt, height: hPt, opacity: o.opacity ?? 1 });
+      }
+    }
+  }
+
+  const pdfPages = pdfDoc.getPages();
+
   for (const o of objects) {
-    if (o.type === 'pageNumber' || o.type === 'watermark' || o.type === 'footer' || o.type === 'qrcode') continue; // handled separately below — these can span many pages
+    if (o.type === 'pageNumber' || o.type === 'letterhead' || o.type === 'watermark' || o.type === 'footer' || o.type === 'qrcode') continue; // handled separately — letterhead above, the rest below (all can span many pages)
     const pdfPage = pdfPages[o.page];
     if (!pdfPage) continue;
     const pageInfoForObject = pagesInfo[o.page];

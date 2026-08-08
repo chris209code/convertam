@@ -286,6 +286,42 @@ export default function PdfLayoutStudioWorkspace() {
     setSelectedId(obj.id);
   }
 
+  // Letterhead is placed flush near the top of the page by default (a
+  // header graphic, not a centered decoration) — unlike Image/Logo's
+  // page-centered placement. Capped on BOTH axes, not just width — a
+  // letterhead graphic whose natural aspect ratio is closer to a full
+  // page than a header strip (a common real-world asset) would otherwise
+  // scale to nearly the page's full height too, visually swallowing the
+  // document by default. The user can still resize it larger themselves;
+  // this only controls the size it lands at on insert. Its w/h here is
+  // also the "reference" band height Push Down mode reserves at the top
+  // (see pdfExport.js).
+  function placeLetterhead(src, naturalWidth, naturalHeight) {
+    const page = pages[activePage];
+    if (!page) return;
+    const maxW = page.width * 0.7;
+    const maxH = page.height * 0.3;
+    const scale = Math.min(1, maxW / naturalWidth, maxH / naturalHeight);
+    const w = naturalWidth * scale;
+    const h = naturalHeight * scale;
+    const obj = createObject('letterhead', {
+      page: activePage, x: (page.width - w) / 2, y: 16, nextId, nextZ,
+      src, w, h, naturalWidth, naturalHeight,
+    });
+    commitPageObjects([...pageObjects, obj]);
+    setSelectedId(obj.id);
+  }
+
+  async function addLetterheadFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    try {
+      const { dataUrl, naturalWidth, naturalHeight } = await fileToPngDataUrl(file);
+      placeLetterhead(dataUrl, naturalWidth, naturalHeight);
+    } catch {
+      setError('Could not insert that letterhead. Please try a different file.');
+    }
+  }
+
   function addWatermark() {
     const page = pages[activePage];
     if (!page) return;
@@ -498,7 +534,7 @@ export default function PdfLayoutStudioWorkspace() {
           </div>
         )}
         <p className="text-sm text-ink-soft mb-4">
-          Upload a PDF and build a professional layout on top of it — add text, images, logos, signatures, shapes, dates, page numbers, watermarks, stamps, and QR codes directly on the page.
+          Upload a PDF and build a professional layout on top of it — add text, images, logos, signatures, shapes, dates, page numbers, letterheads, watermarks, stamps, and QR codes directly on the page.
         </p>
         <label className="dropzone block cursor-pointer"
           onDragOver={(e) => e.preventDefault()}
@@ -533,6 +569,7 @@ export default function PdfLayoutStudioWorkspace() {
         onInsertDateTime={insertDateTime}
         onAddShape={addShape}
         onAddPageNumber={addPageNumber}
+        onChooseLetterhead={(e) => addLetterheadFile(e.target.files?.[0])}
         onAddWatermark={addWatermark}
         onAddStamp={addStamp}
         onAddFooter={addFooter}

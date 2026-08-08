@@ -35,10 +35,11 @@ function divider() {
 
 export default function ElementsPanel({
   onAddText, onChooseImage, onChooseLogo, onToggleSignaturePad, onInsertDateTime, onAddShape, onAddPageNumber,
-  onAddWatermark, onAddStamp, onAddFooter, onAddQrCode,
+  onChooseLetterhead, onAddWatermark, onAddStamp, onAddFooter, onAddQrCode,
 }) {
   const imageInputRef = useRef(null);
   const logoInputRef = useRef(null);
+  const letterheadInputRef = useRef(null);
 
   return (
     <div style={{ marginBottom: 12 }}>
@@ -70,6 +71,9 @@ export default function ElementsPanel({
         <button onClick={onAddPageNumber} title="Add page numbers" style={toolBtn()}>
           <span aria-hidden="true">#️⃣</span> Page #
         </button>
+        <button onClick={() => letterheadInputRef.current?.click()} title="Upload a letterhead header graphic" style={toolBtn()}>
+          <span aria-hidden="true">📰</span> Letterhead
+        </button>
         <button onClick={onAddFooter} title="Add a footer line, optionally with page numbers" style={toolBtn()}>
           <span aria-hidden="true">📏</span> Footer
         </button>
@@ -91,6 +95,7 @@ export default function ElementsPanel({
 
       <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={(e) => { onChooseImage(e); e.target.value = ''; }} />
       <input ref={logoInputRef} type="file" accept="image/*" hidden onChange={(e) => { onChooseLogo(e); e.target.value = ''; }} />
+      <input ref={letterheadInputRef} type="file" accept="image/*" hidden onChange={(e) => { onChooseLetterhead(e); e.target.value = ''; }} />
       <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '6px 0 0' }}>Barcodes are on the way.</p>
     </div>
   );

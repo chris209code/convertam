@@ -92,6 +92,58 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
     return imageEmbedCache.get(src);
   }
 
+  // Lazily parses the ORIGINAL bytes with pdf.js — a completely separate
+  // parse from pdf-lib's own document model above — so Push Down can find
+  // where a page's actual text starts and ends. Without this, "shrink to
+  // fit" scales the whole page including its own built-in margins, so a
+  // normal letter's blank space above/below the text gets preserved
+  // proportionally and shrinks right along with it, leaving the actual
+  // words looking tiny inside mostly-empty space. A fresh copy of the
+  // bytes is used because pdf.js transfers/detaches whatever buffer it's
+  // given to its worker, which must not disturb pdf-lib's already-loaded
+  // model above.
+  let pdfJsDocPromise = null;
+  function getPdfJsDoc() {
+    if (!pdfJsDocPromise) {
+      pdfJsDocPromise = (async () => {
+        const pdfjsLib = await import('pdfjs-dist');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+        return pdfjsLib.getDocument({ data: pdfBytes.slice(0) }).promise;
+      })();
+    }
+    return pdfJsDocPromise;
+  }
+
+  // Returns { bottom, top } in PDF points marking the vertical extent of
+  // real text on a page, padded a little for ascenders/descenders — or
+  // null when there's no extractable text (a scanned/image-only page, or
+  // pdf.js failing for any reason), so callers fall back to treating the
+  // whole page as the content, unchanged from before this existed.
+  async function detectTextContentBoundsPt(pageIndex, pageHeightPt) {
+    try {
+      const doc = await getPdfJsDoc();
+      if (pageIndex + 1 > doc.numPages) return null;
+      const page = await doc.getPage(pageIndex + 1);
+      const content = await page.getTextContent();
+      let minY = Infinity;
+      let maxY = -Infinity;
+      for (const item of content.items) {
+        if (!item.str || !item.str.trim()) continue;
+        const y = item.transform[5];
+        const rise = item.height || Math.abs(item.transform[3]) || 10;
+        if (y < minY) minY = y;
+        if (y + rise > maxY) maxY = y + rise;
+      }
+      if (!isFinite(minY) || !isFinite(maxY)) return null;
+      const padding = 18;
+      const bottom = Math.max(0, minY - padding);
+      const top = Math.min(pageHeightPt, maxY + padding);
+      return top > bottom ? { bottom, top } : null;
+    } catch {
+      return null;
+    }
+  }
+
   // Letterhead, first pass — runs before everything else, and before
   // `pdfPages` below is captured, because Push Down mode can REPLACE a
   // target page's underlying PDFPage object (see applyLetterheadToPage()),
@@ -141,19 +193,43 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
       if (o.mode === 'pushDown') {
         const originalPage = pdfDoc.getPage(pageIdx);
         const { width: pageWidthPt, height: pageHeightPt } = originalPage.getSize();
-        const embeddedOriginal = await pdfDoc.embedPage(originalPage);
+        const contentBoundsPt = await detectTextContentBoundsPt(pageIdx, pageHeightPt);
+        const embeddedOriginal = contentBoundsPt
+          ? await pdfDoc.embedPage(originalPage, { left: 0, right: pageWidthPt, bottom: contentBoundsPt.bottom, top: contentBoundsPt.top })
+          : await pdfDoc.embedPage(originalPage);
+        const contentHeightPt = contentBoundsPt ? contentBoundsPt.top - contentBoundsPt.bottom : pageHeightPt;
         const newPage = pdfDoc.insertPage(pageIdx, [pageWidthPt, pageHeightPt]);
-        const topPt = (bands ? bands.topContentHeight : o.h) / RENDER_SCALE;
-        const bottomPt = (bands ? bands.bottomContentHeight : 0) / RENDER_SCALE;
+        // bands' heights are measured in the letterhead IMAGE's own natural
+        // pixel space (see contentBands.js), which only matches page-space
+        // px 1:1 if the object happens to be placed at its native size —
+        // scaling by how much the user actually stretched it (o.h vs. the
+        // natural height it was detected against) keeps the reserved bands
+        // matching what's really drawn on the page.
+        const bandScale = bands ? o.h / bands.naturalHeight : 1;
+        const topPt = (bands ? bands.topContentHeight * bandScale : o.h) / RENDER_SCALE;
+        const bottomPt = (bands ? bands.bottomContentHeight * bandScale : 0) / RENDER_SCALE;
         const availableHeightPt = Math.max(0, pageHeightPt - topPt - bottomPt);
 
-        if (o.shrinkToFit !== false && pageHeightPt > 0) {
-          const scale = availableHeightPt / pageHeightPt;
+        if (o.shrinkToFit !== false && pageHeightPt > 0 && contentHeightPt > 0) {
+          // Capped at 1 — cropping out the page's own margins above means
+          // there's usually already room to fit at full, un-shrunk size;
+          // never blow the text up past its real size; the same cap keeps
+          // the plain-page fallback (contentBoundsPt === null) exactly as
+          // it always scaled before this cropping existed.
+          const scale = Math.min(1, availableHeightPt / contentHeightPt);
           const drawnWidth = pageWidthPt * scale;
-          const drawnHeight = pageHeightPt * scale;
-          newPage.drawPage(embeddedOriginal, { x: (pageWidthPt - drawnWidth) / 2, y: bottomPt, width: drawnWidth, height: drawnHeight });
+          const drawnHeight = contentHeightPt * scale;
+          // Centered in the leftover vertical space (if the content, even
+          // at full size, doesn't fill the whole reserved band) rather than
+          // jammed against the bottom — reads as intentional, balanced
+          // margins instead of the content floating arbitrarily.
+          newPage.drawPage(embeddedOriginal, {
+            x: (pageWidthPt - drawnWidth) / 2,
+            y: bottomPt + (availableHeightPt - drawnHeight) / 2,
+            width: drawnWidth, height: drawnHeight,
+          });
         } else {
-          newPage.drawPage(embeddedOriginal, { x: 0, y: bottomPt - topPt, width: pageWidthPt, height: pageHeightPt });
+          newPage.drawPage(embeddedOriginal, { x: 0, y: pageHeightPt - topPt - contentHeightPt, width: pageWidthPt, height: contentHeightPt });
         }
 
         newPage.drawImage(embedded, { x: pdfX, y: pageHeightPt - hPt, width: wPt, height: hPt, opacity: o.opacity ?? 1 });

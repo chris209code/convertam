@@ -5,6 +5,7 @@ import { RENDER_SCALE } from './constants';
 import { formatPageNumberText } from './objectTypes/pageNumber';
 import { buildFooterText } from './objectTypes/footer';
 import { resolveTargetPages } from './pageSelection';
+import { detectContentBands } from './contentBands';
 
 // The full object-layout export pipeline, extracted out of
 // PdfLayoutStudioWorkspace.js so it has exactly one implementation shared
@@ -99,13 +100,21 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
   //
   // Push Down works by treating the page's own pre-existing content as one
   // atomic block via pdf-lib's embedPage/drawPage — not true per-paragraph
-  // reflow, which no tool can do reliably for an arbitrary PDF. The whole
-  // block is shifted down by the letterhead's height (reserved as a band
-  // at the page's top edge) and, if shrinkToFit is on (the default),
-  // scaled down just enough to still fit in the remaining space so nothing
-  // is lost; with it off, content already close to the bottom of the page
-  // can be pushed past the page edge — disclosed in the Properties panel,
-  // not silently swallowed. Other placed objects (text, stamps, page
+  // reflow, which no tool can do reliably for an arbitrary PDF. By default
+  // (no usable transparency in the letterhead image — see
+  // contentBands.js's `bands === null` case) the whole block is shifted
+  // down by the letterhead's full height, reserved as one band at the
+  // page's top edge — the right behavior for a plain header graphic. When
+  // the image has a real transparent gap (a bordered design with header
+  // art on top and footer art at the bottom, meant to frame the actual
+  // letter content), only the header's real height is reserved at the top
+  // and the footer's real height at the bottom, so content lands in the
+  // gap between them instead of being squeezed under the whole image.
+  // Either way, if shrinkToFit is on (the default), the block is scaled
+  // down just enough to still fit in whatever space remains so nothing is
+  // lost; with it off, content already close to the bottom of the page can
+  // be pushed past the page edge — disclosed in the Properties panel, not
+  // silently swallowed. Other placed objects (text, stamps, page
   // numbers, ...) are NOT part of this shifted block; they keep their own
   // position regardless of a letterhead's mode.
   const letterheadObjects = objects.filter((o) => o.type === 'letterhead');
@@ -116,6 +125,14 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
     const wPt = o.w / RENDER_SCALE;
     const hPt = o.h / RENDER_SCALE;
     const pdfX = o.x / RENDER_SCALE;
+    // Computed once per letterhead object (not per target page) — a
+    // bordered design (header art + footer art + transparent middle) only
+    // reserves its real header/footer heights as bands instead of its
+    // whole bounding box, so content lands in the transparent gap between
+    // them instead of being squeezed under the entire image. A plain,
+    // non-transparent header image (or one with no real gap) falls back to
+    // `bands === null`, which keeps the original single-band behavior.
+    const bands = o.mode === 'pushDown' ? await detectContentBands(o.src) : null;
 
     for (const pageIdx of targetPages) {
       const pageInfo = pagesInfo[pageIdx];
@@ -126,15 +143,17 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
         const { width: pageWidthPt, height: pageHeightPt } = originalPage.getSize();
         const embeddedOriginal = await pdfDoc.embedPage(originalPage);
         const newPage = pdfDoc.insertPage(pageIdx, [pageWidthPt, pageHeightPt]);
-        const availableHeightPt = Math.max(0, pageHeightPt - hPt);
+        const topPt = (bands ? bands.topContentHeight : o.h) / RENDER_SCALE;
+        const bottomPt = (bands ? bands.bottomContentHeight : 0) / RENDER_SCALE;
+        const availableHeightPt = Math.max(0, pageHeightPt - topPt - bottomPt);
 
         if (o.shrinkToFit !== false && pageHeightPt > 0) {
           const scale = availableHeightPt / pageHeightPt;
           const drawnWidth = pageWidthPt * scale;
           const drawnHeight = pageHeightPt * scale;
-          newPage.drawPage(embeddedOriginal, { x: (pageWidthPt - drawnWidth) / 2, y: 0, width: drawnWidth, height: drawnHeight });
+          newPage.drawPage(embeddedOriginal, { x: (pageWidthPt - drawnWidth) / 2, y: bottomPt, width: drawnWidth, height: drawnHeight });
         } else {
-          newPage.drawPage(embeddedOriginal, { x: 0, y: -hPt, width: pageWidthPt, height: pageHeightPt });
+          newPage.drawPage(embeddedOriginal, { x: 0, y: bottomPt - topPt, width: pageWidthPt, height: pageHeightPt });
         }
 
         newPage.drawImage(embedded, { x: pdfX, y: pageHeightPt - hPt, width: wPt, height: hPt, opacity: o.opacity ?? 1 });

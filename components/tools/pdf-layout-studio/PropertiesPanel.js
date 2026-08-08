@@ -280,8 +280,14 @@ export default function PropertiesPanel({
 
           {o.mode === 'pushDown' && (
             <>
-              <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '4px 0 0' }}>
-                Reserves this element's height as a band at the top of each page, and shifts the page&apos;s own content down to make room — the letterhead never covers existing text. Other elements you&apos;ve placed here (text, stamps, etc.) keep their own position and aren&apos;t shifted along with it.
+              <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: '#EFF6FF', border: '1px solid #BFDBFE', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                <span aria-hidden="true">ℹ️</span>
+                <p style={{ fontSize: '0.72rem', color: '#1E3A8A', margin: 0 }}>
+                  You won&apos;t see this shift here in the editor — the page preview always shows your original document. Click <strong>Apply Layout</strong> (or Download) to see the real, shifted result.
+                </p>
+              </div>
+              <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '8px 0 0' }}>
+                Reserves space at the top of each page so the letterhead never covers your content. If this image has a transparent gap in the middle — a bordered design with header art at the top and footer art at the bottom — only the real header height is reserved up top and the footer&apos;s real height at the bottom, so your content flows into the gap between them. If the image has no transparency at all, its whole height (<strong>{Math.round(o.h)}px</strong> right now) is reserved as one band instead — so a taller plain letterhead pushes content down further; shrink the Height above if that turns out bigger than you expected. Other elements you&apos;ve placed here (text, stamps, etc.) keep their own position and aren&apos;t shifted along with it.
               </p>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#475569', cursor: 'pointer', marginTop: 8 }}>
                 <input type="checkbox" checked={o.shrinkToFit !== false} onChange={(e) => onChange({ shrinkToFit: e.target.checked })} />

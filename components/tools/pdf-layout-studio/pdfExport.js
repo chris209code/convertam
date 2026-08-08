@@ -234,6 +234,22 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
         // that would make the content below unreadable or invisible.
         if (!isFinite(topPt) || topPt < 0) topPt = o.h / RENDER_SCALE;
         if (!isFinite(bottomPt) || bottomPt < 0) bottomPt = 0;
+        // A letterhead placed taller than the page itself (or just close to
+        // it) can make the reserved top+bottom bands add up to the WHOLE
+        // page — leaving nothing for the actual letter, which then gets
+        // drawn at zero height (invisible) rather than merely small. Always
+        // guaranteeing at least 15% of the page for real content converts
+        // "letter silently vanishes" into "letter is visible, just close to
+        // the letterhead" — worse-looking in that extreme case, but never
+        // a blank page.
+        const minContentFraction = 0.15;
+        const maxReservedPt = pageHeightPt * (1 - minContentFraction);
+        const totalReservedPt = topPt + bottomPt;
+        if (totalReservedPt > maxReservedPt && totalReservedPt > 0) {
+          const shrink = maxReservedPt / totalReservedPt;
+          topPt *= shrink;
+          bottomPt *= shrink;
+        }
         const availableHeightPt = Math.max(0, pageHeightPt - topPt - bottomPt);
 
         if (o.shrinkToFit !== false && pageHeightPt > 0 && contentHeightPt > 0) {

@@ -37,6 +37,12 @@ export function createDefaults({ src, w, h, naturalWidth, naturalHeight } = {}) 
     lockAspect: true, mode: 'overlay', pagesRule: 'all', opacity: 1,
     solidBackground: false, backgroundColor: '#FFFFFF',
     shrinkToFit: true, bgRemoved: false,
+    // Push Down band reservation: 'auto' detects header/footer art from the
+    // image itself (see contentBands.js); 'manual' uses manualTopPx/
+    // manualBottomPx instead, set by dragging the guide lines on the page
+    // (Stage.js) or typing exact values (PropertiesPanel.js) — an escape
+    // hatch for designs where auto-detection doesn't land well.
+    bandMode: 'auto', manualTopPx: null, manualBottomPx: null,
   };
 }
 

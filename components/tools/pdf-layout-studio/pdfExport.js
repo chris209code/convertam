@@ -5,7 +5,7 @@ import { RENDER_SCALE } from './constants';
 import { formatPageNumberText } from './objectTypes/pageNumber';
 import { buildFooterText } from './objectTypes/footer';
 import { resolveTargetPages } from './pageSelection';
-import { detectContentBands } from './contentBands';
+import { detectContentBands, computeAutoBandsPx, applyMinContentFloorPx } from './contentBands';
 
 // The full object-layout export pipeline, extracted out of
 // PdfLayoutStudioWorkspace.js so it has exactly one implementation shared
@@ -192,8 +192,10 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
     // whole bounding box, so content lands in the transparent gap between
     // them instead of being squeezed under the entire image. A plain,
     // non-transparent header image (or one with no real gap) falls back to
-    // `bands === null`, which keeps the original single-band behavior.
-    const bands = o.mode === 'pushDown' ? await detectContentBands(o.src) : null;
+    // `bands === null`, which keeps the original single-band behavior. Only
+    // needed in 'auto' mode — a 'manual' letterhead uses the user's own
+    // typed/dragged numbers instead and skips this detection entirely.
+    const bands = o.mode === 'pushDown' && o.bandMode !== 'manual' ? await detectContentBands(o.src) : null;
 
     for (const pageIdx of targetPages) {
       const pageInfo = pagesInfo[pageIdx];
@@ -243,35 +245,24 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
         }
         const contentHeightPt = contentBoundsPt ? contentBoundsPt.top - contentBoundsPt.bottom : pageHeightPt;
         const newPage = pdfDoc.insertPage(pageIdx, [pageWidthPt, pageHeightPt]);
-        // bands' heights are measured in the letterhead IMAGE's own natural
-        // pixel space (see contentBands.js), which only matches page-space
-        // px 1:1 if the object happens to be placed at its native size —
-        // scaling by how much the user actually stretched it (o.h vs. the
-        // natural height it was detected against) keeps the reserved bands
-        // matching what's really drawn on the page.
-        const bandScale = bands && bands.naturalHeight ? effHPx / bands.naturalHeight : 1;
-        let topPt = (bands ? bands.topContentHeight * bandScale : effHPt) / RENDER_SCALE;
-        let bottomPt = (bands ? bands.bottomContentHeight * bandScale : 0) / RENDER_SCALE;
-        // Guards against a degenerate band size (e.g. a corrupt/zero
-        // naturalHeight) ever collapsing the reserved space to something
-        // that would make the content below unreadable or invisible.
-        if (!isFinite(topPt) || topPt < 0) topPt = effHPt / RENDER_SCALE;
-        if (!isFinite(bottomPt) || bottomPt < 0) bottomPt = 0;
-        // Even a page-fitted letterhead can have header+footer art that
-        // itself occupies most of the image (a very deep bordered design),
-        // which would still leave little room for the letter. Always
-        // guaranteeing at least 30% of the page for real content keeps the
-        // result usable — legible body text — rather than a sliver, while
-        // still respecting the design's own header/footer proportions in
-        // the common case where they don't need to be shrunk at all.
-        const minContentFraction = 0.3;
-        const maxReservedPt = pageHeightPt * (1 - minContentFraction);
-        const totalReservedPt = topPt + bottomPt;
-        if (totalReservedPt > maxReservedPt && totalReservedPt > 0) {
-          const shrink = maxReservedPt / totalReservedPt;
-          topPt *= shrink;
-          bottomPt *= shrink;
-        }
+        const pageHeightPx = pageHeightPt * RENDER_SCALE;
+        // 'manual' mode uses the user's own typed/dragged reservation
+        // (Stage.js's draggable guides / PropertiesPanel's number fields)
+        // instead of detecting it from the image — an escape hatch for
+        // designs (or placements) where auto-detection doesn't land well.
+        // Both paths still go through the same shared floor below (see
+        // contentBands.js) so a careless manual value can't zero out the
+        // content either. bands' heights are measured in the letterhead
+        // IMAGE's own natural pixel space, which only matches page-space px
+        // 1:1 if the object happens to be placed at its native size —
+        // computeAutoBandsPx scales by effHPx (how tall it's actually being
+        // drawn, already capped to the page above) to keep the reserved
+        // bands matching what's really on the page.
+        const { topPx, bottomPx } = o.bandMode === 'manual'
+          ? applyMinContentFloorPx(Math.max(0, o.manualTopPx || 0), Math.max(0, o.manualBottomPx || 0), pageHeightPx)
+          : computeAutoBandsPx({ bands, effHPx, pageHeightPx });
+        const topPt = topPx / RENDER_SCALE;
+        const bottomPt = bottomPx / RENDER_SCALE;
         const availableHeightPt = Math.max(0, pageHeightPt - topPt - bottomPt);
 
         if (o.shrinkToFit !== false && pageHeightPt > 0 && contentHeightPt > 0) {

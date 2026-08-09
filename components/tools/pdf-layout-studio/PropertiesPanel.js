@@ -283,12 +283,45 @@ export default function PropertiesPanel({
               <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: '#EFF6FF', border: '1px solid #BFDBFE', display: 'flex', gap: 6, alignItems: 'flex-start' }}>
                 <span aria-hidden="true">ℹ️</span>
                 <p style={{ fontSize: '0.72rem', color: '#1E3A8A', margin: 0 }}>
-                  You won&apos;t see this shift here in the editor — the page preview always shows your original document. Click <strong>Apply Layout</strong> (or Download) to see the real, shifted result.
+                  You won&apos;t see the page content shift here — the preview always shows your original document. The red and green lines on the page below show where header/footer space is reserved right now; drag them, or click <strong>Apply Layout</strong> (or Download) to see the real result.
                 </p>
               </div>
-              <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '8px 0 0' }}>
-                Reserves space at the top of each page so the letterhead never covers your content. If this image has a transparent gap in the middle — a bordered design with header art at the top and footer art at the bottom — only the real header height is reserved up top and the footer&apos;s real height at the bottom, so your content flows into the gap between them. If the image has no transparency at all, its whole height (<strong>{Math.round(o.h)}px</strong> right now) is reserved as one band instead — so a taller plain letterhead pushes content down further; shrink the Height above if that turns out bigger than you expected. Other elements you&apos;ve placed here (text, stamps, etc.) keep their own position and aren&apos;t shifted along with it.
-              </p>
+
+              {label('Content area')}
+              <div style={{ display: 'flex', gap: 6 }}>
+                {toggleBtn(o.bandMode !== 'manual', () => onChange({ bandMode: 'auto' }), 'Auto-detect')}
+                {toggleBtn(o.bandMode === 'manual', () => onChange({
+                  bandMode: 'manual',
+                  manualTopPx: o.manualTopPx ?? Math.round(o.h),
+                  manualBottomPx: o.manualBottomPx ?? 0,
+                }), 'Manual')}
+              </div>
+
+              {o.bandMode === 'manual' ? (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
+                    <div>
+                      <span style={{ fontSize: '0.68rem', color: '#94A3B8' }}>Header space (px)</span>
+                      {numberField(o.manualTopPx ?? 0, (v) => onChange({ manualTopPx: Math.max(0, v) }), { min: 0 })}
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.68rem', color: '#94A3B8' }}>Footer space (px)</span>
+                      {numberField(o.manualBottomPx ?? 0, (v) => onChange({ manualBottomPx: Math.max(0, v) }), { min: 0 })}
+                    </div>
+                  </div>
+                  <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '6px 0 0' }}>
+                    Drag the red (header) and green (footer) lines directly on the page, or type exact pixel values here. Your letter content fills whatever&apos;s left between them.
+                  </p>
+                  <button onClick={() => onChange({ bandMode: 'auto', manualTopPx: null, manualBottomPx: null })} style={{ marginTop: 6, background: 'none', border: 'none', color: '#2563EB', fontSize: '0.72rem', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+                    Reset to auto-detect
+                  </button>
+                </>
+              ) : (
+                <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '6px 0 0' }}>
+                  Reserves space at the top of each page so the letterhead never covers your content. If this image has a transparent gap in the middle — a bordered design with header art at the top and footer art at the bottom — only the real header height is reserved up top and the footer&apos;s real height at the bottom, so your content flows into the gap between them. If the image has no transparency at all, its whole height (<strong>{Math.round(o.h)}px</strong> right now) is reserved as one band instead. If this doesn&apos;t land well for your design, switch to <strong>Manual</strong> above and drag the guide lines yourself.
+                </p>
+              )}
+
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#475569', cursor: 'pointer', marginTop: 8 }}>
                 <input type="checkbox" checked={o.shrinkToFit !== false} onChange={(e) => onChange({ shrinkToFit: e.target.checked })} />
                 Shrink content to fit (recommended)
@@ -299,7 +332,7 @@ export default function PropertiesPanel({
                 </p>
               ) : (
                 <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '6px 0 0' }}>
-                  The page&apos;s content is scaled down just enough to fit below the letterhead, so nothing is lost.
+                  The page&apos;s content is scaled down just enough to fit in the space between the header and footer, so nothing is lost.
                 </p>
               )}
             </>

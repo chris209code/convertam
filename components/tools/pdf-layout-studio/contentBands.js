@@ -85,3 +85,36 @@ export function detectContentBands(srcDataUrl, { alphaThreshold = 10 } = {}) {
     img.src = srcDataUrl;
   });
 }
+
+// Guarantees at least `minContentFraction` of the page stays free for real
+// content even when the requested top+bottom reservation (whether
+// auto-detected or manually typed/dragged) would otherwise eat almost the
+// whole page — shrinking both proportionally rather than favoring one side.
+// Pure and synchronous so both the export pipeline and the live editor
+// guides can call it and always agree on the same numbers.
+export function applyMinContentFloorPx(topPx, bottomPx, pageHeightPx, minContentFraction = 0.3) {
+  const maxReservedPx = pageHeightPx * (1 - minContentFraction);
+  const totalPx = topPx + bottomPx;
+  if (totalPx > maxReservedPx && totalPx > 0) {
+    const shrink = maxReservedPx / totalPx;
+    return { topPx: topPx * shrink, bottomPx: bottomPx * shrink };
+  }
+  return { topPx, bottomPx };
+}
+
+// Turns an already-detected `bands` result (or null, for a plain
+// non-transparent header) plus how tall the letterhead is actually being
+// drawn (`effHPx` — already capped to fit within the page, see
+// pdfExport.js) into final top/bottom reserved-space pixel amounts, with
+// the safety floor above applied. This is the one place that math lives —
+// pdfExport.js's export pass and Stage.js's on-canvas guide lines both call
+// this so a letterhead in "Auto-detect" mode always shows the SAME
+// reservation in the editor that it produces in the actual download.
+export function computeAutoBandsPx({ bands, effHPx, pageHeightPx, minContentFraction = 0.3 }) {
+  const bandScale = bands && bands.naturalHeight ? effHPx / bands.naturalHeight : 1;
+  let topPx = bands ? bands.topContentHeight * bandScale : effHPx;
+  let bottomPx = bands ? bands.bottomContentHeight * bandScale : 0;
+  if (!isFinite(topPx) || topPx < 0) topPx = effHPx;
+  if (!isFinite(bottomPx) || bottomPx < 0) bottomPx = 0;
+  return applyMinContentFloorPx(topPx, bottomPx, pageHeightPx, minContentFraction);
+}

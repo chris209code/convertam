@@ -255,15 +255,18 @@ export default function PropertiesPanel({
           {pagesRuleControl(o, onChange)}
 
           {label('Mode')}
+          <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '0 0 6px' }}>
+            Overlay works like most standard overlay tools — it places the letterhead directly on the page and never touches your content. Push Content Down instead tries to shift your content out of the way, which is more fragile and won&apos;t suit every design.
+          </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {toggleBtn(o.mode === 'overlay', () => onChange({ mode: 'overlay' }), 'Overlay')}
-            {toggleBtn(o.mode === 'pushDown', () => onChange({ mode: 'pushDown' }), 'Push Content Down')}
+            {toggleBtn(o.mode === 'overlay', () => onChange({ mode: 'overlay' }), 'Overlay (Recommended)')}
+            {toggleBtn(o.mode === 'pushDown', () => onChange({ mode: 'pushDown' }), 'Push Content Down (Advanced)')}
           </div>
 
           {o.mode === 'overlay' && (
             <>
               <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '4px 0 0' }}>
-                Placed exactly where you position it, on every page it applies to. Whatever is underneath stays exactly where it is.
+                Placed exactly where you position it, on every page it applies to. Whatever is underneath stays exactly where it is — like the letterhead placement in most standard PDF overlay tools.
               </p>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#475569', cursor: 'pointer', marginTop: 8 }}>
                 <input type="checkbox" checked={!!o.solidBackground} onChange={(e) => onChange({ solidBackground: e.target.checked })} />

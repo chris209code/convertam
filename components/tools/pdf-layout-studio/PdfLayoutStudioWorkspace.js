@@ -77,6 +77,15 @@ export default function PdfLayoutStudioWorkspace() {
   const [editingId, setEditingId] = useState(null);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [bgRemovingId, setBgRemovingId] = useState(null);
+  // Holds a letterhead image picked on the upload screen (see the two
+  // side-by-side dropzones below) BEFORE the main document has finished
+  // loading — placeLetterhead() needs `pages[activePage]` to exist, which
+  // it doesn't yet at that point. The effect below places it automatically
+  // the moment the document becomes available, so choosing both files
+  // up front, in either order, lands the letterhead pre-placed in the
+  // editor instead of requiring a second trip to the toolbar.
+  const [pendingLetterheadFile, setPendingLetterheadFile] = useState(null);
+  const [pendingLetterheadPreview, setPendingLetterheadPreview] = useState(null);
   const [dateFormatId, setDateFormatId] = useState(() => {
     if (typeof window === 'undefined') return DATE_FORMATS[0].id;
     return window.localStorage.getItem(DATE_FORMAT_STORAGE_KEY) || DATE_FORMATS[0].id;
@@ -92,6 +101,32 @@ export default function PdfLayoutStudioWorkspace() {
   // re-render) may have moved on in the meantime.
   const objectsRef = useRef(objects);
   useEffect(() => { objectsRef.current = objects; }, [objects]);
+
+  useEffect(() => {
+    if (pages.length > 0 && pendingLetterheadFile) {
+      addLetterheadFile(pendingLetterheadFile);
+      setPendingLetterheadFile(null);
+      setPendingLetterheadPreview(null);
+    }
+    // Only fires on the pages-become-available transition, not on every
+    // pendingLetterheadFile change (picking/clearing the file shouldn't
+    // itself trigger a placement attempt while still on the upload screen).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pages.length]);
+
+  function handlePendingLetterheadFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    if (pages.length > 0) { addLetterheadFile(file); return; }
+    setPendingLetterheadFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setPendingLetterheadPreview(reader.result);
+    reader.readAsDataURL(file);
+  }
+
+  function clearPendingLetterhead() {
+    setPendingLetterheadFile(null);
+    setPendingLetterheadPreview(null);
+  }
 
   function commitPageObjects(nextPageObjects) {
     const others = objects.filter((o) => o.page !== activePage);
@@ -542,6 +577,7 @@ export default function PdfLayoutStudioWorkspace() {
     setEditingId(null);
     setResultBytes(null);
     setError('');
+    clearPendingLetterhead();
   }
 
   if (!pages.length) {
@@ -564,14 +600,49 @@ export default function PdfLayoutStudioWorkspace() {
         <p className="text-sm text-ink-soft mb-4">
           Upload a PDF and build a professional layout on top of it — add text, images, logos, signatures, shapes, dates, page numbers, letterheads, watermarks, stamps, and QR codes directly on the page.
         </p>
-        <label className="dropzone block cursor-pointer"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => { e.preventDefault(); loadPdfIntoWorkspace(e.dataTransfer.files[0]); }}>
-          <input type="file" accept="application/pdf" onChange={handleFileInput} hidden />
-          <div className="dz-icon">[ PDF ]</div>
-          <div className="dz-main">Click to choose a PDF, or drag it here</div>
-          <div className="dz-sub">Max 100MB.</div>
-        </label>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'stretch' }}>
+          <label className="dropzone block cursor-pointer" style={{ flex: '1 1 260px' }}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => { e.preventDefault(); loadPdfIntoWorkspace(e.dataTransfer.files[0]); }}>
+            <input type="file" accept="application/pdf" onChange={handleFileInput} hidden />
+            <div className="dz-icon">[ PDF ]</div>
+            <div className="dz-main">1. Your document</div>
+            <div className="dz-sub">Click to choose a PDF, or drag it here. Max 100MB.</div>
+          </label>
+
+          {/* Optional second slot, side-by-side with the document upload —
+              like a standard two-file overlay tool — so a letterhead is
+              discoverable immediately instead of only after landing in the
+              editor and finding it in the toolbar. Picking it here just
+              queues the file; it's placed automatically (in simple Overlay
+              mode) the instant the document above finishes loading, in
+              whichever order the two were picked. */}
+          <label className="dropzone block cursor-pointer" style={{ flex: '1 1 260px' }}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => { e.preventDefault(); handlePendingLetterheadFile(e.dataTransfer.files[0]); }}>
+            <input type="file" accept="image/*" onChange={(e) => handlePendingLetterheadFile(e.target.files?.[0])} hidden />
+            {pendingLetterheadPreview ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={pendingLetterheadPreview} alt="" style={{ maxWidth: '100%', maxHeight: 90, borderRadius: 6, marginBottom: 6, objectFit: 'contain' }} />
+                <div className="dz-main">Letterhead ready — added once your document loads</div>
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); clearPendingLetterhead(); }}
+                  style={{ marginTop: 6, background: 'none', border: 'none', color: '#2563EB', fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline', padding: 0 }}
+                >
+                  Remove
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="dz-icon">[ IMG ]</div>
+                <div className="dz-main">2. Add a letterhead (optional)</div>
+                <div className="dz-sub">A logo or header image — click or drag it here. You can add or change this later too.</div>
+              </>
+            )}
+          </label>
+        </div>
         {loading && <p className="text-xs text-ink-soft mt-2">Loading PDF…</p>}
         {error && <div className="status error">{error}</div>}
         <p className="privacy-note">Processed entirely in your browser — your documents never leave your device.</p>

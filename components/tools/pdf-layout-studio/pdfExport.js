@@ -202,6 +202,29 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
       if (o.mode === 'pushDown') {
         const originalPage = pdfDoc.getPage(pageIdx);
         const { width: pageWidthPt, height: pageHeightPt } = originalPage.getSize();
+        // A full-page bordered letterhead is designed to span exactly one
+        // page's height, with header art at the top and footer art at the
+        // bottom. If it's been placed taller than the actual page, drawing
+        // it at that full height pushes its bottom portion (often the
+        // footer) past the page's bottom edge, where it simply isn't part
+        // of the visible page at all — reserving a footer band for art
+        // nobody can see both wastes space AND fails to protect what's
+        // actually shown. Scaling it down (preserving aspect ratio, kept
+        // centered on the same horizontal midpoint) so it fits within the
+        // page keeps the whole design visible and keeps the reserved bands
+        // proportional to what's really on the page, instead of inflating
+        // with however oversized the placement happens to be.
+        let effWPt = wPt;
+        let effHPt = hPt;
+        let effPdfX = pdfX;
+        if (effHPt > pageHeightPt) {
+          const fitScale = pageHeightPt / effHPt;
+          const centerX = pdfX + wPt / 2;
+          effHPt = pageHeightPt;
+          effWPt = wPt * fitScale;
+          effPdfX = centerX - effWPt / 2;
+        }
+        const effHPx = effHPt * RENDER_SCALE;
         let contentBoundsPt = await detectTextContentBoundsPt(pageIdx, pageHeightPt);
         // The cropped embed is attempted first, but never trusted blindly —
         // if pdf-lib rejects the bounds, or silently hands back something
@@ -226,23 +249,22 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
         // scaling by how much the user actually stretched it (o.h vs. the
         // natural height it was detected against) keeps the reserved bands
         // matching what's really drawn on the page.
-        const bandScale = bands && bands.naturalHeight ? o.h / bands.naturalHeight : 1;
-        let topPt = (bands ? bands.topContentHeight * bandScale : o.h) / RENDER_SCALE;
+        const bandScale = bands && bands.naturalHeight ? effHPx / bands.naturalHeight : 1;
+        let topPt = (bands ? bands.topContentHeight * bandScale : effHPt) / RENDER_SCALE;
         let bottomPt = (bands ? bands.bottomContentHeight * bandScale : 0) / RENDER_SCALE;
         // Guards against a degenerate band size (e.g. a corrupt/zero
         // naturalHeight) ever collapsing the reserved space to something
         // that would make the content below unreadable or invisible.
-        if (!isFinite(topPt) || topPt < 0) topPt = o.h / RENDER_SCALE;
+        if (!isFinite(topPt) || topPt < 0) topPt = effHPt / RENDER_SCALE;
         if (!isFinite(bottomPt) || bottomPt < 0) bottomPt = 0;
-        // A letterhead placed taller than the page itself (or just close to
-        // it) can make the reserved top+bottom bands add up to the WHOLE
-        // page — leaving nothing for the actual letter, which then gets
-        // drawn at zero height (invisible) rather than merely small. Always
-        // guaranteeing at least 15% of the page for real content converts
-        // "letter silently vanishes" into "letter is visible, just close to
-        // the letterhead" — worse-looking in that extreme case, but never
-        // a blank page.
-        const minContentFraction = 0.15;
+        // Even a page-fitted letterhead can have header+footer art that
+        // itself occupies most of the image (a very deep bordered design),
+        // which would still leave little room for the letter. Always
+        // guaranteeing at least 30% of the page for real content keeps the
+        // result usable — legible body text — rather than a sliver, while
+        // still respecting the design's own header/footer proportions in
+        // the common case where they don't need to be shrunk at all.
+        const minContentFraction = 0.3;
         const maxReservedPt = pageHeightPt * (1 - minContentFraction);
         const totalReservedPt = topPt + bottomPt;
         if (totalReservedPt > maxReservedPt && totalReservedPt > 0) {
@@ -274,7 +296,7 @@ export async function applyLayoutToPdf(pdfBytes, objects, pagesInfo) {
           newPage.drawPage(embeddedOriginal, { x: 0, y: pageHeightPt - topPt - contentHeightPt, width: pageWidthPt, height: contentHeightPt });
         }
 
-        newPage.drawImage(embedded, { x: pdfX, y: pageHeightPt - hPt, width: wPt, height: hPt, opacity: o.opacity ?? 1 });
+        newPage.drawImage(embedded, { x: effPdfX, y: pageHeightPt - effHPt, width: effWPt, height: effHPt, opacity: o.opacity ?? 1 });
         pdfDoc.removePage(pageIdx + 1); // the original page, now shifted one index later
       } else {
         const pdfPage = pdfDoc.getPage(pageIdx);

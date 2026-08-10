@@ -13,6 +13,7 @@ import { createObject } from './objectTypes';
 import { generateQrDataUrl } from '@/lib/invoice-studio/qrGenerate';
 import { applyLayoutToPdf, extractPageInfo } from './pdfExport';
 import { removeWhiteBackground } from './removeWhiteBackground';
+import CloudUploadButtons from '@/components/cloudUpload/CloudUploadButtons';
 import ElementsPanel from './ElementsPanel';
 import PropertiesPanel from './PropertiesPanel';
 import Toolbar from './Toolbar';
@@ -601,14 +602,17 @@ export default function PdfLayoutStudioWorkspace() {
           Upload a PDF and build a professional layout on top of it — add text, images, logos, signatures, shapes, dates, page numbers, letterheads, watermarks, stamps, and QR codes directly on the page.
         </p>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'stretch' }}>
-          <label className="dropzone block cursor-pointer" style={{ flex: '1 1 260px' }}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => { e.preventDefault(); loadPdfIntoWorkspace(e.dataTransfer.files[0]); }}>
-            <input type="file" accept="application/pdf" onChange={handleFileInput} hidden />
-            <div className="dz-icon">[ PDF ]</div>
-            <div className="dz-main">1. Your document</div>
-            <div className="dz-sub">Click to choose a PDF, or drag it here. Max 100MB.</div>
-          </label>
+          <div style={{ flex: '1 1 260px' }}>
+            <label className="dropzone block cursor-pointer"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { e.preventDefault(); loadPdfIntoWorkspace(e.dataTransfer.files[0]); }}>
+              <input type="file" accept="application/pdf" onChange={handleFileInput} hidden />
+              <div className="dz-icon">[ PDF ]</div>
+              <div className="dz-main">1. Your document</div>
+              <div className="dz-sub">Click to choose a PDF, or drag it here. Max 100MB.</div>
+            </label>
+            <CloudUploadButtons accept="application/pdf" onFile={loadPdfIntoWorkspace} />
+          </div>
 
           {/* Optional second slot, side-by-side with the document upload —
               like a standard two-file overlay tool — so a letterhead is
@@ -617,31 +621,34 @@ export default function PdfLayoutStudioWorkspace() {
               queues the file; it's placed automatically (in simple Overlay
               mode) the instant the document above finishes loading, in
               whichever order the two were picked. */}
-          <label className="dropzone block cursor-pointer" style={{ flex: '1 1 260px' }}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => { e.preventDefault(); handlePendingLetterheadFile(e.dataTransfer.files[0]); }}>
-            <input type="file" accept="image/*" onChange={(e) => handlePendingLetterheadFile(e.target.files?.[0])} hidden />
-            {pendingLetterheadPreview ? (
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={pendingLetterheadPreview} alt="" style={{ maxWidth: '100%', maxHeight: 90, borderRadius: 6, marginBottom: 6, objectFit: 'contain' }} />
-                <div className="dz-main">Letterhead ready — added once your document loads</div>
-                <button
-                  type="button"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); clearPendingLetterhead(); }}
-                  style={{ marginTop: 6, background: 'none', border: 'none', color: '#2563EB', fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline', padding: 0 }}
-                >
-                  Remove
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="dz-icon">[ IMG ]</div>
-                <div className="dz-main">2. Add a letterhead (optional)</div>
-                <div className="dz-sub">A logo or header image — click or drag it here. You can add or change this later too.</div>
-              </>
-            )}
-          </label>
+          <div style={{ flex: '1 1 260px' }}>
+            <label className="dropzone block cursor-pointer"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { e.preventDefault(); handlePendingLetterheadFile(e.dataTransfer.files[0]); }}>
+              <input type="file" accept="image/*" onChange={(e) => handlePendingLetterheadFile(e.target.files?.[0])} hidden />
+              {pendingLetterheadPreview ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={pendingLetterheadPreview} alt="" style={{ maxWidth: '100%', maxHeight: 90, borderRadius: 6, marginBottom: 6, objectFit: 'contain' }} />
+                  <div className="dz-main">Letterhead ready — added once your document loads</div>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); clearPendingLetterhead(); }}
+                    style={{ marginTop: 6, background: 'none', border: 'none', color: '#2563EB', fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline', padding: 0 }}
+                  >
+                    Remove
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="dz-icon">[ IMG ]</div>
+                  <div className="dz-main">2. Add a letterhead (optional)</div>
+                  <div className="dz-sub">A logo or header image — click or drag it here. You can add or change this later too.</div>
+                </>
+              )}
+            </label>
+            {!pendingLetterheadPreview && <CloudUploadButtons accept="image/*" onFile={handlePendingLetterheadFile} />}
+          </div>
         </div>
         {loading && <p className="text-xs text-ink-soft mt-2">Loading PDF…</p>}
         {error && <div className="status error">{error}</div>}

@@ -1,5 +1,6 @@
 import './globals.css';
 import { Space_Grotesk, IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
 import Script from 'next/script';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -95,6 +96,7 @@ export default function RootLayout({ children }) {
           <Footer />
           <FeedbackWidget />
         </DocumentSessionProvider>
+        <Analytics />
       </body>
     </html>
   );

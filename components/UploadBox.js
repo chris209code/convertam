@@ -1,5 +1,6 @@
 'use client';
 import { useRef, useState } from 'react';
+import CloudUploadButtons from './cloudUpload/CloudUploadButtons';
 
 const MAX_SIZE_MB = 100;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
@@ -85,6 +86,7 @@ export default function UploadBox({ accept, multiple, onFiles, label, compact })
         <div className="dz-main">{label || 'Click to choose a file, or drag it here'}</div>
         <div className="dz-sub">Max {MAX_SIZE_MB}MB per file.</div>
       </div>
+      <CloudUploadButtons accept={accept} onFile={(file) => validateFiles([file]) && onFiles([file])} />
       {sizeError && (
         <div className="status error mt-2">{sizeError}</div>
       )}

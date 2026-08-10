@@ -48,7 +48,7 @@ import DocumentTranslatorWorkspace from '@/components/tools/DocumentTranslatorWo
 import CoverLetterWriterWorkspace from '@/components/tools/CoverLetterWriterWorkspace';
 import LinkedInOptimizerWorkspace from '@/components/tools/LinkedInOptimizerWorkspace';
 import ContractSummarizerWorkspace from '@/components/tools/ContractSummarizerWorkspace';
-import PresentationGeneratorWorkspace from '@/components/tools/PresentationGeneratorWorkspace';
+import PresentationStudioWorkspace from '@/components/tools/presentation-studio/PresentationStudioWorkspace';
 import DataAnalystWorkspace from '@/components/tools/DataAnalystWorkspace';
 import ImageCompressorWorkspace from '@/components/tools/ImageCompressorWorkspace';
 import ImageResizerCropperWorkspace from '@/components/tools/ImageResizerCropperWorkspace';
@@ -224,7 +224,7 @@ export default function ToolPageClient({ tool }) {
         {tool.mode === 'cover-letter' && <CoverLetterWriterWorkspace />}
         {tool.mode === 'linkedin-optimizer' && <LinkedInOptimizerWorkspace />}
         {tool.mode === 'contract-summarizer' && <ContractSummarizerWorkspace />}
-        {tool.mode === 'presentation-generator' && <PresentationGeneratorWorkspace />}
+        {tool.mode === 'presentation-generator' && <PresentationStudioWorkspace />}
         {tool.mode === 'data-analyst' && <DataAnalystWorkspace />}
         {tool.mode === 'image-compressor' && <ImageCompressorWorkspace />}
         {tool.mode === 'resize-image' && <ImageResizerCropperWorkspace />}

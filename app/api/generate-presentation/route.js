@@ -11,6 +11,12 @@ const SLIDE_COUNT_GUIDANCE = {
 };
 
 const MAX_SOURCE_CHARS = 100000;
+// Leaves a buffer under this route's maxDuration=60s so a genuinely slow
+// Gemini call (large decks especially, for slideContent) fails with a
+// clean JSON error from our own code instead of getting hard-killed by the
+// hosting platform first, which returns a non-JSON error page the client
+// can't parse.
+const GEMINI_TIMEOUT_MS = 50000;
 
 function languageLine(language) {
   return language && language !== 'English' ? `Write the entire presentation in ${language}.` : '';
@@ -117,6 +123,7 @@ export async function POST(request) {
       const { parsed } = await callGemini({
         apiKey, toolName: 'generate-presentation:outline', routeName: '/api/generate-presentation', parts,
         schema: outlineSchema, maxOutputTokens: 4096, hasImage, inputSizeApprox: trimmedText?.length || 0,
+        timeoutMs: GEMINI_TIMEOUT_MS,
       });
       return Response.json(parsed);
     }
@@ -131,6 +138,7 @@ export async function POST(request) {
       const { parsed } = await callGemini({
         apiKey, toolName: 'generate-presentation:slide-content', routeName: '/api/generate-presentation', parts: [{ text: prompt }],
         schema: slideContentSchema, maxOutputTokens: 16384, inputSizeApprox: prompt.length,
+        timeoutMs: GEMINI_TIMEOUT_MS,
       });
       return Response.json(parsed);
     }

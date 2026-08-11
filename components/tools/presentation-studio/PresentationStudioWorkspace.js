@@ -31,6 +31,23 @@ function downloadBlob(blob, fileName) {
   URL.revokeObjectURL(url);
 }
 
+// A very slow generation (a large deck's slide-content call in particular)
+// can occasionally get killed by the hosting platform's own function
+// timeout before our server code gets a chance to respond — that comes
+// back as a plain-text/HTML error page, not JSON. Parsing defensively here
+// turns that into a readable message instead of a raw "Unexpected token"
+// JSON.parse error surfacing straight to the user.
+async function parseApiResponse(res) {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(res.status >= 500
+      ? 'The server took too long to respond. Please try again — a shorter presentation or fewer slides may help.'
+      : 'Something went wrong. Please try again.');
+  }
+}
+
 // Orchestrator for the AI Presentation Maker rebuild. Mounted at the same
 // 'presentation-generator' slug/mode as before — see components/ToolPageClient.js.
 //
@@ -84,7 +101,7 @@ export default function PresentationStudioWorkspace() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'outline', ...data, ...cfg }),
     });
-    const body = await res.json();
+    const body = await parseApiResponse(res);
     if (!res.ok) throw new Error(body.error || 'Could not generate an outline.');
     return body;
   }
@@ -130,7 +147,7 @@ export default function PresentationStudioWorkspace() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'slideContent', outline: finalOutline, tone: settings.tone, language: settings.language, sourceText: sourceData?.text || '' }),
       });
-      const body = await res.json();
+      const body = await parseApiResponse(res);
       if (!res.ok) throw new Error(body.error || 'Could not generate slide content.');
       const normalized = normalizeSlideContentResponse(body);
       const theme = getTheme(settings.theme);

@@ -134,7 +134,7 @@ const ALL_TOOLS = [
   { name: 'Compare Documents', href: '/compare-pdf' },
   { name: 'Redact & Edit PDF', href: '/redact-pdf' },
   { name: 'PDF Overlay', href: '/pdf-overlay' },
-  { name: 'PDF to Images', href: '/pdf-to-png' },
+  { name: 'PDF to Images', href: '/pdf-to-jpg' },
   { name: 'Write on PDF', href: '/write-on-pdf' },
   { name: 'Fill PDF Forms', href: '/fill-pdf' },
   { name: 'Sign Documents', href: '/sign-documents' },

@@ -81,7 +81,7 @@ function ToolLink({ tool, active, onNavigate, session, doc }) {
       if (wantsConversion) {
         e.preventDefault();
         onNavigate?.();
-        window.location.href = '/pdf-to-png';
+        window.location.href = '/pdf-to-jpg';
         return;
       }
     }

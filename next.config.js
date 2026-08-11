@@ -70,6 +70,15 @@ const nextConfig = {
       { source: '/profit-margin-calculator', destination: '/calculators/profit-margin', permanent: true },
       { source: '/discount-calculator', destination: '/calculators/discount-calculator', permanent: true },
       { source: '/age-calculator', destination: '/calculators/age-calculator', permanent: true },
+      // Pre-AdSense-resubmission content-quality pass: retired 4 tool
+      // pages that were a strict functional subset of a sibling tool (a
+      // "cookie cutter"/doorway-page pattern Google's spam policy calls
+      // out by name) — redirecting rather than 404ing preserves any
+      // existing backlinks/bookmarks to the old URLs.
+      { source: '/jpg-to-pdf', destination: '/images-to-pdf', permanent: true },
+      { source: '/png-to-pdf', destination: '/images-to-pdf', permanent: true },
+      { source: '/pdf-to-png', destination: '/pdf-to-jpg', permanent: true },
+      { source: '/webp-to-jpg', destination: '/convert-image-format', permanent: true },
     ];
   },
 };

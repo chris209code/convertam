@@ -17,8 +17,19 @@ function downloadBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-export default function PdfToImageWorkspace({ format }) {
+// Formerly two separate routes (pdf-to-jpg, pdf-to-png) sharing this exact
+// component with only a fixed output-format prop differing between them —
+// a textbook "cookie-cutter" duplicate-page pattern. Consolidated onto the
+// single pdf-to-jpg route with a real in-page format toggle instead; the
+// old /pdf-to-png URL now 301-redirects here (see next.config.js).
+const FORMATS = [
+  { value: 'jpg', label: 'JPG', mime: 'image/jpeg' },
+  { value: 'png', label: 'PNG', mime: 'image/png' },
+];
+
+export default function PdfToImageWorkspace({ format: initialFormat }) {
   const { session, startSession, getDocumentAsFile } = useDocumentSession();
+  const [format, setFormat] = useState(initialFormat === 'png' ? 'png' : 'jpg');
   const [file, setFile] = useState(null);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
@@ -26,10 +37,7 @@ export default function PdfToImageWorkspace({ format }) {
   const [pdfjsReady, setPdfjsReady] = useState(false);
   const [zipReady, setZipReady] = useState(false);
 
-  // pdf-to-png is pull-only (the output is images, so nothing feeds back
-  // into the session) — pdf-to-jpg shares this component but isn't part of
-  // the workspace group, so it stays a plain standalone tool.
-  const toolSlug = format === 'png' ? 'pdf-to-png' : 'pdf-to-jpg';
+  const toolSlug = 'pdf-to-jpg';
   const pullEnabled = canPullSessionDocument(toolSlug);
 
   function handleFiles(files, { fromSession = false } = {}) {
@@ -61,7 +69,7 @@ export default function PdfToImageWorkspace({ format }) {
       const buf = await file.arrayBuffer();
       const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
       const zip = new window.JSZip();
-      const mime = format === 'png' ? 'image/png' : 'image/jpeg';
+      const mime = FORMATS.find((f) => f.value === format).mime;
 
       for (let i = 1; i <= pdf.numPages; i++) {
         setStatus(`Rendering page ${i} of ${pdf.numPages}…`);
@@ -131,6 +139,24 @@ export default function PdfToImageWorkspace({ format }) {
           </div>
         </div>
       )}
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+        {FORMATS.map((f) => (
+          <button
+            key={f.value}
+            onClick={() => setFormat(f.value)}
+            disabled={busy}
+            style={{
+              padding: '8px 16px', borderRadius: 8, cursor: busy ? 'default' : 'pointer', fontSize: '0.82rem', fontWeight: 700, fontFamily: 'inherit',
+              border: format === f.value ? '2px solid #2563EB' : '1px solid #E2E8F0',
+              background: format === f.value ? '#EFF6FF' : 'white',
+              color: format === f.value ? '#2563EB' : '#475569',
+            }}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
 
       <div className="actions">
         <button

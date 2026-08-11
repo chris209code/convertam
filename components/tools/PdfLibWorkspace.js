@@ -37,8 +37,9 @@ async function loadPdfjs() {
 // Session, and how. merge/rotate/extract are full round-trip (pull the
 // session PDF, push their result back). split is pull-only — it fans one
 // document into many, so there's no single result to feed back (terminal
-// for v1, per the compatibility rules). image-to-pdf (jpg-to-pdf/png-to-pdf)
-// isn't part of this milestone's tool list and is left untouched.
+// for v1, per the compatibility rules). image-to-pdf (now the merged
+// pdf-to-jpg tool) isn't part of this milestone's tool list and is left
+// untouched.
 const SESSION_TOOL_SLUG = { merge: 'merge-pdf', split: 'split-pdf', rotate: 'rotate-pdf', extract: 'extract-pdf-pages' };
 const PULL_MODES = new Set(['merge', 'split', 'rotate', 'extract']);
 const PUSH_MODES = new Set(['merge', 'rotate', 'extract']);

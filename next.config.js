@@ -79,6 +79,11 @@ const nextConfig = {
       { source: '/png-to-pdf', destination: '/images-to-pdf', permanent: true },
       { source: '/pdf-to-png', destination: '/pdf-to-jpg', permanent: true },
       { source: '/webp-to-jpg', destination: '/convert-image-format', permanent: true },
+      // Screenshot Studio was fully deleted (see task history); Google
+      // Search Console still shows stray 404 crawls for the old URL from
+      // lingering backlinks/cache — redirect rather than 404 for anyone
+      // still following an old link.
+      { source: '/screenshot-studio', destination: '/image-tools', permanent: true },
     ];
   },
 };

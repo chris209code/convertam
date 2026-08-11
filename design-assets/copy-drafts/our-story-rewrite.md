@@ -1,4 +1,4 @@
-# Our Story — rewrite (pending, do after AdSense review)
+# Our Story — rewrite (applied)
 
 ## Target
 
@@ -15,8 +15,7 @@ label already covers it, match to the copy's own title).
 
 ## Status
 
-Not implemented yet — approved to ship only after the Google AdSense review
-completes. Stored here so it isn't lost between sessions.
+Applied to `app/about/page.js` on 2026-08-11.
 
 ## Replacement copy (verbatim, as supplied by the founder)
 

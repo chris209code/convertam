@@ -73,57 +73,80 @@ export default function AboutPage() {
       <section className="mb-16">
         <p className="font-mono text-xs text-stamp-amber tracking-wide mb-2">OUR STORY</p>
         <h1 className="font-display text-3xl md:text-4xl font-bold mb-6">
-          Why Convertam Exists
+          Our Story
         </h1>
 
         <div className="rounded-2xl p-8 mb-8" style={{ background: '#f0f5ff', border: '1px solid #d0dcf5' }}>
           <p className="text-ink font-medium text-lg leading-relaxed italic">
-            &ldquo;Convertam wasn&apos;t created because the world needed another PDF converter.
-            It was created because one urgent document turned into a frustrating experience.
-            A simple task became a maze of registrations, paywalls, and unnecessary delays.
-            We thought document tools should respect your time, not test your patience.
-            So we built the kind of tool we wished existed.&rdquo;
+            &ldquo;The answer is simple: I was tired of wasting time.&rdquo;
           </p>
           <p className="text-sm text-ink-soft mt-4 font-semibold">— Christopher Okeke, Founder</p>
         </div>
 
         <p className="text-ink-soft mb-4 leading-relaxed">
-          My idea for Convertam came from a frustrating personal experience. I was sent a PDF form
-          that I needed to fill out and submit urgently. I thought it would take just a few minutes,
-          but every website I tried seemed to add another obstacle. Some required me to create an
-          account before I could do anything. Others let me upload the file, processed it completely,
-          and then — just before I could download it — asked me to pay. After spending my time
-          waiting, it felt incredibly disappointing.
+          People often ask me why I created Convertam.
         </p>
 
         <p className="text-ink-soft mb-4 leading-relaxed">
-          That experience made me wonder: why should something as simple as working with a document
-          be so frustrating?
+          Like many people, I found myself jumping from one website to another just to
+          complete what should have been a simple task. One site asked me to create an
+          account before I could begin. Another processed my file completely, only to
+          ask for payment at the very end. Instead of helping me get work done, these
+          tools seemed designed to slow me down.
         </p>
 
         <p className="text-ink-soft mb-4 leading-relaxed">
-          That&apos;s why I built Convertam. My goal was to create a tool that works the way people
-          expect it to. Open the website, upload your file, convert it, download it, and move on
-          with your day. No unnecessary steps. No wasted time. No complicated process.
+          That experience made me realize the problem wasn&apos;t just PDFs. It was the way
+          so many online productivity tools worked.
         </p>
 
         <p className="text-ink-soft mb-4 leading-relaxed">
-          I believe that in today&apos;s world, document tools should be fast, simple, and accessible.
-          While some advanced conversions require paid processing to cover the underlying technology
-          and infrastructure, I&apos;ve made it a priority to keep as many tools as possible free —
-          and to make every tool, free or premium, as straightforward and hassle-free as possible.
+          I started asking myself a different question: &ldquo;What if there was one platform
+          where people could find the tools they needed without all the unnecessary
+          friction?&rdquo; That&apos;s how Convertam began.
+        </p>
+
+        <p className="text-ink-soft mb-4 leading-relaxed">
+          My goal wasn&apos;t to build the biggest collection of tools. It was to build the
+          most practical one.
+        </p>
+
+        <p className="text-ink-soft mb-4 leading-relaxed">
+          I spent countless hours looking for the best technologies and services I
+          could legally offer for free, bringing them together in one place so people
+          wouldn&apos;t have to keep searching across dozens of different websites. If
+          there was a great tool I could make available at no cost, I wanted it on
+          Convertam.
+        </p>
+
+        <p className="text-ink-soft mb-4 leading-relaxed">
+          Of course, not everything can be free. Some services — especially advanced
+          conversions like PDF to Word — depend on commercial technologies and
+          processing infrastructure that charge us every time they&apos;re used. Rather
+          than hiding that behind misleading promises or waiting until the last step to
+          surprise users with a payment request, I chose to be transparent about it. If
+          a tool requires paid processing, we&apos;ll tell you upfront. And when you decide
+          to use it, the experience should be as direct and hassle-free as possible.
+        </p>
+
+        <p className="text-ink-soft mb-4 leading-relaxed">
+          That philosophy shapes every decision we make. Whether you&apos;re creating an
+          invoice, improving your CV, editing an image, extracting data from a
+          document, converting a file, or using one of our AI tools, the objective is
+          always the same: help you complete the task quickly, with as little friction
+          as possible.
         </p>
 
         <p className="text-ink-soft leading-relaxed">
-          Convertam was built to help people get things done, especially when they&apos;re in a hurry.
-          Whether you&apos;re applying for a job, submitting a school assignment, signing a contract,
-          or handling everyday paperwork, the goal is the same: spend less time fighting with
-          websites and more time getting your work done.
+          Convertam continues to grow because everyday work continues to evolve. As new
+          problems emerge, we&apos;ll keep building new tools — always with the same
+          principle in mind: respect people&apos;s time. That&apos;s what Convertam is really
+          about.
         </p>
 
         <div className="mt-8 pt-8 border-t" style={{ borderColor: '#e2dcc9' }}>
-          <p className="text-ink font-bold text-xl text-center">Upload. Convert am. Download.</p>
-          <p className="text-ink-soft text-sm text-center mt-2">That&apos;s the idea behind Convertam.</p>
+          <p className="text-ink font-bold text-xl text-center">One platform. Endless possibilities.</p>
+          <p className="text-ink-soft text-sm text-center mt-2 font-semibold">— Christopher Okeke, Founder, Convertam</p>
         </div>
       </section>
 

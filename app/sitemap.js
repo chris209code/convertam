@@ -18,14 +18,7 @@ export default function sitemap() {
 
   // Category listing pages — not individual tools, so not covered by the
   // tools-config map above, but they're real indexable pages the homepage
-  // now links to directly and deserve their own sitemap entries.
-  //
-  // 'data-tools' is deliberately excluded here (and its individual studio
-  // pages below are commented out entirely) while the Data Workspace
-  // category stays hidden from navigation and the homepage — those pages
-  // still exist and still work, they're just not ready to be surfaced to
-  // search engines yet. Un-comment / re-add both blocks together with the
-  // homepage/nav reveal once that category is production-ready.
+  // links to directly and deserve their own sitemap entries.
   const categoryPages = [
     'pdf-tools',
     'business',
@@ -35,6 +28,7 @@ export default function sitemap() {
     'calculator-hub',
     'utilities',
     'smart-workflows',
+    'data-tools',
   ].map((slug) => ({
     url: `${BASE_URL}/${slug}`,
     lastModified: new Date(),
@@ -42,21 +36,19 @@ export default function sitemap() {
     priority: 0.85,
   }));
 
-  // Individual Data Tools — hidden from the sitemap while the category is
-  // hidden from navigation (see note above). These pages also carry a
-  // `noindex` meta tag directly (see each page's `metadata` export) so a
-  // stray inbound link doesn't get them indexed either.
-  //
-  // const dataToolPages = [
-  //   'data-tools/text-cleaner',
-  //   'data-tools/json-studio',
-  //   'data-tools/extract-studio',
-  // ].map((path) => ({
-  //   url: `${BASE_URL}/${path}`,
-  //   lastModified: new Date(),
-  //   changeFrequency: 'monthly',
-  //   priority: 0.8,
-  // }));
+  // Individual Data Tools studios — not in tools-config.js (they're not
+  // registered there yet, see app/data-tools/page.js), so listed here
+  // explicitly like the category pages above.
+  const dataToolPages = [
+    'data-tools/text-cleaner',
+    'data-tools/json-studio',
+    'data-tools/extract-studio',
+  ].map((path) => ({
+    url: `${BASE_URL}/${path}`,
+    lastModified: new Date(),
+    changeFrequency: 'monthly',
+    priority: 0.8,
+  }));
 
   // Convertam Learn — the knowledge-base section: one homepage, 7 category
   // pages, and one page per article, each carrying its own updatedAt as
@@ -106,6 +98,7 @@ export default function sitemap() {
       priority: 0.5,
     })),
     ...categoryPages,
+    ...dataToolPages,
     ...toolPages,
     learnHomePage,
     ...learnCategoryPages,

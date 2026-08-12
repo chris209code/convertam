@@ -5,8 +5,6 @@ export const metadata = {
   title: 'JSON Studio — Format, Validate & Transform JSON Online | Convertam',
   description: 'A complete JSON workspace — format, validate, view as a tree, search, compare two documents, transform (sort keys, remove nulls, dedupe) and convert to CSV/XML/Text. Free, no login, 100% private.',
   alternates: { canonical: '/data-tools/json-studio' },
-  // Data Workspace category is temporarily hidden — see app/data-tools/page.js.
-  robots: { index: false, follow: false },
 };
 
 const SCHEMA = {

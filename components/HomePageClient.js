@@ -298,28 +298,22 @@ const CATEGORIES = [
       { name: 'Morse Code Translator', href: '/morse-code-translator' },
     ],
   },
-  // Data Workspace category card is temporarily hidden from the homepage
-  // while the remaining Data Tools studios are still under active
-  // development — re-add this object once they're ready. The hub itself
-  // (/data-tools) and its live studios (Text Cleaner, JSON, Extract) are
-  // untouched and still fully reachable by direct link; only this
-  // homepage entry point is removed.
-  // {
-  //   name: 'Data Workspace',
-  //   gradient: 'linear-gradient(120deg, #22D3EE 0%, #0891B2 100%)',
-  //   bodyTint: '#ECFEFF',
-  //   borderColor: '#A5F3FC',
-  //   dotColor: '#22D3EE',
-  //   accentText: '#0E7490',
-  //   icon: 'data',
-  //   viewAllHref: '/data-tools',
-  //   tools: [
-  //     { name: 'Text Cleaner Studio', href: '/data-tools/text-cleaner' },
-  //     { name: 'JSON Studio', href: '/data-tools/json-studio' },
-  //     { name: 'Extract Studio', href: '/data-tools/extract-studio' },
-  //     { name: 'CSV Formatter', href: '/data-tools' },
-  //   ],
-  // },
+  {
+    name: 'Data Workspace',
+    gradient: 'linear-gradient(120deg, #22D3EE 0%, #0891B2 100%)',
+    bodyTint: '#ECFEFF',
+    borderColor: '#A5F3FC',
+    dotColor: '#22D3EE',
+    accentText: '#0E7490',
+    icon: 'data',
+    viewAllHref: '/data-tools',
+    tools: [
+      { name: 'Text Cleaner Studio', href: '/data-tools/text-cleaner' },
+      { name: 'JSON Studio', href: '/data-tools/json-studio' },
+      { name: 'Extract Studio', href: '/data-tools/extract-studio' },
+      { name: 'Text Case Converter', href: '/text-case-converter' },
+    ],
+  },
 ];
 
 const TRENDING_TOOLS = [

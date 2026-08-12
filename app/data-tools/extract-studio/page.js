@@ -5,8 +5,6 @@ export const metadata = {
   title: 'Extract Studio — Extract Emails, Phone Numbers, URLs & More | Convertam',
   description: 'A complete text extraction workspace — pull emails, phone numbers, URLs, domains, IPs, numbers, currency, dates, hashtags and more from any text. Chain extractors into a pipeline. Free, no login, 100% private.',
   alternates: { canonical: '/data-tools/extract-studio' },
-  // Data Workspace category is temporarily hidden — see app/data-tools/page.js.
-  robots: { index: false, follow: false },
 };
 
 const SCHEMA = {

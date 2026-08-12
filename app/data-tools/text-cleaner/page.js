@@ -5,8 +5,6 @@ export const metadata = {
   title: 'Text Cleaner Studio — Free Online Text Editor | Convertam',
   description: 'Clean, format and analyse text instantly — remove blank lines, duplicates and extra spaces, change case, sort lines, find & replace, and more. Free, no login, 100% private.',
   alternates: { canonical: '/data-tools/text-cleaner' },
-  // Data Workspace category is temporarily hidden — see app/data-tools/page.js.
-  robots: { index: false, follow: false },
 };
 
 const SCHEMA = {

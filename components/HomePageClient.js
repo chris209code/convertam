@@ -94,6 +94,13 @@ const CalculatorsIcon = (
     <rect x="7" y="18" width="10" height="2" rx="1" fill="#2563EB" opacity="0.55" />
   </svg>
 );
+const MediaWorkspaceIcon = (
+  <svg width="22" height="22" viewBox="0 0 24 24">
+    <rect x="2.5" y="5" width="14" height="14" rx="2.5" fill="#fff" />
+    <path d="M9.2 9v6l5-3z" fill="#DB2777" />
+    <path d="M16.5 10.3l4.3-2.6v8.6l-4.3-2.6z" fill="#fff" opacity="0.85" />
+  </svg>
+);
 const UtilitiesIconV2 = (
   <svg width="22" height="22" viewBox="0 0 24 24">
     <g transform="rotate(45 12 12)">
@@ -162,6 +169,9 @@ const ALL_TOOLS = [
   { name: 'Meme Generator', href: '/meme-generator' },
   { name: 'Document Enhancer', href: '/document-enhancer' },
   { name: 'Calculator Hub', href: '/calculator-hub' },
+  { name: 'Audio Studio', href: '/data-tools/audio-studio' },
+  { name: 'Video Studio', href: '/data-tools/video-studio' },
+  { name: 'Video Editor', href: '/data-tools/video-editor' },
   { name: 'QR Code Generator', href: '/qr-code-generator' },
   { name: 'Password Studio', href: '/password-generator' },
   { name: 'Text Case Converter', href: '/text-case-converter' },
@@ -262,23 +272,19 @@ const CATEGORIES = [
     ],
   },
   {
-    name: 'Calculators',
-    gradient: 'linear-gradient(120deg, #2563EB 0%, #3B82F6 100%)',
-    bodyTint: '#F7FAFF',
-    borderColor: '#DBEAFE',
-    dotColor: '#2563EB',
-    accentText: '#2563EB',
-    icon: 'calculator',
-    artwork: '/category-art/calculators.jpg',
-    viewAllHref: '/calculator-hub',
+    name: 'Media Workspace',
+    gradient: 'linear-gradient(120deg, #EC4899 0%, #DB2777 100%)',
+    bodyTint: '#FDF2F8',
+    borderColor: '#FBCFE8',
+    dotColor: '#EC4899',
+    accentText: '#DB2777',
+    icon: 'media',
+    artwork: '/category-art/media-workspace.jpg',
+    viewAllHref: '/media-workspace',
     tools: [
-      { name: 'Salary Calculator', href: '/salary-calculator' },
-      { name: 'Loan Calculator', href: '/calculators/loan-calculator' },
-      { name: 'VAT Calculator', href: '/calculators/vat-calculator' },
-      { name: 'Profit & Loss', href: '/calculators/profit-margin' },
-      { name: 'Discount Calculator', href: '/calculators/discount-calculator' },
-      { name: 'Age Calculator', href: '/calculators/age-calculator' },
-      { name: 'Expense & Budget Calculator', href: '/calculators/expense-budget-calculator' },
+      { name: 'Audio Studio', href: '/data-tools/audio-studio' },
+      { name: 'Video Studio', href: '/data-tools/video-studio' },
+      { name: 'Video Editor', href: '/data-tools/video-editor' },
     ],
   },
   {
@@ -315,6 +321,26 @@ const CATEGORIES = [
       { name: 'Extract Studio', href: '/data-tools/extract-studio' },
     ],
   },
+  {
+    name: 'Calculators',
+    gradient: 'linear-gradient(120deg, #2563EB 0%, #3B82F6 100%)',
+    bodyTint: '#F7FAFF',
+    borderColor: '#DBEAFE',
+    dotColor: '#2563EB',
+    accentText: '#2563EB',
+    icon: 'calculator',
+    artwork: '/category-art/calculators.jpg',
+    viewAllHref: '/calculator-hub',
+    tools: [
+      { name: 'Salary Calculator', href: '/salary-calculator' },
+      { name: 'Loan Calculator', href: '/calculators/loan-calculator' },
+      { name: 'VAT Calculator', href: '/calculators/vat-calculator' },
+      { name: 'Profit & Loss', href: '/calculators/profit-margin' },
+      { name: 'Discount Calculator', href: '/calculators/discount-calculator' },
+      { name: 'Age Calculator', href: '/calculators/age-calculator' },
+      { name: 'Expense & Budget Calculator', href: '/calculators/expense-budget-calculator' },
+    ],
+  },
 ];
 
 const TRENDING_TOOLS = [
@@ -332,6 +358,7 @@ const ICONS = {
   sparkles: AiWorkspaceIcon,
   image: ImageStudioIcon,
   calculator: CalculatorsIcon,
+  media: MediaWorkspaceIcon,
   grid: UtilitiesIconV2,
   data: DataWorkspaceIcon,
   shield: (

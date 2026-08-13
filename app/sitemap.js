@@ -27,6 +27,7 @@ export default function sitemap() {
     'image-tools',
     'calculator-hub',
     'utilities',
+    'media-workspace',
     'smart-workflows',
     'data-tools',
   ].map((slug) => ({
@@ -49,6 +50,9 @@ export default function sitemap() {
     'data-tools/sql-studio',
     'data-tools/base64',
     'data-tools/url-encoder',
+    'data-tools/audio-studio',
+    'data-tools/video-studio',
+    'data-tools/video-editor',
   ].map((path) => ({
     url: `${BASE_URL}/${path}`,
     lastModified: new Date(),

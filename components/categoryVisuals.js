@@ -102,7 +102,18 @@ export const WorkflowIcon = (
   </svg>
 );
 
-// Single source of truth for the 7 suite landing pages, used to build each
+// A camera body with a play triangle — represents Media Workspace's
+// audio/video transcription, captioning and editing tools.
+export const MediaIcon = (
+  <svg width="30" height="30" viewBox="0 0 24 24">
+    <rect x="5.5" y="2.5" width="14.5" height="14.5" rx="2" fill="#fff" opacity="0.3" transform="rotate(6 12 12)" />
+    <rect x="2.5" y="4" width="16" height="14" rx="2" fill="#fff" />
+    <path d="M8.3 8v6l5.2-3z" fill="#DB2777" />
+    <rect x="7" y="19.4" width="10" height="1.6" rx="0.8" fill="#000" opacity="0.14" />
+  </svg>
+);
+
+// Single source of truth for the 8 suite landing pages, used to build each
 // page's "Explore Related Categories" list without hand-maintaining 7
 // near-identical arrays. relatedSuites(selfSlug) returns every OTHER suite.
 const SUITE_CARDS = [
@@ -111,6 +122,7 @@ const SUITE_CARDS = [
   { slug: 'career-studio', accentKey: 'career', href: '/career-studio', icon: '🎯', title: 'Career Studio', desc: 'AI-assisted CVs, resumes and cover letters.' },
   { slug: 'ai-tools', accentKey: 'ai', href: '/ai-tools', icon: '🤖', title: 'AI Workspace', desc: 'AI tools that read, extract and improve your documents.' },
   { slug: 'image-tools', accentKey: 'image', href: '/image-tools', icon: '🖼️', title: 'Image Studio', desc: 'Convert, compress, resize and edit images.' },
+  { slug: 'media-workspace', accentKey: 'media', href: '/media-workspace', icon: '🎬', title: 'Media Workspace', desc: 'Transcribe, caption, edit and compose audio & video.' },
   { slug: 'calculator-hub', accentKey: 'calculator', href: '/calculator-hub', icon: '🧮', title: 'Calculators', desc: 'VAT, loan, salary, and other business calculators.' },
   { slug: 'utilities', accentKey: 'utilities', href: '/utilities', icon: '⚙️', title: 'Utilities', desc: 'QR codes, passwords, text case conversion and more.' },
 ];
@@ -164,6 +176,13 @@ export const CATEGORY_ACCENTS = {
     borderColor: '#A5F3FC', accentText: '#0E7490',
     focusRing: 'rgba(8,145,178,0.12)', shadowTint: 'rgba(8,145,178,0.15)',
     badgeFreeBg: '#CFFAFE', badgeFreeText: '#155E63',
+  },
+  media: {
+    gradient: 'linear-gradient(120deg, #EC4899 0%, #DB2777 100%)',
+    pageBgTop: '#FDF2F8', pageBgBottom: '#FCE7F3',
+    borderColor: '#FBCFE8', accentText: '#DB2777',
+    focusRing: 'rgba(219,39,119,0.12)', shadowTint: 'rgba(219,39,119,0.15)',
+    badgeFreeBg: '#FCE7F3', badgeFreeText: '#9D174D',
   },
   calculator: {
     gradient: 'linear-gradient(120deg, #2563EB 0%, #1D4ED8 100%)',

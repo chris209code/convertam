@@ -1,9 +1,12 @@
 'use client';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { T, confidenceColor } from './theme';
 import { tableToCSV, tableToXLSXBlob, downloadBlob } from '@/lib/smartParser/exporters';
+import { sendToTool } from '@/lib/dataTools/shared';
 
 export default function TablesTab({ tables, onEditCell }) {
+  const router = useRouter();
   const [activeIdx, setActiveIdx] = useState(0);
 
   if (!tables.length) {
@@ -22,6 +25,10 @@ export default function TablesTab({ tables, onEditCell }) {
   }
   async function handleCopy() {
     try { await navigator.clipboard.writeText(tableToCSV(table)); } catch { /* clipboard unavailable */ }
+  }
+  function handleOpenInCsvStudio() {
+    sendToTool({ tool: 'csv-studio', kind: 'csv-text', content: tableToCSV(table), sourceName: `Smart Parser table ${activeIdx + 1}` });
+    router.push('/data-tools/csv-studio');
   }
 
   return (
@@ -45,6 +52,7 @@ export default function TablesTab({ tables, onEditCell }) {
           <button onClick={handleCopy} style={{ padding: '7px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: 'white', fontSize: '0.76rem', fontWeight: 600, cursor: 'pointer', fontFamily: T.font }}>📋 Copy</button>
           <button onClick={handleDownloadCSV} style={{ padding: '7px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: 'white', fontSize: '0.76rem', fontWeight: 600, cursor: 'pointer', fontFamily: T.font }}>CSV</button>
           <button onClick={handleDownloadXLSX} style={{ padding: '7px 12px', borderRadius: 8, border: 'none', background: T.accent, color: 'white', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', fontFamily: T.font }}>XLSX</button>
+          <button onClick={handleOpenInCsvStudio} style={{ padding: '7px 12px', borderRadius: 8, border: 'none', background: T.accentGradient, color: 'white', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', fontFamily: T.font }}>Open in CSV Studio →</button>
         </div>
       </div>
 

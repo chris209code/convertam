@@ -44,6 +44,11 @@ export default function sitemap() {
     'data-tools/text-cleaner',
     'data-tools/json-studio',
     'data-tools/extract-studio',
+    'data-tools/csv-studio',
+    'data-tools/xml-studio',
+    'data-tools/sql-studio',
+    'data-tools/base64',
+    'data-tools/url-encoder',
   ].map((path) => ({
     url: `${BASE_URL}/${path}`,
     lastModified: new Date(),

@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import TransformableBox from '@/components/shared/TransformableBox';
 import { computeFitToWidthScale, getPointerPageSpace } from '@/components/shared/coordinateTransform';
 import { contentFor, createObject } from './objectTypes';
 import { FormFieldNode } from './formFields';
 import { detectStyleAt, sampleBackgroundColor, StyleMatchChip } from './styleMatchPreview';
+import { detectFieldHotspots } from './fieldDetection';
 import ClickMenu from './clickMenu';
+import { RENDER_SCALE } from './constants';
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 3;
@@ -60,6 +62,18 @@ export default function Stage({
   const draftHighlightRef = useRef(null);
 
   const displayScale = baseScale * zoom;
+
+  // Tier 2 of the priority order (see project plan and formFields.js's own
+  // header comment for tier 1): recognizable blanks — a label immediately
+  // followed by a run of underscores/dots, or a bare run on its own —
+  // detected straight from this page's own pdf.js text layer, already
+  // filtered against tier-1 AcroForm widgets so a real field always wins
+  // (see fieldDetection.js). Recomputed only when the page or its fields
+  // change, not on every render.
+  const hotspots = useMemo(
+    () => (page?.textContent ? detectFieldHotspots(page.textContent, page.height, RENDER_SCALE, formFields) : []),
+    [page, formFields]
+  );
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -144,6 +158,10 @@ export default function Stage({
       if (Number.isFinite(style.baselinePageSpaceY)) {
         obj.y = style.baselinePageSpaceY - h * 0.5 - fontSize * 0.32;
       }
+      // A specific match carries the matched text item's own box (see
+      // fontMatch.js's sampleStyleNear) — Auto Text Fit (autoFit.js) shrinks
+      // to keep new text from visibly overrunning that same width.
+      if (style.box) obj.fitWidth = style.box.w;
     }
     commitPageObjects([...pageObjects, obj]);
     setSelectedId(obj.id);
@@ -155,6 +173,37 @@ export default function Stage({
       clearStyleChip();
     }
     return obj;
+  }
+
+  // Tier 2: places text pre-positioned/pre-sized to a detected blank
+  // (fieldDetection.js's hotspot rect) rather than the raw click point —
+  // still sampling nearby style the same way tier 3 does (a labeled blank's
+  // own label text is real, styleable content pdf.js already sees), but the
+  // box itself, not the click, drives x/y/w so the placement lands exactly
+  // over the blank. `fitWidth` shrinks the text if it would otherwise
+  // overrun the blank's own width. No click-menu here — filling a genuine
+  // blank isn't "replacing" anything, so there's nothing to be honest about.
+  function placeInHotspot(hotspot) {
+    const samplePos = { x: hotspot.x + Math.min(6, hotspot.w * 0.1), y: hotspot.y + hotspot.h * 0.5 };
+    const { style } = detectStyleAt(samplePos, page);
+    let obj = createObject('text', { page: activePage, x: hotspot.x + 2, y: hotspot.y, color: inkColor, nextId, nextZ });
+    const fontSize = style?.fontSizePx || obj.fontSize;
+    const h = Math.max(18, Math.round(fontSize * 1.4));
+    const w = Math.max(30, hotspot.w - 4);
+    obj = {
+      ...obj, w, h, fontSize,
+      y: hotspot.y + (hotspot.h - h) / 2,
+      fontFamily: style?.fontFamily || obj.fontFamily,
+      bold: style?.bold ?? obj.bold,
+      italic: style?.italic ?? obj.italic,
+      color: style?.color || obj.color,
+      fitWidth: w,
+    };
+    commitPageObjects([...pageObjects, obj]);
+    setSelectedId(obj.id);
+    setEditingId(obj.id);
+    setStyleChip({ text: hotspot.label ? `Detected blank: "${hotspot.label}"` : 'Detected blank — sized to fit', x: obj.x, y: obj.y });
+    chipTimeoutRef.current = setTimeout(() => setStyleChip(null), 4000);
   }
 
   function handleAddTextHere() {
@@ -190,6 +239,9 @@ export default function Stage({
       ...textObj,
       y: style.baselinePageSpaceY - h * 0.5 - fontSize * 0.32,
       h, fontSize, fontFamily: style.fontFamily, bold: style.bold, italic: style.italic,
+      // Shrinks to fit the covered patch's own width — the replacement
+      // shouldn't visibly spill past where the covered text ended.
+      fitWidth: box.w,
     };
     // Cover committed before the text in the same array so it paints first —
     // this tool has no z-index layering, paint order is array order.
@@ -219,6 +271,12 @@ export default function Stage({
     }
     if (activeTool === 'text') {
       const pos = getPos(e);
+
+      // Tier 2 (see project plan's priority order): a detected blank always
+      // wins over tier 3's free-click style matching below, since it's a
+      // more specific, more confident target than "somewhere near a click".
+      const hotspot = hotspots.find((h) => pos.x >= h.x && pos.x <= h.x + h.w && pos.y >= h.y && pos.y <= h.y + h.h);
+      if (hotspot) { placeInHotspot(hotspot); return; }
 
       // Tier 2/3 smart font matching: sample nearby text (if any) for a
       // closer-fitting default than the plain ink-color default, and snap
@@ -327,6 +385,15 @@ export default function Stage({
               </div>
             )}
             <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+              {activeTool === 'text' && hotspots.map((h) => (
+                <div
+                  key={h.id}
+                  style={{
+                    position: 'absolute', left: h.x, top: h.y, width: h.w, height: h.h,
+                    border: '1.5px dashed #16A34A', borderRadius: 3, background: 'rgba(22,163,74,0.06)',
+                  }}
+                />
+              ))}
               {pageObjects.map((o) => {
                 const Content = contentFor(o.type);
                 return (

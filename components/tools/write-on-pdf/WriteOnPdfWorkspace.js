@@ -9,8 +9,10 @@ import SignaturePad from '@/components/shared/SignaturePad';
 import { INK_COLORS, RENDER_SCALE } from './constants';
 import { createFontEmbedCache, measureTextWidthPagePx, warmMeasurementFonts } from '@/components/shared/fontResolver';
 import { applyFormFieldValues, detectFormFields } from './formFields';
+import { fitFontSize } from './autoFit';
 import Toolbar, { DATE_FORMATS } from './Toolbar';
 import TextProperties from './TextProperties';
+import PageNavigator from './PageNavigator';
 import Stage from './Stage';
 
 const MAX_FILE_BYTES = 100 * 1024 * 1024;
@@ -363,11 +365,15 @@ export default function WriteOnPdfWorkspace() {
           if (!o.text.trim()) continue;
           const font = await embedFor(o);
           const displayText = o.uppercase ? o.text.toUpperCase() : o.text;
-          const sizePt = o.fontSize / RENDER_SCALE;
+          // Auto Text Fit (autoFit.js): the same shrink-to-fit size the
+          // on-screen idle render uses (text.js's Content), so a fitted
+          // object never disagrees between preview and downloaded PDF.
+          const effSize = fitFontSize(o);
+          const sizePt = effSize / RENDER_SCALE;
           // Same vertical-centering heuristic the on-screen DOM box uses —
           // exact when Stage.js snapped this object to a real detected
           // baseline (Phase 2), an approximation otherwise.
-          const baselineFromTopPx = o.h * 0.5 + o.fontSize * 0.32;
+          const baselineFromTopPx = o.h * 0.5 + effSize * 0.32;
           let xPx = o.x;
           // The same measureTextWidthPagePx() the on-screen preview's
           // alignment math uses (text.js's Content) — same font family/
@@ -375,7 +381,7 @@ export default function WriteOnPdfWorkspace() {
           // don't vary by which document embedded it. This is what keeps
           // center/right alignment from visibly disagreeing between the
           // preview and the downloaded PDF.
-          const widthPx = measureTextWidthPagePx(font, displayText, o.fontSize, RENDER_SCALE);
+          const widthPx = measureTextWidthPagePx(font, displayText, effSize, RENDER_SCALE);
           if (o.align === 'center') xPx = o.x + (o.w - widthPx) / 2;
           else if (o.align === 'right') xPx = o.x + o.w - widthPx;
           const { r, g, b } = hexToRgbFractions(o.color);
@@ -498,13 +504,11 @@ export default function WriteOnPdfWorkspace() {
         <button className="btn-ghost-sm" onClick={reset}>Change file</button>
       </div>
 
-      {pages.length > 1 && (
-        <div className="flex items-center gap-2 mb-3">
-          <button className="btn-ghost-sm" disabled={activePage === 0} onClick={() => { setActivePage((p) => p - 1); setSelectedId(null); setEditingId(null); }}>← Prev</button>
-          <span className="text-xs text-ink-soft">Page {activePage + 1} of {pages.length}</span>
-          <button className="btn-ghost-sm" disabled={activePage === pages.length - 1} onClick={() => { setActivePage((p) => p + 1); setSelectedId(null); setEditingId(null); }}>Next →</button>
-        </div>
-      )}
+      <PageNavigator
+        pages={pages}
+        activePage={activePage}
+        onSelectPage={(i) => { setActivePage(i); setSelectedId(null); setEditingId(null); }}
+      />
 
       <Toolbar
         activeTool={activeTool}

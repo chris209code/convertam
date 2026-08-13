@@ -2,6 +2,7 @@
 
 import { cssFontFamily, getCachedMeasureFont, measureTextWidthPagePx } from '@/components/shared/fontResolver';
 import { DEFAULT_FONT_SIZE, RENDER_SCALE } from '../constants';
+import { fitFontSize } from '../autoFit';
 
 export const interaction = 'edit';
 
@@ -48,6 +49,12 @@ export function Content({ obj, isEditing, value, onChangeValue, onBlurCommit }) 
     );
   }
 
+  // Auto Text Fit (autoFit.js): only objects placed against a specific
+  // matched width (fitWidth — set at placement time in Stage.js) ever
+  // shrink; free-positioned text keeps its own stored fontSize untouched.
+  const effectiveFontSize = fitFontSize(obj);
+  const idleStyle = { ...baseStyle, fontSize: effectiveFontSize };
+
   // Horizontal alignment is computed from the same pdf-lib font metrics
   // export will use (measureTextWidthPagePx), not CSS's own text-width
   // calculation — the browser's substitute font for "Helvetica" (usually
@@ -59,7 +66,7 @@ export function Content({ obj, isEditing, value, onChangeValue, onBlurCommit }) 
   // the glyph run, keeps the two in sync.
   const displayText = obj.uppercase ? obj.text.toUpperCase() : obj.text;
   const measureFont = getCachedMeasureFont(obj);
-  const textWidthPagePx = measureFont ? measureTextWidthPagePx(measureFont, displayText, obj.fontSize, RENDER_SCALE) : 0;
+  const textWidthPagePx = measureFont ? measureTextWidthPagePx(measureFont, displayText, effectiveFontSize, RENDER_SCALE) : 0;
   let marginLeft = 0;
   if (obj.align === 'center') marginLeft = Math.max(0, (obj.w - textWidthPagePx) / 2);
   else if (obj.align === 'right') marginLeft = Math.max(0, obj.w - textWidthPagePx);
@@ -67,7 +74,7 @@ export function Content({ obj, isEditing, value, onChangeValue, onBlurCommit }) 
   return (
     <div
       style={{
-        ...baseStyle, whiteSpace: 'nowrap', overflow: 'hidden', cursor: 'move',
+        ...idleStyle, whiteSpace: 'nowrap', overflow: 'hidden', cursor: 'move',
         display: 'flex', alignItems: 'center', justifyContent: 'flex-start', textAlign: 'left',
       }}
     >

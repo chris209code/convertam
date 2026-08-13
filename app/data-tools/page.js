@@ -18,8 +18,8 @@ const SECTIONS = [
     label: 'Parse & Extract',
     icon: '🧠',
     tools: [
-      { slug: 'smart-parser', title: 'Smart Parser', desc: 'Upload any document and extract clean text, structured tables, or the exact custom fields you define — invoices, receipts, reports, statements and more.', icon: '🧠', badge: 'new', available: true, href: '/data-tools/smart-parser' },
-      { slug: 'extract-studio', title: 'Extract Studio', desc: 'Extract emails, phone numbers, URLs, numbers and more from text instantly — chain extractors into a pipeline.', icon: '🧲', badge: 'new', available: true, href: '/data-tools/extract-studio' },
+      { slug: 'smart-parser', title: 'Smart Parser', desc: 'Upload any document and extract clean text, structured tables, or the exact custom fields you define — invoices, receipts, reports, statements and more.', icon: '🧠', available: true, href: '/data-tools/smart-parser' },
+      { slug: 'extract-studio', title: 'Extract Studio', desc: 'Extract emails, phone numbers, URLs, numbers and more from text instantly — chain extractors into a pipeline.', icon: '🧲', available: true, href: '/data-tools/extract-studio' },
     ],
   },
   {
@@ -27,10 +27,10 @@ const SECTIONS = [
     label: 'Clean & Transform',
     icon: '🧹',
     tools: [
-      { slug: 'text-cleaner', title: 'Text Cleaner Studio', desc: 'Clean, transform and analyse text instantly — dozens of operations in one workspace.', icon: '🧹', badge: 'new', available: true, href: '/data-tools/text-cleaner' },
-      { slug: 'csv-studio', title: 'CSV Studio', desc: 'A real spreadsheet-like workspace to edit, clean, deduplicate and analyse CSV data — with correct import/export round-tripping.', icon: '📈', badge: 'new', available: true, href: '/data-tools/csv-studio' },
-      { slug: 'xml-studio', title: 'XML Studio', desc: 'Format, validate, browse as a tree, and convert XML to JSON or CSV — protected against XXE and malformed payloads.', icon: '🗂️', badge: 'new', available: true, href: '/data-tools/xml-studio' },
-      { slug: 'json-studio', title: 'JSON Studio', desc: 'Validate, format, analyse and transform JSON files instantly — including conversion to CSV, XML and Text.', icon: '🧩', badge: 'new', available: true, href: '/data-tools/json-studio' },
+      { slug: 'text-cleaner', title: 'Text Cleaner Studio', desc: 'Clean, transform and analyse text instantly — dozens of operations in one workspace.', icon: '🧹', available: true, href: '/data-tools/text-cleaner' },
+      { slug: 'csv-studio', title: 'CSV Studio', desc: 'A real spreadsheet-like workspace to edit, clean, deduplicate and analyse CSV data — with correct import/export round-tripping.', icon: '📈', available: true, href: '/data-tools/csv-studio' },
+      { slug: 'xml-studio', title: 'XML Studio', desc: 'Format, validate, browse as a tree, and convert XML to JSON or CSV — protected against XXE and malformed payloads.', icon: '🗂️', available: true, href: '/data-tools/xml-studio' },
+      { slug: 'json-studio', title: 'JSON Studio', desc: 'Validate, format, analyse and transform JSON files instantly — including conversion to CSV, XML and Text.', icon: '🧩', available: true, href: '/data-tools/json-studio' },
       { slug: 'text-case-converter', title: 'Text Case Converter', desc: 'Instantly convert text into UPPERCASE, lowercase, Title Case, camelCase and more.', icon: '🔤', badge: 'free', available: true, href: '/text-case-converter' },
     ],
   },
@@ -39,7 +39,7 @@ const SECTIONS = [
     label: 'Query & Analyze',
     icon: '🗄️',
     tools: [
-      { slug: 'sql-studio', title: 'SQL Studio', desc: 'Write and run real SQL — SELECT, JOIN, GROUP BY, INSERT, UPDATE, DELETE — directly against CSV, JSON or XLSX data you import, entirely in your browser.', icon: '🗄️', badge: 'new', available: true, href: '/data-tools/sql-studio' },
+      { slug: 'sql-studio', title: 'SQL Studio', desc: 'Write and run real SQL — SELECT, JOIN, GROUP BY, INSERT, UPDATE, DELETE — directly against CSV, JSON or XLSX data you import, entirely in your browser.', icon: '🗄️', available: true, href: '/data-tools/sql-studio' },
     ],
   },
   {
@@ -47,8 +47,8 @@ const SECTIONS = [
     label: 'Encoding & Utilities',
     icon: '🔐',
     tools: [
-      { slug: 'base64', title: 'Base64 Encode / Decode', desc: 'Encode text or files to Base64, or decode back to text or a file — correct Unicode and binary handling.', icon: '🔐', badge: 'new', available: true, href: '/data-tools/base64' },
-      { slug: 'url-encoder', title: 'URL Encoder / Decoder', desc: 'Correctly percent-encode or decode URLs and query strings — spaces, Unicode, and reserved characters handled properly.', icon: '🌐', badge: 'new', available: true, href: '/data-tools/url-encoder' },
+      { slug: 'base64', title: 'Base64 Encode / Decode', desc: 'Encode text or files to Base64, or decode back to text or a file — correct Unicode and binary handling.', icon: '🔐', available: true, href: '/data-tools/base64' },
+      { slug: 'url-encoder', title: 'URL Encoder / Decoder', desc: 'Correctly percent-encode or decode URLs and query strings — spaces, Unicode, and reserved characters handled properly.', icon: '🌐', available: true, href: '/data-tools/url-encoder' },
     ],
   },
 ];

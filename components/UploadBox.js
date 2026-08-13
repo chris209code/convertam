@@ -2,10 +2,14 @@
 import { useRef, useState } from 'react';
 import CloudUploadButtons from './cloudUpload/CloudUploadButtons';
 
-const MAX_SIZE_MB = 100;
-const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+const DEFAULT_MAX_SIZE_MB = 100;
 
-export default function UploadBox({ accept, multiple, onFiles, label, compact }) {
+// maxSizeMB is optional — every existing caller keeps the original 100MB
+// ceiling unchanged; only a caller that explicitly needs a different limit
+// (e.g. Video Studio's larger video files) passes its own.
+export default function UploadBox({ accept, multiple, onFiles, label, compact, maxSizeMB }) {
+  const MAX_SIZE_MB = maxSizeMB || DEFAULT_MAX_SIZE_MB;
+  const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
   const inputRef = useRef(null);
   const [drag, setDrag] = useState(false);
   const [sizeError, setSizeError] = useState('');

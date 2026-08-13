@@ -8,6 +8,8 @@
     "start": "next start"
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@sparticuz/chromium": "131.0.1",
     "@upstash/redis": "^1.38.0",
     "@vercel/analytics": "^2.0.1",

@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   OPERATIONS, operationById, applyPipeline,
 } from './textEngine';
 import { computeStats, formatDuration } from './textStats';
+import { receiveHandoff } from '@/lib/dataTools/shared';
 
 const CATEGORIES = [
   { id: 'clean', label: 'Clean', icon: '🧹' },
@@ -48,6 +49,14 @@ export default function TextCleanerStudio() {
   const [copyState, setCopyState] = useState('idle');
   const fileInputRef = useRef(null);
   const inputTextareaRef = useRef(null);
+
+  useEffect(() => {
+    const handoff = receiveHandoff();
+    if (handoff && handoff.tool === 'text-cleaner' && handoff.kind === 'text') {
+      setRawInput(handoff.content);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const commitPipeline = useCallback((updater) => {
     setPast((p) => [...p, pipeline]);

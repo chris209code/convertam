@@ -18,6 +18,7 @@ import TranscriptEditor from '../shared/TranscriptEditor';
 const STATUS_LABEL = {
   preparing: 'Preparing your audio…',
   transcribing: 'Transcribing speech…',
+  merging: 'Combining transcript…',
 };
 
 const RENDER_STATUS_LABEL = {
@@ -34,8 +35,9 @@ export default function AudioStudioWorkspace() {
   const [metaError, setMetaError] = useState('');
 
   const [transcript, setTranscript] = useState(null);
-  const [transcribeStatus, setTranscribeStatus] = useState('idle'); // idle | preparing | transcribing | error
+  const [transcribeStatus, setTranscribeStatus] = useState('idle'); // idle | preparing | transcribing | merging | error
   const [transcribeError, setTranscribeError] = useState('');
+  const [transcribeProgress, setTranscribeProgress] = useState(null); // { chunkIndex, totalChunks } | null — only set once a file needs more than one chunk
   const [currentTime, setCurrentTime] = useState(0);
   const playerRef = useRef(null);
 
@@ -83,20 +85,40 @@ export default function AudioStudioWorkspace() {
     setTranscript(null);
     setTranscribeStatus('idle');
     setTranscribeError('');
+    setTranscribeProgress(null);
   }
 
   async function handleTranscribe() {
     if (!file) return;
     setTranscribeStatus('preparing');
     setTranscribeError('');
+    setTranscribeProgress(null);
     try {
-      const result = await transcribeMedia({ file, onStatus: (s) => setTranscribeStatus(s === 'done' ? 'idle' : s) });
+      const result = await transcribeMedia({
+        file,
+        onStatus: (s, detail) => {
+          setTranscribeProgress(detail?.totalChunks > 1 ? detail : null);
+          setTranscribeStatus(s === 'done' ? 'idle' : s);
+        },
+      });
       setTranscript(result);
       setTranscribeStatus('idle');
+      setTranscribeProgress(null);
     } catch (err) {
       setTranscribeStatus('error');
       setTranscribeError(err instanceof TranscriptionError ? err.message : 'Transcription failed. Please try again.');
+      setTranscribeProgress(null);
     }
+  }
+
+  // Real progress ("part 2 of 5"), not an indefinite spinner, once a file
+  // is long enough to need more than one chunk — see STATUS_LABEL for the
+  // single-chunk / non-transcribing fallback text.
+  function transcribeStatusLabel() {
+    if (transcribeStatus === 'transcribing' && transcribeProgress) {
+      return `Transcribing part ${transcribeProgress.chunkIndex + 1} of ${transcribeProgress.totalChunks}…`;
+    }
+    return STATUS_LABEL[transcribeStatus] || 'Working…';
   }
 
   function handleSeek(time) {
@@ -136,7 +158,7 @@ export default function AudioStudioWorkspace() {
     }
   }
 
-  const isBusy = transcribeStatus === 'preparing' || transcribeStatus === 'transcribing';
+  const isBusy = transcribeStatus === 'preparing' || transcribeStatus === 'transcribing' || transcribeStatus === 'merging';
   const isRendering = renderStatus === 'preparing' || renderStatus === 'rendering' || renderStatus === 'finalizing';
 
   if (!file) {
@@ -184,7 +206,7 @@ export default function AudioStudioWorkspace() {
       {!transcript && (
         <div style={{ textAlign: 'center', padding: '16px 0' }}>
           <button onClick={handleTranscribe} disabled={isBusy} style={primaryBtn(isBusy)}>
-            {isBusy ? STATUS_LABEL[transcribeStatus] || 'Working…' : '🎙️ Transcribe'}
+            {isBusy ? transcribeStatusLabel() : '🎙️ Transcribe'}
           </button>
           {transcribeStatus === 'error' && <div style={{ ...statusBox, marginTop: 12, display: 'inline-block' }}>⚠️ {transcribeError}</div>}
         </div>

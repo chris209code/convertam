@@ -17,6 +17,7 @@ import TranscriptEditor from '../shared/TranscriptEditor';
 const TRANSCRIBE_STATUS_LABEL = {
   preparing: 'Preparing audio…',
   transcribing: 'Transcribing speech…',
+  merging: 'Combining transcript…',
 };
 
 const BURN_STATUS_LABEL = {
@@ -31,8 +32,9 @@ export default function VideoStudioWorkspace() {
   const [metaError, setMetaError] = useState('');
 
   const [transcript, setTranscript] = useState(null);
-  const [transcribeStatus, setTranscribeStatus] = useState('idle'); // idle | preparing | transcribing | error
+  const [transcribeStatus, setTranscribeStatus] = useState('idle'); // idle | preparing | transcribing | merging | error
   const [transcribeError, setTranscribeError] = useState('');
+  const [transcribeProgress, setTranscribeProgress] = useState(null); // { chunkIndex, totalChunks } | null — only set once a file needs more than one chunk
   const [currentTime, setCurrentTime] = useState(0);
   const videoRef = useRef(null);
 
@@ -71,6 +73,7 @@ export default function VideoStudioWorkspace() {
     setTranscript(null);
     setTranscribeStatus('idle');
     setTranscribeError('');
+    setTranscribeProgress(null);
     setExtractStatus('idle');
     setExtractError('');
     setBurnStatus('idle');
@@ -118,17 +121,35 @@ export default function VideoStudioWorkspace() {
     if (!file) return;
     setTranscribeStatus('preparing');
     setTranscribeError('');
+    setTranscribeProgress(null);
     try {
-      const result = await transcribeMedia({ file, onStatus: (s) => setTranscribeStatus(s === 'done' ? 'idle' : s) });
+      const result = await transcribeMedia({
+        file,
+        onStatus: (s, detail) => {
+          setTranscribeProgress(detail?.totalChunks > 1 ? detail : null);
+          setTranscribeStatus(s === 'done' ? 'idle' : s);
+        },
+      });
       setTranscript(result);
       setTranscribeStatus('idle');
+      setTranscribeProgress(null);
       if (quick) {
         downloadBlob(transcriptToSrt(result), 'text/plain', `${baseName(file.name)}.srt`);
       }
     } catch (err) {
       setTranscribeStatus('error');
       setTranscribeError(err instanceof TranscriptionError ? err.message : 'Transcription failed. Please try again.');
+      setTranscribeProgress(null);
     }
+  }
+
+  // Real progress ("part 2 of 5"), not an indefinite spinner, once a file
+  // is long enough to need more than one chunk.
+  function transcribeStatusLabel() {
+    if (transcribeStatus === 'transcribing' && transcribeProgress) {
+      return `Transcribing part ${transcribeProgress.chunkIndex + 1} of ${transcribeProgress.totalChunks}…`;
+    }
+    return TRANSCRIBE_STATUS_LABEL[transcribeStatus] || 'Working…';
   }
 
   function handleSeek(time) {
@@ -176,7 +197,7 @@ export default function VideoStudioWorkspace() {
     }
   }
 
-  const isTranscribing = transcribeStatus === 'preparing' || transcribeStatus === 'transcribing';
+  const isTranscribing = transcribeStatus === 'preparing' || transcribeStatus === 'transcribing' || transcribeStatus === 'merging';
   const isBurning = burnStatus === 'loading' || burnStatus === 'burning';
   const hasNoAudio = metadata && metadata.hasAudio === false;
 
@@ -241,7 +262,7 @@ export default function VideoStudioWorkspace() {
           {!transcript && (
             <>
               <button onClick={() => handleTranscribe(false)} disabled={isTranscribing} style={primaryBtn(isTranscribing)}>
-                {isTranscribing ? TRANSCRIBE_STATUS_LABEL[transcribeStatus] || 'Working…' : '📝 Transcribe & Edit'}
+                {isTranscribing ? transcribeStatusLabel() : '📝 Transcribe & Edit'}
               </button>
               <button onClick={() => handleTranscribe(true)} disabled={isTranscribing} style={smallBtn}>
                 ⚡ Quick Subtitle (SRT)

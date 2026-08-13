@@ -2,18 +2,26 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 // The one server-side endpoint in the Media Workspace. Receives a small,
-// pre-compressed WAV (client already downsampled to TRANSCRIBE_SAMPLE_RATE
-// mono via lib/media/audioEncode.js before this is ever called — see
-// limits.js's header comment for why that step is mandatory, not optional),
-// re-validates duration/size server-side (never trust the client-only
-// check), and calls Gemini through the shared callGemini wrapper. Nothing
-// is ever written to disk — the buffer is base64-encoded in memory and
-// discarded the moment this function returns.
+// pre-compressed WAV — one chunk of a (possibly longer) file, already
+// downsampled to TRANSCRIBE_SAMPLE_RATE mono and sliced to at most
+// TRANSCRIBE_CHUNK_SECONDS client-side (see lib/media/audioEncode.js and
+// lib/media/providers/geminiTranscription.js's chunking orchestration —
+// limits.js's header comment explains why chunking exists at all),
+// re-validates duration/size server-side for THIS chunk (never trust the
+// client-only check), and calls Gemini through the shared callGemini
+// wrapper. Nothing is ever written to disk — the buffer is base64-encoded
+// in memory and discarded the moment this function returns.
+//
+// chunkIndex/totalChunks/actionId are small additive fields on top of the
+// original single-request contract, not a new contract — every request
+// still carries exactly one chunk's WAV and gets exactly one Gemini call;
+// these three fields only tell the rate limiter which requests belong to
+// the same user-initiated transcription action (see rateLimit.js).
 
 import { callGemini, AIError, CATEGORY_MESSAGES } from '@/lib/geminiClient';
 import { TRANSCRIBE_PROMPT, TRANSCRIBE_SCHEMA } from '@/lib/media/schema';
-import { TRANSCRIBE_MAX_RAW_BYTES, validateTranscribeDuration } from '@/lib/media/limits';
-import { checkTranscribeRateLimit } from '@/lib/media/rateLimit';
+import { TRANSCRIBE_MAX_RAW_BYTES, validateTranscribeChunkDuration } from '@/lib/media/limits';
+import { checkTranscribeActionLimit, checkTranscribeChunkLimit } from '@/lib/media/rateLimit';
 
 function getClientIdentifier(request) {
   const forwarded = request.headers.get('x-forwarded-for');
@@ -29,19 +37,39 @@ export async function POST(request) {
 
   try {
     const identifier = getClientIdentifier(request);
-    const { allowed } = await checkTranscribeRateLimit(identifier);
-    if (!allowed) {
-      return Response.json({ error: 'You\'ve reached the transcription limit for now. Please try again in a bit.', category: 'rate_limit' }, { status: 429 });
-    }
 
     const formData = await request.formData();
     const audio = formData.get('audio');
     const durationSeconds = parseFloat(formData.get('durationSeconds'));
+    const chunkIndexRaw = formData.get('chunkIndex');
+    const chunkIndex = chunkIndexRaw != null ? parseInt(chunkIndexRaw, 10) : 0;
+    // Falls back to the client IP when actionId is missing (an old/
+    // unexpected caller) rather than rejecting outright — every chunk from
+    // that caller then shares one action identity, the same fail-safe
+    // posture the original single-limiter code had.
+    const actionId = formData.get('actionId') || identifier;
+
+    // Chunk 0 both starts and reserves the action's slot in the 10/hour
+    // action budget — every later chunk in the same action (index > 0)
+    // only touches the chunk-call budget below. Checked before the
+    // chunk-call budget so a rejected action never consumes a chunk-call
+    // slot for a request that was never going to reach Gemini.
+    if (chunkIndex === 0) {
+      const { allowed: actionAllowed } = await checkTranscribeActionLimit(identifier, actionId);
+      if (!actionAllowed) {
+        return Response.json({ error: 'You\'ve reached the transcription limit for now (10 per hour). Please try again in a bit.', category: 'rate_limit' }, { status: 429 });
+      }
+    }
+
+    const { allowed: chunkAllowed } = await checkTranscribeChunkLimit(identifier);
+    if (!chunkAllowed) {
+      return Response.json({ error: 'You\'ve made too many transcription requests in the last hour. Please wait a bit and try again.', category: 'rate_limit' }, { status: 429 });
+    }
 
     if (!audio) {
       return Response.json({ error: 'No audio received.' }, { status: 400 });
     }
-    const durationError = validateTranscribeDuration(durationSeconds);
+    const durationError = validateTranscribeChunkDuration(durationSeconds);
     if (durationError) {
       return Response.json({ error: durationError, category: 'invalid_request' }, { status: 400 });
     }

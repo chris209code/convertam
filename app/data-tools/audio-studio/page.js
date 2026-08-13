@@ -73,7 +73,7 @@ export default function AudioStudioPage() {
             <section style={{ marginBottom: 36 }}>
               <h2 style={sectionH2}>Audio transcription explained</h2>
               <p>
-                When you click Transcribe, Audio Studio sends a compressed copy of your audio to Convertam&apos;s AI provider, which listens to it and returns exactly what was said, broken into timestamped segments. This version transcribes clips up to 3 minutes — a real, current limit driven by how much audio can fit in a single request, documented plainly below rather than hidden. Nothing is invented: silent or unintelligible stretches are left out or marked, never filled in with guessed words.
+                When you click Transcribe, Audio Studio sends a compressed copy of your audio to Convertam&apos;s AI provider, which listens to it and returns exactly what was said, broken into timestamped segments. Audio longer than a few minutes is automatically split into sequential, overlapping pieces behind the scenes and stitched back into one continuous transcript — you just see &quot;Transcribing part 2 of 5…&quot; and get one finished result. This version transcribes clips up to 15 minutes — a real, current limit, documented plainly below rather than hidden. Nothing is invented: silent or unintelligible stretches are left out or marked, never filled in with guessed words.
               </p>
             </section>
 
@@ -134,7 +134,7 @@ export default function AudioStudioPage() {
             <section style={{ marginBottom: 36 }}>
               <h2 style={sectionH2}>Limitations</h2>
               <ul style={ul}>
-                <li><strong>Transcription length:</strong> clips up to 3 minutes in this version — a real technical limit, not an arbitrary one, driven by how much audio fits in a single AI request.</li>
+                <li><strong>Transcription length:</strong> clips up to 15 minutes in this version. Longer audio is transcribed in sequential pieces and merged automatically, but there&apos;s still a real ceiling on total length per click.</li>
                 <li><strong>Languages:</strong> transcription quality depends on how well the underlying AI model handles the spoken language; results are most reliable for widely-spoken languages.</li>
                 <li><strong>Speaker labels:</strong> not supported in this version — Audio Studio doesn&apos;t attempt to guess who is speaking when, since that would risk showing you a confident-looking but wrong answer.</li>
                 <li><strong>Word-level timing:</strong> captions are timed per sentence/clause, not per individual word, in this version.</li>

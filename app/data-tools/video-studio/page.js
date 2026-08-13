@@ -74,7 +74,7 @@ export default function VideoStudioPage() {
             <section style={{ marginBottom: 36 }}>
               <h2 style={sectionH2}>How video becomes a transcript</h2>
               <p>
-                Your video plays locally in the built-in preview player the moment you upload it — nothing is sent anywhere just to preview or scrub through it. When you click Transcribe, Video Studio decodes the video&apos;s audio track in your browser and sends a compressed copy of just that audio to Convertam&apos;s AI provider, which returns a timestamped transcript. This version transcribes videos up to 3 minutes — a real, current limit tied to how much audio fits in a single request, stated plainly here rather than hidden. Nothing is invented: silent or unintelligible stretches are left out or marked, never filled in with guessed words.
+                Your video plays locally in the built-in preview player the moment you upload it — nothing is sent anywhere just to preview or scrub through it. When you click Transcribe, Video Studio decodes the video&apos;s audio track in your browser and sends a compressed copy of just that audio to Convertam&apos;s AI provider, which returns a timestamped transcript. Longer audio is automatically split into sequential, overlapping pieces behind the scenes and stitched back into one continuous transcript — you just see &quot;Transcribing part 2 of 5…&quot; and get one finished result. This version transcribes videos up to 15 minutes — a real, current limit, stated plainly here rather than hidden. Nothing is invented: silent or unintelligible stretches are left out or marked, never filled in with guessed words.
               </p>
             </section>
 
@@ -126,7 +126,7 @@ export default function VideoStudioPage() {
             <section style={{ marginBottom: 36 }}>
               <h2 style={sectionH2}>Limitations</h2>
               <ul style={ul}>
-                <li><strong>Transcription length:</strong> videos up to 3 minutes in this version — a real technical limit driven by how much audio fits in a single AI request.</li>
+                <li><strong>Transcription length:</strong> videos up to 15 minutes in this version. Longer audio is transcribed in sequential pieces and merged automatically, but there&apos;s still a real ceiling on total length per click.</li>
                 <li><strong>Caption burn-in speed:</strong> runs in your browser, so it takes real processing time proportional to your video&apos;s length and your device&apos;s power — there is no server doing this work instantly behind the scenes.</li>
                 <li><strong>Caption styling:</strong> one clean default caption style in this version — style presets and customization are planned for a future update.</li>
                 <li><strong>Speaker labels and word-level timing:</strong> not supported in this version, for the same reason as Audio Studio — Convertam doesn&apos;t guess at data a plain transcription model can&apos;t reliably provide.</li>

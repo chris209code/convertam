@@ -17,6 +17,14 @@ export const metadata = {
 // Studio, so they stay as their own entries.
 const SECTIONS = [
   {
+    id: 'document-parsing',
+    label: 'Document Parsing',
+    icon: '🧠',
+    tools: [
+      { slug: 'smart-parser', title: 'Smart Parser', desc: 'Upload any document and extract clean text, structured tables, or the exact custom fields you define — invoices, receipts, reports, statements and more.', icon: '🧠', badge: 'new', available: true, href: '/data-tools/smart-parser' },
+    ],
+  },
+  {
     id: 'text-tools',
     label: 'Text Tools',
     icon: '📝',

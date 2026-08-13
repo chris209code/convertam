@@ -40,6 +40,7 @@ export default function sitemap() {
   // registered there yet, see app/data-tools/page.js), so listed here
   // explicitly like the category pages above.
   const dataToolPages = [
+    'data-tools/smart-parser',
     'data-tools/text-cleaner',
     'data-tools/json-studio',
     'data-tools/extract-studio',

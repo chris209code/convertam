@@ -306,12 +306,13 @@ const CATEGORIES = [
     dotColor: '#22D3EE',
     accentText: '#0E7490',
     icon: 'data',
+    artwork: '/category-art/data-workspace.jpg',
     viewAllHref: '/data-tools',
     tools: [
+      { name: 'Smart Parser', href: '/data-tools/smart-parser' },
       { name: 'Text Cleaner Studio', href: '/data-tools/text-cleaner' },
       { name: 'JSON Studio', href: '/data-tools/json-studio' },
       { name: 'Extract Studio', href: '/data-tools/extract-studio' },
-      { name: 'Text Case Converter', href: '/text-case-converter' },
     ],
   },
 ];

@@ -75,6 +75,16 @@ export default function VideoEditorWorkspace() {
   const mainClips = getTrackClips(timeline, MAIN_TRACK);
   const overlayClips = getTrackClips(timeline, OVERLAY_TRACK);
   const isComposed = timeline.compositionMode !== 'single';
+  // A heuristic, not an exact timeline-alignment check: if any main clip
+  // and any overlay clip both keep their own audio in video-call/PIP mode,
+  // that's very often two mics on the same conversation (or the same
+  // source used twice) about to sound duplicated/echoed on export. Flagged
+  // rather than silently auto-muted, since two genuinely separate people
+  // each captured with their own mic is the other common case, and that
+  // one legitimately wants both tracks audible.
+  const possibleDuplicateAudio = timeline.compositionMode === 'pip'
+    && mainClips.some((c) => c.audioMode === 'keep')
+    && overlayClips.some((c) => c.audioMode === 'keep');
 
   function commit(updater) {
     setPast((p) => [...p, timeline]);
@@ -564,6 +574,19 @@ export default function VideoEditorWorkspace() {
               </button>
             ))}
           </div>
+          {possibleDuplicateAudio && (
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', padding: '8px 12px', borderRadius: 8, background: '#FFFBEB', border: '1px solid #FDE68A', marginBottom: 10 }}>
+              <span style={{ fontSize: '0.74rem', color: '#92400E' }}>
+                ⚠️ Main and overlay both keep their own audio — if this is one conversation captured twice, it may sound duplicated. Two separate people, each with their own mic, is fine as-is.
+              </span>
+              <button
+                onClick={() => commit((tl) => ({ ...tl, clips: tl.clips.map((c) => (c.track === OVERLAY_TRACK && c.audioMode === 'keep' ? { ...c, audioMode: 'mute' } : c)) }))}
+                style={{ ...smallBtn, flexShrink: 0 }}
+              >
+                Mute overlay audio
+              </button>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
             <div>
               <div style={{ ...fieldLabel, marginBottom: 5 }}>Fit</div>

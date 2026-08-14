@@ -16,6 +16,7 @@ import { validateUploadSize, MAX_UPLOAD_VIDEO_BYTES, MAX_UPLOAD_IMAGE_BYTES, MAX
 import {
   createTimeline, addSource, addClip, trimClip, splitClip, deleteClip, joinClips, reorderClip,
   setClipAudioMode, setCompositionMode, setDividerRatio, setPipCorner, setPipPosition, setPipSizeRatio,
+  setFitMode, setBackgroundFill,
   getTrackClips, getTotalDuration, findActiveClipAt, clipDuration, MAIN_TRACK, OVERLAY_TRACK,
 } from '@/lib/media/timeline';
 import { drawCompositionFrame, computeLayoutRects, pipPositionFromPoint, COMPOSE_WIDTH, COMPOSE_HEIGHT } from '@/lib/media/compositionLayouts';
@@ -562,6 +563,20 @@ export default function VideoEditorWorkspace() {
                 {m.label}
               </button>
             ))}
+          </div>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+            <div>
+              <div style={{ ...fieldLabel, marginBottom: 5 }}>Fit</div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => commit((tl) => setFitMode(tl, 'cover'))} style={{ ...smallBtn, background: timeline.fitMode !== 'contain' ? T.accentGradient : 'white', color: timeline.fitMode !== 'contain' ? 'white' : T.inkSecondary, border: timeline.fitMode !== 'contain' ? 'none' : `1px solid ${T.border}` }}>Crop to fill</button>
+                <button onClick={() => commit((tl) => setFitMode(tl, 'contain'))} style={{ ...smallBtn, background: timeline.fitMode === 'contain' ? T.accentGradient : 'white', color: timeline.fitMode === 'contain' ? 'white' : T.inkSecondary, border: timeline.fitMode === 'contain' ? 'none' : `1px solid ${T.border}` }}>Fit whole frame</button>
+              </div>
+            </div>
+            {timeline.fitMode === 'contain' && (
+              <label style={fieldLabel}>Background color
+                <input type="color" value={timeline.backgroundFill} onChange={(e) => commit((tl) => setBackgroundFill(tl, e.target.value))} style={{ width: 40, height: 28, padding: 0, border: `1px solid ${T.border}`, borderRadius: 6, cursor: 'pointer' }} />
+              </label>
+            )}
           </div>
           {(timeline.compositionMode === 'split-lr' || timeline.compositionMode === 'split-tb') && (
             <label style={fieldLabel}>Divider position

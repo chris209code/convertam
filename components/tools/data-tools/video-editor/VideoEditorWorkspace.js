@@ -11,8 +11,8 @@ import { useEffect, useRef, useState } from 'react';
 import UploadBox from '@/components/UploadBox';
 import { T } from '../smart-parser/theme';
 import { downloadBlob } from '@/lib/dataTools/shared';
-import { extractVideoMetadata, extractImageMetadata, formatDuration } from '@/lib/media/metadata';
-import { validateUploadSize, MAX_UPLOAD_VIDEO_BYTES, MAX_UPLOAD_IMAGE_BYTES } from '@/lib/media/limits';
+import { extractVideoMetadata, extractImageMetadata, extractAudioMetadata, formatDuration } from '@/lib/media/metadata';
+import { validateUploadSize, MAX_UPLOAD_VIDEO_BYTES, MAX_UPLOAD_IMAGE_BYTES, MAX_UPLOAD_AUDIO_BYTES } from '@/lib/media/limits';
 import {
   createTimeline, addSource, addClip, trimClip, splitClip, deleteClip, joinClips, reorderClip,
   setClipAudioMode, setCompositionMode, setDividerRatio, setPipCorner, setPipPosition, setPipSizeRatio,
@@ -153,8 +153,30 @@ export default function VideoEditorWorkspace() {
     }
   }
 
+  // A clip's 'replace'/'mix' audio comes from its own standalone 'audio'-
+  // kind source (see timeline.js's addSource) rather than reusing a video
+  // source — chosen fresh per clip via this file input, not shared across
+  // clips, so swapping one clip's music never silently changes another's.
+  async function handleReplaceAudioFile(files, mode) {
+    const f = files[0];
+    if (!f || !selectedClip) return;
+    const sizeError = validateUploadSize(f, 'audio');
+    if (sizeError) { setUploadError(sizeError); return; }
+    setUploadError('');
+    try {
+      const meta = await extractAudioMetadata(f);
+      commit((tl) => {
+        const { timeline: withSource, source } = addSource(tl, f, meta, 'audio');
+        return setClipAudioMode(withSource, selectedClip.id, mode, source.id);
+      });
+    } catch (err) {
+      setUploadError(err.message || 'Could not read this audio file.');
+    }
+  }
+
   const selectedClip = timeline.clips.find((c) => c.id === selectedClipId) || null;
   const selectedSource = selectedClip ? timeline.sources.find((s) => s.id === selectedClip.sourceId) : null;
+  const selectedClipAudioSource = selectedClip?.audioSourceId ? timeline.sources.find((s) => s.id === selectedClip.audioSourceId) : null;
 
   function handleTrimChange(field, value) {
     if (!selectedClip) return;
@@ -486,8 +508,18 @@ export default function VideoEditorWorkspace() {
                 <select value={selectedClip.audioMode} onChange={(e) => commit((tl) => setClipAudioMode(tl, selectedClip.id, e.target.value))} style={numInput}>
                   <option value="keep">Keep</option>
                   <option value="mute">Mute</option>
+                  <option value="replace">Replace…</option>
+                  <option value="mix">Mix with…</option>
                 </select>
               </label>
+              {(selectedClip.audioMode === 'replace' || selectedClip.audioMode === 'mix') && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: T.mutedDark }}>
+                    {selectedClipAudioSource ? selectedClipAudioSource.file.name : (selectedClip.audioMode === 'replace' ? 'Replacement audio' : 'Audio to mix in')}
+                  </span>
+                  <input type="file" accept="audio/*" onChange={(e) => handleReplaceAudioFile(e.target.files, selectedClip.audioMode)} style={{ fontSize: '0.72rem', maxWidth: 200 }} />
+                </div>
+              )}
             </div>
           )}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

@@ -43,16 +43,6 @@ const SECTIONS = [
     ],
   },
   {
-    id: 'media',
-    label: 'Media',
-    icon: '🎙️',
-    tools: [
-      { slug: 'audio-studio', title: 'Audio Studio', desc: 'Transcribe audio to an editable transcript, generate SRT/VTT captions, and turn audio into a captioned video or audiogram — no login required.', icon: '🎙️', available: true, href: '/data-tools/audio-studio' },
-      { slug: 'video-studio', title: 'Video Studio', desc: 'Extract audio, transcribe, and burn real captions into your video.', icon: '🎬', available: true, href: '/data-tools/video-studio' },
-      { slug: 'video-editor', title: 'Video Editor', desc: 'Trim, split, join and reorder clips, then compose split-screen, picture-in-picture or video-call layouts from two videos — right in your browser.', icon: '✂️', available: true, href: '/data-tools/video-editor' },
-    ],
-  },
-  {
     id: 'encoding-utilities',
     label: 'Encoding & Utilities',
     icon: '🔐',

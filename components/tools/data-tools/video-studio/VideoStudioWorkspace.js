@@ -11,7 +11,7 @@ import { validateUploadSize, validateRenderDuration, validateRenderDimensions, M
 import { transcribeMedia, TranscriptionError } from '@/lib/media/providers/geminiTranscription';
 import { transcriptToSrt, transcriptToVtt, transcriptToAss, DEFAULT_CAPTION_STYLE } from '@/lib/media/captions';
 import { transcriptToPlainText } from '@/lib/media/transcript';
-import { burnAssSubtitles, FfmpegLoadError, FfmpegRenderError } from '@/lib/media/ffmpegClient';
+import { burnAssSubtitles, terminateFFmpeg, FfmpegLoadError, FfmpegRenderError, FfmpegCancelledError } from '@/lib/media/ffmpegClient';
 import TranscriptEditor from '../shared/TranscriptEditor';
 
 const TRANSCRIBE_STATUS_LABEL = {
@@ -44,6 +44,9 @@ export default function VideoStudioWorkspace() {
   const [burnStatus, setBurnStatus] = useState('idle'); // idle | loading | burning | error
   const [burnProgress, setBurnProgress] = useState(0);
   const [burnError, setBurnError] = useState('');
+  const [burnEta, setBurnEta] = useState('');
+  const burnCancelRef = useRef(null);
+  const burnStartRef = useRef(0);
 
   async function handleFiles(files) {
     const f = files[0];
@@ -181,20 +184,43 @@ export default function VideoStudioWorkspace() {
 
     setBurnStatus('loading');
     setBurnProgress(0);
+    setBurnEta('');
+    const cancelToken = { cancelled: false };
+    burnCancelRef.current = cancelToken;
+    burnStartRef.current = Date.now();
     try {
       const assText = transcriptToAss(transcript, DEFAULT_CAPTION_STYLE);
       setBurnStatus('burning');
       const mp4Blob = await burnAssSubtitles({
         videoFile: file,
         assText,
-        onProgress: setBurnProgress,
+        onProgress: (p) => {
+          setBurnProgress(p);
+          const elapsedSec = (Date.now() - burnStartRef.current) / 1000;
+          setBurnEta(p > 0.03 ? `~${formatDuration(Math.max(0, elapsedSec / p - elapsedSec))} remaining` : '');
+        },
+        cancelToken,
       });
       downloadBlob(mp4Blob, 'video/mp4', `${baseName(file.name)}-captioned.mp4`);
       setBurnStatus('idle');
+      setBurnEta('');
     } catch (err) {
-      setBurnStatus('error');
-      setBurnError(err instanceof FfmpegLoadError || err instanceof FfmpegRenderError ? err.message : 'Could not burn captions into this video. Please try again.');
+      if (err instanceof FfmpegCancelledError || cancelToken.cancelled) {
+        setBurnStatus('idle');
+        setBurnProgress(0);
+        setBurnEta('');
+      } else {
+        setBurnStatus('error');
+        setBurnError(err instanceof FfmpegLoadError || err instanceof FfmpegRenderError ? err.message : 'Could not burn captions into this video. Please try again.');
+      }
+    } finally {
+      burnCancelRef.current = null;
     }
+  }
+
+  function handleCancelBurn() {
+    if (burnCancelRef.current) burnCancelRef.current.cancelled = true;
+    terminateFFmpeg(); // the only way to interrupt an in-flight ffmpeg.wasm exec() — see ffmpegClient.js
   }
 
   const isTranscribing = transcribeStatus === 'preparing' || transcribeStatus === 'transcribing' || transcribeStatus === 'merging';
@@ -292,12 +318,17 @@ export default function VideoStudioWorkspace() {
             <p style={{ margin: '0 0 10px', fontSize: '0.82rem', color: T.inkSecondary }}>
               Burn these captions directly into the video&apos;s pixels — a real MP4 with visible, styled subtitles, playable anywhere, not just an overlay in this preview.
             </p>
-            <button onClick={handleBurnCaptions} disabled={isBurning} style={primaryBtn(isBurning)}>
-              {isBurning ? `${BURN_STATUS_LABEL[burnStatus] || 'Working…'}${burnStatus === 'burning' ? ` ${Math.round(burnProgress * 100)}%` : ''}` : '🔥 Burn Captions into Video'}
-            </button>
-            {burnStatus === 'burning' && (
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+              <button onClick={handleBurnCaptions} disabled={isBurning} style={primaryBtn(isBurning)}>
+                {isBurning ? `${BURN_STATUS_LABEL[burnStatus] || 'Working…'}${burnStatus === 'burning' ? ` ${Math.round(burnProgress * 100)}%` : ''}` : '🔥 Burn Captions into Video'}
+              </button>
+              {isBurning && (
+                <button onClick={handleCancelBurn} style={ghostBtn}>Cancel</button>
+              )}
+            </div>
+            {isBurning && (
               <p style={{ margin: '8px 0 0', fontSize: '0.72rem', color: T.muted }}>
-                Keep this tab open while your video renders.
+                Keep this tab open while your video renders{burnEta ? ` — ${burnEta}` : ''}. This runs entirely in this browser tab and can take longer than the video itself, especially at higher resolutions.
               </p>
             )}
             {burnStatus === 'error' && <div style={{ ...statusBox, marginTop: 12, display: 'inline-block' }}>⚠️ {burnError}</div>}

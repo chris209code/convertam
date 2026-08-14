@@ -11,9 +11,12 @@ import { validateUploadSize, MAX_UPLOAD_AUDIO_BYTES } from '@/lib/media/limits';
 import { transcribeMedia, TranscriptionError } from '@/lib/media/providers/geminiTranscription';
 import { transcriptToSrt, transcriptToVtt } from '@/lib/media/captions';
 import { transcriptToPlainText } from '@/lib/media/transcript';
-import { renderCaptionedVideo, isCaptionedVideoSupported } from '@/lib/media/renderCaptionedVideo';
+import { renderCaptionedVideo, isCaptionedVideoSupported, RenderCancelledError } from '@/lib/media/renderCaptionedVideo';
+import { terminateFFmpeg } from '@/lib/media/ffmpegClient';
+import { DEFAULT_BACKGROUND } from '@/lib/media/videoCompose';
 import WaveformPlayer from '../shared/WaveformPlayer';
 import TranscriptEditor from '../shared/TranscriptEditor';
+import BackgroundPicker from './BackgroundPicker';
 
 const STATUS_LABEL = {
   preparing: 'Preparing your audio…',
@@ -44,6 +47,10 @@ export default function AudioStudioWorkspace() {
   const [renderStatus, setRenderStatus] = useState('idle'); // idle | preparing | rendering | finalizing | error
   const [renderProgress, setRenderProgress] = useState(0);
   const [renderError, setRenderError] = useState('');
+  const [renderEta, setRenderEta] = useState('');
+  const cancelTokenRef = useRef(null);
+  const renderStartRef = useRef(0);
+  const [videoOptions, setVideoOptions] = useState({ background: DEFAULT_BACKGROUND, showWaveform: true });
 
   useEffect(() => {
     (async () => {
@@ -77,6 +84,7 @@ export default function AudioStudioWorkspace() {
   }
 
   function reset() {
+    if (cancelTokenRef.current) cancelTokenRef.current.cancelled = true;
     if (fileUrl) URL.revokeObjectURL(fileUrl);
     setFile(null);
     setFileUrl(null);
@@ -86,6 +94,11 @@ export default function AudioStudioWorkspace() {
     setTranscribeStatus('idle');
     setTranscribeError('');
     setTranscribeProgress(null);
+    setRenderStatus('idle');
+    setRenderProgress(0);
+    setRenderError('');
+    setRenderEta('');
+    setVideoOptions({ background: DEFAULT_BACKGROUND, showWaveform: true });
   }
 
   async function handleTranscribe() {
@@ -144,18 +157,47 @@ export default function AudioStudioWorkspace() {
     setRenderStatus('preparing');
     setRenderError('');
     setRenderProgress(0);
+    setRenderEta('');
+    const cancelToken = { cancelled: false };
+    cancelTokenRef.current = cancelToken;
+    renderStartRef.current = Date.now();
     try {
       const mp4Blob = await renderCaptionedVideo({
         file, peaks, transcript,
+        background: videoOptions.background,
+        showWaveform: videoOptions.showWaveform,
         onStatus: (s) => setRenderStatus(s === 'done' ? 'idle' : s),
-        onProgress: setRenderProgress,
+        onProgress: (p) => {
+          setRenderProgress(p);
+          // A live ETA computed from this render's own measured pace so
+          // far — never a canned number, and it self-corrects if a
+          // device's real ffmpeg.wasm throughput turns out slower or
+          // faster than the finalizing step's early frames suggested.
+          const elapsedSec = (Date.now() - renderStartRef.current) / 1000;
+          setRenderEta(p > 0.03 ? `~${formatDuration(Math.max(0, elapsedSec / p - elapsedSec))} remaining` : '');
+        },
+        cancelToken,
       });
       downloadBlob(mp4Blob, 'video/mp4', `${baseName(file.name)}-captioned.mp4`);
       setRenderStatus('idle');
+      setRenderEta('');
     } catch (err) {
-      setRenderStatus('error');
-      setRenderError(err.message || 'Could not create the video. Please try again.');
+      if (err instanceof RenderCancelledError) {
+        setRenderStatus('idle');
+        setRenderProgress(0);
+        setRenderEta('');
+      } else {
+        setRenderStatus('error');
+        setRenderError(err.message || 'Could not create the video. Please try again.');
+      }
+    } finally {
+      cancelTokenRef.current = null;
     }
+  }
+
+  function handleCancelRender() {
+    if (cancelTokenRef.current) cancelTokenRef.current.cancelled = true;
+    terminateFFmpeg(); // the only way to interrupt an in-flight ffmpeg.wasm exec() — see ffmpegClient.js
   }
 
   const isBusy = transcribeStatus === 'preparing' || transcribeStatus === 'transcribing' || transcribeStatus === 'merging';
@@ -228,14 +270,20 @@ export default function AudioStudioWorkspace() {
           {isCaptionedVideoSupported() ? (
             <div style={{ marginTop: 20, padding: '16px', borderRadius: 12, background: T.accentTint, textAlign: 'center' }}>
               <p style={{ margin: '0 0 10px', fontSize: '0.82rem', color: T.inkSecondary }}>
-                Turn this audio into a downloadable video with your captions burned in — a branded background, a waveform, and your transcript's captions.
+                Turn this audio into a downloadable video with your captions burned in — pick a background image or color, plus a waveform, and your transcript's captions.
               </p>
-              <button onClick={handleCreateVideo} disabled={isRendering} style={primaryBtn(isRendering)}>
-                {isRendering ? `${RENDER_STATUS_LABEL[renderStatus] || 'Working…'} ${Math.round(renderProgress * 100)}%` : '🎬 Create Captioned Video'}
-              </button>
-              {renderStatus === 'rendering' && (
+              <BackgroundPicker peaks={peaks} value={videoOptions} onChange={setVideoOptions} />
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button onClick={handleCreateVideo} disabled={isRendering} style={primaryBtn(isRendering)}>
+                  {isRendering ? `${RENDER_STATUS_LABEL[renderStatus] || 'Working…'} ${Math.round(renderProgress * 100)}%` : '🎬 Create Captioned Video'}
+                </button>
+                {isRendering && (
+                  <button onClick={handleCancelRender} style={ghostBtn}>Cancel</button>
+                )}
+              </div>
+              {isRendering && (
                 <p style={{ margin: '8px 0 0', fontSize: '0.72rem', color: T.muted }}>
-                  Keep this tab open while your video renders.
+                  Keep this tab open while your video renders{renderEta ? ` — ${renderEta}` : ''}. Rendering happens entirely in this browser tab and can take longer than the audio itself, especially during the final MP4 step.
                 </p>
               )}
               {renderStatus === 'error' && <div style={{ ...statusBox, marginTop: 12, display: 'inline-block' }}>⚠️ {renderError}</div>}

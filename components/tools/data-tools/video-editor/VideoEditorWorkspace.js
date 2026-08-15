@@ -19,7 +19,7 @@ import {
   addOverlayTrack, removeOverlayTrack, setOverlayTrackMode, setOverlayTrackDividerRatio,
   setOverlayTrackPipCorner, setOverlayTrackPipPosition, setOverlayTrackPipSizeRatio,
   setFitMode, setBackgroundFill, setFrameAspect,
-  setClipSpeed, setClipFade, setClipFilters, setClipCropFocus, setClipTransitionOut,
+  setClipSpeed, setClipFade, setClipFilters, setClipCropFocus, setClipTransitionOut, setClipGain, setClipReversed,
   addTextOverlay, updateTextOverlay, deleteTextOverlay,
   addImageOverlay, updateImageOverlay, deleteImageOverlay,
   addShapeOverlay, updateShapeOverlay, deleteShapeOverlay,
@@ -31,6 +31,7 @@ import { renderTimeline, isTimelineExportSupported } from '@/lib/media/timelineR
 import { extractThumbnails, thumbnailsForRange } from '@/lib/media/thumbnails';
 import { extractWaveformPeaks, drawWaveform } from '@/lib/media/waveform';
 import { detectSilence } from '@/lib/media/silenceDetect';
+import { computeNormalizationGain } from '@/lib/media/normalizeAudio';
 // Auto Captions reuses the exact same transcription/caption engine as
 // Audio Studio and Video Studio — no separate implementation. It runs on
 // the EXPORTED render (not the raw source clips), since that's the only
@@ -216,6 +217,7 @@ export default function VideoEditorWorkspace() {
   const [waveformBySource, setWaveformBySource] = useState({}); // sourceId -> peaks[] | 'loading' | 'error'
   const [silenceRanges, setSilenceRanges] = useState(null); // null = not run yet; [] = ran, found none; [{ start, end, selected }] = ran, found some — never applied until the user confirms
   const [silenceScanning, setSilenceScanning] = useState(false);
+  const [normalizing, setNormalizing] = useState(false);
 
   // ---- Auto Captions state — operates on the exported render, not the
   // raw source clips (see the import comment above for why). ----
@@ -641,6 +643,22 @@ export default function VideoEditorWorkspace() {
       return next;
     });
   }
+  // ---- Audio normalization: plain RMS-level analysis (see
+  // normalizeAudio.js), no AI — computes a gain multiplier once and stores
+  // it on the clip via setClipGain, same as any other manual clip setting.
+  async function handleNormalizeAudio() {
+    if (!selectedClip || !selectedSource || selectedSource.kind === 'image') return;
+    setNormalizing(true);
+    try {
+      const gain = await computeNormalizationGain(selectedSource.file, selectedClip.sourceStart, selectedClip.sourceEnd);
+      commit((tl) => setClipGain(tl, selectedClip.id, gain));
+    } catch {
+      setUploadError('Could not analyze this clip\'s audio.');
+    } finally {
+      setNormalizing(false);
+    }
+  }
+
   // ---- Silence removal: detect, let the user review/uncheck, only then
   // apply as ordinary split+delete operations — never a silent auto-cut. ----
   async function handleFindSilence() {
@@ -972,15 +990,28 @@ export default function VideoEditorWorkspace() {
 
       if (mainHit) {
         await loadClip(mainVideoRef.current, mainHit.clip, lastMainClipRef);
-        // Matching native playback rate to the clip's speed keeps native
-        // playback (needed for audio) from drifting away from the
-        // seek-corrected position below — at 2x speed, sourceTime advances
-        // twice as fast as unscaled native playback would.
         mainVideoRef.current.playbackRate = mainHit.clip.speed || 1;
-        if (Math.abs(mainVideoRef.current.currentTime - mainHit.sourceTime) > 0.15) {
-          mainVideoRef.current.currentTime = mainHit.sourceTime;
+        if (mainHit.clip.reversed) {
+          // Native <video> has no reverse-playback mode — approximated here
+          // by scrubbing currentTime backward every frame instead of letting
+          // native forward playback run. Audio can't be scrubbed backward
+          // live either, so it's silenced below; the export renders a real
+          // reversed copy (with correctly reversed audio) via ffmpeg before
+          // capture — see timelineRender.js's prerenderReversedClips. This
+          // preview is a best-effort visual, not the authoritative output.
+          if (!mainVideoRef.current.paused) mainVideoRef.current.pause();
+          const mirroredTime = mainHit.clip.sourceEnd - (mainHit.sourceTime - mainHit.clip.sourceStart);
+          mainVideoRef.current.currentTime = Math.max(0, mirroredTime);
+        } else {
+          // Matching native playback rate to the clip's speed keeps native
+          // playback (needed for audio) from drifting away from the
+          // seek-corrected position below — at 2x speed, sourceTime advances
+          // twice as fast as unscaled native playback would.
+          if (Math.abs(mainVideoRef.current.currentTime - mainHit.sourceTime) > 0.15) {
+            mainVideoRef.current.currentTime = mainHit.sourceTime;
+          }
+          syncTrackPlayback(mainVideoRef.current, true);
         }
-        syncTrackPlayback(mainVideoRef.current, true);
       } else {
         syncTrackPlayback(mainVideoRef.current, false);
       }
@@ -992,10 +1023,13 @@ export default function VideoEditorWorkspace() {
       // Fades apply to audio too (not just the visual), so a fading-out
       // clip doesn't cut abruptly to silence at full volume.
       if (audioCtxRef.current) {
-        if (mainHit) {
+        if (mainHit && mainHit.clip.reversed) {
+          mainGainRef.current.gain.value = 0;
+          mainReplaceGainRef.current.gain.value = 0;
+        } else if (mainHit) {
           const elapsedInClip = mainHit.sourceTime - mainHit.clip.sourceStart;
           const mixKeepsOwnAudio = await applyReplacementAudioLive(mainHit.clip, elapsedInClip, mainReplaceAudioElRef.current, mainReplaceGainRef.current, mainReplaceSrcNodeRef, mainReplaceLastClipRef);
-          mainGainRef.current.gain.value = ((mainHit.clip.audioMode === 'keep' || mixKeepsOwnAudio) ? 1 : 0) * mainOpacity;
+          mainGainRef.current.gain.value = ((mainHit.clip.audioMode === 'keep' || mixKeepsOwnAudio) ? 1 : 0) * mainOpacity * (mainHit.clip.gain ?? 1);
         } else {
           mainGainRef.current.gain.value = 0;
           mainReplaceGainRef.current.gain.value = 0;
@@ -1012,6 +1046,14 @@ export default function VideoEditorWorkspace() {
         if (hit && isImage) {
           if (s.imageEl) await loadImage(s.imageEl, hit.clip, s.lastImageSourceIdRef);
           if (s.videoEl) syncTrackPlayback(s.videoEl, false);
+        } else if (hit && s.videoEl && hit.clip.reversed) {
+          // Best-effort scrub-backward preview — see the main track's
+          // identical handling above for why native playback can't do this.
+          await loadClip(s.videoEl, hit.clip, s.lastClipIdRef);
+          s.videoEl.playbackRate = hit.clip.speed || 1;
+          if (!s.videoEl.paused) s.videoEl.pause();
+          const mirroredTime = hit.clip.sourceEnd - (hit.sourceTime - hit.clip.sourceStart);
+          s.videoEl.currentTime = Math.max(0, mirroredTime);
         } else if (hit && s.videoEl) {
           await loadClip(s.videoEl, hit.clip, s.lastClipIdRef);
           s.videoEl.playbackRate = hit.clip.speed || 1;
@@ -1026,15 +1068,17 @@ export default function VideoEditorWorkspace() {
         const opacity = hit ? getFadeOpacity(hit.clip, hit.sourceTime - hit.clip.sourceStart) : 1;
 
         if (audioCtxRef.current && s.gain && s.replaceGain) {
-          if (hit && isImage) {
+          if (hit && (isImage || hit.clip.reversed)) {
             // An image has no video audio track of its own, but can still
             // carry replace/mix audio (e.g. narration under a title card).
-            await applyReplacementAudioLive(hit.clip, 0, s.replaceAudioEl, s.replaceGain, s.replaceSrcNodeRef, s.replaceLastClipIdRef);
+            // A reversed clip's own audio can't be scrubbed backward live —
+            // silenced here, correctly reversed in the actual export.
+            if (isImage) await applyReplacementAudioLive(hit.clip, 0, s.replaceAudioEl, s.replaceGain, s.replaceSrcNodeRef, s.replaceLastClipIdRef);
             s.gain.gain.value = 0;
           } else if (hit) {
             const elapsedInClip = hit.sourceTime - hit.clip.sourceStart;
             const mixKeepsOwnAudio = await applyReplacementAudioLive(hit.clip, elapsedInClip, s.replaceAudioEl, s.replaceGain, s.replaceSrcNodeRef, s.replaceLastClipIdRef);
-            s.gain.gain.value = ((hit.clip.audioMode === 'keep' || mixKeepsOwnAudio) ? 1 : 0) * opacity;
+            s.gain.gain.value = ((hit.clip.audioMode === 'keep' || mixKeepsOwnAudio) ? 1 : 0) * opacity * (hit.clip.gain ?? 1);
           } else {
             s.gain.gain.value = 0;
             s.replaceGain.gain.value = 0;
@@ -1480,6 +1524,11 @@ export default function VideoEditorWorkspace() {
                         value={selectedClip.fadeOut.toFixed(1)}
                         onChange={(e) => commit((tl) => setClipFade(tl, selectedClip.id, { fadeOut: parseFloat(e.target.value) || 0 }))} style={numInput} />
                     </label>
+                    <label style={fieldLabel}>Volume {Math.round((selectedClip.gain ?? 1) * 100)}%
+                      <input type="range" min={0.1} max={3} step={0.05} value={selectedClip.gain ?? 1}
+                        onChange={(e) => commit((tl) => setClipGain(tl, selectedClip.id, parseFloat(e.target.value)))} style={{ width: 90 }} />
+                    </label>
+                    <button onClick={handleNormalizeAudio} disabled={normalizing} style={smallBtn}>{normalizing ? 'Analyzing…' : '🔊 Normalize audio'}</button>
                   </div>
                 )}
 
@@ -1551,9 +1600,23 @@ export default function VideoEditorWorkspace() {
                   {selectedSource.kind !== 'image' && <button onClick={() => handleJoinWithNext(selectedClip.track)} style={smallBtn}>⤵ Join with next</button>}
                   {selectedClip.track === MAIN_TRACK && selectedSource.kind !== 'image' && <button onClick={handleFreezeFrame} style={smallBtn}>❄ Freeze frame</button>}
                   {selectedClip.track === MAIN_TRACK && selectedSource.kind !== 'image' && <button onClick={handleFindSilence} disabled={silenceScanning} style={smallBtn}>{silenceScanning ? 'Scanning…' : '🔇 Find silence'}</button>}
+                  {selectedSource.kind !== 'image' && (
+                    <button
+                      onClick={() => commit((tl) => setClipReversed(tl, selectedClip.id, !selectedClip.reversed))}
+                      style={{ ...smallBtn, background: selectedClip.reversed ? T.accentGradient : 'white', color: selectedClip.reversed ? 'white' : T.inkSecondary }}
+                    >
+                      ⏪ {selectedClip.reversed ? 'Reversed' : 'Reverse'}
+                    </button>
+                  )}
                   <button onClick={handleDuplicateSelected} style={smallBtn}>⧉ Duplicate</button>
                   <button onClick={handleDeleteSelected} style={{ ...smallBtn, color: '#DC2626', borderColor: '#FCA5A5' }}>✕ Delete clip</button>
                 </div>
+
+                {selectedClip.reversed && (
+                  <p style={{ fontSize: '0.66rem', color: T.muted, margin: '6px 0 0' }}>
+                    Reversed clips preview silently as a best-effort scrub — the exported video plays this clip backwards with its audio correctly reversed too.
+                  </p>
+                )}
 
                 {silenceRanges !== null && (
                   <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>

@@ -3,7 +3,7 @@ import VideoEditorWorkspace from '../../../components/tools/data-tools/video-edi
 
 export const metadata = {
   title: 'Video Editor — Trim, Text, Speed & Split-Screen Video Editing | Convertam',
-  description: 'Trim, split, and reorder clips, add text/titles and a logo, adjust speed and fades, apply filters, and compose split-screen or picture-in-picture layouts — entirely in your browser, no login required.',
+  description: 'Trim, split, and reorder clips, add text/titles and a logo, adjust speed and fades, apply filters, compose split-screen or picture-in-picture layouts, and generate Auto Captions — entirely in your browser, no login required.',
   alternates: { canonical: '/data-tools/video-editor' },
 };
 
@@ -29,7 +29,7 @@ const FAQ = [
   { q: 'What is picture-in-picture / video-call layout?', a: 'Choose Picture-in-picture to show your main video full-size with the second video as a smaller, repositionable box in a corner — the familiar video-call layout, with adjustable corner and size.' },
   { q: 'Can I control audio from each video separately?', a: 'Yes — each clip has its own audio setting (Keep or Mute), so you can choose which video\'s sound plays during composed sections.' },
   { q: 'Can I export a vertical video for TikTok or Reels?', a: 'Yes — choose the Vertical (9:16) frame in the Composition panel. It works with a single video too, no overlay needed; the export is simply reframed to that shape. Square (1:1) and Landscape (16:9) are also available.' },
-  { q: 'Does Convertam store my videos?', a: 'No. Editing, preview, and export all happen locally in your browser. Your video files are never uploaded anywhere.' },
+  { q: 'Does Convertam store my videos?', a: 'No. Editing, preview, and export all happen locally in your browser. Your video files are never uploaded anywhere, with one narrow exception: if you use Auto Captions, a compressed copy of just your exported video\'s audio is sent to our transcription provider for that single request, and not stored afterward.' },
   { q: 'What do I get when I export?', a: 'A real MP4 file reflecting every trim, split, join, reorder, composition, text, speed, fade, filter, and crop choice you made — downloaded directly to your device.' },
   { q: 'Can I add text or a title to my video?', a: 'Yes — the Text & titles panel adds Heading, Subtitle, Lower third, Simple text, Watermark, Quote, or Callout layers, each with its own font size, color, background, position, and timing.' },
   { q: 'Can I add my logo or a watermark image?', a: 'Yes — upload an image in the Media panel\'s Logo/watermark slot, then set its size, opacity, and corner position.' },
@@ -37,6 +37,9 @@ const FAQ = [
   { q: 'Are there transitions between clips?', a: 'Fade, Dip to black, and Dip to white are available — pick one from the selected clip\'s Transition control. A true crossfade (blending two clips\' video at once) isn\'t supported yet.' },
   { q: 'Can I find and remove silent parts automatically?', a: 'Click Find silence on a clip to scan it for quiet stretches, review the list, uncheck anything you want to keep, then remove the rest — nothing is cut without your review.' },
   { q: 'Does the export resolution actually change the file?', a: 'Yes — 480p/720p/1080p and the Small/Balanced/High quality setting both genuinely change the exported file\'s pixel dimensions and encoding, not just a label.' },
+  { q: 'Can I add captions to my video?', a: 'Yes — after exporting, use Auto Captions to transcribe the exported video\'s audio, edit the transcript for accuracy, then download it as SRT, VTT, or TXT, or burn the captions directly into the video as a new export.' },
+  { q: 'Does adding captions upload my video?', a: 'Only the audio, and only for that one request. Auto Captions sends a compressed copy of your exported video\'s audio to our transcription provider to generate the transcript; it\'s processed for that single request and not stored afterward. Burning captions into the video happens locally in your browser, like every other export.' },
+  { q: 'Does Video Editor use AI to edit my video for me?', a: 'No. All editing — trimming, splitting, composition, text, speed, filters, and export — is manual and runs locally in your browser. The only AI-powered feature is Auto Captions (speech-to-text transcription); there is no AI auto-editing, highlight generation, or scene detection.' },
 ];
 
 export default function VideoEditorPage() {
@@ -92,6 +95,7 @@ export default function VideoEditorPage() {
                 <li><strong>Per-clip audio</strong> — keep, mute, replace, or mix in different audio per clip.</li>
                 <li><strong>Reframe for social platforms</strong> — Landscape (16:9), Square (1:1), or Vertical (9:16), with one-click YouTube/TikTok/Instagram/LinkedIn presets.</li>
                 <li><strong>Export controls</strong> — choose resolution (480p/720p/1080p) and quality (small/balanced/high).</li>
+                <li><strong>Auto Captions</strong> — transcribe your exported video, edit the transcript, download SRT/VTT/TXT, or burn captions directly into the video.</li>
                 <li><strong>Keyboard shortcuts</strong> — Space to play/pause, S to split, D to duplicate, Delete to remove, Ctrl/Cmd+Z to undo.</li>
               </ul>
             </section>
@@ -143,7 +147,7 @@ export default function VideoEditorPage() {
             <section style={{ marginBottom: 36 }}>
               <h2 style={sectionH2}>Privacy and temporary processing</h2>
               <p>
-                Editing, preview, and export all happen locally in your browser — your video files are never uploaded anywhere. Nothing about your video is saved on Convertam&apos;s servers, because it never reaches them in the first place.
+                Editing, composition, and export all happen locally in your browser — your video is never uploaded for those steps. Auto Captions is the one exception: generating a transcript requires sending a compressed copy of just the exported video&apos;s audio to our transcription provider, processed for that single request and not stored afterward. If you don&apos;t use Auto Captions, nothing about your video ever reaches Convertam&apos;s servers.
               </p>
             </section>
 
@@ -153,7 +157,7 @@ export default function VideoEditorPage() {
                 <li><strong>Two tracks:</strong> one main track plus one optional overlay track — not an open-ended multi-track timeline.</li>
                 <li><strong>Rendering speed:</strong> export runs in your browser, so it takes real processing time proportional to your video&apos;s length, composition, effects, and your device&apos;s power — using speed, fades, filters, text, or a watermark takes longer to export than a straight trim.</li>
                 <li><strong>Crossfade transitions:</strong> only Fade, Dip to black, and Dip to white are available between clips — a true crossfade (blending two clips&apos; video at once) isn&apos;t supported yet.</li>
-                <li><strong>Captions/subtitles:</strong> not yet connected to this tool — for now, transcribe and caption a video separately in Video Studio.</li>
+                <li><strong>Captions:</strong> Auto Captions transcribes your <em>exported</em> video, not the live timeline — export first, then generate captions from that file.</li>
               </ul>
             </section>
 

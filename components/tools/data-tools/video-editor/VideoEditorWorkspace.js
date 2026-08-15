@@ -28,6 +28,26 @@ import { renderTimeline, isTimelineExportSupported } from '@/lib/media/timelineR
 import { extractThumbnails, thumbnailsForRange } from '@/lib/media/thumbnails';
 import { extractWaveformPeaks, drawWaveform } from '@/lib/media/waveform';
 import { detectSilence } from '@/lib/media/silenceDetect';
+// Auto Captions reuses the exact same transcription/caption engine as
+// Audio Studio and Video Studio — no separate implementation. It runs on
+// the EXPORTED render (not the raw source clips), since that's the only
+// point a multi-clip, trimmed, reordered timeline has one single, final
+// audio timeline for a transcript to actually match.
+import { transcribeMedia, TranscriptionError } from '@/lib/media/providers/geminiTranscription';
+import { transcriptToSrt, transcriptToVtt, transcriptToAss, DEFAULT_CAPTION_STYLE } from '@/lib/media/captions';
+import { transcriptToPlainText } from '@/lib/media/transcript';
+import { burnAssSubtitles, FfmpegLoadError, FfmpegRenderError, FfmpegCancelledError } from '@/lib/media/ffmpegClient';
+import TranscriptEditor from '../shared/TranscriptEditor';
+
+const TRANSCRIBE_STATUS_LABEL = {
+  preparing: 'Preparing audio…',
+  transcribing: 'Transcribing speech…',
+  merging: 'Combining transcript…',
+};
+const BURN_STATUS_LABEL = {
+  loading: 'Loading video engine…',
+  burning: 'Burning captions into video…',
+};
 
 const RENDER_STATUS_LABEL = {
   preparing: 'Preparing…',
@@ -135,6 +155,20 @@ export default function VideoEditorWorkspace() {
   const [waveformBySource, setWaveformBySource] = useState({}); // sourceId -> peaks[] | 'loading' | 'error'
   const [silenceRanges, setSilenceRanges] = useState(null); // null = not run yet; [] = ran, found none; [{ start, end, selected }] = ran, found some — never applied until the user confirms
   const [silenceScanning, setSilenceScanning] = useState(false);
+
+  // ---- Auto Captions state — operates on the exported render, not the
+  // raw source clips (see the import comment above for why). ----
+  const [exportedBlob, setExportedBlob] = useState(null);
+  const [transcript, setTranscript] = useState(null);
+  const [transcribeStatus, setTranscribeStatus] = useState('idle'); // idle | preparing | transcribing | merging | error
+  const [transcribeError, setTranscribeError] = useState('');
+  const [transcribeProgress, setTranscribeProgress] = useState(null); // { chunkIndex, totalChunks } | null
+  const [burnStatus, setBurnStatus] = useState('idle'); // idle | loading | burning | error
+  const [burnProgress, setBurnProgress] = useState(0);
+  const [burnError, setBurnError] = useState('');
+  const [burnEta, setBurnEta] = useState('');
+  const burnCancelRef = useRef(null);
+  const burnStartRef = useRef(0);
 
   const canvasRef = useRef(null);
   const mainVideoRef = useRef(null);
@@ -936,13 +970,110 @@ export default function VideoEditorWorkspace() {
       });
       downloadBlob(blob, 'video/mp4', 'edited-video.mp4');
       setRenderStatus('idle');
+      // Kept for Auto Captions below — a fresh export invalidates any
+      // transcript from a previous one (timing would no longer match), so
+      // caption state is cleared here rather than left stale against a
+      // render it no longer describes.
+      setExportedBlob(blob);
+      setTranscript(null);
+      setTranscribeStatus('idle');
+      setTranscribeError('');
+      setBurnStatus('idle');
+      setBurnError('');
     } catch (err) {
       setRenderStatus('error');
       setRenderError(err.message || 'Could not export this video. Please try again.');
     }
   }
 
+  // ---- Auto Captions — the one operation in this tool that leaves the
+  // browser: transcribeMedia() sends a compressed copy of the exported
+  // video's audio to Convertam's transcription provider. Everything else
+  // here (transcript editing, SRT/VTT/TXT export, caption burn-in) is the
+  // same local engine already used by Audio Studio and Video Studio. ----
+  async function handleTranscribeExport() {
+    if (!exportedBlob) return;
+    setTranscribeStatus('preparing');
+    setTranscribeError('');
+    setTranscribeProgress(null);
+    try {
+      const file = new File([exportedBlob], 'edited-video.mp4', { type: 'video/mp4' });
+      const result = await transcribeMedia({
+        file,
+        onStatus: (s, detail) => {
+          setTranscribeProgress(detail?.totalChunks > 1 ? detail : null);
+          setTranscribeStatus(s === 'done' ? 'idle' : s);
+        },
+      });
+      setTranscript(result);
+      setTranscribeStatus('idle');
+      setTranscribeProgress(null);
+    } catch (err) {
+      setTranscribeStatus('error');
+      setTranscribeError(err instanceof TranscriptionError ? err.message : 'Transcription failed. Please try again.');
+      setTranscribeProgress(null);
+    }
+  }
+  function transcribeStatusLabel() {
+    if (transcribeStatus === 'transcribing' && transcribeProgress) {
+      return `Transcribing part ${transcribeProgress.chunkIndex + 1} of ${transcribeProgress.totalChunks}…`;
+    }
+    return TRANSCRIBE_STATUS_LABEL[transcribeStatus] || 'Working…';
+  }
+  // Reuses the live editing preview's own playhead/scrub rather than a
+  // second video element — the export is a rendering of this same
+  // timeline, so seeking a caption segment here moves the same preview.
+  function handleCaptionsSeek(time) {
+    setPlaying(false);
+    setPlayhead(time);
+  }
+  function handleDownloadSrt() { downloadBlob(transcriptToSrt(transcript), 'text/plain', 'edited-video.srt'); }
+  function handleDownloadVtt() { downloadBlob(transcriptToVtt(transcript), 'text/vtt', 'edited-video.vtt'); }
+  function handleDownloadTxt() { downloadBlob(transcriptToPlainText(transcript), 'text/plain', 'edited-video-transcript.txt'); }
+
+  async function handleBurnCaptions() {
+    if (!exportedBlob || !transcript) return;
+    setBurnError('');
+    setBurnStatus('loading');
+    setBurnProgress(0);
+    setBurnEta('');
+    const cancelToken = { cancelled: false };
+    burnCancelRef.current = cancelToken;
+    burnStartRef.current = Date.now();
+    try {
+      const videoFile = new File([exportedBlob], 'edited-video.mp4', { type: 'video/mp4' });
+      const assText = transcriptToAss(transcript, DEFAULT_CAPTION_STYLE);
+      setBurnStatus('burning');
+      const mp4Blob = await burnAssSubtitles({
+        videoFile,
+        assText,
+        onProgress: (p) => {
+          setBurnProgress(p);
+          const elapsedSec = (Date.now() - burnStartRef.current) / 1000;
+          setBurnEta(p > 0.03 ? `~${formatDuration(Math.max(0, elapsedSec / p - elapsedSec))} remaining` : '');
+        },
+        cancelToken,
+      });
+      downloadBlob(mp4Blob, 'video/mp4', 'edited-video-captioned.mp4');
+      setBurnStatus('idle');
+      setBurnEta('');
+    } catch (err) {
+      if (err instanceof FfmpegCancelledError || cancelToken.cancelled) {
+        setBurnStatus('idle');
+        setBurnProgress(0);
+        setBurnEta('');
+      } else {
+        setBurnStatus('error');
+        setBurnError(err instanceof FfmpegLoadError || err instanceof FfmpegRenderError ? err.message : 'Could not burn captions into this video. Please try again.');
+      }
+    } finally {
+      burnCancelRef.current = null;
+    }
+  }
+
   const isExporting = renderStatus === 'preparing' || renderStatus === 'rendering' || renderStatus === 'finalizing';
+  const isTranscribing = transcribeStatus === 'preparing' || transcribeStatus === 'transcribing' || transcribeStatus === 'merging';
+  const isBurning = burnStatus === 'loading' || burnStatus === 'burning';
   const supported = isTimelineExportSupported();
 
   if (!mainClips.length) {
@@ -1558,8 +1689,41 @@ export default function VideoEditorWorkspace() {
               Exporting isn&apos;t supported in this browser yet. Try a recent version of Chrome, Edge, or Firefox.
             </p>
           )}
+
+          {/* Captions — the one step in this tool that isn't purely local;
+              operates on the exported render (not the raw clips), since
+              that's the only point a multi-clip, trimmed, reordered
+              timeline has one final audio track for a transcript to match. */}
+          <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginTop: 10 }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Auto Captions</div>
+            {!exportedBlob ? (
+              <p style={{ fontSize: '0.72rem', color: T.muted, margin: 0 }}>Export your video above, then transcribe it here to add captions.</p>
+            ) : !transcript ? (
+              <>
+                <button onClick={handleTranscribeExport} disabled={isTranscribing} style={{ ...primaryBtn(isTranscribing), width: '100%', padding: '10px 20px', fontSize: '0.85rem' }}>
+                  {isTranscribing ? transcribeStatusLabel() : '📝 Transcribe exported video'}
+                </button>
+                {transcribeStatus === 'error' && <div style={{ ...statusBox, marginTop: 8 }}>⚠️ {transcribeError}</div>}
+              </>
+            ) : (
+              <>
+                <TranscriptEditor transcript={transcript} onTranscriptChange={setTranscript} currentTime={playhead} onSeek={handleCaptionsSeek} />
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+                  <button onClick={handleDownloadSrt} style={smallBtn}>⬇ SRT</button>
+                  <button onClick={handleDownloadVtt} style={smallBtn}>⬇ VTT</button>
+                  <button onClick={handleDownloadTxt} style={smallBtn}>⬇ TXT</button>
+                  <button onClick={() => { setTranscript(null); setTranscribeStatus('idle'); }} style={smallBtn}>Re-transcribe</button>
+                </div>
+                <button onClick={handleBurnCaptions} disabled={isBurning} style={{ ...primaryBtn(isBurning), width: '100%', marginTop: 8, padding: '10px 20px', fontSize: '0.85rem' }}>
+                  {isBurning ? `${BURN_STATUS_LABEL[burnStatus] || 'Working…'} ${Math.round(burnProgress * 100)}%${burnEta ? ` — ${burnEta}` : ''}` : '🔥 Burn captions into video'}
+                </button>
+                {burnStatus === 'error' && <div style={{ ...statusBox, marginTop: 8 }}>⚠️ {burnError}</div>}
+              </>
+            )}
+          </div>
+
           <p style={{ fontSize: '0.68rem', color: T.muted, marginTop: 10, textAlign: 'center' }}>
-            Your videos are processed entirely in your browser and are never uploaded.
+            Editing, composition, and export all happen locally in your browser — your video is never uploaded for those steps. Auto Captions is the one exception: a compressed copy of just the exported video&apos;s audio is sent to our transcription provider, processed for that request, and not stored afterward.
           </p>
         </div>
       </div>

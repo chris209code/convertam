@@ -16,10 +16,10 @@ import { validateUploadSize, MAX_UPLOAD_VIDEO_BYTES, MAX_UPLOAD_IMAGE_BYTES, MAX
 import {
   createTimeline, addSource, addClip, trimClip, splitClip, deleteClip, joinClips, reorderClip,
   setClipAudioMode, setCompositionMode, setDividerRatio, setPipCorner, setPipPosition, setPipSizeRatio,
-  setFitMode, setBackgroundFill,
+  setFitMode, setBackgroundFill, setFrameAspect,
   getTrackClips, getTotalDuration, findActiveClipAt, clipDuration, MAIN_TRACK, OVERLAY_TRACK,
 } from '@/lib/media/timeline';
-import { drawCompositionFrame, computeLayoutRects, pipPositionFromPoint, COMPOSE_WIDTH, COMPOSE_HEIGHT } from '@/lib/media/compositionLayouts';
+import { drawCompositionFrame, computeLayoutRects, pipPositionFromPoint, getComposeSize } from '@/lib/media/compositionLayouts';
 import { renderTimeline, isTimelineExportSupported } from '@/lib/media/timelineRender';
 
 const RENDER_STATUS_LABEL = {
@@ -33,6 +33,16 @@ const COMPOSITION_MODES = [
   { id: 'split-lr', label: 'Split screen (side by side)' },
   { id: 'split-tb', label: 'Split screen (top/bottom)' },
   { id: 'pip', label: 'Picture-in-picture / video call' },
+];
+
+// Output frame shape — independent of composition mode. Works with a
+// single video too: picking a non-landscape shape reframes (crops/fits)
+// the whole export into it, the same "TikTok/Reels/Shorts vs. YouTube vs.
+// IG feed" choice most editing apps expose.
+const FRAME_ASPECT_OPTIONS = [
+  { id: 'landscape', label: 'Landscape', sub: '16:9 · YouTube', icon: '▭' },
+  { id: 'square', label: 'Square', sub: '1:1 · Feed', icon: '▢' },
+  { id: 'vertical', label: 'Vertical', sub: '9:16 · TikTok/Reels', icon: '▯' },
 ];
 
 // Quick-jump presets alongside free dragging — not a replacement for it.
@@ -75,6 +85,12 @@ export default function VideoEditorWorkspace() {
   const mainClips = getTrackClips(timeline, MAIN_TRACK);
   const overlayClips = getTrackClips(timeline, OVERLAY_TRACK);
   const isComposed = timeline.compositionMode !== 'single';
+  // Canvas pixel size for the chosen output frame shape — the single
+  // source of truth the preview canvas, drag math, and export (via
+  // drawCompositionFrame reading the same timeline.frameAspect) all agree
+  // on, so the preview never drifts from what actually gets exported.
+  const { width: composeW, height: composeH } = getComposeSize(timeline.frameAspect);
+  const needsReframe = timeline.frameAspect !== 'landscape';
   // A heuristic, not an exact timeline-alignment check: if any main clip
   // and any overlay clip both keep their own audio in video-call/PIP mode,
   // that's very often two mics on the same conversation (or the same
@@ -328,15 +344,15 @@ export default function VideoEditorWorkspace() {
   function canvasPointFromEvent(e) {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
-    const scaleX = COMPOSE_WIDTH / rect.width;
-    const scaleY = COMPOSE_HEIGHT / rect.height;
+    const scaleX = composeW / rect.width;
+    const scaleY = composeH / rect.height;
     return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
   }
 
   function handleOverlayPointerDown(e) {
     if (timeline.compositionMode !== 'pip' || !overlayClips.length) return;
     const point = canvasPointFromEvent(e);
-    const rects = computeLayoutRects(timeline, COMPOSE_WIDTH, COMPOSE_HEIGHT);
+    const rects = computeLayoutRects(timeline, composeW, composeH);
     if (!rects.overlay) return;
     const r = rects.overlay;
     if (point.x < r.x || point.x > r.x + r.w || point.y < r.y || point.y > r.y + r.h) return;
@@ -349,7 +365,7 @@ export default function VideoEditorWorkspace() {
   function handleOverlayPointerMove(e) {
     if (!dragStateRef.current) return;
     const point = canvasPointFromEvent(e);
-    livePipPositionRef.current = pipPositionFromPoint(COMPOSE_WIDTH, COMPOSE_HEIGHT, timeline.pipSizeRatio, point.x, point.y, dragStateRef.current);
+    livePipPositionRef.current = pipPositionFromPoint(composeW, composeH, timeline.pipSizeRatio, point.x, point.y, dragStateRef.current);
   }
 
   function handleOverlayPointerUp() {
@@ -407,8 +423,8 @@ export default function VideoEditorWorkspace() {
           <div style={{ background: '#0F172A', borderRadius: 10, overflow: 'hidden', marginBottom: 8, position: 'relative' }}>
             <canvas
               ref={canvasRef}
-              width={COMPOSE_WIDTH}
-              height={COMPOSE_HEIGHT}
+              width={composeW}
+              height={composeH}
               onPointerDown={handleOverlayPointerDown}
               onPointerMove={handleOverlayPointerMove}
               onPointerUp={handleOverlayPointerUp}
@@ -583,6 +599,34 @@ export default function VideoEditorWorkspace() {
           {/* Composition — always visible, not just after an overlay exists */}
           <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Composition</div>
+
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ ...fieldLabel, marginBottom: 4 }}>Frame</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {FRAME_ASPECT_OPTIONS.map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => commit((tl) => setFrameAspect(tl, f.id))}
+                    title={f.sub}
+                    style={{
+                      ...smallBtn, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, lineHeight: 1.2,
+                      background: timeline.frameAspect === f.id ? T.accentGradient : 'white',
+                      color: timeline.frameAspect === f.id ? 'white' : T.inkSecondary,
+                      border: timeline.frameAspect === f.id ? 'none' : `1px solid ${T.border}`,
+                    }}
+                  >
+                    <span>{f.icon} {f.label}</span>
+                    <span style={{ fontSize: '0.6rem', fontWeight: 500, opacity: 0.85 }}>{f.sub}</span>
+                  </button>
+                ))}
+              </div>
+              {needsReframe && (
+                <p style={{ fontSize: '0.66rem', color: T.muted, margin: '6px 0 0' }}>
+                  Reframing re-encodes the whole video (crops to fill by default) — export takes longer than a straight trim.
+                </p>
+              )}
+            </div>
+
             {overlayClips.length === 0 && (
               <p style={{ fontSize: '0.7rem', color: T.muted, margin: '0 0 8px' }}>Add a second video or image overlay above to enable split-screen or picture-in-picture.</p>
             )}

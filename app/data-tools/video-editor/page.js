@@ -28,6 +28,7 @@ const FAQ = [
   { q: 'What is split-screen composition?', a: 'Upload a second video as an overlay and choose Split screen (side by side or top/bottom) to show both videos at once, divided by an adjustable line.' },
   { q: 'What is picture-in-picture / video-call layout?', a: 'Choose Picture-in-picture to show your main video full-size with the second video as a smaller, repositionable box in a corner — the familiar video-call layout, with adjustable corner and size.' },
   { q: 'Can I control audio from each video separately?', a: 'Yes — each clip has its own audio setting (Keep or Mute), so you can choose which video\'s sound plays during composed sections.' },
+  { q: 'Can I export a vertical video for TikTok or Reels?', a: 'Yes — choose the Vertical (9:16) frame in the Composition panel. It works with a single video too, no overlay needed; the export is simply reframed to that shape. Square (1:1) and Landscape (16:9) are also available.' },
   { q: 'Does Convertam store my videos?', a: 'No. Editing, preview, and export all happen locally in your browser. Your video files are never uploaded anywhere.' },
   { q: 'What do I get when I export?', a: 'A real MP4 file reflecting every trim, split, join, reorder, and composition choice you made — downloaded directly to your device.' },
 ];
@@ -72,6 +73,7 @@ export default function VideoEditorPage() {
                 <li><strong>Split-screen</strong> — two videos side by side or stacked, with an adjustable divider.</li>
                 <li><strong>Picture-in-picture / video call</strong> — a main video with a repositionable, resizable overlay in any corner.</li>
                 <li><strong>Per-clip audio</strong> — keep or mute each clip&apos;s audio independently.</li>
+                <li><strong>Reframe for social platforms</strong> — export Landscape (16:9), Square (1:1), or Vertical (9:16), for YouTube, Instagram feed, or TikTok/Reels/Shorts.</li>
               </ul>
             </section>
 
@@ -86,6 +88,13 @@ export default function VideoEditorPage() {
               <h2 style={sectionH2}>Split-screen and picture-in-picture composition</h2>
               <p>
                 Add a second video as an overlay track to unlock composition. <strong>Split screen</strong> places both videos side by side or one above the other, with a divider you can drag to adjust the balance. <strong>Picture-in-picture</strong> keeps your main video full-size and places the second video as a smaller box in whichever corner you choose — the layout used for video-call-style reaction or commentary videos. Both modes crop instead of stretching mismatched aspect ratios, so neither video is ever distorted.
+              </p>
+            </section>
+
+            <section style={{ marginBottom: 36 }}>
+              <h2 style={sectionH2}>Exporting for TikTok, Instagram, and YouTube</h2>
+              <p>
+                Pick a <strong>Frame</strong> in the Composition panel to choose the shape your export is cropped to: Landscape (16:9) for YouTube, Square (1:1) for an Instagram feed post, or Vertical (9:16) for TikTok, Reels, and Shorts. This works with a single video too — no second clip or overlay required, the whole export is simply reframed. Use <strong>Crop to fill</strong> to fill the new frame edge to edge (cropping the sides or top/bottom as needed), or <strong>Fit whole frame</strong> to keep the entire original picture visible with a solid-color letterbox filling the rest.
               </p>
             </section>
 

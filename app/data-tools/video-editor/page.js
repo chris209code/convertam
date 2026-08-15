@@ -2,8 +2,8 @@ import Link from 'next/link';
 import VideoEditorWorkspace from '../../../components/tools/data-tools/video-editor/VideoEditorWorkspace';
 
 export const metadata = {
-  title: 'Video Editor — Trim, Split, Join & Compose Split-Screen Video | Convertam',
-  description: 'Trim, split, delete, join and reorder video clips, then compose split-screen, picture-in-picture, or video-call layouts from two videos — entirely in your browser, no login required.',
+  title: 'Video Editor — Trim, Text, Speed & Split-Screen Video Editing | Convertam',
+  description: 'Trim, split, and reorder clips, add text/titles and a logo, adjust speed and fades, apply filters, and compose split-screen or picture-in-picture layouts — entirely in your browser, no login required.',
   alternates: { canonical: '/data-tools/video-editor' },
 };
 
@@ -13,7 +13,7 @@ const SCHEMA = {
   name: 'Video Editor',
   applicationCategory: 'MultimediaApplication',
   operatingSystem: 'Any (runs in browser)',
-  description: 'A browser-based non-destructive video editor: trim, split, delete, join, and reorder clips, plus split-screen, picture-in-picture, and video-call composition from two video sources.',
+  description: 'A browser-based non-destructive video editor: trim, split, delete, join, and reorder clips; add text/titles, a logo/watermark, speed changes, fades, and color filters; compose split-screen, picture-in-picture, and video-call layouts from two video sources.',
   offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
   url: 'https://www.convertam.app/data-tools/video-editor',
 };
@@ -30,7 +30,13 @@ const FAQ = [
   { q: 'Can I control audio from each video separately?', a: 'Yes — each clip has its own audio setting (Keep or Mute), so you can choose which video\'s sound plays during composed sections.' },
   { q: 'Can I export a vertical video for TikTok or Reels?', a: 'Yes — choose the Vertical (9:16) frame in the Composition panel. It works with a single video too, no overlay needed; the export is simply reframed to that shape. Square (1:1) and Landscape (16:9) are also available.' },
   { q: 'Does Convertam store my videos?', a: 'No. Editing, preview, and export all happen locally in your browser. Your video files are never uploaded anywhere.' },
-  { q: 'What do I get when I export?', a: 'A real MP4 file reflecting every trim, split, join, reorder, and composition choice you made — downloaded directly to your device.' },
+  { q: 'What do I get when I export?', a: 'A real MP4 file reflecting every trim, split, join, reorder, composition, text, speed, fade, filter, and crop choice you made — downloaded directly to your device.' },
+  { q: 'Can I add text or a title to my video?', a: 'Yes — the Text & titles panel adds Heading, Subtitle, Lower third, Simple text, Watermark, Quote, or Callout layers, each with its own font size, color, background, position, and timing.' },
+  { q: 'Can I add my logo or a watermark image?', a: 'Yes — upload an image in the Media panel\'s Logo/watermark slot, then set its size, opacity, and corner position.' },
+  { q: 'Can I change a clip\'s speed, or add fade in/out?', a: 'Yes — every clip has a Speed control (0.25× to 4×) and Fade in/Fade out, applied to both video and audio together.' },
+  { q: 'Are there transitions between clips?', a: 'Fade, Dip to black, and Dip to white are available — pick one from the selected clip\'s Transition control. A true crossfade (blending two clips\' video at once) isn\'t supported yet.' },
+  { q: 'Can I find and remove silent parts automatically?', a: 'Click Find silence on a clip to scan it for quiet stretches, review the list, uncheck anything you want to keep, then remove the rest — nothing is cut without your review.' },
+  { q: 'Does the export resolution actually change the file?', a: 'Yes — 480p/720p/1080p and the Small/Balanced/High quality setting both genuinely change the exported file\'s pixel dimensions and encoding, not just a label.' },
 ];
 
 export default function VideoEditorPage() {
@@ -44,7 +50,7 @@ export default function VideoEditorPage() {
           <div style={{ maxWidth: 760, margin: '0 auto 32px', textAlign: 'center' }}>
             <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '2rem', fontWeight: 800, color: '#0F172A', marginBottom: 10 }}>Video Editor</h1>
             <p style={{ fontSize: '1rem', color: '#475569', lineHeight: 1.6 }}>
-              Trim, split, delete, join and reorder clips on a real timeline, then compose split-screen, picture-in-picture, or video-call layouts from two videos — all in your browser.
+              Trim, split, and reorder clips on a real timeline with drag-to-trim handles, add text/titles and a logo, adjust speed and fades, apply color filters, then compose split-screen or picture-in-picture layouts from two videos — all in your browser.
             </p>
           </div>
 
@@ -64,16 +70,29 @@ export default function VideoEditorPage() {
             <section style={{ marginBottom: 36 }}>
               <h2 style={sectionH2}>What can Video Editor do?</h2>
               <ul style={ul}>
-                <li><strong>Trim</strong> — set precise in/out points for any clip.</li>
+                <li><strong>Trim</strong> — drag either edge of a clip on the timeline, or set precise numeric in/out points.</li>
                 <li><strong>Split</strong> — cut a clip in two at the playhead.</li>
                 <li><strong>Delete</strong> — remove an unwanted segment.</li>
                 <li><strong>Join</strong> — merge adjacent clips back together.</li>
                 <li><strong>Reorder</strong> — drag clips into a new sequence.</li>
+                <li><strong>Duplicate</strong> — one click to repeat a clip.</li>
+                <li><strong>Freeze frame</strong> — turn the current frame into a still image dropped into the sequence.</li>
                 <li><strong>Undo/redo</strong> — step backward and forward through your edit history.</li>
+                <li><strong>Timeline thumbnails and waveform</strong> — see a filmstrip and audio waveform on every clip, not just a plain colored bar.</li>
+                <li><strong>Text and titles</strong> — headings, subtitles, lower thirds, quotes, callouts, and watermark text, each with its own font size, color, background, position, and timing.</li>
+                <li><strong>Logo / watermark image</strong> — upload an image, position it in a corner, and control its size and opacity.</li>
+                <li><strong>Speed</strong> — 0.25× to 4× per clip.</li>
+                <li><strong>Fade in/out</strong> — per clip, video and audio together.</li>
+                <li><strong>Transitions</strong> — fade, dip to black, or dip to white between clips.</li>
+                <li><strong>Color filters</strong> — brightness, contrast, saturation, grayscale, and warm/cool/vintage/cinematic presets.</li>
+                <li><strong>Crop focus</strong> — choose which part of an oversized frame stays visible when cropping to fill.</li>
+                <li><strong>Silence removal</strong> — scan a clip for silent stretches and review them before removing.</li>
                 <li><strong>Split-screen</strong> — two videos side by side or stacked, with an adjustable divider.</li>
                 <li><strong>Picture-in-picture / video call</strong> — a main video with a repositionable, resizable overlay in any corner.</li>
-                <li><strong>Per-clip audio</strong> — keep or mute each clip&apos;s audio independently.</li>
-                <li><strong>Reframe for social platforms</strong> — export Landscape (16:9), Square (1:1), or Vertical (9:16), for YouTube, Instagram feed, or TikTok/Reels/Shorts.</li>
+                <li><strong>Per-clip audio</strong> — keep, mute, replace, or mix in different audio per clip.</li>
+                <li><strong>Reframe for social platforms</strong> — Landscape (16:9), Square (1:1), or Vertical (9:16), with one-click YouTube/TikTok/Instagram/LinkedIn presets.</li>
+                <li><strong>Export controls</strong> — choose resolution (480p/720p/1080p) and quality (small/balanced/high).</li>
+                <li><strong>Keyboard shortcuts</strong> — Space to play/pause, S to split, D to duplicate, Delete to remove, Ctrl/Cmd+Z to undo.</li>
               </ul>
             </section>
 
@@ -95,6 +114,13 @@ export default function VideoEditorPage() {
               <h2 style={sectionH2}>Exporting for TikTok, Instagram, and YouTube</h2>
               <p>
                 Pick a <strong>Frame</strong> in the Composition panel to choose the shape your export is cropped to: Landscape (16:9) for YouTube, Square (1:1) for an Instagram feed post, or Vertical (9:16) for TikTok, Reels, and Shorts. This works with a single video too — no second clip or overlay required, the whole export is simply reframed. Use <strong>Crop to fill</strong> to fill the new frame edge to edge (cropping the sides or top/bottom as needed), or <strong>Fit whole frame</strong> to keep the entire original picture visible with a solid-color letterbox filling the rest.
+              </p>
+            </section>
+
+            <section style={{ marginBottom: 36 }}>
+              <h2 style={sectionH2}>Text, titles, speed, and effects</h2>
+              <p>
+                The <strong>Text &amp; titles</strong> panel adds always-on-top text layers — pick a Heading, Subtitle, Lower third, Simple text, Watermark, Quote, or Callout starting point, then set its own font size, color, background, bold/italic, alignment, position, and start/end timing. <strong>Logo/watermark</strong> works the same way for an image instead of text. Per clip, the <strong>Clip</strong> panel adds <strong>Speed</strong> (0.25× to 4×), <strong>Fade in/out</strong> (video and audio together), <strong>Filters</strong> (brightness, contrast, saturation, grayscale, or a one-click preset), and <strong>Crop focus</strong> for choosing which part of the frame survives a crop. Choosing a <strong>Transition</strong> other than Cut sets that clip&apos;s fade-out and the next clip&apos;s fade-in to match automatically.
               </p>
             </section>
 
@@ -125,9 +151,9 @@ export default function VideoEditorPage() {
               <h2 style={sectionH2}>Limitations</h2>
               <ul style={ul}>
                 <li><strong>Two tracks:</strong> one main track plus one optional overlay track — not an open-ended multi-track timeline.</li>
-                <li><strong>Rendering speed:</strong> export runs in your browser, so it takes real processing time proportional to your video&apos;s length, composition, and your device&apos;s power.</li>
-                <li><strong>Transitions and effects:</strong> not supported in this version — cuts are hard cuts.</li>
-                <li><strong>Text overlays and titles:</strong> not yet available — planned for a future update.</li>
+                <li><strong>Rendering speed:</strong> export runs in your browser, so it takes real processing time proportional to your video&apos;s length, composition, effects, and your device&apos;s power — using speed, fades, filters, text, or a watermark takes longer to export than a straight trim.</li>
+                <li><strong>Crossfade transitions:</strong> only Fade, Dip to black, and Dip to white are available between clips — a true crossfade (blending two clips&apos; video at once) isn&apos;t supported yet.</li>
+                <li><strong>Captions/subtitles:</strong> not yet connected to this tool — for now, transcribe and caption a video separately in Video Studio.</li>
               </ul>
             </section>
 

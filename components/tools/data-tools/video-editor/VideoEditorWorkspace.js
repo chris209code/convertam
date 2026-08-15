@@ -14,13 +14,20 @@ import { downloadBlob } from '@/lib/dataTools/shared';
 import { extractVideoMetadata, extractImageMetadata, extractAudioMetadata, formatDuration } from '@/lib/media/metadata';
 import { validateUploadSize, MAX_UPLOAD_VIDEO_BYTES, MAX_UPLOAD_IMAGE_BYTES, MAX_UPLOAD_AUDIO_BYTES } from '@/lib/media/limits';
 import {
-  createTimeline, addSource, addClip, trimClip, splitClip, deleteClip, joinClips, reorderClip,
+  createTimeline, addSource, addClip, trimClip, splitClip, deleteClip, joinClips, reorderClip, duplicateClip,
   setClipAudioMode, setCompositionMode, setDividerRatio, setPipCorner, setPipPosition, setPipSizeRatio,
   setFitMode, setBackgroundFill, setFrameAspect,
+  setClipSpeed, setClipFade, setClipFilters, setClipCropFocus, setClipTransitionOut,
+  addTextOverlay, updateTextOverlay, deleteTextOverlay,
+  addImageOverlay, updateImageOverlay, deleteImageOverlay,
+  setExportResolution, setExportQuality,
   getTrackClips, getTotalDuration, findActiveClipAt, clipDuration, MAIN_TRACK, OVERLAY_TRACK,
 } from '@/lib/media/timeline';
-import { drawCompositionFrame, computeLayoutRects, pipPositionFromPoint, getComposeSize } from '@/lib/media/compositionLayouts';
+import { drawCompositionFrame, drawTextOverlays, drawImageOverlays, computeLayoutRects, pipPositionFromPoint, getComposeSize, getFadeOpacity } from '@/lib/media/compositionLayouts';
 import { renderTimeline, isTimelineExportSupported } from '@/lib/media/timelineRender';
+import { extractThumbnails, thumbnailsForRange } from '@/lib/media/thumbnails';
+import { extractWaveformPeaks, drawWaveform } from '@/lib/media/waveform';
+import { detectSilence } from '@/lib/media/silenceDetect';
 
 const RENDER_STATUS_LABEL = {
   preparing: 'Preparing…',
@@ -53,6 +60,65 @@ const PIP_CORNER_OPTIONS = [
   { id: 'bottom-right', label: 'Bottom right', icon: '↘' },
 ];
 
+// Named platform shortcuts on top of the same 3 underlying frame shapes —
+// picking one just calls setFrameAspect() with its mapped aspect, so this
+// is purely a friendlier label layer, not new engine behavior.
+const SOCIAL_PRESETS = [
+  { id: 'youtube', label: 'YouTube', aspect: 'landscape', icon: '▭' },
+  { id: 'youtube-shorts', label: 'YouTube Shorts', aspect: 'vertical', icon: '▯' },
+  { id: 'tiktok', label: 'TikTok', aspect: 'vertical', icon: '▯' },
+  { id: 'ig-reel', label: 'Instagram Reel', aspect: 'vertical', icon: '▯' },
+  { id: 'ig-square', label: 'Instagram Feed', aspect: 'square', icon: '▢' },
+  { id: 'linkedin', label: 'LinkedIn', aspect: 'landscape', icon: '▭' },
+];
+
+const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
+
+const FILTER_PRESETS = {
+  none: { brightness: 1, contrast: 1, saturation: 1, grayscale: 0 },
+  grayscale: { brightness: 1, contrast: 1.05, saturation: 1, grayscale: 1 },
+  warm: { brightness: 1.05, contrast: 1.05, saturation: 1.25, grayscale: 0 },
+  cool: { brightness: 1, contrast: 1.05, saturation: 0.85, grayscale: 0 },
+  vintage: { brightness: 1.05, contrast: 0.9, saturation: 0.7, grayscale: 0 },
+  cinematic: { brightness: 0.95, contrast: 1.2, saturation: 0.9, grayscale: 0 },
+};
+
+// 'crossfade' (blending two clips' video simultaneously) deliberately isn't
+// offered here — it needs a second, always-decoding video element in both
+// preview and export that this pass doesn't build. Fade/dip-to-color are
+// real, implemented by reusing the existing per-clip fade engine (this
+// clip's fadeOut + the next clip's fadeIn, plus the background color for
+// the dip variants) rather than new rendering machinery — see
+// handleSetTransition.
+const TRANSITION_OPTIONS = [
+  { id: 'cut', label: 'Cut' },
+  { id: 'fade', label: 'Fade' },
+  { id: 'dip-black', label: 'Dip to black' },
+  { id: 'dip-white', label: 'Dip to white' },
+];
+
+const TEXT_PRESET_OPTIONS = [
+  { id: 'heading', label: 'Heading', size: 64, y: 0.15, bold: true },
+  { id: 'subtitle', label: 'Subtitle', size: 36, y: 0.24, bold: false },
+  { id: 'lower-third', label: 'Lower third', size: 40, y: 0.82, bold: true, background: 'bar' },
+  { id: 'simple', label: 'Simple text', size: 44, y: 0.5, bold: false },
+  { id: 'watermark', label: 'Watermark', size: 24, y: 0.95, bold: false, opacity: 0.6 },
+  { id: 'quote', label: 'Quote', size: 40, y: 0.5, italic: true },
+  { id: 'callout', label: 'Callout', size: 36, y: 0.5, background: 'solid' },
+];
+
+const RESOLUTION_OPTIONS = [
+  { id: '480p', label: '480p', sub: 'Small' },
+  { id: '720p', label: '720p', sub: 'Balanced' },
+  { id: '1080p', label: '1080p', sub: 'High quality' },
+];
+
+const QUALITY_OPTIONS = [
+  { id: 'small', label: 'Small file' },
+  { id: 'balanced', label: 'Balanced' },
+  { id: 'high', label: 'High quality' },
+];
+
 export default function VideoEditorWorkspace() {
   const [timeline, setTimeline] = useState(createTimeline());
   const [past, setPast] = useState([]);
@@ -64,6 +130,11 @@ export default function VideoEditorWorkspace() {
   const [renderStatus, setRenderStatus] = useState('idle');
   const [renderProgress, setRenderProgress] = useState(0);
   const [renderError, setRenderError] = useState('');
+  const [selectedTextOverlayId, setSelectedTextOverlayId] = useState(null);
+  const [thumbnailsBySource, setThumbnailsBySource] = useState({}); // sourceId -> { thumbs, duration } | 'loading' | 'error'
+  const [waveformBySource, setWaveformBySource] = useState({}); // sourceId -> peaks[] | 'loading' | 'error'
+  const [silenceRanges, setSilenceRanges] = useState(null); // null = not run yet; [] = ran, found none; [{ start, end, selected }] = ran, found some — never applied until the user confirms
+  const [silenceScanning, setSilenceScanning] = useState(false);
 
   const canvasRef = useRef(null);
   const mainVideoRef = useRef(null);
@@ -73,6 +144,11 @@ export default function VideoEditorWorkspace() {
   const lastMainClipRef = useRef(null);
   const lastOverlayClipRef = useRef(null);
   const lastOverlayImageRef = useRef(null);
+  // Logo/watermark <img> elements, one per imageOverlay's sourceId — plain
+  // Image() objects (not part of the DOM tree, same as the text overlays
+  // needing no element at all) since drawImageOverlays only ever reads
+  // pixels off them via canvas drawImage, never displays them directly.
+  const imageOverlayElsRef = useRef(new Map());
 
   // Live-preview audio graph — separate from (but modeled on) the Web Audio
   // routing timelineRender.js's composed export already uses. Built lazily,
@@ -209,6 +285,39 @@ export default function VideoEditorWorkspace() {
   // per-clip, since the graph and its gain nodes are reused across clips.
   useEffect(() => () => { audioCtxRef.current?.close().catch(() => {}); }, []);
 
+  // Extracts a filmstrip + waveform once per VIDEO source (not per clip —
+  // trimming/splitting a clip re-slices the same cached arrays instead of
+  // re-decoding), so dragging trim handles stays instant. Guarded by the
+  // `=== undefined` check so this only ever fires once per source id.
+  useEffect(() => {
+    timeline.sources.forEach((s) => {
+      if (s.kind !== 'video') return;
+      if (thumbnailsBySource[s.id] === undefined) {
+        setThumbnailsBySource((prev) => ({ ...prev, [s.id]: 'loading' }));
+        extractThumbnails(s.file, 10, 100)
+          .then((result) => setThumbnailsBySource((prev) => ({ ...prev, [s.id]: result })))
+          .catch(() => setThumbnailsBySource((prev) => ({ ...prev, [s.id]: 'error' })));
+      }
+      if (waveformBySource[s.id] === undefined && s.hasAudio) {
+        setWaveformBySource((prev) => ({ ...prev, [s.id]: 'loading' }));
+        extractWaveformPeaks(s.file, 100)
+          .then((peaks) => setWaveformBySource((prev) => ({ ...prev, [s.id]: peaks })))
+          .catch(() => setWaveformBySource((prev) => ({ ...prev, [s.id]: 'error' })));
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeline.sources]);
+
+  function ensureImageOverlayElement(sourceId) {
+    if (imageOverlayElsRef.current.has(sourceId)) return imageOverlayElsRef.current.get(sourceId);
+    const source = timeline.sources.find((s) => s.id === sourceId);
+    if (!source) return null;
+    const img = new Image();
+    img.src = URL.createObjectURL(source.file);
+    imageOverlayElsRef.current.set(sourceId, img);
+    return img;
+  }
+
   async function handleMainFiles(files) {
     const f = files[0];
     if (!f) return;
@@ -330,6 +439,151 @@ export default function VideoEditorWorkspace() {
     commit((tl) => joinClips(tl, clips[idx].id, clips[idx + 1].id));
   }
 
+  function handleDuplicateSelected() {
+    if (!selectedClip) return;
+    commit((tl) => duplicateClip(tl, selectedClip.id));
+  }
+
+  // Transitions reuse the existing per-clip fade engine rather than new
+  // rendering machinery: Fade/Dip-to-black/white = this clip's fadeOut +
+  // the next clip's fadeIn, both set to the transition's duration, plus
+  // (for the dip variants) the timeline's background color — since fading
+  // to transparent always reveals whatever backgroundFill currently is.
+  function handleSetTransition(clip, type) {
+    const mainList = getTrackClips(timeline, MAIN_TRACK);
+    const idx = mainList.findIndex((c) => c.id === clip.id);
+    const nextClip = idx >= 0 ? mainList[idx + 1] : null;
+    const dur = clip.transitionOut.duration || 0.5;
+    commit((tl) => {
+      let next = setClipTransitionOut(tl, clip.id, { type });
+      if (type === 'cut') {
+        next = setClipFade(next, clip.id, { fadeOut: 0 });
+        if (nextClip) next = setClipFade(next, nextClip.id, { fadeIn: 0 });
+      } else {
+        next = setClipFade(next, clip.id, { fadeOut: dur });
+        if (nextClip) next = setClipFade(next, nextClip.id, { fadeIn: dur });
+        if (type === 'dip-white') next = setBackgroundFill(next, '#FFFFFF');
+        else next = setBackgroundFill(next, '#000000');
+      }
+      return next;
+    });
+  }
+  // ---- Silence removal: detect, let the user review/uncheck, only then
+  // apply as ordinary split+delete operations — never a silent auto-cut. ----
+  async function handleFindSilence() {
+    if (!selectedClip || selectedClip.track !== MAIN_TRACK || !selectedSource) return;
+    setSilenceScanning(true);
+    setSilenceRanges(null);
+    try {
+      const ranges = await detectSilence(selectedSource.file, selectedClip.sourceStart, selectedClip.sourceEnd);
+      setSilenceRanges(ranges.map((r) => ({ ...r, selected: true })));
+    } catch {
+      setSilenceRanges([]);
+    } finally {
+      setSilenceScanning(false);
+    }
+  }
+  function toggleSilenceRange(index) {
+    setSilenceRanges((prev) => prev.map((r, i) => (i === index ? { ...r, selected: !r.selected } : r)));
+  }
+  // Ranges are independent (non-overlapping, expressed in the original
+  // source file's own absolute time), so they can be applied in any order —
+  // each is found fresh by which current clip fragment still contains it,
+  // since an earlier cut elsewhere never changes another fragment's own
+  // sourceStart/sourceEnd.
+  function handleApplySilenceRemoval() {
+    if (!silenceRanges?.length || !selectedClip) return;
+    const originalSourceId = selectedClip.sourceId;
+    const selected = silenceRanges.filter((r) => r.selected);
+    if (!selected.length) return;
+    commit((tl) => {
+      let next = tl;
+      for (const range of selected) {
+        const target = next.clips.find((c) => c.sourceId === originalSourceId && c.sourceStart <= range.start + 0.02 && c.sourceEnd >= range.end - 0.02);
+        if (!target) continue;
+        const afterFirstSplit = splitClip(next, target.id, range.start);
+        const midCandidate = afterFirstSplit.clips.find((c) => c.sourceId === originalSourceId && Math.abs(c.sourceStart - range.start) < 0.06 && c.sourceEnd > range.start);
+        if (!midCandidate) { next = afterFirstSplit; continue; }
+        const afterSecondSplit = splitClip(afterFirstSplit, midCandidate.id, range.end);
+        const toDelete = afterSecondSplit.clips.find((c) => c.sourceId === originalSourceId && Math.abs(c.sourceStart - range.start) < 0.06 && Math.abs(c.sourceEnd - range.end) < 0.06);
+        next = toDelete ? deleteClip(afterSecondSplit, toDelete.id) : afterSecondSplit;
+      }
+      return next;
+    });
+    setSilenceRanges(null);
+    setSelectedClipId(null);
+  }
+
+  function handleTransitionDuration(clip, duration) {
+    const mainList = getTrackClips(timeline, MAIN_TRACK);
+    const idx = mainList.findIndex((c) => c.id === clip.id);
+    const nextClip = idx >= 0 ? mainList[idx + 1] : null;
+    commit((tl) => {
+      let next = setClipTransitionOut(tl, clip.id, { duration });
+      if (clip.transitionOut.type !== 'cut') {
+        next = setClipFade(next, clip.id, { fadeOut: duration });
+        if (nextClip) next = setClipFade(next, nextClip.id, { fadeIn: duration });
+      }
+      return next;
+    });
+  }
+
+  // Captures whatever the canvas is showing right now, turns it into a new
+  // 'image' source (the exact same source kind a real image upload would
+  // produce), and splits the active clip at the playhead to insert it — a
+  // freeze frame is just a still image clip dropped into the sequence, so
+  // it reuses splitClip/addSource/addClip rather than needing new engine
+  // primitives of its own.
+  async function handleFreezeFrame() {
+    if (!selectedClip || selectedClip.track !== MAIN_TRACK) return;
+    const hit = findActiveClipAt(timeline, MAIN_TRACK, playhead);
+    if (!hit || hit.clip.id !== selectedClip.id) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+    if (!blob) return;
+    const file = new File([blob], 'freeze-frame.jpg', { type: 'image/jpeg' });
+    const freezeDuration = 2;
+    commit((tl) => {
+      const split = splitClip(tl, hit.clip.id, hit.sourceTime);
+      // If the playhead landed too close to an edge, splitClip is a no-op
+      // (see its own 0.05s guard) — the freeze frame still gets inserted,
+      // just without an actual split on that side.
+      const mainNow = getTrackClips(split, MAIN_TRACK);
+      const insertAfter = mainNow.find((c) => c.sourceId === hit.clip.sourceId && Math.abs(c.sourceEnd - hit.sourceTime) < 0.1)
+        || mainNow.find((c) => c.id === hit.clip.id)
+        || mainNow[0];
+      const { timeline: withSource, source } = addSource(split, file, { width: composeW, height: composeH }, 'image');
+      const withClip = addClip(withSource, source.id, MAIN_TRACK);
+      const newClips = getTrackClips(withClip, MAIN_TRACK);
+      const freezeClip = newClips[newClips.length - 1];
+      const targetIndex = insertAfter ? newClips.findIndex((c) => c.id === insertAfter.id) + 1 : newClips.length - 1;
+      const reordered = reorderClip(withClip, freezeClip.id, targetIndex);
+      return trimClip(reordered, freezeClip.id, { sourceStart: 0, sourceEnd: freezeDuration });
+    });
+  }
+
+  // ---- Keyboard shortcuts — ignored while typing in a text input/textarea
+  // so trim/overlay text fields keep working normally. ----
+  useEffect(() => {
+    function onKeyDown(e) {
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
+      if (e.metaKey || e.ctrlKey) {
+        if (e.key.toLowerCase() === 'z' && e.shiftKey) { e.preventDefault(); redo(); }
+        else if (e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
+        return;
+      }
+      if (e.key === ' ') { e.preventDefault(); handleTogglePlay(); }
+      else if (e.key === 'Delete' || e.key === 'Backspace') { if (selectedClipId) { e.preventDefault(); handleDeleteSelected(); } }
+      else if (e.key.toLowerCase() === 's') { handleSplitAtPlayhead(); }
+      else if (e.key.toLowerCase() === 'd') { handleDuplicateSelected(); }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClipId, playing, playhead, timeline, past, future]);
+
   const dragIndexRef = useRef(null);
   function handleDragStart(index) { dragIndexRef.current = index; }
   function handleDrop(track, index) {
@@ -338,6 +592,105 @@ export default function VideoEditorWorkspace() {
     if (from === null || from === index) return;
     const clip = getTrackClips(timeline, track)[from];
     commit((tl) => reorderClip(tl, clip.id, index));
+  }
+
+  // ---- Drag-to-trim: pixel delta on the main track's own rendered width
+  // converts to seconds via a single px-per-second ratio (the track's
+  // width divided by the timeline's total duration) — clip strips are
+  // flex-proportional to duration, so this ratio holds for every clip.
+  // Live-updates timeline state directly (bypassing commit()) while
+  // dragging so the undo stack doesn't get one entry per pixel moved; a
+  // single entry for the whole drag is pushed on release instead. ----
+  const mainTrackRef = useRef(null);
+  const trimDragRef = useRef(null);
+
+  function handleTrimHandleDown(e, clip, edge) {
+    e.stopPropagation();
+    e.preventDefault();
+    const trackRect = mainTrackRef.current.getBoundingClientRect();
+    trimDragRef.current = {
+      clipId: clip.id,
+      edge,
+      startClientX: e.clientX,
+      startValue: edge === 'start' ? clip.sourceStart : clip.sourceEnd,
+      pxPerSecond: trackRect.width / (totalDuration || 1),
+      speed: clip.speed || 1,
+      preDragTimeline: timeline,
+    };
+    window.addEventListener('pointermove', handleTrimHandleMove);
+    window.addEventListener('pointerup', handleTrimHandleUp);
+  }
+  function handleTrimHandleMove(e) {
+    const drag = trimDragRef.current;
+    if (!drag) return;
+    const dSeconds = ((e.clientX - drag.startClientX) / drag.pxPerSecond) * drag.speed;
+    const newValue = drag.startValue + dSeconds;
+    setTimeline((prev) => {
+      const clip = prev.clips.find((c) => c.id === drag.clipId);
+      if (!clip) return prev;
+      return drag.edge === 'start'
+        ? trimClip(prev, drag.clipId, { sourceStart: newValue, sourceEnd: clip.sourceEnd })
+        : trimClip(prev, drag.clipId, { sourceStart: clip.sourceStart, sourceEnd: newValue });
+    });
+  }
+  function handleTrimHandleUp() {
+    const drag = trimDragRef.current;
+    trimDragRef.current = null;
+    window.removeEventListener('pointermove', handleTrimHandleMove);
+    window.removeEventListener('pointerup', handleTrimHandleUp);
+    if (drag) {
+      setPast((p) => [...p, drag.preDragTimeline]);
+      setFuture([]);
+    }
+  }
+
+  // ---- Text overlays ----
+  function handleAddTextOverlay(presetId) {
+    const preset = TEXT_PRESET_OPTIONS.find((p) => p.id === presetId) || TEXT_PRESET_OPTIONS[3];
+    const next = addTextOverlay(timeline, {
+      preset: preset.id, text: preset.label, size: preset.size, y: preset.y,
+      bold: !!preset.bold, italic: !!preset.italic, background: preset.background || 'none',
+      opacity: preset.opacity ?? 1, start: 0, end: null,
+    });
+    const newId = next.textOverlays[next.textOverlays.length - 1].id;
+    commit(next);
+    setSelectedTextOverlayId(newId);
+  }
+  function handleUpdateTextOverlay(id, patch) { commit((tl) => updateTextOverlay(tl, id, patch)); }
+  function handleDeleteTextOverlay(id) {
+    commit((tl) => deleteTextOverlay(tl, id));
+    if (selectedTextOverlayId === id) setSelectedTextOverlayId(null);
+  }
+  const selectedTextOverlay = timeline.textOverlays.find((o) => o.id === selectedTextOverlayId) || null;
+
+  // ---- Watermark / logo (image overlay) ----
+  async function handleWatermarkFile(files) {
+    const f = files[0];
+    if (!f) return;
+    const sizeError = validateUploadSize(f, 'image');
+    if (sizeError) { setUploadError(sizeError); return; }
+    setUploadError('');
+    try {
+      const meta = await extractImageMetadata(f);
+      const { timeline: withSource, source } = addSource(timeline, f, meta, 'image');
+      commit(addImageOverlay(withSource, { sourceId: source.id }));
+    } catch (err) {
+      setUploadError(err.message || 'Could not read this image file.');
+    }
+  }
+  function handleUpdateImageOverlay(id, patch) { commit((tl) => updateImageOverlay(tl, id, patch)); }
+  function handleDeleteImageOverlay(id) { commit((tl) => deleteImageOverlay(tl, id)); }
+
+  // ---- Crop focus (which part of an oversized frame survives Crop to
+  // fill) — a small draggable pad in the Clip panel rather than dragging
+  // directly on the preview, so it never conflicts with PIP's existing
+  // drag-on-preview gesture. ----
+  function handleCropFocusPointer(e) {
+    if (!selectedClip) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    commit((tl) => setClipCropFocus(tl, selectedClip.id, { x, y }));
   }
 
   // ---- Live preview loop: same drawCompositionFrame function export uses ----
@@ -435,6 +788,11 @@ export default function VideoEditorWorkspace() {
 
       if (mainHit) {
         await loadClip(mainVideoRef.current, mainHit.clip, lastMainClipRef);
+        // Matching native playback rate to the clip's speed keeps native
+        // playback (needed for audio) from drifting away from the
+        // seek-corrected position below — at 2x speed, sourceTime advances
+        // twice as fast as unscaled native playback would.
+        mainVideoRef.current.playbackRate = mainHit.clip.speed || 1;
         if (Math.abs(mainVideoRef.current.currentTime - mainHit.sourceTime) > 0.15) {
           mainVideoRef.current.currentTime = mainHit.sourceTime;
         }
@@ -447,6 +805,7 @@ export default function VideoEditorWorkspace() {
         syncTrackPlayback(overlayVideoRef.current, false);
       } else if (overlayHit) {
         await loadClip(overlayVideoRef.current, overlayHit.clip, lastOverlayClipRef);
+        overlayVideoRef.current.playbackRate = overlayHit.clip.speed || 1;
         if (Math.abs(overlayVideoRef.current.currentTime - overlayHit.sourceTime) > 0.15) {
           overlayVideoRef.current.currentTime = overlayHit.sourceTime;
         }
@@ -455,13 +814,18 @@ export default function VideoEditorWorkspace() {
         syncTrackPlayback(overlayVideoRef.current, false);
       }
 
+      const mainOpacity = mainHit ? getFadeOpacity(mainHit.clip, mainHit.sourceTime - mainHit.clip.sourceStart) : 1;
+      const overlayOpacity = overlayHit && !overlayIsImage ? getFadeOpacity(overlayHit.clip, overlayHit.sourceTime - overlayHit.clip.sourceStart) : 1;
+
       // Audio routing only matters once the graph exists (first Play press)
       // — before that, both preview <video> elements stay muted and silent.
+      // Fades apply to audio too (not just the visual), so a fading-out
+      // clip doesn't cut abruptly to silence at full volume.
       if (audioCtxRef.current) {
         if (mainHit) {
           const elapsedInClip = mainHit.sourceTime - mainHit.clip.sourceStart;
           const mixKeepsOwnAudio = await applyReplacementAudioLive(mainHit.clip, elapsedInClip, mainReplaceAudioElRef.current, mainReplaceGainRef.current, mainReplaceSrcNodeRef, mainReplaceLastClipRef);
-          mainGainRef.current.gain.value = (mainHit.clip.audioMode === 'keep' || mixKeepsOwnAudio) ? 1 : 0;
+          mainGainRef.current.gain.value = ((mainHit.clip.audioMode === 'keep' || mixKeepsOwnAudio) ? 1 : 0) * mainOpacity;
         } else {
           mainGainRef.current.gain.value = 0;
           mainReplaceGainRef.current.gain.value = 0;
@@ -474,7 +838,7 @@ export default function VideoEditorWorkspace() {
         } else if (overlayHit) {
           const elapsedInClip = overlayHit.sourceTime - overlayHit.clip.sourceStart;
           const mixKeepsOwnAudio = await applyReplacementAudioLive(overlayHit.clip, elapsedInClip, overlayReplaceAudioElRef.current, overlayReplaceGainRef.current, overlayReplaceSrcNodeRef, overlayReplaceLastClipRef);
-          overlayGainRef.current.gain.value = (overlayHit.clip.audioMode === 'keep' || mixKeepsOwnAudio) ? 1 : 0;
+          overlayGainRef.current.gain.value = ((overlayHit.clip.audioMode === 'keep' || mixKeepsOwnAudio) ? 1 : 0) * overlayOpacity;
         } else {
           overlayGainRef.current.gain.value = 0;
           overlayReplaceGainRef.current.gain.value = 0;
@@ -492,9 +856,19 @@ export default function VideoEditorWorkspace() {
         timeline: drawTimeline,
         mainEl: mainHit ? mainVideoRef.current : null,
         overlayEl: overlayHit ? (overlayIsImage ? overlayImageRef.current : overlayVideoRef.current) : null,
+        mainClip: mainHit?.clip || null,
+        overlayClip: overlayHit?.clip || null,
+        mainOpacity, overlayOpacity,
         rounded: true,
         border: true,
       });
+
+      // Logo/watermark + text layers draw last, on top of everything else —
+      // same shared functions the composed export uses per frame, so what
+      // the preview shows is exactly what gets exported.
+      timeline.imageOverlays.forEach((o) => { if (o.sourceId) ensureImageOverlayElement(o.sourceId); });
+      drawImageOverlays(ctx, { timeline: drawTimeline, timelineSeconds: playhead, imageElements: imageOverlayElsRef.current });
+      drawTextOverlays(ctx, { timeline: drawTimeline, timelineSeconds: playhead });
 
       if (playing && playStartRef.current) {
         const elapsedWall = (performance.now() - playStartRef.current.atWall) / 1000;
@@ -646,28 +1020,52 @@ export default function VideoEditorWorkspace() {
                 <button onClick={redo} disabled={!future.length} style={smallBtn}>↷ Redo</button>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 3, minHeight: 38 }}>
-              {mainClips.map((clip, i) => (
-                <div
-                  key={clip.id}
-                  draggable
-                  onDragStart={() => handleDragStart(i)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => handleDrop(MAIN_TRACK, i)}
-                  onClick={() => setSelectedClipId(clip.id)}
-                  style={{
-                    flex: clipDuration(clip) || 1, minWidth: 40, height: 38, borderRadius: 7, cursor: 'grab',
-                    background: clip.id === selectedClipId ? T.accentGradient : T.accentTint,
-                    border: clip.id === selectedClipId ? `2px solid ${T.accentDark}` : `1px solid ${T.border}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '0.66rem', fontWeight: 700, color: clip.id === selectedClipId ? 'white' : T.inkSecondary,
-                    padding: '0 4px', overflow: 'hidden', whiteSpace: 'nowrap',
-                  }}
-                  title={`${formatDuration(clipDuration(clip))} — click to edit, drag to reorder`}
-                >
-                  {formatDuration(clipDuration(clip))}
-                </div>
-              ))}
+            <div ref={mainTrackRef} style={{ display: 'flex', gap: 3, minHeight: 46 }}>
+              {mainClips.map((clip, i) => {
+                const source = timeline.sources.find((s) => s.id === clip.sourceId);
+                const isSelected = clip.id === selectedClipId;
+                return (
+                  <div
+                    key={clip.id}
+                    draggable
+                    onDragStart={() => handleDragStart(i)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => handleDrop(MAIN_TRACK, i)}
+                    onClick={() => setSelectedClipId(clip.id)}
+                    style={{
+                      position: 'relative', flex: clipDuration(clip) || 1, minWidth: 44, height: 46, borderRadius: 7, cursor: 'grab',
+                      background: isSelected ? T.accentGradient : T.accentTint,
+                      border: isSelected ? `2px solid ${T.accentDark}` : `1px solid ${T.border}`,
+                      overflow: 'hidden',
+                    }}
+                    title={`${formatDuration(clipDuration(clip))} — click to edit, drag to reorder, drag the side handles to trim`}
+                  >
+                    <ClipThumbFilmstrip source={source} sourceStart={clip.sourceStart} sourceEnd={clip.sourceEnd} thumbnailsBySource={thumbnailsBySource} />
+                    <ClipWaveform source={source} sourceStart={clip.sourceStart} sourceEnd={clip.sourceEnd} waveformBySource={waveformBySource} />
+                    <div style={{
+                      position: 'absolute', left: 0, right: 0, top: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '0.62rem', fontWeight: 700, color: 'white', textShadow: '0 1px 2px rgba(0,0,0,0.7)',
+                      padding: '2px 4px', pointerEvents: 'none', zIndex: 2,
+                    }}>
+                      {formatDuration(clipDuration(clip))}{clip.speed !== 1 ? ` · ${clip.speed}×` : ''}
+                    </div>
+                    {isSelected && (
+                      <>
+                        <div
+                          onPointerDown={(e) => handleTrimHandleDown(e, clip, 'start')}
+                          title="Drag to trim the start"
+                          style={trimHandleStyle('left')}
+                        />
+                        <div
+                          onPointerDown={(e) => handleTrimHandleDown(e, clip, 'end')}
+                          title="Drag to trim the end"
+                          style={trimHandleStyle('right')}
+                        />
+                      </>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -742,13 +1140,124 @@ export default function VideoEditorWorkspace() {
                         <input type="file" accept="audio/*" onChange={(e) => handleReplaceAudioFile(e.target.files, selectedClip.audioMode)} style={{ fontSize: '0.7rem', maxWidth: 200 }} />
                       </div>
                     )}
+                    <label style={fieldLabel}>Speed
+                      <select value={selectedClip.speed} onChange={(e) => commit((tl) => setClipSpeed(tl, selectedClip.id, parseFloat(e.target.value)))} style={numInput}>
+                        {SPEED_OPTIONS.map((s) => <option key={s} value={s}>{s}×</option>)}
+                      </select>
+                    </label>
                   </div>
                 )}
+
+                {selectedSource.kind !== 'image' && (
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 8 }}>
+                    <label style={fieldLabel}>Fade in
+                      <input type="number" step={0.1} min={0} max={(selectedClip.sourceEnd - selectedClip.sourceStart) / 2}
+                        value={selectedClip.fadeIn.toFixed(1)}
+                        onChange={(e) => commit((tl) => setClipFade(tl, selectedClip.id, { fadeIn: parseFloat(e.target.value) || 0 }))} style={numInput} />
+                    </label>
+                    <label style={fieldLabel}>Fade out
+                      <input type="number" step={0.1} min={0} max={(selectedClip.sourceEnd - selectedClip.sourceStart) / 2}
+                        value={selectedClip.fadeOut.toFixed(1)}
+                        onChange={(e) => commit((tl) => setClipFade(tl, selectedClip.id, { fadeOut: parseFloat(e.target.value) || 0 }))} style={numInput} />
+                    </label>
+                  </div>
+                )}
+
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ ...fieldLabel, marginBottom: 4 }}>Filters</div>
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 6 }}>
+                    {Object.entries(FILTER_PRESETS).map(([id, values]) => (
+                      <button key={id} onClick={() => commit((tl) => setClipFilters(tl, selectedClip.id, values))} style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.68rem' }}>
+                        {id === 'none' ? 'Reset' : id[0].toUpperCase() + id.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <label style={fieldLabel}>Brightness
+                      <input type="range" min={0.5} max={1.5} step={0.02} value={selectedClip.filters.brightness}
+                        onChange={(e) => commit((tl) => setClipFilters(tl, selectedClip.id, { brightness: parseFloat(e.target.value) }))} style={{ width: 90 }} />
+                    </label>
+                    <label style={fieldLabel}>Contrast
+                      <input type="range" min={0.5} max={1.5} step={0.02} value={selectedClip.filters.contrast}
+                        onChange={(e) => commit((tl) => setClipFilters(tl, selectedClip.id, { contrast: parseFloat(e.target.value) }))} style={{ width: 90 }} />
+                    </label>
+                    <label style={fieldLabel}>Saturation
+                      <input type="range" min={0} max={2} step={0.02} value={selectedClip.filters.saturation}
+                        onChange={(e) => commit((tl) => setClipFilters(tl, selectedClip.id, { saturation: parseFloat(e.target.value) }))} style={{ width: 90 }} />
+                    </label>
+                  </div>
+                </div>
+
+                {selectedClip.track === MAIN_TRACK && mainClips.length > 1 && mainClips[mainClips.length - 1].id !== selectedClip.id && (
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ ...fieldLabel, marginBottom: 4 }}>Transition to next clip</div>
+                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {TRANSITION_OPTIONS.map((t) => (
+                        <button key={t.id} onClick={() => handleSetTransition(selectedClip, t.id)}
+                          style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.68rem', background: selectedClip.transitionOut.type === t.id ? T.accentGradient : 'white', color: selectedClip.transitionOut.type === t.id ? 'white' : T.inkSecondary, border: selectedClip.transitionOut.type === t.id ? 'none' : `1px solid ${T.border}` }}>
+                          {t.label}
+                        </button>
+                      ))}
+                      {selectedClip.transitionOut.type !== 'cut' && (
+                        <input type="number" step={0.1} min={0.1} max={2} value={selectedClip.transitionOut.duration.toFixed(1)}
+                          onChange={(e) => handleTransitionDuration(selectedClip, parseFloat(e.target.value) || 0.5)}
+                          style={{ ...numInput, width: 56 }} title="Transition duration (seconds)" />
+                      )}
+                    </div>
+                    {selectedClip.transitionOut.type !== 'cut' && (
+                      <p style={{ fontSize: '0.64rem', color: T.muted, margin: '4px 0 0' }}>Sets this clip's fade-out and the next clip's fade-in to match{selectedClip.transitionOut.type !== 'fade' ? ', and the composition background color' : ''}.</p>
+                    )}
+                  </div>
+                )}
+
+                {timeline.fitMode !== 'contain' && (
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ ...fieldLabel, marginBottom: 4 }}>Crop focus <span style={{ fontWeight: 500, opacity: 0.8 }}>— which part stays in frame</span></div>
+                    <div
+                      onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); handleCropFocusPointer(e); }}
+                      onPointerMove={(e) => { if (e.buttons === 1) handleCropFocusPointer(e); }}
+                      style={{ position: 'relative', width: 72, height: 72, borderRadius: 8, border: `1px solid ${T.border}`, background: '#0F172A', cursor: 'crosshair' }}
+                    >
+                      <div style={{
+                        position: 'absolute', width: 12, height: 12, borderRadius: '50%', background: T.accentGradient, border: '2px solid white',
+                        left: `calc(${selectedClip.cropFocus.x * 100}% - 6px)`, top: `calc(${selectedClip.cropFocus.y * 100}% - 6px)`, pointerEvents: 'none',
+                      }} />
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {selectedSource.kind !== 'image' && <button onClick={handleSplitAtPlayhead} style={smallBtn}>✂ Split at playhead</button>}
                   {selectedSource.kind !== 'image' && <button onClick={() => handleJoinWithNext(selectedClip.track)} style={smallBtn}>⤵ Join with next</button>}
+                  {selectedClip.track === MAIN_TRACK && selectedSource.kind !== 'image' && <button onClick={handleFreezeFrame} style={smallBtn}>❄ Freeze frame</button>}
+                  {selectedClip.track === MAIN_TRACK && selectedSource.kind !== 'image' && <button onClick={handleFindSilence} disabled={silenceScanning} style={smallBtn}>{silenceScanning ? 'Scanning…' : '🔇 Find silence'}</button>}
+                  <button onClick={handleDuplicateSelected} style={smallBtn}>⧉ Duplicate</button>
                   <button onClick={handleDeleteSelected} style={{ ...smallBtn, color: '#DC2626', borderColor: '#FCA5A5' }}>✕ Delete clip</button>
                 </div>
+
+                {silenceRanges !== null && (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
+                    {silenceRanges.length === 0 ? (
+                      <p style={{ fontSize: '0.72rem', color: T.muted, margin: 0 }}>No silent stretches of 0.4s or longer found in this clip.</p>
+                    ) : (
+                      <>
+                        <p style={{ fontSize: '0.7rem', color: T.mutedDark, margin: '0 0 6px', fontWeight: 700 }}>{silenceRanges.length} silent stretch{silenceRanges.length === 1 ? '' : 'es'} found — review before removing:</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8, maxHeight: 140, overflowY: 'auto' }}>
+                          {silenceRanges.map((r, i) => (
+                            <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', color: T.inkSecondary }}>
+                              <input type="checkbox" checked={r.selected} onChange={() => toggleSilenceRange(i)} />
+                              {formatDuration(r.start)} – {formatDuration(r.end)} <span style={{ color: T.muted }}>({(r.end - r.start).toFixed(1)}s)</span>
+                            </label>
+                          ))}
+                        </div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={handleApplySilenceRemoval} disabled={!silenceRanges.some((r) => r.selected)} style={{ ...smallBtn, background: T.accentGradient, color: 'white', border: 'none' }}>Remove selected</button>
+                          <button onClick={() => setSilenceRanges(null)} style={smallBtn}>Cancel</button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </>
             ) : (
               <p style={{ fontSize: '0.72rem', color: T.muted, margin: 0 }}>Click a clip on the timeline to trim, split, join, delete it, or change its audio.</p>
@@ -771,8 +1280,117 @@ export default function VideoEditorWorkspace() {
                 <div style={{ fontSize: '0.7rem', color: T.mutedDark, marginBottom: 2 }}>Image overlay</div>
                 <UploadBox accept="image/png,image/jpeg,image/webp" onFiles={handleOverlayImageFiles} maxSizeMB={MAX_UPLOAD_IMAGE_BYTES / (1024 * 1024)} compact compactLabel={overlayClips.some((c) => timeline.sources.find((s) => s.id === c.sourceId)?.kind === 'image') ? '↻ Replace image overlay' : '+ Add image overlay'} />
               </div>
+              <div>
+                <div style={{ fontSize: '0.7rem', color: T.mutedDark, marginBottom: 2 }}>Logo / watermark</div>
+                <UploadBox accept="image/png,image/jpeg,image/webp" onFiles={handleWatermarkFile} maxSizeMB={MAX_UPLOAD_IMAGE_BYTES / (1024 * 1024)} compact compactLabel={timeline.imageOverlays.length ? '+ Add another logo' : '+ Add logo/watermark'} />
+              </div>
             </div>
             {uploadError && <div style={{ ...statusBox, marginTop: 8 }}>⚠️ {uploadError}</div>}
+          </div>
+
+          {timeline.imageOverlays.length > 0 && (
+            <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Logos & watermarks</div>
+              {timeline.imageOverlays.map((o) => {
+                const src = timeline.sources.find((s) => s.id === o.sourceId);
+                return (
+                  <div key={o.id} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 0', borderTop: `1px solid ${T.border}` }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, wordBreak: 'break-word' }}>{src?.file.name || 'Logo'}</span>
+                      <button onClick={() => handleDeleteImageOverlay(o.id)} style={{ ...smallBtn, padding: '4px 8px', color: '#DC2626', borderColor: '#FCA5A5' }}>✕</button>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <label style={fieldLabel}>Size
+                        <input type="range" min={0.05} max={0.4} step={0.01} value={o.scale} onChange={(e) => handleUpdateImageOverlay(o.id, { scale: parseFloat(e.target.value) })} style={{ width: 90 }} />
+                      </label>
+                      <label style={fieldLabel}>Opacity
+                        <input type="range" min={0.1} max={1} step={0.02} value={o.opacity} onChange={(e) => handleUpdateImageOverlay(o.id, { opacity: parseFloat(e.target.value) })} style={{ width: 90 }} />
+                      </label>
+                      <div>
+                        <div style={{ ...fieldLabel, marginBottom: 4 }}>Position</div>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          {PIP_CORNER_OPTIONS.map((c) => (
+                            <button key={c.id} onClick={() => handleUpdateImageOverlay(o.id, { x: c.id.includes('left') ? 0.12 : 0.88, y: c.id.includes('top') ? 0.12 : 0.88 })} style={{ ...smallBtn, padding: '5px 8px' }}>{c.icon}</button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Text & titles — always visible */}
+          <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Text & titles</div>
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
+              {TEXT_PRESET_OPTIONS.map((p) => (
+                <button key={p.id} onClick={() => handleAddTextOverlay(p.id)} style={{ ...smallBtn, padding: '6px 10px', fontSize: '0.68rem' }}>+ {p.label}</button>
+              ))}
+            </div>
+            {timeline.textOverlays.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: selectedTextOverlay ? 8 : 0 }}>
+                {timeline.textOverlays.map((o) => (
+                  <button
+                    key={o.id}
+                    onClick={() => setSelectedTextOverlayId(o.id === selectedTextOverlayId ? null : o.id)}
+                    style={{
+                      ...smallBtn, textAlign: 'left', display: 'flex', justifyContent: 'space-between', gap: 6,
+                      background: o.id === selectedTextOverlayId ? T.accentGradient : 'white',
+                      color: o.id === selectedTextOverlayId ? 'white' : T.inkSecondary,
+                      border: o.id === selectedTextOverlayId ? 'none' : `1px solid ${T.border}`,
+                    }}
+                  >
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.text || '(empty text)'}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {selectedTextOverlay && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 8, borderTop: `1px solid ${T.border}` }}>
+                <label style={fieldLabel}>Text
+                  <input type="text" value={selectedTextOverlay.text} onChange={(e) => handleUpdateTextOverlay(selectedTextOverlay.id, { text: e.target.value })} style={{ ...numInput, width: '100%' }} />
+                </label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <label style={fieldLabel}>Size
+                    <input type="range" min={16} max={96} step={2} value={selectedTextOverlay.size} onChange={(e) => handleUpdateTextOverlay(selectedTextOverlay.id, { size: parseInt(e.target.value, 10) })} style={{ width: 90 }} />
+                  </label>
+                  <label style={fieldLabel}>Color
+                    <input type="color" value={selectedTextOverlay.color} onChange={(e) => handleUpdateTextOverlay(selectedTextOverlay.id, { color: e.target.value })} style={{ width: 40, height: 28, padding: 0, border: `1px solid ${T.border}`, borderRadius: 6, cursor: 'pointer' }} />
+                  </label>
+                  <label style={fieldLabel}>Opacity
+                    <input type="range" min={0.1} max={1} step={0.02} value={selectedTextOverlay.opacity} onChange={(e) => handleUpdateTextOverlay(selectedTextOverlay.id, { opacity: parseFloat(e.target.value) })} style={{ width: 90 }} />
+                  </label>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => handleUpdateTextOverlay(selectedTextOverlay.id, { bold: !selectedTextOverlay.bold })} style={{ ...smallBtn, fontWeight: selectedTextOverlay.bold ? 900 : 700, background: selectedTextOverlay.bold ? T.accentGradient : 'white', color: selectedTextOverlay.bold ? 'white' : T.inkSecondary }}>B</button>
+                  <button onClick={() => handleUpdateTextOverlay(selectedTextOverlay.id, { italic: !selectedTextOverlay.italic })} style={{ ...smallBtn, fontStyle: 'italic', background: selectedTextOverlay.italic ? T.accentGradient : 'white', color: selectedTextOverlay.italic ? 'white' : T.inkSecondary }}>I</button>
+                  {['left', 'center', 'right'].map((a) => (
+                    <button key={a} onClick={() => handleUpdateTextOverlay(selectedTextOverlay.id, { align: a })} style={{ ...smallBtn, background: selectedTextOverlay.align === a ? T.accentGradient : 'white', color: selectedTextOverlay.align === a ? 'white' : T.inkSecondary }}>{a[0].toUpperCase()}</button>
+                  ))}
+                </div>
+                <label style={fieldLabel}>Background
+                  <select value={selectedTextOverlay.background} onChange={(e) => handleUpdateTextOverlay(selectedTextOverlay.id, { background: e.target.value })} style={numInput}>
+                    <option value="none">None</option>
+                    <option value="bar">Bar</option>
+                    <option value="solid">Solid</option>
+                  </select>
+                </label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <label style={fieldLabel}>Show from
+                    <input type="number" step={0.5} min={0} max={totalDuration} value={selectedTextOverlay.start.toFixed(1)}
+                      onChange={(e) => handleUpdateTextOverlay(selectedTextOverlay.id, { start: Math.max(0, parseFloat(e.target.value) || 0) })} style={numInput} />
+                  </label>
+                  <label style={fieldLabel}>Until
+                    <input type="number" step={0.5} min={0} max={totalDuration} value={selectedTextOverlay.end ?? totalDuration}
+                      onChange={(e) => handleUpdateTextOverlay(selectedTextOverlay.id, { end: parseFloat(e.target.value) || null })} style={numInput} />
+                  </label>
+                </div>
+                <p style={{ fontSize: '0.66rem', color: T.muted, margin: 0 }}>Drag on the preview to reposition (coming soon) — for now, set position from templates above and fine-tune with Start/Until timing.</p>
+                <button onClick={() => handleDeleteTextOverlay(selectedTextOverlay.id)} style={{ ...smallBtn, color: '#DC2626', borderColor: '#FCA5A5', alignSelf: 'flex-start' }}>✕ Delete text</button>
+              </div>
+            )}
           </div>
 
           {/* Composition — always visible, not just after an overlay exists */}
@@ -780,6 +1398,22 @@ export default function VideoEditorWorkspace() {
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Composition</div>
 
             <div style={{ marginBottom: 10 }}>
+              <div style={{ ...fieldLabel, marginBottom: 4 }}>Quick presets</div>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
+                {SOCIAL_PRESETS.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => commit((tl) => setFrameAspect(tl, p.aspect))}
+                    style={{
+                      ...smallBtn, padding: '5px 9px', fontSize: '0.68rem',
+                      background: timeline.frameAspect === p.aspect ? T.accentTint : 'white',
+                      border: timeline.frameAspect === p.aspect ? `1px solid ${T.accentDark}` : `1px solid ${T.border}`,
+                    }}
+                  >
+                    {p.icon} {p.label}
+                  </button>
+                ))}
+              </div>
               <div style={{ ...fieldLabel, marginBottom: 4 }}>Frame</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {FRAME_ASPECT_OPTIONS.map((f) => (
@@ -884,6 +1518,33 @@ export default function VideoEditorWorkspace() {
           </div>
 
           {/* Export */}
+          <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Export settings</div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ ...fieldLabel, marginBottom: 4 }}>Resolution</div>
+                <div style={{ display: 'flex', gap: 5 }}>
+                  {RESOLUTION_OPTIONS.map((r) => (
+                    <button key={r.id} onClick={() => commit((tl) => setExportResolution(tl, r.id))} title={r.sub}
+                      style={{ ...smallBtn, padding: '6px 10px', background: timeline.exportResolution === r.id ? T.accentGradient : 'white', color: timeline.exportResolution === r.id ? 'white' : T.inkSecondary, border: timeline.exportResolution === r.id ? 'none' : `1px solid ${T.border}` }}>
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div style={{ ...fieldLabel, marginBottom: 4 }}>Quality</div>
+                <div style={{ display: 'flex', gap: 5 }}>
+                  {QUALITY_OPTIONS.map((q) => (
+                    <button key={q.id} onClick={() => commit((tl) => setExportQuality(tl, q.id))}
+                      style={{ ...smallBtn, padding: '6px 10px', background: timeline.exportQuality === q.id ? T.accentGradient : 'white', color: timeline.exportQuality === q.id ? 'white' : T.inkSecondary, border: timeline.exportQuality === q.id ? 'none' : `1px solid ${T.border}` }}>
+                      {q.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
           {supported ? (
             <div style={{ textAlign: 'center', padding: '4px 0' }}>
               <button onClick={handleExport} disabled={isExporting} style={{ ...primaryBtn(isExporting), width: '100%' }}>
@@ -912,3 +1573,55 @@ const primaryBtn = (disabled) => ({ padding: '13px 32px', borderRadius: 12, bord
 const statusBox = { padding: '10px 14px', borderRadius: 10, background: T.dangerTint, border: '1px solid #FECACA', color: '#991B1B', fontSize: '0.82rem', fontWeight: 600 };
 const fieldLabel = { display: 'flex', flexDirection: 'column', gap: 3, fontSize: '0.7rem', fontWeight: 700, color: T.mutedDark };
 const numInput = { padding: '6px 8px', borderRadius: 6, border: `1px solid ${T.border}`, fontSize: '0.78rem', fontFamily: T.font, width: 90 };
+
+function trimHandleStyle(side) {
+  return {
+    position: 'absolute', top: 0, bottom: 0, [side]: 0, width: 9, zIndex: 3,
+    background: 'rgba(255,255,255,0.85)', cursor: 'ew-resize',
+    borderRadius: side === 'left' ? '7px 0 0 7px' : '0 7px 7px 0',
+  };
+}
+
+// Filmstrip background for a clip strip — the subset of that SOURCE's
+// cached thumbnails (extracted once, see the workspace's thumbnail effect)
+// falling within this clip's own trim range, so a re-trimmed clip shows
+// the right slice without re-decoding anything.
+function ClipThumbFilmstrip({ source, sourceStart, sourceEnd, thumbnailsBySource }) {
+  const entry = thumbnailsBySource[source?.id];
+  if (!entry || entry === 'loading' || entry === 'error') return null;
+  const thumbs = thumbnailsForRange(entry.thumbs, entry.duration, sourceStart, sourceEnd);
+  if (!thumbs.length) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', zIndex: 0 }}>
+      {thumbs.map((src, i) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img key={i} src={src} alt="" draggable={false} style={{ flex: 1, minWidth: 0, height: '100%', objectFit: 'cover', opacity: 0.6 }} />
+      ))}
+    </div>
+  );
+}
+
+// Waveform strip along the bottom of a clip — same "slice the cached
+// per-source peaks to this clip's own trim range" idea as the thumbnails.
+function ClipWaveform({ source, sourceStart, sourceEnd, waveformBySource }) {
+  const peaks = waveformBySource[source?.id];
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    if (!canvasRef.current || !Array.isArray(peaks) || !source?.duration) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const n = peaks.length;
+    const startIdx = Math.max(0, Math.floor((sourceStart / source.duration) * n));
+    const endIdx = Math.min(n, Math.ceil((sourceEnd / source.duration) * n));
+    const slice = peaks.slice(startIdx, endIdx);
+    if (slice.length) drawWaveform(ctx, slice, { x: 0, y: 0, width: canvas.width, height: canvas.height, color: '#ffffff' });
+  }, [peaks, sourceStart, sourceEnd, source?.duration]);
+  if (!Array.isArray(peaks)) return null;
+  return (
+    <canvas
+      ref={canvasRef} width={240} height={16}
+      style={{ position: 'absolute', left: 2, right: 2, bottom: 2, width: 'calc(100% - 4px)', height: 14, opacity: 0.9, zIndex: 1, pointerEvents: 'none' }}
+    />
+  );
+}

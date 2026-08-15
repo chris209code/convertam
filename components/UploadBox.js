@@ -7,7 +7,7 @@ const DEFAULT_MAX_SIZE_MB = 100;
 // maxSizeMB is optional — every existing caller keeps the original 100MB
 // ceiling unchanged; only a caller that explicitly needs a different limit
 // (e.g. Video Studio's larger video files) passes its own.
-export default function UploadBox({ accept, multiple, onFiles, label, compact, maxSizeMB }) {
+export default function UploadBox({ accept, multiple, onFiles, label, compact, compactLabel, maxSizeMB }) {
   const MAX_SIZE_MB = maxSizeMB || DEFAULT_MAX_SIZE_MB;
   const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
   const inputRef = useRef(null);
@@ -66,7 +66,7 @@ export default function UploadBox({ accept, multiple, onFiles, label, compact, m
       <div>
         {input}
         <button type="button" onClick={pick} className="text-xs text-ink-soft underline" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}>
-          ⇄ Replace file
+          {compactLabel || '⇄ Replace file'}
         </button>
         {sizeError && <div className="status error mt-2">{sizeError}</div>}
       </div>

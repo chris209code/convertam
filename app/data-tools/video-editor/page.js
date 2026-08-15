@@ -3,7 +3,7 @@ import VideoEditorWorkspace from '../../../components/tools/data-tools/video-edi
 
 export const metadata = {
   title: 'Video Editor — Multi-Track, Video Call & Screen Recording | Convertam',
-  description: 'Trim, split, and reorder clips on a zoomable timeline, add text/titles/shapes with entrance animations and a logo, rotate/flip/crop and pan, adjust speed and fades, apply filters, compose multi-track split-screen, picture-in-picture, or video-call layouts with per-track mute/solo/lock and a custom reframe background, record your screen, drop timeline markers, and generate Auto Captions — entirely in your browser, no login required.',
+  description: 'Trim, split, and reorder clips on a zoomable, snapping, multi-select timeline, add text/titles/shapes with entrance animations and a logo, rotate/flip/crop and pan, adjust speed and fades, apply filters, compose multi-track split-screen, picture-in-picture, or video-call layouts with per-track mute/solo/lock and a custom reframe background, record your screen, drop timeline markers, and generate Auto Captions straight from your edited timeline — entirely in your browser, no login required.',
   alternates: { canonical: '/data-tools/video-editor' },
 };
 
@@ -33,7 +33,7 @@ const FAQ = [
   { q: 'Can I draw shapes or arrows on my video?', a: 'Yes — the Shapes panel adds rectangle, circle, line, and arrow annotations, each with its own color, filled or outline style, stroke width, position, and start/end timing.' },
   { q: 'Can I control audio from each video separately?', a: 'Yes — each clip has its own audio setting (Keep or Mute), so you can choose which video\'s sound plays during composed sections.' },
   { q: 'Can I export a vertical video for TikTok or Reels?', a: 'Yes — choose the Vertical (9:16) frame in the Composition panel. It works with a single video too, no overlay needed; the export is simply reframed to that shape. Square (1:1) and Landscape (16:9) are also available.' },
-  { q: 'Does Convertam store my videos?', a: 'No. Editing, preview, and export all happen locally in your browser. Your video files are never uploaded anywhere, with one narrow exception: if you use Auto Captions, a compressed copy of just your exported video\'s audio is sent to our transcription provider for that single request, and not stored afterward.' },
+  { q: 'Does Convertam store my videos?', a: 'No. Editing, preview, and export all happen locally in your browser. Your video files are never uploaded anywhere, with one narrow exception: if you use Auto Captions, a compressed copy of just your edited timeline\'s rendered audio is sent to our transcription provider for that single request, and not stored afterward.' },
   { q: 'What do I get when I export?', a: 'A real MP4 file reflecting every trim, split, join, reorder, composition, text, speed, fade, filter, and crop choice you made — downloaded directly to your device.' },
   { q: 'Can I add text or a title to my video?', a: 'Yes — the Text & titles panel adds Heading, Subtitle, Lower third, Simple text, Watermark, Quote, or Callout layers, each with its own font size, color, background, position, and timing.' },
   { q: 'Can I add my logo or a watermark image?', a: 'Yes — upload an image in the Media panel\'s Logo/watermark slot, then set its size, opacity, and corner position.' },
@@ -49,8 +49,10 @@ const FAQ = [
   { q: 'How do I fill the empty space when reframing a video, like 16:9 to 9:16?', a: 'With Fit whole frame selected, choose a Background: a solid Color, a two-color Gradient, Blurred (a soft, zoomed-in copy of your own video — the common look for turning landscape footage into a clean vertical video), or a Custom image you upload.' },
   { q: 'Can I even out the volume of my clips?', a: 'Yes — select a clip and click Normalize audio to analyze its loudness and set a matching volume automatically, or drag the Volume slider yourself. This is plain signal analysis, not AI.' },
   { q: 'Can I play a clip backwards?', a: 'Yes — click Reverse on a selected clip. The live preview shows a best-effort silent scrub since browsers can\'t play video backwards natively, but the exported video genuinely plays that clip backwards with its audio correctly reversed too.' },
-  { q: 'Can I add captions to my video?', a: 'Yes — after exporting, use Auto Captions to transcribe the exported video\'s audio, edit the transcript for accuracy, then download it as SRT, VTT, or TXT, or burn the captions directly into the video as a new export.' },
-  { q: 'Does adding captions upload my video?', a: 'Only the audio, and only for that one request. Auto Captions sends a compressed copy of your exported video\'s audio to our transcription provider to generate the transcript; it\'s processed for that single request and not stored afterward. Burning captions into the video happens locally in your browser, like every other export.' },
+  { q: 'Can I add captions to my video?', a: 'Yes — click Auto Captions at any point while editing (no export needed first). It renders your edited timeline\'s audio locally, transcribes it, and lets you fix up the transcript, download it as SRT, VTT, or TXT, or burn the captions directly into your final exported video.' },
+  { q: 'Does adding captions upload my video?', a: 'No — never your video, and not even your original audio files. Auto Captions renders your edited timeline\'s audio mix locally first, then sends a compressed copy of just that rendered audio to our transcription provider for that one request; it\'s not stored afterward. Burning captions into the final video happens locally in your browser, like every other export.' },
+  { q: 'Do captions match my edits — trims, deleted sections, muted clips?', a: 'Yes — Auto Captions transcribes a local render of the ACTUAL edited timeline\'s audio, not your original source files, so trims, splits, deleted sections, reordering, mute/replace/mix audio choices, volume, fades, and ducking are all reflected in both what gets transcribed and the resulting timestamps.' },
+  { q: 'Do I need to export before generating captions?', a: 'No — that\'s the point. Auto Captions works directly off your current timeline. Export only happens once, at the end, when you burn the finished captions into your final video (or whenever you export normally, with or without captions).' },
   { q: 'Does Video Editor use AI to edit my video for me?', a: 'No. All editing — trimming, splitting, composition, text, speed, filters, and export — is manual and runs locally in your browser. The only AI-powered feature is Auto Captions (speech-to-text transcription); there is no AI auto-editing, highlight generation, or scene detection.' },
   { q: 'Can I zoom in on the timeline?', a: 'Yes — the +/− buttons above the main track zoom the whole timeline in or out, useful for trimming precisely on a long clip. The main track and every overlay track scroll together, so they stay aligned.' },
   { q: 'Can I mute or solo one overlay track?', a: 'Yes — every overlay track has its own Mute and Solo buttons in its timeline header. Mute silences just that track; Solo silences every OTHER overlay track so you can hear this one alone. Both apply only to overlay tracks\' audio, not the main track.' },
@@ -62,6 +64,8 @@ const FAQ = [
   { q: 'Can I manually crop or pan a clip?', a: 'Yes — the Crop / pan control combines a draggable focus pad (choose which part of the frame stays visible) with a zoom slider (crop in tighter than a straight fill). It\'s available whenever Crop to fill is selected for the frame.' },
   { q: 'What are the safe-zone guides?', a: 'An optional on-screen overlay (toggle it from the Composition panel) showing the standard 90%/80% action-safe and title-safe boundaries, so you can keep important content away from edges some displays crop. It\'s a preview aid only — it never appears in the exported video.' },
   { q: 'Is there an audio level meter?', a: 'Yes — a live level meter sits under the Master audio controls, reading the final mixed output while you play the timeline back.' },
+  { q: 'Can I select and edit multiple clips at once?', a: 'Yes — Ctrl/Cmd-click a clip to add it to your selection (click again to remove it), or Shift-click to select every clip between your last pick and the one you clicked. Delete or Duplicate then applies to the whole selection in one action, and one undo step. Click empty timeline space to clear the selection.' },
+  { q: 'Does trimming snap to anything?', a: 'Yes — dragging a trim handle snaps to the playhead, the edges of clips on any track, and your markers, with a small highlight on the handle when it snaps. Hold Alt while dragging to bypass snapping for a precise freehand trim; the numeric Trim start/end inputs are never affected by snapping either way.' },
 ];
 
 export default function VideoEditorPage() {
@@ -95,12 +99,13 @@ export default function VideoEditorPage() {
             <section style={{ marginBottom: 36 }}>
               <h2 style={sectionH2}>What can Video Editor do?</h2>
               <ul style={ul}>
-                <li><strong>Trim</strong> — drag either edge of a clip on the timeline, or set precise numeric in/out points.</li>
+                <li><strong>Trim</strong> — drag either edge of a clip on the timeline, or set precise numeric in/out points. Dragging snaps to the playhead, other clips&apos; edges, and markers for a clean cut, with a small on-screen highlight when it snaps — hold Alt to drag without snapping.</li>
                 <li><strong>Split</strong> — cut a clip in two at the playhead.</li>
-                <li><strong>Delete</strong> — remove an unwanted segment.</li>
+                <li><strong>Multi-select</strong> — Ctrl/Cmd-click to add clips to a selection, Shift-click to select a range, then delete or duplicate all of them in one action (one undo step, original order preserved). Click empty timeline space to clear the selection.</li>
+                <li><strong>Delete</strong> — remove an unwanted segment, or every selected clip at once.</li>
                 <li><strong>Join</strong> — merge adjacent clips back together.</li>
                 <li><strong>Reorder</strong> — drag clips into a new sequence.</li>
-                <li><strong>Duplicate</strong> — one click to repeat a clip.</li>
+                <li><strong>Duplicate</strong> — one click to repeat a clip, or duplicate a whole multi-clip selection as one block.</li>
                 <li><strong>Freeze frame</strong> — turn the current frame into a still image dropped into the sequence.</li>
                 <li><strong>Undo/redo</strong> — step backward and forward through your edit history.</li>
                 <li><strong>Timeline thumbnails and waveform</strong> — see a filmstrip and audio waveform on every clip, not just a plain colored bar.</li>
@@ -131,7 +136,7 @@ export default function VideoEditorPage() {
                 <li><strong>Reframe for social platforms</strong> — Landscape (16:9), Square (1:1), or Vertical (9:16), with one-click YouTube/TikTok/Instagram/LinkedIn presets.</li>
                 <li><strong>Reframe background</strong> — when fitting the whole frame into a new shape leaves empty space, fill it with a solid color, a color gradient, a blurred/zoomed copy of your own video, or a custom uploaded image.</li>
                 <li><strong>Export controls</strong> — choose resolution (480p/720p/1080p), quality (small/balanced/high), and frame rate (original, or a fixed 24/30/60fps), with an estimated output size shown before you export and a Cancel button once it&apos;s running.</li>
-                <li><strong>Auto Captions</strong> — transcribe your exported video, edit the transcript, download SRT/VTT/TXT, or burn captions directly into the video.</li>
+                <li><strong>Auto Captions</strong> — transcribe your edited timeline directly (no export needed first), edit the transcript, download SRT/VTT/TXT, or burn captions straight into your final exported video.</li>
                 <li><strong>Keyboard shortcuts</strong> — Space to play/pause, S to split, D to duplicate, Delete to remove, M to drop a marker, Ctrl/Cmd+Z to undo.</li>
               </ul>
             </section>
@@ -199,7 +204,7 @@ export default function VideoEditorPage() {
             <section style={{ marginBottom: 36 }}>
               <h2 style={sectionH2}>Privacy and temporary processing</h2>
               <p>
-                Editing, composition, screen recording, and export all happen locally in your browser — your video is never uploaded for those steps, and a screen recording never leaves your device unless you choose to export it. Auto Captions is the one exception: generating a transcript requires sending a compressed copy of just the exported video&apos;s audio to our transcription provider, processed for that single request and not stored afterward. If you don&apos;t use Auto Captions, nothing about your video ever reaches Convertam&apos;s servers.
+                Editing, composition, screen recording, and export all happen locally in your browser — your video is never uploaded for those steps, and a screen recording never leaves your device unless you choose to export it. Auto Captions is the one exception: it first renders just your edited timeline&apos;s audio locally (never the video), then sends a compressed copy of that rendered audio to our transcription provider, processed for that single request and not stored afterward. If you don&apos;t use Auto Captions, nothing about your video — or its audio — ever reaches Convertam&apos;s servers.
               </p>
             </section>
 
@@ -211,7 +216,8 @@ export default function VideoEditorPage() {
                 <li><strong>Crossfade&apos;s incoming clip:</strong> during the blend, the next clip is held on its own first frame (not actively playing) while it dissolves in — this avoids any jump or repeat once its own official slot begins, at the cost of that clip not visibly moving until the crossfade finishes.</li>
                 <li><strong>Screen recording audio:</strong> whether system/tab audio can be captured alongside your screen depends on your browser and what you choose to share — your microphone isn&apos;t captured unless your operating system routes it into the shared audio.</li>
                 <li><strong>Reversed clip preview:</strong> browsers can&apos;t natively play video backwards, so a reversed clip previews as a best-effort silent scrub rather than smooth playback — the exported video plays it backwards properly, with its audio correctly reversed too.</li>
-                <li><strong>Captions:</strong> Auto Captions transcribes your <em>exported</em> video, not the live timeline — export first, then generate captions from that file.</li>
+                <li><strong>Auto Captions rendering time:</strong> generating the timeline&apos;s audio for transcription happens in real time (roughly as long as your edited timeline&apos;s own length), since it plays the mix back to capture it — shorter than a full video export, but not instant for a long timeline.</li>
+                <li><strong>Multi-select scope:</strong> a selection can only include clips from one track at a time — it&apos;s for shared delete/duplicate actions on a sequence of clips, not for moving several clips freely across the timeline at once.</li>
               </ul>
             </section>
 

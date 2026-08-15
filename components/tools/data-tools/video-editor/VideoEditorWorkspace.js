@@ -14,7 +14,7 @@ import { downloadBlob } from '@/lib/dataTools/shared';
 import { extractVideoMetadata, extractImageMetadata, extractAudioMetadata, formatDuration } from '@/lib/media/metadata';
 import { validateUploadSize, MAX_UPLOAD_VIDEO_BYTES, MAX_UPLOAD_IMAGE_BYTES, MAX_UPLOAD_AUDIO_BYTES } from '@/lib/media/limits';
 import {
-  createTimeline, addSource, addClip, trimClip, splitClip, deleteClip, joinClips, reorderClip, duplicateClip,
+  createTimeline, addSource, addClip, trimClip, splitClip, deleteClip, deleteClips, joinClips, reorderClip, duplicateClip, duplicateClips,
   setClipAudioMode,
   addOverlayTrack, removeOverlayTrack, setOverlayTrackMode, setOverlayTrackDividerRatio,
   setOverlayTrackPipCorner, setOverlayTrackPipPosition, setOverlayTrackPipSizeRatio, setOverlayTrackFlags, isOverlayTrackAudible,
@@ -26,11 +26,12 @@ import {
   addShapeOverlay, updateShapeOverlay, deleteShapeOverlay,
   setExportResolution, setExportQuality, setExportFps,
   getTrackClips, getTotalDuration, findActiveClipAt, clipDuration, MAIN_TRACK, BLEND_TRANSITION_TYPES,
+  getClipTimelineBounds, getAllClipBoundaryTimes,
   getMasterGain, setMasterVolume, setMasterMuted, setMasterFade,
   addMarker, updateMarker, deleteMarker,
 } from '@/lib/media/timeline';
 import { drawCompositionFrame, drawTextOverlays, drawImageOverlays, drawShapeOverlays, computeLayoutRects, pipPositionFromPoint, getComposeSize, getFadeOpacity } from '@/lib/media/compositionLayouts';
-import { renderTimeline, isTimelineExportSupported, TimelineRenderCancelledError } from '@/lib/media/timelineRender';
+import { renderTimeline, renderTimelineAudio, isTimelineExportSupported, TimelineRenderCancelledError, TimelineRenderError } from '@/lib/media/timelineRender';
 import { extractThumbnails, thumbnailsForRange } from '@/lib/media/thumbnails';
 import { extractWaveformPeaks, drawWaveform } from '@/lib/media/waveform';
 import { detectSilence } from '@/lib/media/silenceDetect';
@@ -38,9 +39,16 @@ import { computeNormalizationGain } from '@/lib/media/normalizeAudio';
 import { duckGainAtTime } from '@/lib/media/ducking';
 // Auto Captions reuses the exact same transcription/caption engine as
 // Audio Studio and Video Studio — no separate implementation. It runs on
-// the EXPORTED render (not the raw source clips), since that's the only
-// point a multi-clip, trimmed, reordered timeline has one single, final
-// audio timeline for a transcript to actually match.
+// a LOCAL, audio-only render of the edited timeline's actual mix
+// (renderTimelineAudio, in timelineRender.js — the same audio graph the
+// composed video export uses, minus the canvas/video-encoding work), not
+// on an already-exported video file — so generating captions never
+// requires exporting a video first. Because that render plays the timeline
+// back on its own real time axis, the resulting transcript's timestamps
+// are already the EDITED timeline's timestamps, not the original source
+// clips' — no separate remapping step needed. Burning captions in then
+// renders the actual final video (once) and burns the captions into that
+// same pass, rather than reusing a separate, possibly-stale earlier export.
 import { transcribeMedia, TranscriptionError } from '@/lib/media/providers/geminiTranscription';
 import { transcriptToSrt, transcriptToVtt, transcriptToAss, DEFAULT_CAPTION_STYLE } from '@/lib/media/captions';
 import { transcriptToPlainText } from '@/lib/media/transcript';
@@ -48,11 +56,14 @@ import { burnAssSubtitles, FfmpegLoadError, FfmpegRenderError, FfmpegCancelledEr
 import TranscriptEditor from '../shared/TranscriptEditor';
 
 const TRANSCRIBE_STATUS_LABEL = {
-  preparing: 'Preparing audio…',
+  'preparing-audio': 'Preparing audio…',
+  'rendering-audio': 'Rendering timeline audio…',
+  preparing: 'Preparing for transcription…',
   transcribing: 'Transcribing speech…',
   merging: 'Combining transcript…',
 };
 const BURN_STATUS_LABEL = {
+  'rendering-video': 'Rendering final video…',
   loading: 'Loading video engine…',
   burning: 'Burning captions into video…',
 };
@@ -248,6 +259,13 @@ export default function VideoEditorWorkspace() {
   const [past, setPast] = useState([]);
   const [future, setFuture] = useState([]);
   const [selectedClipId, setSelectedClipId] = useState(null);
+  // Multi-select — purely additive on top of the existing single
+  // selectedClipId (which keeps driving the single-clip Clip panel exactly
+  // as before): extraSelectedClipIds holds any OTHER clips added via
+  // Ctrl/Cmd-click or Shift-click range-select, always within the same
+  // track as selectedClipId (see handleClipClick). The "current selection"
+  // for bulk actions is the union of the two — see selectionIds below.
+  const [extraSelectedClipIds, setExtraSelectedClipIds] = useState([]);
   const [playhead, setPlayhead] = useState(0); // timeline-relative seconds
   const [playing, setPlaying] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -275,19 +293,29 @@ export default function VideoEditorWorkspace() {
   // OUTSIDE drawCompositionFrame (the function export also calls), so they
   // can never accidentally end up burned into an exported video.
   const [showSafeGuides, setShowSafeGuides] = useState(false);
+  // Whether the trim handle currently being dragged is snapped this frame
+  // — { clipId, edge } or null, used only for the subtle visual highlight
+  // on that one handle. Set sparingly (only on actual on/off transitions,
+  // see handleTrimHandleMove) so a drag doesn't re-render on every pixel.
+  const [snappedHandle, setSnappedHandle] = useState(null);
 
-  // ---- Auto Captions state — operates on the exported render, not the
-  // raw source clips (see the import comment above for why). ----
-  const [exportedBlob, setExportedBlob] = useState(null);
+  // ---- Auto Captions state — operates on a local audio-only render of
+  // the current timeline (see the import comment above for why). ----
   const [transcript, setTranscript] = useState(null);
-  const [transcribeStatus, setTranscribeStatus] = useState('idle'); // idle | preparing | transcribing | merging | error
+  // The exact timeline object transcript was generated from — since every
+  // commit() produces a new object, `timeline !== transcriptTimelineRef`
+  // is a cheap, reliable "has anything changed since?" check, used only to
+  // show a non-blocking staleness hint (never auto-deletes the transcript).
+  const [transcriptTimelineRef, setTranscriptTimelineRef] = useState(null);
+  const [transcribeStatus, setTranscribeStatus] = useState('idle'); // idle | preparing-audio | rendering-audio | preparing | transcribing | merging | error
   const [transcribeError, setTranscribeError] = useState('');
-  const [transcribeProgress, setTranscribeProgress] = useState(null); // { chunkIndex, totalChunks } | null
-  const [burnStatus, setBurnStatus] = useState('idle'); // idle | loading | burning | error
+  const [transcribeProgress, setTranscribeProgress] = useState(null); // { chunkIndex, totalChunks } | { audioRenderProgress } | null
+  const [burnStatus, setBurnStatus] = useState('idle'); // idle | rendering-video | loading | burning | error
   const [burnProgress, setBurnProgress] = useState(0);
   const [burnError, setBurnError] = useState('');
   const [burnEta, setBurnEta] = useState('');
   const burnCancelRef = useRef(null);
+  const audioRenderCancelRef = useRef(null);
   const exportCancelRef = useRef(null);
   const burnStartRef = useRef(0);
 
@@ -543,7 +571,7 @@ export default function VideoEditorWorkspace() {
       // Selecting the clip immediately — not just adding it — is what
       // makes the trim/audio/split panel actually show up without the
       // user needing to know to click the timeline strip first.
-      if (newClipId) setSelectedClipId(newClipId);
+      if (newClipId) { setSelectedClipId(newClipId); setExtraSelectedClipIds([]); }
     } catch (err) {
       setUploadError(err.message || 'Could not read this video file.');
     }
@@ -568,7 +596,7 @@ export default function VideoEditorWorkspace() {
       const newClipId = getTrackClips(next, trackId).at(-1)?.id || null;
       commit(next);
       setSelectedOverlayTrackId(trackId);
-      if (newClipId) setSelectedClipId(newClipId);
+      if (newClipId) { setSelectedClipId(newClipId); setExtraSelectedClipIds([]); }
     } catch (err) {
       setUploadError(err.message || 'Could not read this video file.');
     }
@@ -592,7 +620,7 @@ export default function VideoEditorWorkspace() {
       const newClipId = getTrackClips(next, trackId).at(-1)?.id || null;
       commit(next);
       setSelectedOverlayTrackId(trackId);
-      if (newClipId) setSelectedClipId(newClipId);
+      if (newClipId) { setSelectedClipId(newClipId); setExtraSelectedClipIds([]); }
     } catch (err) {
       setUploadError(err.message || 'Could not read this image file.');
     }
@@ -669,6 +697,72 @@ export default function VideoEditorWorkspace() {
   const selectedClipAudioSource = selectedClip?.audioSourceId ? timeline.sources.find((s) => s.id === selectedClip.audioSourceId) : null;
   const selectedClipTrack = selectedClip && selectedClip.track !== MAIN_TRACK ? overlayTracks.find((t) => t.id === selectedClip.track) : null;
   const isLockedSelected = !!selectedClipTrack?.locked;
+  // Union of the primary selection and any extra multi-selected clips —
+  // the single source of truth every bulk action (delete/duplicate) and
+  // every "is this clip highlighted" check reads from.
+  const selectionIds = selectedClipId ? [selectedClipId, ...extraSelectedClipIds.filter((id) => id !== selectedClipId)] : [];
+  const selectionIdSet = new Set(selectionIds);
+
+  // Click handling for multi-select on the timeline: plain click selects
+  // only this clip (existing single-select behavior, unchanged); Ctrl/Cmd
+  // toggles this clip in/out of the selection; Shift selects the
+  // contiguous range between the current primary and this clip, but only
+  // within the SAME track — multi-select never spans tracks, matching the
+  // sequential-per-track model everything else here assumes. overlayTrackId
+  // is passed through only for overlay-track clips, to keep the existing
+  // "select an overlay clip also selects its track's Composition panel"
+  // behavior working on a plain click.
+  function handleClipClick(e, clip, overlayTrackId) {
+    const clickedId = clip.id;
+    if (e.ctrlKey || e.metaKey) {
+      e.stopPropagation();
+      const primaryClip = selectedClipId ? timeline.clips.find((c) => c.id === selectedClipId) : null;
+      if (clickedId === selectedClipId) {
+        if (extraSelectedClipIds.length) {
+          const [newPrimary, ...rest] = extraSelectedClipIds;
+          setSelectedClipId(newPrimary);
+          setExtraSelectedClipIds(rest);
+        } else {
+          setSelectedClipId(null);
+          setExtraSelectedClipIds([]);
+        }
+      } else if (extraSelectedClipIds.includes(clickedId)) {
+        setExtraSelectedClipIds((prev) => prev.filter((id) => id !== clickedId));
+      } else if (!primaryClip || primaryClip.track === clip.track) {
+        if (!selectedClipId) setSelectedClipId(clickedId);
+        else setExtraSelectedClipIds((prev) => [...prev, clickedId]);
+      } else {
+        // Ctrl-clicking a clip on a DIFFERENT track than the current
+        // selection starts a fresh single selection there rather than
+        // silently no-op'ing or mixing tracks.
+        setSelectedClipId(clickedId);
+        setExtraSelectedClipIds([]);
+      }
+      return;
+    }
+    if (e.shiftKey && selectedClipId) {
+      const primaryClip = timeline.clips.find((c) => c.id === selectedClipId);
+      if (primaryClip && primaryClip.track === clip.track) {
+        e.stopPropagation();
+        const trackClips = getTrackClips(timeline, clip.track);
+        const i1 = trackClips.findIndex((c) => c.id === selectedClipId);
+        const i2 = trackClips.findIndex((c) => c.id === clickedId);
+        if (i1 !== -1 && i2 !== -1) {
+          const [lo, hi] = i1 < i2 ? [i1, i2] : [i2, i1];
+          setExtraSelectedClipIds(trackClips.slice(lo, hi + 1).map((c) => c.id).filter((id) => id !== selectedClipId));
+          return;
+        }
+      }
+    }
+    setSelectedClipId(clickedId);
+    setExtraSelectedClipIds([]);
+    if (overlayTrackId !== undefined) setSelectedOverlayTrackId(overlayTrackId);
+  }
+  function clearSelectionIfEmptyClick(e) {
+    if (e.target !== e.currentTarget) return;
+    setSelectedClipId(null);
+    setExtraSelectedClipIds([]);
+  }
 
   function handleTrimChange(field, value) {
     if (!selectedClip) return;
@@ -687,11 +781,17 @@ export default function VideoEditorWorkspace() {
     commit((tl) => splitClip(tl, selectedClip.id, hit.sourceTime));
   }
 
+  // Handles both the single-clip "Delete clip" button and a multi-select
+  // bulk delete — selectionIds is just [selectedClipId] in the ordinary
+  // single-clip case, so this is a strict generalization, not a second
+  // code path. One commit() call either way, so undo/redo treats a
+  // multi-delete as one history entry regardless of how many clips it removed.
   function handleDeleteSelected() {
-    if (!selectedClip) return;
-    const track = selectedClip.track;
+    if (!selectionIds.length) return;
+    const track = selectedClip?.track ?? timeline.clips.find((c) => c.id === selectionIds[0])?.track;
+    if (track === undefined) return;
     commit((tl) => {
-      const next = deleteClip(tl, selectedClip.id);
+      const next = selectionIds.length > 1 ? deleteClips(tl, selectionIds) : deleteClip(tl, selectionIds[0]);
       // An overlay track left with zero clips is dead weight in the track
       // list/UI — same "clean up after yourself" removeSource already does
       // for a deleted source's now-empty tracks.
@@ -699,6 +799,7 @@ export default function VideoEditorWorkspace() {
       return track !== MAIN_TRACK && !stillHasClips ? removeOverlayTrack(next, track) : next;
     });
     setSelectedClipId(null);
+    setExtraSelectedClipIds([]);
     if (track !== MAIN_TRACK && selectedOverlayTrackId === track) setSelectedOverlayTrackId(null);
   }
 
@@ -712,6 +813,17 @@ export default function VideoEditorWorkspace() {
   function handleDuplicateSelected() {
     if (!selectedClip) return;
     commit((tl) => duplicateClip(tl, selectedClip.id));
+  }
+  // Bulk duplicate for 2+ selected clips — a separate function (rather than
+  // folding into handleDuplicateSelected) so the existing single-clip
+  // Duplicate button's behavior/tests are completely untouched; this one is
+  // only ever wired to a button that's itself only shown when multi-select
+  // is active. Inserts all copies as one contiguous block (see
+  // duplicateClips' own comment) in a single commit — one undo/redo entry.
+  function handleDuplicateMultiSelected() {
+    if (selectionIds.length < 2) return;
+    commit((tl) => duplicateClips(tl, selectionIds));
+    setExtraSelectedClipIds([]);
   }
 
   // Transitions reuse the existing per-clip fade engine rather than new
@@ -811,6 +923,7 @@ export default function VideoEditorWorkspace() {
     });
     setSilenceRanges(null);
     setSelectedClipId(null);
+    setExtraSelectedClipIds([]);
   }
 
   function handleTransitionDuration(clip, duration) {
@@ -884,7 +997,7 @@ export default function VideoEditorWorkspace() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedClipId, playing, playhead, timeline, past, future]);
+  }, [selectedClipId, extraSelectedClipIds, playing, playhead, timeline, past, future]);
 
   const dragIndexRef = useRef(null);
   function handleDragStart(index) { dragIndexRef.current = index; }
@@ -906,18 +1019,51 @@ export default function VideoEditorWorkspace() {
   const mainTrackRef = useRef(null);
   const trimDragRef = useRef(null);
 
+  // Fixed on-screen snap distance (not seconds) so it feels the same
+  // regardless of timeline zoom — converted to a timeline-seconds
+  // threshold per-drag using that drag's own pxPerSecond.
+  const SNAP_PX = 10;
+
   function handleTrimHandleDown(e, clip, edge) {
     e.stopPropagation();
     e.preventDefault();
     const trackRect = mainTrackRef.current.getBoundingClientRect();
+    const pxPerSecond = trackRect.width / (totalDuration || 1);
+    // clipTimelineStart is this clip's own ABSOLUTE-timeline start — fixed
+    // for the whole drag, since trimming a clip never moves anything
+    // BEFORE it (only its own duration changes, rippling everything
+    // after). Both handles therefore actually move the same point in
+    // absolute timeline time — this clip's END boundary (see the
+    // handleTrimHandleMove comment below for why the 'start' handle is no
+    // exception) — which is what snapping compares against candidates for.
+    const clipTimelineStart = getClipTimelineBounds(timeline, clip.id)?.start ?? 0;
+    // Snapshot of every "interesting" timeline position, taken once at
+    // drag-start since nothing else moves during this drag: the playhead,
+    // timeline start, every marker, and every clip boundary on every
+    // track (including this clip's own pre-drag boundaries, which is
+    // harmless — snapping back to where you started is a reasonable
+    // outcome, not a bug).
+    const snapTargets = [
+      0,
+      playhead,
+      ...timeline.markers.map((m) => m.time),
+      ...getAllClipBoundaryTimes(timeline),
+    ];
     trimDragRef.current = {
       clipId: clip.id,
       edge,
       startClientX: e.clientX,
       startValue: edge === 'start' ? clip.sourceStart : clip.sourceEnd,
-      pxPerSecond: trackRect.width / (totalDuration || 1),
+      // Both endpoints are snapshotted (not just the one being dragged) so
+      // the snap math below never needs to read back into React state —
+      // the OTHER endpoint never changes mid-drag, only the dragged one.
+      clipSourceStart: clip.sourceStart,
+      clipSourceEnd: clip.sourceEnd,
+      pxPerSecond,
       speed: clip.speed || 1,
       preDragTimeline: timeline,
+      clipTimelineStart,
+      snapTargets,
     };
     window.addEventListener('pointermove', handleTrimHandleMove);
     window.addEventListener('pointerup', handleTrimHandleUp);
@@ -926,7 +1072,33 @@ export default function VideoEditorWorkspace() {
     const drag = trimDragRef.current;
     if (!drag) return;
     const dSeconds = ((e.clientX - drag.startClientX) / drag.pxPerSecond) * drag.speed;
-    const newValue = drag.startValue + dSeconds;
+    let newValue = drag.startValue + dSeconds;
+    let didSnap = false;
+    if (!e.altKey) {
+      // Both the 'end' handle and the 'start' handle ultimately move this
+      // clip's absolute-timeline END boundary — trimming the start just
+      // shortens the clip from a FIXED timeline-start point, so its own
+      // end (and everything after it) is what actually shifts (see
+      // handleTrimHandleDown's own comment). Converting the raw dragged
+      // value into that one shared "moving edge" position lets both
+      // handles snap against the exact same candidate set with the same math.
+      const rawTimelineEdge = drag.edge === 'end'
+        ? drag.clipTimelineStart + (newValue - drag.clipSourceStart) / drag.speed
+        : drag.clipTimelineStart + (drag.clipSourceEnd - newValue) / drag.speed;
+      const thresholdSeconds = SNAP_PX / drag.pxPerSecond;
+      let nearest = null;
+      let nearestDist = thresholdSeconds;
+      for (const target of drag.snapTargets) {
+        const dist = Math.abs(target - rawTimelineEdge);
+        if (dist <= nearestDist) { nearest = target; nearestDist = dist; }
+      }
+      if (nearest !== null) {
+        didSnap = true;
+        newValue = drag.edge === 'end'
+          ? drag.clipSourceStart + (nearest - drag.clipTimelineStart) * drag.speed
+          : drag.clipSourceEnd - (nearest - drag.clipTimelineStart) * drag.speed;
+      }
+    }
     setTimeline((prev) => {
       const clip = prev.clips.find((c) => c.id === drag.clipId);
       if (!clip) return prev;
@@ -934,12 +1106,17 @@ export default function VideoEditorWorkspace() {
         ? trimClip(prev, drag.clipId, { sourceStart: newValue, sourceEnd: clip.sourceEnd })
         : trimClip(prev, drag.clipId, { sourceStart: clip.sourceStart, sourceEnd: newValue });
     });
+    setSnappedHandle((prev) => {
+      const next = didSnap ? { clipId: drag.clipId, edge: drag.edge } : null;
+      return (prev?.clipId === next?.clipId && prev?.edge === next?.edge) ? prev : next;
+    });
   }
   function handleTrimHandleUp() {
     const drag = trimDragRef.current;
     trimDragRef.current = null;
     window.removeEventListener('pointermove', handleTrimHandleMove);
     window.removeEventListener('pointerup', handleTrimHandleUp);
+    setSnappedHandle(null);
     if (drag) {
       setPast((p) => [...p, drag.preDragTimeline]);
       setFuture([]);
@@ -1411,16 +1588,6 @@ export default function VideoEditorWorkspace() {
       });
       downloadBlob(blob, 'video/mp4', 'edited-video.mp4');
       setRenderStatus('idle');
-      // Kept for Auto Captions below — a fresh export invalidates any
-      // transcript from a previous one (timing would no longer match), so
-      // caption state is cleared here rather than left stale against a
-      // render it no longer describes.
-      setExportedBlob(blob);
-      setTranscript(null);
-      setTranscribeStatus('idle');
-      setTranscribeError('');
-      setBurnStatus('idle');
-      setBurnError('');
     } catch (err) {
       if (err instanceof TimelineRenderCancelledError || cancelToken.cancelled) {
         setRenderStatus('idle');
@@ -1437,17 +1604,31 @@ export default function VideoEditorWorkspace() {
   }
 
   // ---- Auto Captions — the one operation in this tool that leaves the
-  // browser: transcribeMedia() sends a compressed copy of the exported
-  // video's audio to Convertam's transcription provider. Everything else
-  // here (transcript editing, SRT/VTT/TXT export, caption burn-in) is the
-  // same local engine already used by Audio Studio and Video Studio. ----
-  async function handleTranscribeExport() {
-    if (!exportedBlob) return;
-    setTranscribeStatus('preparing');
+  // browser, and only for the transcription step: renderTimelineAudio()
+  // renders the CURRENT edited timeline's actual audio mix locally first
+  // (see its own comment in timelineRender.js), and only that rendered
+  // audio — never the video — is sent to Convertam's transcription
+  // provider. Everything else here (transcript editing, SRT/VTT/TXT
+  // export, caption burn-in) is the same local engine already used by
+  // Audio Studio and Video Studio. ----
+  async function handleAutoCaptions() {
+    if (!mainClips.length) return;
+    setTranscribeStatus('preparing-audio');
     setTranscribeError('');
     setTranscribeProgress(null);
+    const cancelToken = { cancelled: false };
+    audioRenderCancelRef.current = cancelToken;
+    const timelineAtStart = timeline;
     try {
-      const file = new File([exportedBlob], 'edited-video.mp4', { type: 'video/mp4' });
+      const audioBlob = await renderTimelineAudio(timelineAtStart, {
+        onStatus: (s) => { if (s === 'preparing') setTranscribeStatus('preparing-audio'); else if (s === 'rendering') setTranscribeStatus('rendering-audio'); },
+        onProgress: (p) => setTranscribeProgress({ audioRenderProgress: p }),
+        cancelToken,
+      });
+      audioRenderCancelRef.current = null;
+      if (cancelToken.cancelled) throw new TimelineRenderCancelledError();
+      setTranscribeProgress(null);
+      const file = new File([audioBlob], 'timeline-audio.webm', { type: audioBlob.type || 'audio/webm' });
       const result = await transcribeMedia({
         file,
         onStatus: (s, detail) => {
@@ -1456,16 +1637,30 @@ export default function VideoEditorWorkspace() {
         },
       });
       setTranscript(result);
+      setTranscriptTimelineRef(timelineAtStart);
       setTranscribeStatus('idle');
       setTranscribeProgress(null);
     } catch (err) {
-      setTranscribeStatus('error');
-      setTranscribeError(err instanceof TranscriptionError ? err.message : 'Transcription failed. Please try again.');
-      setTranscribeProgress(null);
+      if (err instanceof TimelineRenderCancelledError || cancelToken.cancelled) {
+        setTranscribeStatus('idle');
+        setTranscribeProgress(null);
+      } else {
+        setTranscribeStatus('error');
+        setTranscribeError(err instanceof TranscriptionError || err instanceof TimelineRenderError ? err.message : 'Could not generate captions. Please try again.');
+        setTranscribeProgress(null);
+      }
+    } finally {
+      audioRenderCancelRef.current = null;
     }
   }
+  function handleCancelAutoCaptions() {
+    if (audioRenderCancelRef.current) audioRenderCancelRef.current.cancelled = true;
+  }
   function transcribeStatusLabel() {
-    if (transcribeStatus === 'transcribing' && transcribeProgress) {
+    if (transcribeStatus === 'rendering-audio' && transcribeProgress?.audioRenderProgress != null) {
+      return `Rendering timeline audio… ${Math.round(transcribeProgress.audioRenderProgress * 100)}%`;
+    }
+    if (transcribeStatus === 'transcribing' && transcribeProgress?.totalChunks) {
       return `Transcribing part ${transcribeProgress.chunkIndex + 1} of ${transcribeProgress.totalChunks}…`;
     }
     return TRANSCRIBE_STATUS_LABEL[transcribeStatus] || 'Working…';
@@ -1481,19 +1676,33 @@ export default function VideoEditorWorkspace() {
   function handleDownloadVtt() { downloadBlob(transcriptToVtt(transcript), 'text/vtt', 'edited-video.vtt'); }
   function handleDownloadTxt() { downloadBlob(transcriptToPlainText(transcript), 'text/plain', 'edited-video-transcript.txt'); }
 
+  // Renders the actual final video (once, fresh — never reusing a
+  // possibly-stale earlier export) and burns the captions into that same
+  // pass, producing exactly one downloaded file — the "Final MP4" the
+  // Auto Captions workflow ends at, rather than exporting once for
+  // transcription and again for captions the way this used to work.
   async function handleBurnCaptions() {
-    if (!exportedBlob || !transcript) return;
+    if (!transcript || !mainClips.length) return;
     setBurnError('');
-    setBurnStatus('loading');
+    setBurnStatus('rendering-video');
     setBurnProgress(0);
     setBurnEta('');
     const cancelToken = { cancelled: false };
     burnCancelRef.current = cancelToken;
     burnStartRef.current = Date.now();
     try {
-      const videoFile = new File([exportedBlob], 'edited-video.mp4', { type: 'video/mp4' });
+      const videoBlob = await renderTimeline(timeline, {
+        onStatus: () => {},
+        onProgress: setBurnProgress,
+        cancelToken,
+      });
+      if (cancelToken.cancelled) throw new TimelineRenderCancelledError();
+      setBurnProgress(0);
+      setBurnStatus('loading');
+      const videoFile = new File([videoBlob], 'edited-video.mp4', { type: 'video/mp4' });
       const assText = transcriptToAss(transcript, DEFAULT_CAPTION_STYLE);
       setBurnStatus('burning');
+      burnStartRef.current = Date.now();
       const mp4Blob = await burnAssSubtitles({
         videoFile,
         assText,
@@ -1508,22 +1717,25 @@ export default function VideoEditorWorkspace() {
       setBurnStatus('idle');
       setBurnEta('');
     } catch (err) {
-      if (err instanceof FfmpegCancelledError || cancelToken.cancelled) {
+      if (err instanceof FfmpegCancelledError || err instanceof TimelineRenderCancelledError || cancelToken.cancelled) {
         setBurnStatus('idle');
         setBurnProgress(0);
         setBurnEta('');
       } else {
         setBurnStatus('error');
-        setBurnError(err instanceof FfmpegLoadError || err instanceof FfmpegRenderError ? err.message : 'Could not burn captions into this video. Please try again.');
+        setBurnError(err instanceof FfmpegLoadError || err instanceof FfmpegRenderError || err instanceof TimelineRenderError ? err.message : 'Could not burn captions into this video. Please try again.');
       }
     } finally {
       burnCancelRef.current = null;
     }
   }
+  function handleCancelBurnCaptions() {
+    if (burnCancelRef.current) burnCancelRef.current.cancelled = true;
+  }
 
   const isExporting = renderStatus === 'preparing' || renderStatus === 'rendering' || renderStatus === 'finalizing';
-  const isTranscribing = transcribeStatus === 'preparing' || transcribeStatus === 'transcribing' || transcribeStatus === 'merging';
-  const isBurning = burnStatus === 'loading' || burnStatus === 'burning';
+  const isTranscribing = transcribeStatus === 'preparing-audio' || transcribeStatus === 'rendering-audio' || transcribeStatus === 'preparing' || transcribeStatus === 'transcribing' || transcribeStatus === 'merging';
+  const isBurning = burnStatus === 'rendering-video' || burnStatus === 'loading' || burnStatus === 'burning';
   const supported = isTimelineExportSupported();
 
   if (!mainClips.length) {
@@ -1653,10 +1865,11 @@ export default function VideoEditorWorkspace() {
               this existed (see mainTrackRef's own comment above). */}
           <div style={{ overflowX: timelineZoom > 1 ? 'auto' : 'hidden', marginBottom: 10 }}>
             <div style={{ width: `${timelineZoom * 100}%`, minWidth: '100%' }}>
-              <div ref={mainTrackRef} style={{ display: 'flex', gap: 3, minHeight: 46 }}>
+              <div ref={mainTrackRef} onClick={clearSelectionIfEmptyClick} style={{ display: 'flex', gap: 3, minHeight: 46 }}>
               {mainClips.map((clip, i) => {
                 const source = timeline.sources.find((s) => s.id === clip.sourceId);
-                const isSelected = clip.id === selectedClipId;
+                const isPrimary = clip.id === selectedClipId;
+                const isSelected = selectionIdSet.has(clip.id);
                 return (
                   <div
                     key={clip.id}
@@ -1664,14 +1877,15 @@ export default function VideoEditorWorkspace() {
                     onDragStart={() => handleDragStart(i)}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={() => handleDrop(MAIN_TRACK, i)}
-                    onClick={() => setSelectedClipId(clip.id)}
+                    onClick={(e) => handleClipClick(e, clip)}
                     style={{
                       position: 'relative', flex: clipDuration(clip) || 1, minWidth: 44, height: 46, borderRadius: 7, cursor: 'grab',
                       background: isSelected ? T.accentGradient : T.accentTint,
-                      border: isSelected ? `2px solid ${T.accentDark}` : `1px solid ${T.border}`,
+                      border: isPrimary ? `2px solid ${T.accentDark}` : isSelected ? `2px solid ${T.accentDark}90` : `1px solid ${T.border}`,
+                      boxShadow: isSelected && !isPrimary ? `inset 0 0 0 1px white` : 'none',
                       overflow: 'hidden',
                     }}
-                    title={`${formatDuration(clipDuration(clip))} — click to edit, drag to reorder, drag the side handles to trim`}
+                    title={`${formatDuration(clipDuration(clip))} — click to edit (Ctrl/Cmd-click to multi-select, Shift-click for a range), drag to reorder, drag the side handles to trim`}
                   >
                     <ClipThumbFilmstrip source={source} sourceStart={clip.sourceStart} sourceEnd={clip.sourceEnd} thumbnailsBySource={thumbnailsBySource} />
                     <ClipWaveform source={source} sourceStart={clip.sourceStart} sourceEnd={clip.sourceEnd} waveformBySource={waveformBySource} />
@@ -1682,17 +1896,20 @@ export default function VideoEditorWorkspace() {
                     }}>
                       {formatDuration(clipDuration(clip))}{clip.speed !== 1 ? ` · ${clip.speed}×` : ''}
                     </div>
-                    {isSelected && (
+                    {isSelected && !isPrimary && (
+                      <div style={{ position: 'absolute', top: 3, right: 3, width: 14, height: 14, borderRadius: '50%', background: 'white', color: T.accentDark, fontSize: '0.6rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3, pointerEvents: 'none' }}>✓</div>
+                    )}
+                    {isPrimary && (
                       <>
                         <div
                           onPointerDown={(e) => handleTrimHandleDown(e, clip, 'start')}
-                          title="Drag to trim the start"
-                          style={trimHandleStyle('left')}
+                          title="Drag to trim the start (snaps to the playhead, other clip edges, and markers — hold Alt to bypass)"
+                          style={trimHandleStyle('left', snappedHandle?.clipId === clip.id && snappedHandle?.edge === 'start')}
                         />
                         <div
                           onPointerDown={(e) => handleTrimHandleDown(e, clip, 'end')}
-                          title="Drag to trim the end"
-                          style={trimHandleStyle('right')}
+                          title="Drag to trim the end (snaps to the playhead, other clip edges, and markers — hold Alt to bypass)"
+                          style={trimHandleStyle('right', snappedHandle?.clipId === clip.id && snappedHandle?.edge === 'end')}
                         />
                       </>
                     )}
@@ -1727,14 +1944,14 @@ export default function VideoEditorWorkspace() {
                         </button>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 3, minHeight: 32, opacity: track.hidden ? 0.5 : 1 }}>
+                    <div onClick={clearSelectionIfEmptyClick} style={{ display: 'flex', gap: 3, minHeight: 32, opacity: track.hidden ? 0.5 : 1 }}>
                       {trackClips.map((clip) => {
                         const clipSource = timeline.sources.find((s) => s.id === clip.sourceId);
                         const isImage = clipSource?.kind === 'image';
                         return (
                           <div
                             key={clip.id}
-                            onClick={() => { setSelectedClipId(clip.id); setSelectedOverlayTrackId(track.id); }}
+                            onClick={(e) => { e.stopPropagation(); setSelectedClipId(clip.id); setExtraSelectedClipIds([]); setSelectedOverlayTrackId(track.id); }}
                             style={{
                               flex: isImage ? 1 : (clipDuration(clip) || 1), minWidth: 40, height: 32, borderRadius: 7, cursor: 'pointer',
                               background: clip.id === selectedClipId ? T.accentGradient : '#F1F5F9',
@@ -1761,7 +1978,19 @@ export default function VideoEditorWorkspace() {
           {/* Clip */}
           <div style={{ background: T.accentTint, borderRadius: 10, padding: 12, marginBottom: 10 }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Clip</div>
-            {selectedClip && selectedSource && isLockedSelected ? (
+            {selectionIds.length > 1 ? (
+              <>
+                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: T.ink, marginBottom: 8 }}>
+                  {selectionIds.length} clips selected
+                </div>
+                <p style={{ fontSize: '0.7rem', color: T.mutedDark, margin: '0 0 8px' }}>Ctrl/Cmd-click to add or remove a clip, Shift-click for a range, or click empty timeline space to clear.</p>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <button onClick={handleDuplicateMultiSelected} style={smallBtn}>⧉ Duplicate selected</button>
+                  <button onClick={handleDeleteSelected} style={{ ...smallBtn, color: '#DC2626', borderColor: '#FCA5A5' }}>✕ Delete selected</button>
+                  <button onClick={() => setExtraSelectedClipIds([])} style={smallBtn}>Clear selection</button>
+                </div>
+              </>
+            ) : selectedClip && selectedSource && isLockedSelected ? (
               <>
                 <div style={{ fontSize: '0.74rem', fontWeight: 700, color: T.ink, marginBottom: 8, wordBreak: 'break-word' }}>
                   {selectedSource.file.name} <span style={{ fontWeight: 500, color: T.mutedDark }}>(overlay)</span>
@@ -2565,23 +2794,34 @@ export default function VideoEditorWorkspace() {
             </p>
           )}
 
-          {/* Captions — the one step in this tool that isn't purely local;
-              operates on the exported render (not the raw clips), since
-              that's the only point a multi-clip, trimmed, reordered
-              timeline has one final audio track for a transcript to match. */}
+          {/* Captions — the one step in this tool that isn't purely local.
+              Works straight off the current timeline (renders just its
+              audio locally first — see the import comment above), so
+              there's no need to export a video before captioning. */}
           <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginTop: 10 }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Auto Captions</div>
-            {!exportedBlob ? (
-              <p style={{ fontSize: '0.72rem', color: T.muted, margin: 0 }}>Export your video above, then transcribe it here to add captions.</p>
+            {!mainClips.length ? (
+              <p style={{ fontSize: '0.72rem', color: T.muted, margin: 0 }}>Add a clip to the timeline, then generate captions here.</p>
             ) : !transcript ? (
               <>
-                <button onClick={handleTranscribeExport} disabled={isTranscribing} style={{ ...primaryBtn(isTranscribing), width: '100%', padding: '10px 20px', fontSize: '0.85rem' }}>
-                  {isTranscribing ? transcribeStatusLabel() : '📝 Transcribe exported video'}
+                <button onClick={handleAutoCaptions} disabled={isTranscribing} style={{ ...primaryBtn(isTranscribing), width: '100%', padding: '10px 20px', fontSize: '0.85rem' }}>
+                  {isTranscribing ? transcribeStatusLabel() : '📝 Auto Captions'}
                 </button>
+                {isTranscribing && (transcribeStatus === 'preparing-audio' || transcribeStatus === 'rendering-audio') && (
+                  <>
+                    <p style={{ margin: '6px 0 0', fontSize: '0.68rem', color: T.muted }}>Keep this tab open while the timeline's audio renders.</p>
+                    <button onClick={handleCancelAutoCaptions} style={{ ...smallBtn, marginTop: 6 }}>Cancel</button>
+                  </>
+                )}
                 {transcribeStatus === 'error' && <div style={{ ...statusBox, marginTop: 8 }}>⚠️ {transcribeError}</div>}
               </>
             ) : (
               <>
+                {transcriptTimelineRef !== null && transcriptTimelineRef !== timeline && (
+                  <p style={{ fontSize: '0.68rem', color: '#92400E', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, padding: '6px 8px', margin: '0 0 8px' }}>
+                    ⚠️ The timeline has changed since this transcript was generated — re-transcribe so captions line up with your latest edits.
+                  </p>
+                )}
                 <TranscriptEditor transcript={transcript} onTranscriptChange={setTranscript} currentTime={playhead} onSeek={handleCaptionsSeek} />
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
                   <button onClick={handleDownloadSrt} style={smallBtn}>⬇ SRT</button>
@@ -2590,15 +2830,21 @@ export default function VideoEditorWorkspace() {
                   <button onClick={() => { setTranscript(null); setTranscribeStatus('idle'); }} style={smallBtn}>Re-transcribe</button>
                 </div>
                 <button onClick={handleBurnCaptions} disabled={isBurning} style={{ ...primaryBtn(isBurning), width: '100%', marginTop: 8, padding: '10px 20px', fontSize: '0.85rem' }}>
-                  {isBurning ? `${BURN_STATUS_LABEL[burnStatus] || 'Working…'} ${Math.round(burnProgress * 100)}%${burnEta ? ` — ${burnEta}` : ''}` : '🔥 Burn captions into video'}
+                  {isBurning ? `${BURN_STATUS_LABEL[burnStatus] || 'Working…'} ${Math.round(burnProgress * 100)}%${burnEta ? ` — ${burnEta}` : ''}` : '🔥 Burn captions & export final video'}
                 </button>
+                {isBurning && (
+                  <>
+                    <p style={{ margin: '6px 0 0', fontSize: '0.68rem', color: T.muted }}>Keep this tab open while the final video renders.</p>
+                    <button onClick={handleCancelBurnCaptions} style={{ ...smallBtn, marginTop: 6 }}>Cancel</button>
+                  </>
+                )}
                 {burnStatus === 'error' && <div style={{ ...statusBox, marginTop: 8 }}>⚠️ {burnError}</div>}
               </>
             )}
           </div>
 
           <p style={{ fontSize: '0.68rem', color: T.muted, marginTop: 10, textAlign: 'center' }}>
-            Editing, composition, and export all happen locally in your browser — your video is never uploaded for those steps. Auto Captions is the one exception: a compressed copy of just the exported video&apos;s audio is sent to our transcription provider, processed for that request, and not stored afterward.
+            Editing, composition, and export all happen locally in your browser — your video is never uploaded. Auto Captions is the one exception: it renders the edited timeline&apos;s audio locally, then sends a compressed copy of just that audio (never your video) to our transcription provider, processed for that request and not stored afterward.
           </p>
         </div>
       </div>
@@ -2614,10 +2860,12 @@ const statusBox = { padding: '10px 14px', borderRadius: 10, background: T.danger
 const fieldLabel = { display: 'flex', flexDirection: 'column', gap: 3, fontSize: '0.7rem', fontWeight: 700, color: T.mutedDark };
 const numInput = { padding: '6px 8px', borderRadius: 6, border: `1px solid ${T.border}`, fontSize: '0.78rem', fontFamily: T.font, width: 90 };
 
-function trimHandleStyle(side) {
+function trimHandleStyle(side, snapped) {
   return {
     position: 'absolute', top: 0, bottom: 0, [side]: 0, width: 9, zIndex: 3,
-    background: 'rgba(255,255,255,0.85)', cursor: 'ew-resize',
+    background: snapped ? '#F59E0B' : 'rgba(255,255,255,0.85)',
+    boxShadow: snapped ? '0 0 0 2px rgba(245,158,11,0.5)' : 'none',
+    cursor: 'ew-resize',
     borderRadius: side === 'left' ? '7px 0 0 7px' : '0 7px 7px 0',
   };
 }

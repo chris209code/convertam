@@ -74,6 +74,31 @@ export default function VideoEditorWorkspace() {
   const lastOverlayClipRef = useRef(null);
   const lastOverlayImageRef = useRef(null);
 
+  // Live-preview audio graph — separate from (but modeled on) the Web Audio
+  // routing timelineRender.js's composed export already uses. Built lazily,
+  // on the first Play press (a real user gesture, required for browsers to
+  // let audio start), rather than up front — most users open the tool,
+  // trim, and only later press Play.
+  const audioCtxRef = useRef(null);
+  const mainGainRef = useRef(null);
+  const overlayGainRef = useRef(null);
+  const mainReplaceGainRef = useRef(null);
+  const overlayReplaceGainRef = useRef(null);
+  const mainSrcNodeRef = useRef(null);
+  const overlaySrcNodeRef = useRef(null);
+  const mainTappedElRef = useRef(null); // which <video> DOM node mainSrcNodeRef taps — re-tapped if it changes (see ensureAudioGraph)
+  const overlayTappedElRef = useRef(null);
+  const mainReplaceAudioElRef = useRef(null); // hidden <audio> for a clip's 'replace'/'mix' audioSourceId
+  const overlayReplaceAudioElRef = useRef(null);
+  const mainReplaceSrcNodeRef = useRef(null);
+  const overlayReplaceSrcNodeRef = useRef(null);
+  const mainReplaceLastClipRef = useRef(null);
+  const overlayReplaceLastClipRef = useRef(null);
+  // Wall-clock anchor set when Play starts: { atWall, atPlayhead }. The
+  // playhead advances from real elapsed time rather than a fixed per-frame
+  // step, so it never drifts away from the audio actually playing.
+  const playStartRef = useRef(null);
+
   // Free-drag PiP repositioning: while a drag is in progress, the live
   // position lives here (not in timeline state) so every pointermove
   // doesn't spam the undo history — commit() only fires once, on release.
@@ -121,6 +146,68 @@ export default function VideoEditorWorkspace() {
     setFuture((f) => f.slice(1));
     setTimeline(next);
   }
+
+  // Builds the live-preview audio graph on first use and (re-)connects it
+  // to whichever <video> DOM nodes currently exist. Safe to call every time
+  // Play is pressed — cheap no-ops once already set up. Re-tapping (rather
+  // than tapping once and assuming forever) matters because the preview
+  // <video> elements get unmounted if every clip is deleted and the empty-
+  // upload view returns, then remounted fresh if a video is uploaded again.
+  function ensureAudioGraph() {
+    const AudioContextClass = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext);
+    if (!AudioContextClass) return;
+    if (!audioCtxRef.current) {
+      const ctx = new AudioContextClass();
+      const mainGain = ctx.createGain();
+      const overlayGain = ctx.createGain();
+      const mainReplaceGain = ctx.createGain();
+      const overlayReplaceGain = ctx.createGain();
+      mainGain.connect(ctx.destination);
+      overlayGain.connect(ctx.destination);
+      mainReplaceGain.connect(ctx.destination);
+      overlayReplaceGain.connect(ctx.destination);
+      audioCtxRef.current = ctx;
+      mainGainRef.current = mainGain;
+      overlayGainRef.current = overlayGain;
+      mainReplaceGainRef.current = mainReplaceGain;
+      overlayReplaceGainRef.current = overlayReplaceGain;
+      mainReplaceAudioElRef.current = new Audio();
+      overlayReplaceAudioElRef.current = new Audio();
+    } else if (audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume().catch(() => {});
+    }
+    const ctx = audioCtxRef.current;
+    // Tapping a media element into the Web Audio graph redirects its audio
+    // output away from direct hardware playback and can only be done once
+    // per element, ever — and un-muting must happen only once tapped, since
+    // some browsers skip decoding a muted video's audio track entirely,
+    // leaving nothing for the tap to capture even after gain is raised.
+    if (mainVideoRef.current && mainTappedElRef.current !== mainVideoRef.current) {
+      mainSrcNodeRef.current = ctx.createMediaElementSource(mainVideoRef.current);
+      mainSrcNodeRef.current.connect(mainGainRef.current);
+      mainVideoRef.current.muted = false;
+      mainTappedElRef.current = mainVideoRef.current;
+    }
+    if (overlayVideoRef.current && overlayTappedElRef.current !== overlayVideoRef.current) {
+      overlaySrcNodeRef.current = ctx.createMediaElementSource(overlayVideoRef.current);
+      overlaySrcNodeRef.current.connect(overlayGainRef.current);
+      overlayVideoRef.current.muted = false;
+      overlayTappedElRef.current = overlayVideoRef.current;
+    }
+  }
+
+  function handleTogglePlay() {
+    const next = !playing;
+    if (next) {
+      ensureAudioGraph();
+      playStartRef.current = { atWall: performance.now(), atPlayhead: playhead };
+    }
+    setPlaying(next);
+  }
+
+  // Releases the AudioContext when the workspace unmounts — nothing to do
+  // per-clip, since the graph and its gain nodes are reused across clips.
+  useEffect(() => () => { audioCtxRef.current?.close().catch(() => {}); }, []);
 
   async function handleMainFiles(files) {
     const f = files[0];
@@ -289,8 +376,58 @@ export default function VideoEditorWorkspace() {
       }
     }
 
+    // Plays a track's own video audio (respecting Play/pause) once the
+    // audio graph exists; a no-op before the user's first Play press, since
+    // nothing is tapped into the graph yet and the elements stay muted.
+    function syncTrackPlayback(videoEl, active) {
+      if (active && playing) {
+        if (videoEl.paused) videoEl.play().catch(() => {});
+      } else if (!videoEl.paused) {
+        videoEl.pause();
+      }
+    }
+
+    // Mirrors timelineRender.js's applyReplacementAudio, adapted for live
+    // playback instead of recording: routes a clip's 'replace'/'mix'
+    // audioSourceId into its own gain node, keeping it seeked to the same
+    // offset into the clip as the video (so pressing Play mid-clip doesn't
+    // start the replacement audio from 0). Returns whether the clip's own
+    // video audio should stay audible too ('mix') or not ('replace'/other).
+    async function applyReplacementAudioLive(clip, elapsedInClip, audioEl, gainNode, srcNodeRef, lastClipIdRef) {
+      const isReplaceOrMix = clip && (clip.audioMode === 'replace' || clip.audioMode === 'mix') && clip.audioSourceId;
+      if (!isReplaceOrMix) {
+        gainNode.gain.value = 0;
+        if (!audioEl.paused) audioEl.pause();
+        lastClipIdRef.current = null;
+        return false;
+      }
+      if (clip.id !== lastClipIdRef.current) {
+        const audioSource = timeline.sources.find((s) => s.id === clip.audioSourceId);
+        if (audioSource) {
+          if (audioEl.dataset.sourceId !== audioSource.id) {
+            audioEl.src = URL.createObjectURL(audioSource.file);
+            audioEl.dataset.sourceId = audioSource.id;
+            await new Promise((resolve) => { audioEl.onloadedmetadata = resolve; });
+          }
+          if (!srcNodeRef.current) {
+            srcNodeRef.current = audioCtxRef.current.createMediaElementSource(audioEl);
+            srcNodeRef.current.connect(gainNode);
+          }
+          audioEl.currentTime = Math.max(0, Math.min(elapsedInClip, audioEl.duration || elapsedInClip));
+        }
+        lastClipIdRef.current = clip.id;
+      } else if (Math.abs(audioEl.currentTime - elapsedInClip) > 0.15) {
+        audioEl.currentTime = Math.max(0, Math.min(elapsedInClip, audioEl.duration || elapsedInClip));
+      }
+      gainNode.gain.value = 1;
+      if (playing) { if (audioEl.paused) audioEl.play().catch(() => {}); } else if (!audioEl.paused) audioEl.pause();
+      return clip.audioMode === 'mix';
+    }
+
     async function tick() {
       if (cancelled) return;
+      if (playing && !playStartRef.current) playStartRef.current = { atWall: performance.now(), atPlayhead: playhead };
+
       const mainHit = findActiveClipAt(timeline, MAIN_TRACK, playhead);
       const overlayHit = isComposed ? findActiveClipAt(timeline, OVERLAY_TRACK, playhead) : null;
       const overlaySource = overlayHit ? timeline.sources.find((s) => s.id === overlayHit.clip.sourceId) : null;
@@ -301,13 +438,46 @@ export default function VideoEditorWorkspace() {
         if (Math.abs(mainVideoRef.current.currentTime - mainHit.sourceTime) > 0.15) {
           mainVideoRef.current.currentTime = mainHit.sourceTime;
         }
+        syncTrackPlayback(mainVideoRef.current, true);
+      } else {
+        syncTrackPlayback(mainVideoRef.current, false);
       }
       if (overlayHit && overlayIsImage) {
         await loadImage(overlayImageRef.current, overlayHit.clip, lastOverlayImageRef);
+        syncTrackPlayback(overlayVideoRef.current, false);
       } else if (overlayHit) {
         await loadClip(overlayVideoRef.current, overlayHit.clip, lastOverlayClipRef);
         if (Math.abs(overlayVideoRef.current.currentTime - overlayHit.sourceTime) > 0.15) {
           overlayVideoRef.current.currentTime = overlayHit.sourceTime;
+        }
+        syncTrackPlayback(overlayVideoRef.current, true);
+      } else {
+        syncTrackPlayback(overlayVideoRef.current, false);
+      }
+
+      // Audio routing only matters once the graph exists (first Play press)
+      // — before that, both preview <video> elements stay muted and silent.
+      if (audioCtxRef.current) {
+        if (mainHit) {
+          const elapsedInClip = mainHit.sourceTime - mainHit.clip.sourceStart;
+          const mixKeepsOwnAudio = await applyReplacementAudioLive(mainHit.clip, elapsedInClip, mainReplaceAudioElRef.current, mainReplaceGainRef.current, mainReplaceSrcNodeRef, mainReplaceLastClipRef);
+          mainGainRef.current.gain.value = (mainHit.clip.audioMode === 'keep' || mixKeepsOwnAudio) ? 1 : 0;
+        } else {
+          mainGainRef.current.gain.value = 0;
+          mainReplaceGainRef.current.gain.value = 0;
+        }
+        if (overlayHit && overlayIsImage) {
+          // An image has no video audio track of its own, but can still
+          // carry replace/mix audio (e.g. narration under a title card).
+          await applyReplacementAudioLive(overlayHit.clip, 0, overlayReplaceAudioElRef.current, overlayReplaceGainRef.current, overlayReplaceSrcNodeRef, overlayReplaceLastClipRef);
+          overlayGainRef.current.gain.value = 0;
+        } else if (overlayHit) {
+          const elapsedInClip = overlayHit.sourceTime - overlayHit.clip.sourceStart;
+          const mixKeepsOwnAudio = await applyReplacementAudioLive(overlayHit.clip, elapsedInClip, overlayReplaceAudioElRef.current, overlayReplaceGainRef.current, overlayReplaceSrcNodeRef, overlayReplaceLastClipRef);
+          overlayGainRef.current.gain.value = (overlayHit.clip.audioMode === 'keep' || mixKeepsOwnAudio) ? 1 : 0;
+        } else {
+          overlayGainRef.current.gain.value = 0;
+          overlayReplaceGainRef.current.gain.value = 0;
         }
       }
 
@@ -326,12 +496,15 @@ export default function VideoEditorWorkspace() {
         border: true,
       });
 
-      if (playing) {
-        setPlayhead((t) => {
-          const next = t + 1 / 30;
-          if (next >= totalDuration) { setPlaying(false); return totalDuration; }
-          return next;
-        });
+      if (playing && playStartRef.current) {
+        const elapsedWall = (performance.now() - playStartRef.current.atWall) / 1000;
+        const next = playStartRef.current.atPlayhead + elapsedWall;
+        if (next >= totalDuration) {
+          setPlaying(false);
+          setPlayhead(totalDuration);
+        } else {
+          setPlayhead(next);
+        }
       }
       rafRef.current = requestAnimationFrame(tick);
     }
@@ -447,7 +620,7 @@ export default function VideoEditorWorkspace() {
           )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <button onClick={() => setPlaying((p) => !p)} style={playBtn}>{playing ? '⏸' : '▶'}</button>
+            <button onClick={handleTogglePlay} style={playBtn}>{playing ? '⏸' : '▶'}</button>
             <input
               type="range" min={0} max={totalDuration || 0.01} step={0.05} value={playhead}
               onChange={(e) => { setPlaying(false); setPlayhead(parseFloat(e.target.value)); }}

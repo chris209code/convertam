@@ -19,7 +19,7 @@ import {
   addOverlayTrack, removeOverlayTrack, setOverlayTrackMode, setOverlayTrackDividerRatio,
   setOverlayTrackPipCorner, setOverlayTrackPipPosition, setOverlayTrackPipSizeRatio,
   setFitMode, setBackgroundFill, setFrameAspect,
-  setClipSpeed, setClipFade, setClipFilters, setClipCropFocus, setClipTransitionOut, setClipGain, setClipReversed,
+  setClipSpeed, setClipFade, setClipFilters, setClipCropFocus, setClipTransitionOut, setClipGain, setClipReversed, setClipDucking,
   addTextOverlay, updateTextOverlay, deleteTextOverlay,
   addImageOverlay, updateImageOverlay, deleteImageOverlay,
   addShapeOverlay, updateShapeOverlay, deleteShapeOverlay,
@@ -32,6 +32,7 @@ import { extractThumbnails, thumbnailsForRange } from '@/lib/media/thumbnails';
 import { extractWaveformPeaks, drawWaveform } from '@/lib/media/waveform';
 import { detectSilence } from '@/lib/media/silenceDetect';
 import { computeNormalizationGain } from '@/lib/media/normalizeAudio';
+import { duckGainAtTime } from '@/lib/media/ducking';
 // Auto Captions reuses the exact same transcription/caption engine as
 // Audio Studio and Video Studio — no separate implementation. It runs on
 // the EXPORTED render (not the raw source clips), since that's the only
@@ -155,18 +156,22 @@ const FILTER_PRESETS = {
   cinematic: { brightness: 0.95, contrast: 1.2, saturation: 0.9, grayscale: 0 },
 };
 
-// 'crossfade' (blending two clips' video simultaneously) deliberately isn't
-// offered here — it needs a second, always-decoding video element in both
-// preview and export that this pass doesn't build. Fade/dip-to-color are
-// real, implemented by reusing the existing per-clip fade engine (this
-// clip's fadeOut + the next clip's fadeIn, plus the background color for
-// the dip variants) rather than new rendering machinery — see
-// handleSetTransition.
+// Fade/dip-to-color reuse the existing per-clip fade engine (this clip's
+// fadeOut + the next clip's fadeIn, plus the background color for the dip
+// variants) — see handleSetTransition. Crossfade reuses that exact same
+// audio fade behavior, adding a genuine simultaneous VIDEO blend on top: a
+// second, always-decoding lookahead element (main*CrossfadeVideoRef in the
+// preview loop, its export-path equivalent in timelineRender.js) draws the
+// next clip's own first frame with rising opacity over the outgoing clip's
+// tail, rather than fading through the background color. The incoming clip
+// is held on that first frame (not advancing) during the blend, so there's
+// no jump/repeat when its own official slot begins right after.
 const TRANSITION_OPTIONS = [
   { id: 'cut', label: 'Cut' },
   { id: 'fade', label: 'Fade' },
   { id: 'dip-black', label: 'Dip to black' },
   { id: 'dip-white', label: 'Dip to white' },
+  { id: 'crossfade', label: 'Crossfade' },
 ];
 
 const SHAPE_TYPE_OPTIONS = [
@@ -237,6 +242,13 @@ export default function VideoEditorWorkspace() {
   const mainVideoRef = useRef(null);
   const rafRef = useRef(null);
   const lastMainClipRef = useRef(null);
+  // A second, always-available main-track video element used only during a
+  // 'crossfade' transition's tail — holds the NEXT clip frozen on its own
+  // first frame while it dissolves in over the outgoing clip. See
+  // TRANSITION_OPTIONS' own comment for why it's frozen rather than
+  // playing.
+  const mainCrossfadeVideoRef = useRef(null);
+  const mainCrossfadeLoadedClipRef = useRef(null);
   // Logo/watermark <img> elements, one per imageOverlay's sourceId — plain
   // Image() objects (not part of the DOM tree, same as the text overlays
   // needing no element at all) since drawImageOverlays only ever reads
@@ -624,6 +636,12 @@ export default function VideoEditorWorkspace() {
   // the next clip's fadeIn, both set to the transition's duration, plus
   // (for the dip variants) the timeline's background color — since fading
   // to transparent always reveals whatever backgroundFill currently is.
+  // Crossfade only sets THIS clip's fadeOut (which the render loops read to
+  // drive the video-blend progress — see TRANSITION_OPTIONS' comment) and
+  // deliberately leaves the next clip's fadeIn untouched: the blend already
+  // brings the next clip up to full opacity by the moment its own official
+  // slot begins, so also fading it in from black there would dip it back
+  // down and repeat the transition on top of itself.
   function handleSetTransition(clip, type) {
     const mainList = getTrackClips(timeline, MAIN_TRACK);
     const idx = mainList.findIndex((c) => c.id === clip.id);
@@ -634,11 +652,18 @@ export default function VideoEditorWorkspace() {
       if (type === 'cut') {
         next = setClipFade(next, clip.id, { fadeOut: 0 });
         if (nextClip) next = setClipFade(next, nextClip.id, { fadeIn: 0 });
+      } else if (type === 'crossfade') {
+        next = setClipFade(next, clip.id, { fadeOut: dur });
+        if (nextClip) next = setClipFade(next, nextClip.id, { fadeIn: 0 });
       } else {
         next = setClipFade(next, clip.id, { fadeOut: dur });
         if (nextClip) next = setClipFade(next, nextClip.id, { fadeIn: dur });
+        // Only the dip variants actually reveal backgroundFill (fading to
+        // transparent shows whatever's behind) — fade and crossfade don't
+        // touch it, so an earlier dip choice on another clip isn't silently
+        // overwritten by picking Fade/Crossfade on this one.
         if (type === 'dip-white') next = setBackgroundFill(next, '#FFFFFF');
-        else next = setBackgroundFill(next, '#000000');
+        else if (type === 'dip-black') next = setBackgroundFill(next, '#000000');
       }
       return next;
     });
@@ -713,7 +738,9 @@ export default function VideoEditorWorkspace() {
       let next = setClipTransitionOut(tl, clip.id, { duration });
       if (clip.transitionOut.type !== 'cut') {
         next = setClipFade(next, clip.id, { fadeOut: duration });
-        if (nextClip) next = setClipFade(next, nextClip.id, { fadeIn: duration });
+        // See handleSetTransition's own comment — crossfade deliberately
+        // never sets the next clip's fadeIn.
+        if (nextClip && clip.transitionOut.type !== 'crossfade') next = setClipFade(next, nextClip.id, { fadeIn: duration });
       }
       return next;
     });
@@ -951,7 +978,7 @@ export default function VideoEditorWorkspace() {
     // offset into the clip as the video (so pressing Play mid-clip doesn't
     // start the replacement audio from 0). Returns whether the clip's own
     // video audio should stay audible too ('mix') or not ('replace'/other).
-    async function applyReplacementAudioLive(clip, elapsedInClip, audioEl, gainNode, srcNodeRef, lastClipIdRef) {
+    async function applyReplacementAudioLive(clip, elapsedInClip, audioEl, gainNode, srcNodeRef, lastClipIdRef, duckGain = 1) {
       const isReplaceOrMix = clip && (clip.audioMode === 'replace' || clip.audioMode === 'mix') && clip.audioSourceId;
       if (!isReplaceOrMix) {
         gainNode.gain.value = 0;
@@ -977,7 +1004,9 @@ export default function VideoEditorWorkspace() {
       } else if (Math.abs(audioEl.currentTime - elapsedInClip) > 0.15) {
         audioEl.currentTime = Math.max(0, Math.min(elapsedInClip, audioEl.duration || elapsedInClip));
       }
-      gainNode.gain.value = 1;
+      // A short ramp (not an instant jump) so a duck threshold crossing
+      // doesn't click — same reasoning as the export path's own setTargetAtTime.
+      gainNode.gain.setTargetAtTime(duckGain, audioCtxRef.current.currentTime, 0.15);
       if (playing) { if (audioEl.paused) audioEl.play().catch(() => {}); } else if (!audioEl.paused) audioEl.pause();
       return clip.audioMode === 'mix';
     }
@@ -1028,7 +1057,10 @@ export default function VideoEditorWorkspace() {
           mainReplaceGainRef.current.gain.value = 0;
         } else if (mainHit) {
           const elapsedInClip = mainHit.sourceTime - mainHit.clip.sourceStart;
-          const mixKeepsOwnAudio = await applyReplacementAudioLive(mainHit.clip, elapsedInClip, mainReplaceAudioElRef.current, mainReplaceGainRef.current, mainReplaceSrcNodeRef, mainReplaceLastClipRef);
+          const mainDuckGain = mainHit.clip.duckBackground && mainHit.clip.audioMode === 'mix'
+            ? duckGainAtTime(waveformBySource[mainHit.clip.sourceId], timeline.sources.find((s) => s.id === mainHit.clip.sourceId)?.duration, mainHit.sourceTime)
+            : 1;
+          const mixKeepsOwnAudio = await applyReplacementAudioLive(mainHit.clip, elapsedInClip, mainReplaceAudioElRef.current, mainReplaceGainRef.current, mainReplaceSrcNodeRef, mainReplaceLastClipRef, mainDuckGain);
           mainGainRef.current.gain.value = ((mainHit.clip.audioMode === 'keep' || mixKeepsOwnAudio) ? 1 : 0) * mainOpacity * (mainHit.clip.gain ?? 1);
         } else {
           mainGainRef.current.gain.value = 0;
@@ -1077,7 +1109,10 @@ export default function VideoEditorWorkspace() {
             s.gain.gain.value = 0;
           } else if (hit) {
             const elapsedInClip = hit.sourceTime - hit.clip.sourceStart;
-            const mixKeepsOwnAudio = await applyReplacementAudioLive(hit.clip, elapsedInClip, s.replaceAudioEl, s.replaceGain, s.replaceSrcNodeRef, s.replaceLastClipIdRef);
+            const layerDuckGain = hit.clip.duckBackground && hit.clip.audioMode === 'mix'
+              ? duckGainAtTime(waveformBySource[hit.clip.sourceId], timeline.sources.find((s2) => s2.id === hit.clip.sourceId)?.duration, hit.sourceTime)
+              : 1;
+            const mixKeepsOwnAudio = await applyReplacementAudioLive(hit.clip, elapsedInClip, s.replaceAudioEl, s.replaceGain, s.replaceSrcNodeRef, s.replaceLastClipIdRef, layerDuckGain);
             s.gain.gain.value = ((hit.clip.audioMode === 'keep' || mixKeepsOwnAudio) ? 1 : 0) * opacity * (hit.clip.gain ?? 1);
           } else {
             s.gain.gain.value = 0;
@@ -1086,6 +1121,30 @@ export default function VideoEditorWorkspace() {
         }
 
         if (hit) drawnOverlayLayers.push({ trackId: track.id, el: isImage ? s.imageEl : s.videoEl, clip: hit.clip, opacity });
+      }
+
+      // 'crossfade' transition tail: draw the NEXT main-track clip, frozen
+      // on its own first frame, dissolving in over the outgoing clip's last
+      // fadeOut seconds — see TRANSITION_OPTIONS' comment for why it's held
+      // frozen rather than played.
+      let crossfadeLayer = null;
+      if (mainHit && mainHit.clip.transitionOut?.type === 'crossfade' && mainHit.clip.fadeOut > 0) {
+        const dur = mainHit.clip.sourceEnd - mainHit.clip.sourceStart;
+        const elapsedInClip = mainHit.sourceTime - mainHit.clip.sourceStart;
+        if (elapsedInClip > dur - mainHit.clip.fadeOut) {
+          const mainList = getTrackClips(timeline, MAIN_TRACK);
+          const idx = mainList.findIndex((c) => c.id === mainHit.clip.id);
+          const nextClip = idx >= 0 ? mainList[idx + 1] : null;
+          const nextSource = nextClip ? timeline.sources.find((s) => s.id === nextClip.sourceId) : null;
+          if (nextClip && nextSource && nextSource.kind !== 'image' && mainCrossfadeVideoRef.current) {
+            await loadClip(mainCrossfadeVideoRef.current, nextClip, mainCrossfadeLoadedClipRef);
+            if (Math.abs(mainCrossfadeVideoRef.current.currentTime - nextClip.sourceStart) > 0.05) {
+              mainCrossfadeVideoRef.current.currentTime = nextClip.sourceStart;
+            }
+            const progress = Math.max(0, Math.min(1, (elapsedInClip - (dur - mainHit.clip.fadeOut)) / mainHit.clip.fadeOut));
+            crossfadeLayer = { el: mainCrossfadeVideoRef.current, clip: nextClip, opacity: progress };
+          }
+        }
       }
 
       // A live drag overrides the dragged track's committed pipPosition for
@@ -1100,6 +1159,9 @@ export default function VideoEditorWorkspace() {
         mainEl: mainHit ? mainVideoRef.current : null,
         mainClip: mainHit?.clip || null,
         mainOpacity,
+        crossfadeEl: crossfadeLayer?.el || null,
+        crossfadeClip: crossfadeLayer?.clip || null,
+        crossfadeOpacity: crossfadeLayer?.opacity || 0,
         overlayLayers: drawnOverlayLayers,
         rounded: true,
         border: true,
@@ -1345,6 +1407,7 @@ export default function VideoEditorWorkspace() {
               }}
             />
             <video ref={mainVideoRef} muted playsInline style={{ display: 'none' }} />
+            <video ref={mainCrossfadeVideoRef} muted playsInline style={{ display: 'none' }} />
             {overlayTracks.map((track) => (
               <Fragment key={track.id}>
                 <video ref={(el) => { getOverlayLayerState(track.id).videoEl = el; }} muted playsInline style={{ display: 'none' }} />
@@ -1503,6 +1566,12 @@ export default function VideoEditorWorkspace() {
                         </span>
                         <input type="file" accept="audio/*" onChange={(e) => handleReplaceAudioFile(e.target.files, selectedClip.audioMode)} style={{ fontSize: '0.7rem', maxWidth: 200 }} />
                       </div>
+                    )}
+                    {selectedClip.audioMode === 'mix' && (
+                      <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 5 }} title="Automatically lowers the mixed-in audio's volume while this clip's own audio has signal (e.g. voice over music)">
+                        <input type="checkbox" checked={!!selectedClip.duckBackground} onChange={(e) => commit((tl) => setClipDucking(tl, selectedClip.id, e.target.checked))} />
+                        Duck background
+                      </label>
                     )}
                     <label style={fieldLabel}>Speed
                       <select value={selectedClip.speed} onChange={(e) => commit((tl) => setClipSpeed(tl, selectedClip.id, parseFloat(e.target.value)))} style={numInput}>

@@ -3,7 +3,7 @@ import VideoEditorWorkspace from '../../../components/tools/data-tools/video-edi
 
 export const metadata = {
   title: 'Video Editor — Multi-Track, Video Call & Screen Recording | Convertam',
-  description: 'Trim, split, and reorder clips, add text/titles/shapes and a logo, adjust speed and fades, apply filters, compose multi-track split-screen, picture-in-picture, or video-call layouts, record your screen, and generate Auto Captions — entirely in your browser, no login required.',
+  description: 'Trim, split, and reorder clips, add text/titles/shapes and a logo, rotate/flip, adjust speed and fades, apply filters, compose multi-track split-screen, picture-in-picture, or video-call layouts with a custom reframe background, record your screen, drop timeline markers, and generate Auto Captions — entirely in your browser, no login required.',
   alternates: { canonical: '/data-tools/video-editor' },
 };
 
@@ -42,6 +42,11 @@ const FAQ = [
   { q: 'Can I duck background music under a voice track?', a: 'Yes — set a clip\'s audio to Mix with…, upload the background audio, then check Duck background. It analyzes the clip\'s own audio and automatically lowers the mixed-in track\'s volume while the clip has signal (e.g. speech), raising it back during quiet stretches. Plain signal analysis, not AI.' },
   { q: 'Can I find and remove silent parts automatically?', a: 'Click Find silence on a clip to scan it for quiet stretches, review the list, uncheck anything you want to keep, then remove the rest — nothing is cut without your review.' },
   { q: 'Does the export resolution actually change the file?', a: 'Yes — 480p/720p/1080p and the Small/Balanced/High quality setting both genuinely change the exported file\'s pixel dimensions and encoding, not just a label.' },
+  { q: 'Can I change the export frame rate?', a: 'Yes — choose Original (the default, matching your source footage), or a fixed 24/30/60fps. An estimated output size is shown before you export, and you can cancel an export in progress at any time.' },
+  { q: 'Can I rotate or flip a clip?', a: 'Yes — the Clip panel has a Rotate button that cycles a clip through 90°/180°/270°, plus separate Flip horizontal and Flip vertical toggles. Handy for footage recorded sideways or a mirrored webcam feed.' },
+  { q: 'What is Master audio?', a: 'A project-wide Volume slider, Mute all toggle, and Fade in/Fade out that apply on top of everything else — every clip\'s own volume, fades, and ducking are unaffected; Master audio just scales the final mix.' },
+  { q: 'What are timeline markers?', a: 'Press M (or the flag button above the timeline) to drop a labeled marker at the current playhead position — useful for planning where to cut, noting a music change, or leaving yourself a reminder. Markers are for navigating your own edit; they don\'t appear in the exported video.' },
+  { q: 'How do I fill the empty space when reframing a video, like 16:9 to 9:16?', a: 'With Fit whole frame selected, choose a Background: a solid Color, a two-color Gradient, Blurred (a soft, zoomed-in copy of your own video — the common look for turning landscape footage into a clean vertical video), or a Custom image you upload.' },
   { q: 'Can I even out the volume of my clips?', a: 'Yes — select a clip and click Normalize audio to analyze its loudness and set a matching volume automatically, or drag the Volume slider yourself. This is plain signal analysis, not AI.' },
   { q: 'Can I play a clip backwards?', a: 'Yes — click Reverse on a selected clip. The live preview shows a best-effort silent scrub since browsers can\'t play video backwards natively, but the exported video genuinely plays that clip backwards with its audio correctly reversed too.' },
   { q: 'Can I add captions to my video?', a: 'Yes — after exporting, use Auto Captions to transcribe the exported video\'s audio, edit the transcript for accuracy, then download it as SRT, VTT, or TXT, or burn the captions directly into the video as a new export.' },
@@ -89,8 +94,9 @@ export default function VideoEditorPage() {
                 <li><strong>Freeze frame</strong> — turn the current frame into a still image dropped into the sequence.</li>
                 <li><strong>Undo/redo</strong> — step backward and forward through your edit history.</li>
                 <li><strong>Timeline thumbnails and waveform</strong> — see a filmstrip and audio waveform on every clip, not just a plain colored bar.</li>
-                <li><strong>Text and titles</strong> — headings, subtitles, lower thirds, quotes, callouts, and watermark text, each with its own font size, color, background, position, and timing.</li>
+                <li><strong>Text and titles</strong> — headings, subtitles, lower thirds, quotes, callouts, and watermark text, each with its own font size, color, background (with adjustable opacity), outline, drop shadow, position, and timing — one click to duplicate any text layer.</li>
                 <li><strong>Logo / watermark image</strong> — upload an image, position it in a corner, and control its size and opacity.</li>
+                <li><strong>Rotate &amp; flip</strong> — rotate any clip 90°/180°/270° and flip it horizontally or vertically, useful for footage shot the wrong way or mirrored webcam captures.</li>
                 <li><strong>Speed</strong> — 0.25× to 4× per clip.</li>
                 <li><strong>Fade in/out</strong> — per clip, video and audio together.</li>
                 <li><strong>Transitions</strong> — fade, dip to black, dip to white, or crossfade between clips.</li>
@@ -99,6 +105,8 @@ export default function VideoEditorPage() {
                 <li><strong>Silence removal</strong> — scan a clip for silent stretches and review them before removing.</li>
                 <li><strong>Audio normalization</strong> — one click to analyze and level out a clip&apos;s volume, or set it manually.</li>
                 <li><strong>Reverse clip</strong> — plays a clip&apos;s video and audio backwards in the export.</li>
+                <li><strong>Master audio</strong> — a project-wide volume control, mute-all, and fade in/out that apply on top of every clip&apos;s own volume and fades.</li>
+                <li><strong>Timeline markers</strong> — press M (or the flag button) to drop a labeled marker at the playhead, for planning cuts, noting music changes, or leaving yourself notes — markers are for your own navigation and aren&apos;t burned into the export.</li>
                 <li><strong>Multi-track overlays</strong> — add any number of video or image overlay tracks, not just one.</li>
                 <li><strong>Split-screen</strong> — two videos side by side or stacked, with an adjustable divider.</li>
                 <li><strong>Picture-in-picture / video call</strong> — a main video with one or more repositionable, resizable overlay tiles, each independently positioned.</li>
@@ -108,9 +116,10 @@ export default function VideoEditorPage() {
                 <li><strong>Per-clip audio</strong> — keep, mute, replace, or mix in different audio per clip.</li>
                 <li><strong>Audio ducking</strong> — automatically lowers mixed-in background audio while a clip&apos;s own audio has signal, so voice and music don&apos;t fight for attention.</li>
                 <li><strong>Reframe for social platforms</strong> — Landscape (16:9), Square (1:1), or Vertical (9:16), with one-click YouTube/TikTok/Instagram/LinkedIn presets.</li>
-                <li><strong>Export controls</strong> — choose resolution (480p/720p/1080p) and quality (small/balanced/high).</li>
+                <li><strong>Reframe background</strong> — when fitting the whole frame into a new shape leaves empty space, fill it with a solid color, a color gradient, a blurred/zoomed copy of your own video, or a custom uploaded image.</li>
+                <li><strong>Export controls</strong> — choose resolution (480p/720p/1080p), quality (small/balanced/high), and frame rate (original, or a fixed 24/30/60fps), with an estimated output size shown before you export and a Cancel button once it&apos;s running.</li>
                 <li><strong>Auto Captions</strong> — transcribe your exported video, edit the transcript, download SRT/VTT/TXT, or burn captions directly into the video.</li>
-                <li><strong>Keyboard shortcuts</strong> — Space to play/pause, S to split, D to duplicate, Delete to remove, Ctrl/Cmd+Z to undo.</li>
+                <li><strong>Keyboard shortcuts</strong> — Space to play/pause, S to split, D to duplicate, Delete to remove, M to drop a marker, Ctrl/Cmd+Z to undo.</li>
               </ul>
             </section>
 
@@ -145,14 +154,14 @@ export default function VideoEditorPage() {
             <section style={{ marginBottom: 36 }}>
               <h2 style={sectionH2}>Exporting for TikTok, Instagram, and YouTube</h2>
               <p>
-                Pick a <strong>Frame</strong> in the Composition panel to choose the shape your export is cropped to: Landscape (16:9) for YouTube, Square (1:1) for an Instagram feed post, or Vertical (9:16) for TikTok, Reels, and Shorts. This works with a single video too — no second clip or overlay required, the whole export is simply reframed. Use <strong>Crop to fill</strong> to fill the new frame edge to edge (cropping the sides or top/bottom as needed), or <strong>Fit whole frame</strong> to keep the entire original picture visible with a solid-color letterbox filling the rest.
+                Pick a <strong>Frame</strong> in the Composition panel to choose the shape your export is cropped to: Landscape (16:9) for YouTube, Square (1:1) for an Instagram feed post, or Vertical (9:16) for TikTok, Reels, and Shorts. This works with a single video too — no second clip or overlay required, the whole export is simply reframed. Use <strong>Crop to fill</strong> to fill the new frame edge to edge (cropping the sides or top/bottom as needed), or <strong>Fit whole frame</strong> to keep the entire original picture visible with space left over on the sides or top/bottom — choose what fills that space: a solid <strong>Color</strong>, a <strong>Gradient</strong> between two colors, a <strong>Blurred</strong> zoomed-in copy of your own footage (the common look for turning a 16:9 video into a clean 9:16 one), or a <strong>Custom image</strong> you upload.
               </p>
             </section>
 
             <section style={{ marginBottom: 36 }}>
               <h2 style={sectionH2}>Text, titles, speed, and effects</h2>
               <p>
-                The <strong>Text &amp; titles</strong> panel adds always-on-top text layers — pick a Heading, Subtitle, Lower third, Simple text, Watermark, Quote, or Callout starting point, then set its own font size, color, background, bold/italic, alignment, position, and start/end timing. The <strong>Shapes</strong> panel works the same way for rectangle, circle, line, and arrow annotations — each with its own color, filled/outline style, stroke width, position or endpoints, and timing. <strong>Logo/watermark</strong> follows the same pattern for an image instead of text. Per clip, the <strong>Clip</strong> panel adds <strong>Speed</strong> (0.25× to 4×), <strong>Fade in/out</strong> (video and audio together), <strong>Volume</strong> (with a one-click <strong>Normalize audio</strong> button that analyzes the clip and levels it to a consistent loudness), <strong>Reverse</strong> to play the clip backwards, <strong>Duck background</strong> to automatically lower mixed-in background audio while the clip&apos;s own audio has signal, <strong>Filters</strong> (brightness, contrast, saturation, grayscale, or a one-click preset), and <strong>Crop focus</strong> for choosing which part of the frame survives a crop. Choosing a <strong>Transition</strong> — Fade, Dip to black, Dip to white, or <strong>Crossfade</strong> — sets that clip&apos;s fade-out (and, for the non-crossfade options, the next clip&apos;s fade-in) to match automatically; Crossfade additionally blends both clips&apos; video together during the transition, rather than fading through a color.
+                The <strong>Text &amp; titles</strong> panel adds always-on-top text layers — pick a Heading, Subtitle, Lower third, Simple text, Watermark, Quote, or Callout starting point, then set its own font size, color, background (and its opacity), outline, drop shadow, bold/italic, alignment, position, and start/end timing, and duplicate any layer in one click. The <strong>Shapes</strong> panel works the same way for rectangle, circle, line, and arrow annotations — each with its own color, filled/outline style, stroke width, position or endpoints, and timing. <strong>Logo/watermark</strong> follows the same pattern for an image instead of text. Per clip, the <strong>Clip</strong> panel adds <strong>Speed</strong> (0.25× to 4×), <strong>Fade in/out</strong> (video and audio together), <strong>Rotate</strong> (90° steps) and <strong>Flip horizontal/vertical</strong>, <strong>Volume</strong> (with a one-click <strong>Normalize audio</strong> button that analyzes the clip and levels it to a consistent loudness), <strong>Reverse</strong> to play the clip backwards, <strong>Duck background</strong> to automatically lower mixed-in background audio while the clip&apos;s own audio has signal, <strong>Filters</strong> (brightness, contrast, saturation, grayscale, or a one-click preset), and <strong>Crop focus</strong> for choosing which part of the frame survives a crop. A separate <strong>Master audio</strong> control applies a project-wide volume, mute-all, and fade in/out on top of every clip&apos;s own settings. Choosing a <strong>Transition</strong> — Fade, Dip to black, Dip to white, or <strong>Crossfade</strong> — sets that clip&apos;s fade-out (and, for the non-crossfade options, the next clip&apos;s fade-in) to match automatically; Crossfade additionally blends both clips&apos; video together during the transition, rather than fading through a color.
               </p>
             </section>
 

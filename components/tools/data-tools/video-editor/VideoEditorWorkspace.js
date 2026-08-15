@@ -18,16 +18,19 @@ import {
   setClipAudioMode,
   addOverlayTrack, removeOverlayTrack, setOverlayTrackMode, setOverlayTrackDividerRatio,
   setOverlayTrackPipCorner, setOverlayTrackPipPosition, setOverlayTrackPipSizeRatio,
-  setFitMode, setBackgroundFill, setFrameAspect,
+  setFitMode, setBackgroundFill, setBackgroundType, setBackgroundGradient, setBackgroundImageSource, setFrameAspect,
   setClipSpeed, setClipFade, setClipFilters, setClipCropFocus, setClipTransitionOut, setClipGain, setClipReversed, setClipDucking,
-  addTextOverlay, updateTextOverlay, deleteTextOverlay,
+  rotateClip90, setClipFlip,
+  addTextOverlay, updateTextOverlay, deleteTextOverlay, duplicateTextOverlay,
   addImageOverlay, updateImageOverlay, deleteImageOverlay,
   addShapeOverlay, updateShapeOverlay, deleteShapeOverlay,
-  setExportResolution, setExportQuality,
+  setExportResolution, setExportQuality, setExportFps,
   getTrackClips, getTotalDuration, findActiveClipAt, clipDuration, MAIN_TRACK,
+  getMasterGain, setMasterVolume, setMasterMuted, setMasterFade,
+  addMarker, updateMarker, deleteMarker,
 } from '@/lib/media/timeline';
 import { drawCompositionFrame, drawTextOverlays, drawImageOverlays, drawShapeOverlays, computeLayoutRects, pipPositionFromPoint, getComposeSize, getFadeOpacity } from '@/lib/media/compositionLayouts';
-import { renderTimeline, isTimelineExportSupported } from '@/lib/media/timelineRender';
+import { renderTimeline, isTimelineExportSupported, TimelineRenderCancelledError } from '@/lib/media/timelineRender';
 import { extractThumbnails, thumbnailsForRange } from '@/lib/media/thumbnails';
 import { extractWaveformPeaks, drawWaveform } from '@/lib/media/waveform';
 import { detectSilence } from '@/lib/media/silenceDetect';
@@ -174,6 +177,15 @@ const TRANSITION_OPTIONS = [
   { id: 'crossfade', label: 'Crossfade' },
 ];
 
+const MARKER_LABEL_OPTIONS = ['Marker', 'Intro', 'Important moment', 'Cut here', 'Caption', 'Music change', 'Outro'];
+
+const BACKGROUND_TYPE_OPTIONS = [
+  { id: 'solid', label: 'Solid' },
+  { id: 'gradient', label: 'Gradient' },
+  { id: 'blur', label: 'Blurred video' },
+  { id: 'image', label: 'Image' },
+];
+
 const SHAPE_TYPE_OPTIONS = [
   { id: 'rectangle', label: 'Rectangle', icon: '▭' },
   { id: 'circle', label: 'Circle', icon: '◯' },
@@ -202,6 +214,23 @@ const QUALITY_OPTIONS = [
   { id: 'balanced', label: 'Balanced' },
   { id: 'high', label: 'High quality' },
 ];
+
+const FPS_OPTIONS = [
+  { id: 'original', label: 'Original', sub: 'Match source' },
+  { id: 24, label: '24', sub: 'Cinematic' },
+  { id: 30, label: '30', sub: 'Standard' },
+  { id: 60, label: '60', sub: 'Smooth' },
+];
+
+// Rough kbps-per-quality-tier lookup used only for the "estimated size"
+// readout — not a promise of exact output size, ffmpeg's actual bitrate
+// depends on content complexity too. Video kbps only; a flat allowance for
+// audio (~128kbps) is added on top in estimatedExportMB below.
+const ESTIMATED_VIDEO_KBPS = {
+  '480p': { small: 800, balanced: 1200, high: 2000 },
+  '720p': { small: 1500, balanced: 2500, high: 4000 },
+  '1080p': { small: 3000, balanced: 5000, high: 8000 },
+};
 
 export default function VideoEditorWorkspace() {
   const [timeline, setTimeline] = useState(createTimeline());
@@ -236,6 +265,7 @@ export default function VideoEditorWorkspace() {
   const [burnError, setBurnError] = useState('');
   const [burnEta, setBurnEta] = useState('');
   const burnCancelRef = useRef(null);
+  const exportCancelRef = useRef(null);
   const burnStartRef = useRef(0);
 
   const canvasRef = useRef(null);
@@ -284,6 +314,11 @@ export default function VideoEditorWorkspace() {
   // trim, and only later press Play.
   const audioCtxRef = useRef(null);
   const mainGainRef = useRef(null);
+  // Every other gain node (main, each overlay's, all replace/mix gains)
+  // routes through this ONE master gain before reaching the speakers —
+  // project-level volume/mute/fade-in/fade-out apply on top of everything
+  // else without touching any of those individual gain computations.
+  const masterGainRef = useRef(null);
   const mainReplaceGainRef = useRef(null);
   const mainSrcNodeRef = useRef(null);
   const mainTappedElRef = useRef(null); // which <video> DOM node mainSrcNodeRef taps — re-tapped if it changes (see ensureAudioGraph)
@@ -304,6 +339,8 @@ export default function VideoEditorWorkspace() {
   const [selectedOverlayTrackId, setSelectedOverlayTrackId] = useState(null); // which overlay track's Composition controls are shown
 
   const totalDuration = getTotalDuration(timeline);
+  const videoKbps = ESTIMATED_VIDEO_KBPS[timeline.exportResolution]?.[timeline.exportQuality] ?? ESTIMATED_VIDEO_KBPS['720p'].balanced;
+  const estimatedExportMB = Math.max(0.1, Math.round(((videoKbps + 128) * totalDuration) / 8 / 1024 * 10) / 10);
   const mainClips = getTrackClips(timeline, MAIN_TRACK);
   const overlayTracks = timeline.overlayTracks;
   const allOverlayClips = overlayTracks.flatMap((t) => getTrackClips(timeline, t.id));
@@ -356,11 +393,14 @@ export default function VideoEditorWorkspace() {
     if (!AudioContextClass) return;
     if (!audioCtxRef.current) {
       const ctx = new AudioContextClass();
+      const masterGain = ctx.createGain();
+      masterGain.connect(ctx.destination);
       const mainGain = ctx.createGain();
       const mainReplaceGain = ctx.createGain();
-      mainGain.connect(ctx.destination);
-      mainReplaceGain.connect(ctx.destination);
+      mainGain.connect(masterGain);
+      mainReplaceGain.connect(masterGain);
       audioCtxRef.current = ctx;
+      masterGainRef.current = masterGain;
       mainGainRef.current = mainGain;
       mainReplaceGainRef.current = mainReplaceGain;
       mainReplaceAudioElRef.current = new Audio();
@@ -384,8 +424,8 @@ export default function VideoEditorWorkspace() {
       if (!s.gain) {
         s.gain = ctx.createGain();
         s.replaceGain = ctx.createGain();
-        s.gain.connect(ctx.destination);
-        s.replaceGain.connect(ctx.destination);
+        s.gain.connect(masterGainRef.current);
+        s.replaceGain.connect(masterGainRef.current);
         s.replaceAudioEl = new Audio();
       }
       if (s.videoEl && s.tappedEl !== s.videoEl) {
@@ -796,6 +836,7 @@ export default function VideoEditorWorkspace() {
       else if (e.key === 'Delete' || e.key === 'Backspace') { if (selectedClipId) { e.preventDefault(); handleDeleteSelected(); } }
       else if (e.key.toLowerCase() === 's') { handleSplitAtPlayhead(); }
       else if (e.key.toLowerCase() === 'd') { handleDuplicateSelected(); }
+      else if (e.key.toLowerCase() === 'm') { commit((tl) => addMarker(tl, playhead)); }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -898,6 +939,23 @@ export default function VideoEditorWorkspace() {
   }
   function handleUpdateImageOverlay(id, patch) { commit((tl) => updateImageOverlay(tl, id, patch)); }
   function handleDeleteImageOverlay(id) { commit((tl) => deleteImageOverlay(tl, id)); }
+
+  // ---- Custom background image (backgroundType 'image') — a normal image
+  // source, referenced by id rather than added as an overlay/clip. ----
+  async function handleBackgroundImageFile(files) {
+    const f = files[0];
+    if (!f) return;
+    const sizeError = validateUploadSize(f, 'image');
+    if (sizeError) { setUploadError(sizeError); return; }
+    setUploadError('');
+    try {
+      const meta = await extractImageMetadata(f);
+      const { timeline: withSource, source } = addSource(timeline, f, meta, 'image');
+      commit(setBackgroundImageSource(withSource, source.id));
+    } catch (err) {
+      setUploadError(err.message || 'Could not read this image file.');
+    }
+  }
 
   // ---- Shape overlays (rectangle/circle/line/arrow annotations) ----
   function handleAddShapeOverlay(type) {
@@ -1052,6 +1110,7 @@ export default function VideoEditorWorkspace() {
       // Fades apply to audio too (not just the visual), so a fading-out
       // clip doesn't cut abruptly to silence at full volume.
       if (audioCtxRef.current) {
+        if (masterGainRef.current) masterGainRef.current.gain.value = getMasterGain(timeline, playhead);
         if (mainHit && mainHit.clip.reversed) {
           mainGainRef.current.gain.value = 0;
           mainReplaceGainRef.current.gain.value = 0;
@@ -1163,6 +1222,7 @@ export default function VideoEditorWorkspace() {
         crossfadeClip: crossfadeLayer?.clip || null,
         crossfadeOpacity: crossfadeLayer?.opacity || 0,
         overlayLayers: drawnOverlayLayers,
+        backgroundImageEl: timeline.backgroundImageSourceId ? ensureImageOverlayElement(timeline.backgroundImageSourceId) : null,
         rounded: true,
         border: true,
       });
@@ -1245,10 +1305,13 @@ export default function VideoEditorWorkspace() {
     setRenderStatus('preparing');
     setRenderError('');
     setRenderProgress(0);
+    const cancelToken = { cancelled: false };
+    exportCancelRef.current = cancelToken;
     try {
       const blob = await renderTimeline(timeline, {
         onStatus: (s) => setRenderStatus(s === 'done' ? 'idle' : s),
         onProgress: setRenderProgress,
+        cancelToken,
       });
       downloadBlob(blob, 'video/mp4', 'edited-video.mp4');
       setRenderStatus('idle');
@@ -1263,9 +1326,18 @@ export default function VideoEditorWorkspace() {
       setBurnStatus('idle');
       setBurnError('');
     } catch (err) {
-      setRenderStatus('error');
-      setRenderError(err.message || 'Could not export this video. Please try again.');
+      if (err instanceof TimelineRenderCancelledError || cancelToken.cancelled) {
+        setRenderStatus('idle');
+      } else {
+        setRenderStatus('error');
+        setRenderError(err.message || 'Could not export this video. Please try again.');
+      }
+    } finally {
+      exportCancelRef.current = null;
     }
+  }
+  function handleCancelExport() {
+    if (exportCancelRef.current) exportCancelRef.current.cancelled = true;
   }
 
   // ---- Auto Captions — the one operation in this tool that leaves the
@@ -1424,15 +1496,48 @@ export default function VideoEditorWorkspace() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <button onClick={handleTogglePlay} style={playBtn}>{playing ? '⏸' : '▶'}</button>
-            <input
-              type="range" min={0} max={totalDuration || 0.01} step={0.05} value={playhead}
-              onChange={(e) => { setPlaying(false); setPlayhead(parseFloat(e.target.value)); }}
-              style={{ flex: 1 }}
-            />
+            <div style={{ position: 'relative', flex: 1 }}>
+              <input
+                type="range" min={0} max={totalDuration || 0.01} step={0.05} value={playhead}
+                onChange={(e) => { setPlaying(false); setPlayhead(parseFloat(e.target.value)); }}
+                style={{ width: '100%' }}
+              />
+              {timeline.markers.map((m) => (
+                <div
+                  key={m.id}
+                  onClick={() => { setPlaying(false); setPlayhead(m.time); }}
+                  title={`${m.label} — ${formatDuration(m.time)}`}
+                  style={{
+                    position: 'absolute', top: -2, left: `${totalDuration ? (m.time / totalDuration) * 100 : 0}%`,
+                    width: 2, height: 8, background: T.accentDark, cursor: 'pointer', pointerEvents: 'auto',
+                  }}
+                />
+              ))}
+            </div>
+            <button onClick={() => commit((tl) => addMarker(tl, playhead))} style={{ ...smallBtn, padding: '6px 9px', flexShrink: 0 }} title="Add marker at playhead (M)">
+              🚩
+            </button>
             <span style={{ fontSize: '0.72rem', color: T.mutedDark, minWidth: 76, textAlign: 'right' }}>
               {formatDuration(playhead)} / {formatDuration(totalDuration)}
             </span>
           </div>
+
+          {timeline.markers.length > 0 && (
+            <div style={{ marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {timeline.markers.map((m) => (
+                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button onClick={() => { setPlaying(false); setPlayhead(m.time); }} style={{ ...smallBtn, padding: '4px 8px', fontSize: '0.68rem', flexShrink: 0 }}>
+                    {formatDuration(m.time)}
+                  </button>
+                  <select value={m.label} onChange={(e) => commit((tl) => updateMarker(tl, m.id, { label: e.target.value }))} style={{ ...numInput, flex: 1, width: 'auto' }}>
+                    {MARKER_LABEL_OPTIONS.map((l) => <option key={l} value={l}>{l}</option>)}
+                    {!MARKER_LABEL_OPTIONS.includes(m.label) && <option value={m.label}>{m.label}</option>}
+                  </select>
+                  <button onClick={() => commit((tl) => deleteMarker(tl, m.id))} style={{ ...smallBtn, padding: '4px 8px', color: '#DC2626', borderColor: '#FCA5A5', flexShrink: 0 }}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Main track timeline */}
           <div style={{ marginBottom: 10 }}>
@@ -1677,6 +1782,21 @@ export default function VideoEditorWorkspace() {
                       ⏪ {selectedClip.reversed ? 'Reversed' : 'Reverse'}
                     </button>
                   )}
+                  <button onClick={() => commit((tl) => rotateClip90(tl, selectedClip.id))} style={smallBtn} title={`Rotate 90° (currently ${selectedClip.rotation || 0}°)`}>
+                    ↻ Rotate{selectedClip.rotation ? ` ${selectedClip.rotation}°` : ''}
+                  </button>
+                  <button
+                    onClick={() => commit((tl) => setClipFlip(tl, selectedClip.id, { flipH: !selectedClip.flipH }))}
+                    style={{ ...smallBtn, background: selectedClip.flipH ? T.accentGradient : 'white', color: selectedClip.flipH ? 'white' : T.inkSecondary }}
+                  >
+                    ⇋ Flip H
+                  </button>
+                  <button
+                    onClick={() => commit((tl) => setClipFlip(tl, selectedClip.id, { flipV: !selectedClip.flipV }))}
+                    style={{ ...smallBtn, background: selectedClip.flipV ? T.accentGradient : 'white', color: selectedClip.flipV ? 'white' : T.inkSecondary }}
+                  >
+                    ⇵ Flip V
+                  </button>
                   <button onClick={handleDuplicateSelected} style={smallBtn}>⧉ Duplicate</button>
                   <button onClick={handleDeleteSelected} style={{ ...smallBtn, color: '#DC2626', borderColor: '#FCA5A5' }}>✕ Delete clip</button>
                 </div>
@@ -1853,13 +1973,28 @@ export default function VideoEditorWorkspace() {
                     <button key={a} onClick={() => handleUpdateTextOverlay(selectedTextOverlay.id, { align: a })} style={{ ...smallBtn, background: selectedTextOverlay.align === a ? T.accentGradient : 'white', color: selectedTextOverlay.align === a ? 'white' : T.inkSecondary }}>{a[0].toUpperCase()}</button>
                   ))}
                 </div>
-                <label style={fieldLabel}>Background
-                  <select value={selectedTextOverlay.background} onChange={(e) => handleUpdateTextOverlay(selectedTextOverlay.id, { background: e.target.value })} style={numInput}>
-                    <option value="none">None</option>
-                    <option value="bar">Bar</option>
-                    <option value="solid">Solid</option>
-                  </select>
-                </label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  <label style={fieldLabel}>Background
+                    <select value={selectedTextOverlay.background} onChange={(e) => handleUpdateTextOverlay(selectedTextOverlay.id, { background: e.target.value })} style={numInput}>
+                      <option value="none">None</option>
+                      <option value="bar">Bar</option>
+                      <option value="solid">Solid</option>
+                    </select>
+                  </label>
+                  {selectedTextOverlay.background !== 'none' && (
+                    <label style={fieldLabel}>Background opacity
+                      <input type="range" min={0.1} max={1} step={0.02} value={selectedTextOverlay.backgroundOpacity ?? 0.6}
+                        onChange={(e) => handleUpdateTextOverlay(selectedTextOverlay.id, { backgroundOpacity: parseFloat(e.target.value) })} style={{ width: 90 }} />
+                    </label>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button onClick={() => handleUpdateTextOverlay(selectedTextOverlay.id, { outline: !selectedTextOverlay.outline })} style={{ ...smallBtn, background: selectedTextOverlay.outline ? T.accentGradient : 'white', color: selectedTextOverlay.outline ? 'white' : T.inkSecondary }}>Outline</button>
+                  {selectedTextOverlay.outline && (
+                    <input type="color" value={selectedTextOverlay.outlineColor} onChange={(e) => handleUpdateTextOverlay(selectedTextOverlay.id, { outlineColor: e.target.value })} style={{ width: 40, height: 28, padding: 0, border: `1px solid ${T.border}`, borderRadius: 6, cursor: 'pointer' }} />
+                  )}
+                  <button onClick={() => handleUpdateTextOverlay(selectedTextOverlay.id, { shadow: !selectedTextOverlay.shadow })} style={{ ...smallBtn, background: selectedTextOverlay.shadow ? T.accentGradient : 'white', color: selectedTextOverlay.shadow ? 'white' : T.inkSecondary }}>Shadow</button>
+                </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <label style={fieldLabel}>Show from
                     <input type="number" step={0.5} min={0} max={totalDuration} value={selectedTextOverlay.start.toFixed(1)}
@@ -1871,7 +2006,10 @@ export default function VideoEditorWorkspace() {
                   </label>
                 </div>
                 <p style={{ fontSize: '0.66rem', color: T.muted, margin: 0 }}>Drag on the preview to reposition (coming soon) — for now, set position from templates above and fine-tune with Start/Until timing.</p>
-                <button onClick={() => handleDeleteTextOverlay(selectedTextOverlay.id)} style={{ ...smallBtn, color: '#DC2626', borderColor: '#FCA5A5', alignSelf: 'flex-start' }}>✕ Delete text</button>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => { const next = duplicateTextOverlay(timeline, selectedTextOverlay.id); const newId = next.textOverlays[next.textOverlays.length - 1].id; commit(next); setSelectedTextOverlayId(newId); }} style={smallBtn}>⧉ Duplicate</button>
+                  <button onClick={() => handleDeleteTextOverlay(selectedTextOverlay.id)} style={{ ...smallBtn, color: '#DC2626', borderColor: '#FCA5A5' }}>✕ Delete text</button>
+                </div>
               </div>
             )}
           </div>
@@ -2035,7 +2173,7 @@ export default function VideoEditorWorkspace() {
                 </button>
               </div>
             )}
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 8 }}>
               <div>
                 <div style={{ ...fieldLabel, marginBottom: 4 }}>Fit</div>
                 <div style={{ display: 'flex', gap: 6 }}>
@@ -2044,11 +2182,42 @@ export default function VideoEditorWorkspace() {
                 </div>
               </div>
               {timeline.fitMode === 'contain' && (
-                <label style={fieldLabel}>Background
-                  <input type="color" value={timeline.backgroundFill} onChange={(e) => commit((tl) => setBackgroundFill(tl, e.target.value))} style={{ width: 40, height: 28, padding: 0, border: `1px solid ${T.border}`, borderRadius: 6, cursor: 'pointer' }} />
-                </label>
+                <div>
+                  <div style={{ ...fieldLabel, marginBottom: 4 }}>Background</div>
+                  <div style={{ display: 'flex', gap: 5 }}>
+                    {BACKGROUND_TYPE_OPTIONS.map((b) => (
+                      <button key={b.id} onClick={() => commit((tl) => setBackgroundType(tl, b.id))}
+                        style={{ ...smallBtn, padding: '6px 9px', background: (timeline.backgroundType || 'solid') === b.id ? T.accentGradient : 'white', color: (timeline.backgroundType || 'solid') === b.id ? 'white' : T.inkSecondary, border: (timeline.backgroundType || 'solid') === b.id ? 'none' : `1px solid ${T.border}` }}>
+                        {b.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
+            {timeline.fitMode === 'contain' && (timeline.backgroundType || 'solid') === 'solid' && (
+              <label style={{ ...fieldLabel, marginBottom: 8 }}>Color
+                <input type="color" value={timeline.backgroundFill} onChange={(e) => commit((tl) => setBackgroundFill(tl, e.target.value))} style={{ width: 40, height: 28, padding: 0, border: `1px solid ${T.border}`, borderRadius: 6, cursor: 'pointer' }} />
+              </label>
+            )}
+            {timeline.fitMode === 'contain' && timeline.backgroundType === 'gradient' && (
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 8 }}>
+                <label style={fieldLabel}>From
+                  <input type="color" value={timeline.backgroundGradient?.from || '#0F172A'} onChange={(e) => commit((tl) => setBackgroundGradient(tl, { from: e.target.value }))} style={{ width: 40, height: 28, padding: 0, border: `1px solid ${T.border}`, borderRadius: 6, cursor: 'pointer' }} />
+                </label>
+                <label style={fieldLabel}>To
+                  <input type="color" value={timeline.backgroundGradient?.to || '#334155'} onChange={(e) => commit((tl) => setBackgroundGradient(tl, { to: e.target.value }))} style={{ width: 40, height: 28, padding: 0, border: `1px solid ${T.border}`, borderRadius: 6, cursor: 'pointer' }} />
+                </label>
+                <label style={fieldLabel}>Angle
+                  <input type="range" min={0} max={360} step={5} value={timeline.backgroundGradient?.angle ?? 135} onChange={(e) => commit((tl) => setBackgroundGradient(tl, { angle: parseInt(e.target.value, 10) }))} style={{ width: 90 }} />
+                </label>
+              </div>
+            )}
+            {timeline.fitMode === 'contain' && timeline.backgroundType === 'image' && (
+              <div style={{ marginBottom: 8 }}>
+                <UploadBox accept="image/png,image/jpeg,image/webp" onFiles={handleBackgroundImageFile} maxSizeMB={MAX_UPLOAD_IMAGE_BYTES / (1024 * 1024)} compact compactLabel={timeline.backgroundImageSourceId ? '↻ Replace background image' : '+ Add background image'} />
+              </div>
+            )}
 
             {overlayTracks.length > 1 && (
               <div style={{ marginBottom: 10 }}>
@@ -2127,6 +2296,34 @@ export default function VideoEditorWorkspace() {
             })()}
           </div>
 
+          {/* Master audio — applies on top of every clip's own volume/fades, across the whole timeline */}
+          <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Master audio</div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 8 }}>
+              <label style={fieldLabel}>Volume {Math.round((timeline.masterVolume ?? 1) * 100)}%
+                <input type="range" min={0} max={2} step={0.05} value={timeline.masterVolume ?? 1}
+                  onChange={(e) => commit((tl) => setMasterVolume(tl, parseFloat(e.target.value)))} style={{ width: 100 }} />
+              </label>
+              <button
+                onClick={() => commit((tl) => setMasterMuted(tl, !tl.masterMuted))}
+                style={{ ...smallBtn, background: timeline.masterMuted ? '#DC2626' : 'white', color: timeline.masterMuted ? 'white' : T.inkSecondary, borderColor: timeline.masterMuted ? '#DC2626' : T.border }}
+              >
+                {timeline.masterMuted ? '🔇 Muted' : '🔊 Mute all'}
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <label style={fieldLabel}>Fade in
+                <input type="number" step={0.5} min={0} max={totalDuration / 2} value={(timeline.masterFadeIn || 0).toFixed(1)}
+                  onChange={(e) => commit((tl) => setMasterFade(tl, { masterFadeIn: parseFloat(e.target.value) || 0 }))} style={numInput} />
+              </label>
+              <label style={fieldLabel}>Fade out
+                <input type="number" step={0.5} min={0} max={totalDuration / 2} value={(timeline.masterFadeOut || 0).toFixed(1)}
+                  onChange={(e) => commit((tl) => setMasterFade(tl, { masterFadeOut: parseFloat(e.target.value) || 0 }))} style={numInput} />
+              </label>
+            </div>
+            <p style={{ fontSize: '0.66rem', color: T.muted, margin: '6px 0 0' }}>Applies to the whole mix, on top of every clip&apos;s own volume and fades.</p>
+          </div>
+
           {/* Export */}
           <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Export settings</div>
@@ -2153,14 +2350,31 @@ export default function VideoEditorWorkspace() {
                   ))}
                 </div>
               </div>
+              <div>
+                <div style={{ ...fieldLabel, marginBottom: 4 }}>FPS</div>
+                <div style={{ display: 'flex', gap: 5 }}>
+                  {FPS_OPTIONS.map((f) => (
+                    <button key={f.id} onClick={() => commit((tl) => setExportFps(tl, f.id))} title={f.sub}
+                      style={{ ...smallBtn, padding: '6px 10px', background: (timeline.exportFps ?? 'original') === f.id ? T.accentGradient : 'white', color: (timeline.exportFps ?? 'original') === f.id ? 'white' : T.inkSecondary, border: (timeline.exportFps ?? 'original') === f.id ? 'none' : `1px solid ${T.border}` }}>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
+            <p style={{ fontSize: '0.68rem', color: T.muted, margin: '8px 0 0' }}>Estimated size: ~{estimatedExportMB} MB</p>
           </div>
           {supported ? (
             <div style={{ textAlign: 'center', padding: '4px 0' }}>
               <button onClick={handleExport} disabled={isExporting} style={{ ...primaryBtn(isExporting), width: '100%' }}>
                 {isExporting ? `${RENDER_STATUS_LABEL[renderStatus] || 'Working…'} ${Math.round(renderProgress * 100)}%` : '⬇ Export MP4'}
               </button>
-              {isExporting && <p style={{ margin: '6px 0 0', fontSize: '0.68rem', color: T.muted }}>Keep this tab open while your video exports.</p>}
+              {isExporting && (
+                <>
+                  <p style={{ margin: '6px 0 0', fontSize: '0.68rem', color: T.muted }}>Keep this tab open while your video exports.</p>
+                  <button onClick={handleCancelExport} style={{ ...smallBtn, marginTop: 6 }}>Cancel export</button>
+                </>
+              )}
               {renderStatus === 'error' && <div style={{ ...statusBox, marginTop: 8, display: 'inline-block' }}>⚠️ {renderError}</div>}
             </div>
           ) : (

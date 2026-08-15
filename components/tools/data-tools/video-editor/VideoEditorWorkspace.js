@@ -593,7 +593,13 @@ export default function VideoEditorWorkspace() {
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         {/* Left: preview, playback, timeline strips */}
         <div style={{ flex: '1 1 360px', minWidth: 300, maxWidth: 440 }}>
-          <div style={{ background: '#0F172A', borderRadius: 10, overflow: 'hidden', marginBottom: 8, position: 'relative' }}>
+          {/* maxHeight (not just maxWidth) keeps a Vertical (9:16) frame from
+              blowing up the whole layout's height — the canvas scales down
+              to whichever of width/height is more restrictive, the same way
+              object-fit: contain would, so Landscape/Square/Vertical all fit
+              the same on-screen budget instead of Vertical alone towering
+              over everything else. */}
+          <div style={{ background: '#0F172A', borderRadius: 10, overflow: 'hidden', marginBottom: 8, position: 'relative', maxHeight: 'clamp(220px, 46vh, 460px)', display: 'flex', justifyContent: 'center' }}>
             <canvas
               ref={canvasRef}
               width={composeW}
@@ -603,7 +609,7 @@ export default function VideoEditorWorkspace() {
               onPointerUp={handleOverlayPointerUp}
               onPointerCancel={handleOverlayPointerUp}
               style={{
-                width: '100%', height: 'auto', display: 'block',
+                maxWidth: '100%', maxHeight: 'clamp(220px, 46vh, 460px)', width: 'auto', height: 'auto', display: 'block',
                 touchAction: timeline.compositionMode === 'pip' && overlayClips.length ? 'none' : 'auto',
                 cursor: timeline.compositionMode === 'pip' && overlayClips.length ? (isDraggingOverlay ? 'grabbing' : 'grab') : 'default',
               }}

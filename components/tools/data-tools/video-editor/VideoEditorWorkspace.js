@@ -30,7 +30,7 @@ import {
   getMasterGain, setMasterVolume, setMasterMuted, setMasterFade,
   addMarker, updateMarker, deleteMarker,
 } from '@/lib/media/timeline';
-import { drawCompositionFrame, drawTextOverlays, drawImageOverlays, drawShapeOverlays, computeLayoutRects, pipPositionFromPoint, getComposeSize, getFadeOpacity, getTextOverlayBounds, buildCutoutCanvas } from '@/lib/media/compositionLayouts';
+import { drawCompositionFrame, drawTextOverlays, drawImageOverlays, drawShapeOverlays, computeLayoutRects, pipPositionFromPoint, getComposeSize, getFadeOpacity, getTextOverlayBounds, buildCutoutCanvas, getPipRange, CORNER_PRESETS, drawCover } from '@/lib/media/compositionLayouts';
 import { ensureSegmenterLoaded, getPersonMaskCanvas } from '@/lib/media/segmentation';
 import { renderTimeline, renderTimelineAudio, isTimelineExportSupported, TimelineRenderCancelledError, TimelineRenderError } from '@/lib/media/timelineRender';
 import { extractThumbnails, thumbnailsForRange } from '@/lib/media/thumbnails';
@@ -294,17 +294,22 @@ export default function VideoEditorWorkspace() {
   const [isRecordingScreen, setIsRecordingScreen] = useState(false);
   const [screenRecordingAudioWarning, setScreenRecordingAudioWarning] = useState('');
   const [screenRecordMic, setScreenRecordMic] = useState(true); // narrate over the recording by default; can be turned off before starting
+  const [screenRecordCamera, setScreenRecordCamera] = useState(false); // fully optional — off by default, screen (+ mic) alone must keep working exactly as before
+  const [screenRecordCameraCorner, setScreenRecordCameraCorner] = useState('bottom-right');
+  const [screenRecordCameraSizeRatio, setScreenRecordCameraSizeRatio] = useState(0.22);
   // What was ACTUALLY captured, once a recording starts — video is always
-  // true while recording; mic/systemAudio are each independently 'on' |
-  // 'off' | 'denied' (mic only) so the UI can show real per-source status
-  // (e.g. mic on + system audio unavailable is not the same situation as
-  // mic denied + system audio on) rather than one combined message.
+  // true while recording; mic/systemAudio/camera are each independently
+  // 'on' | 'off' | 'denied' so the UI can show real per-source status (e.g.
+  // mic on + system audio unavailable is not the same situation as mic
+  // denied + system audio on) rather than one combined message.
   const [screenRecordingCaptureState, setScreenRecordingCaptureState] = useState(null);
   const screenRecorderRef = useRef(null);
   // Extra teardown beyond the MediaRecorder itself, needed once mic audio
-  // is mixed in — the mic's own getUserMedia stream and the AudioContext
-  // doing the mixing aren't part of `stream` and won't stop/close on their
-  // own just because the display stream's tracks do.
+  // is mixed in and/or the camera PIP compositor is running — the mic's
+  // own getUserMedia stream, the camera's stream, the AudioContext doing
+  // the audio mixing, and the canvas compositor's rAF loop are none of
+  // them part of `stream` and won't stop/close on their own just because
+  // the display stream's tracks do.
   const screenRecordingCleanupRef = useRef(null);
   const [renderStatus, setRenderStatus] = useState('idle');
   const [renderProgress, setRenderProgress] = useState(0);
@@ -714,17 +719,95 @@ export default function VideoEditorWorkspace() {
         }
       }
 
-      // Independent, per-source status — mic and system audio are two
-      // unrelated capabilities (see the module comment above); collapsing
-      // them into one combined message would hide which ONE actually
-      // failed when only one did.
+      // Camera is a third, fully independent capture on top of the two
+      // above — a denial or absent device here never blocks or degrades
+      // the screen/mic recording already in progress, it just means no
+      // webcam PIP gets composited in (see the checklist row below).
+      let cameraStream = null;
+      let cameraDenied = false;
+      if (screenRecordCamera && navigator.mediaDevices.getUserMedia) {
+        try {
+          cameraStream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } });
+        } catch {
+          cameraDenied = true;
+        }
+      }
+
+      // Independent, per-source status — mic, system audio, and camera are
+      // three unrelated capabilities (see the module comment above);
+      // collapsing them into one combined message would hide which ONE
+      // actually failed when only one did.
       setScreenRecordingCaptureState({
         video: true,
         mic: !screenRecordMic ? 'off' : micStream ? 'on' : 'denied',
         systemAudio: systemAudioTracks.length > 0 ? 'on' : 'unavailable',
+        camera: !screenRecordCamera ? 'off' : cameraStream ? 'on' : 'denied',
       });
 
-      const recordedTracks = [...displayStream.getVideoTracks()];
+      // ---- Video track: the raw display track, unless a webcam PIP was
+      // requested and granted — then a <canvas>, redrawn every frame with
+      // the camera composited over the screen share and captured back into
+      // a track via canvas.captureStream(). Baking the PIP into the actual
+      // pixels at capture time is the only way it survives into a single
+      // recorded file; this is entirely separate from (and never touches)
+      // the audio capture/mixing above. ----
+      let videoTrack = displayStream.getVideoTracks()[0];
+      let compositor = null;
+      if (cameraStream) {
+        const waitReady = (el) => new Promise((resolve) => {
+          if (el.readyState >= 1) { el.play().then(resolve).catch(resolve); return; }
+          el.onloadedmetadata = () => { el.play().then(resolve).catch(resolve); };
+        });
+        const displayVideoEl = document.createElement('video');
+        displayVideoEl.muted = true;
+        displayVideoEl.srcObject = displayStream;
+        const cameraVideoEl = document.createElement('video');
+        cameraVideoEl.muted = true;
+        cameraVideoEl.srcObject = cameraStream;
+        await Promise.all([waitReady(displayVideoEl), waitReady(cameraVideoEl)]);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = displayVideoEl.videoWidth || 1280;
+        canvas.height = displayVideoEl.videoHeight || 720;
+        const ctx = canvas.getContext('2d');
+        let rafId = null;
+        const draw = () => {
+          ctx.drawImage(displayVideoEl, 0, 0, canvas.width, canvas.height);
+          const { pipW, pipH, margin, rangeX, rangeY } = getPipRange(canvas.width, canvas.height, screenRecordCameraSizeRatio);
+          const pos = CORNER_PRESETS[screenRecordCameraCorner] || CORNER_PRESETS['bottom-right'];
+          const rect = { x: margin + pos.x * rangeX, y: margin + pos.y * rangeY, w: pipW, h: pipH };
+          // Same rounded-corner + white-border look the timeline's own PIP
+          // overlay tracks use, for a consistent "picture in picture" feel.
+          ctx.save();
+          const radius = Math.min(rect.w, rect.h) * 0.06;
+          ctx.beginPath();
+          ctx.moveTo(rect.x + radius, rect.y);
+          ctx.arcTo(rect.x + rect.w, rect.y, rect.x + rect.w, rect.y + rect.h, radius);
+          ctx.arcTo(rect.x + rect.w, rect.y + rect.h, rect.x, rect.y + rect.h, radius);
+          ctx.arcTo(rect.x, rect.y + rect.h, rect.x, rect.y, radius);
+          ctx.arcTo(rect.x, rect.y, rect.x + rect.w, rect.y, radius);
+          ctx.closePath();
+          ctx.clip();
+          drawCover(ctx, cameraVideoEl, rect);
+          ctx.restore();
+          ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+          rafId = requestAnimationFrame(draw);
+        };
+        draw();
+        const canvasStream = canvas.captureStream(30);
+        videoTrack = canvasStream.getVideoTracks()[0];
+        compositor = {
+          stop: () => {
+            if (rafId != null) cancelAnimationFrame(rafId);
+            displayVideoEl.pause();
+            cameraVideoEl.pause();
+          },
+        };
+      }
+
+      const recordedTracks = [videoTrack];
       let audioCtx = null;
       if (systemAudioTracks.length && micStream) {
         // Both sources exist — mix them into one track so both survive.
@@ -758,6 +841,8 @@ export default function VideoEditorWorkspace() {
       recorder.onstop = async () => {
         displayStream.getTracks().forEach((t) => t.stop());
         micStream?.getTracks().forEach((t) => t.stop());
+        cameraStream?.getTracks().forEach((t) => t.stop());
+        compositor?.stop();
         audioCtx?.close();
         screenRecordingCleanupRef.current = null;
         setIsRecordingScreen(false);
@@ -771,7 +856,12 @@ export default function VideoEditorWorkspace() {
       // "Stop sharing" control, not just our in-app Stop button.
       displayStream.getVideoTracks()[0]?.addEventListener('ended', () => { if (recorder.state !== 'inactive') recorder.stop(); });
       screenRecorderRef.current = recorder;
-      screenRecordingCleanupRef.current = () => { micStream?.getTracks().forEach((t) => t.stop()); audioCtx?.close(); };
+      screenRecordingCleanupRef.current = () => {
+        micStream?.getTracks().forEach((t) => t.stop());
+        cameraStream?.getTracks().forEach((t) => t.stop());
+        compositor?.stop();
+        audioCtx?.close();
+      };
       recorder.start();
       setIsRecordingScreen(true);
     } catch (err) {
@@ -790,9 +880,9 @@ export default function VideoEditorWorkspace() {
   // captured, shown from the moment recording starts through however long
   // the app keeps screenRecordingCaptureState around (until the next
   // recording begins) — this is deliberately per-SOURCE (video/mic/system
-  // audio each shown independently) rather than one combined sentence, so
-  // "mic denied" and "system audio unavailable" never get conflated into
-  // a single ambiguous warning.
+  // audio/camera each shown independently) rather than one combined
+  // sentence, so "mic denied" and "system audio unavailable" never get
+  // conflated into a single ambiguous warning.
   function renderScreenRecordingCaptureChecklist() {
     if (!screenRecordingCaptureState) return null;
     const s = screenRecordingCaptureState;
@@ -806,6 +896,29 @@ export default function VideoEditorWorkspace() {
         {row(true, 'Screen video')}
         {row(s.mic === 'on', s.mic === 'on' ? 'Microphone' : s.mic === 'off' ? 'Microphone off (not requested)' : 'Microphone unavailable — check this site\'s mic permission')}
         {row(s.systemAudio === 'on', s.systemAudio === 'on' ? 'System/tab audio' : 'System/tab audio unavailable (browser/OS limitation)')}
+        {row(s.camera === 'on', s.camera === 'on' ? 'Webcam (picture-in-picture)' : s.camera === 'off' ? 'Webcam off (not requested)' : 'Webcam unavailable — check this site\'s camera permission')}
+      </div>
+    );
+  }
+
+  // Corner + size controls for the optional webcam PIP, shown only once
+  // "Include camera" is checked and only before recording starts (the
+  // position/size are baked into the pixels at capture time — see
+  // handleStartScreenRecording — so they can't be changed mid-recording).
+  function renderScreenRecordCameraOptions() {
+    if (!screenRecordCamera) return null;
+    return (
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 5, paddingLeft: 18 }}>
+        {PIP_CORNER_OPTIONS.map((c) => (
+          <button key={c.id} type="button" onClick={() => setScreenRecordCameraCorner(c.id)} title={c.label}
+            style={{ ...smallBtn, padding: '4px 8px', fontSize: '0.68rem', background: screenRecordCameraCorner === c.id ? T.accentGradient : 'white', color: screenRecordCameraCorner === c.id ? 'white' : T.inkSecondary, border: screenRecordCameraCorner === c.id ? 'none' : `1px solid ${T.border}` }}>
+            {c.icon}
+          </button>
+        ))}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.68rem', color: T.mutedDark }}>Size
+          <input type="range" min={0.12} max={0.35} step={0.01} value={screenRecordCameraSizeRatio}
+            onChange={(e) => setScreenRecordCameraSizeRatio(parseFloat(e.target.value))} style={{ width: 70 }} />
+        </label>
       </div>
     );
   }
@@ -2043,10 +2156,17 @@ export default function VideoEditorWorkspace() {
             {isRecordingScreen ? '⏹ Stop recording' : '⏺ Or record your screen'}
           </button>
           {!isRecordingScreen && (
-            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 6, fontSize: '0.72rem', color: T.mutedDark, cursor: 'pointer' }}>
-              <input type="checkbox" checked={screenRecordMic} onChange={(e) => setScreenRecordMic(e.target.checked)} />
-              🎤 Include microphone (narrate over the recording)
-            </label>
+            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', marginTop: 6 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.72rem', color: T.mutedDark, cursor: 'pointer' }}>
+                <input type="checkbox" checked={screenRecordMic} onChange={(e) => setScreenRecordMic(e.target.checked)} />
+                🎤 Include microphone (narrate over the recording)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.72rem', color: T.mutedDark, cursor: 'pointer', marginTop: 4 }}>
+                <input type="checkbox" checked={screenRecordCamera} onChange={(e) => setScreenRecordCamera(e.target.checked)} />
+                📷 Include camera (webcam picture-in-picture)
+              </label>
+              {renderScreenRecordCameraOptions()}
+            </div>
           )}
         </div>
         {uploadError && <div style={{ ...statusBox, marginTop: 12 }}>⚠️ {uploadError}</div>}
@@ -2606,10 +2726,17 @@ export default function VideoEditorWorkspace() {
                   {isRecordingScreen ? '⏹ Stop recording' : '⏺ Record screen'}
                 </button>
                 {!isRecordingScreen && (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5, fontSize: '0.68rem', color: T.mutedDark, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={screenRecordMic} onChange={(e) => setScreenRecordMic(e.target.checked)} />
-                    🎤 Include microphone
-                  </label>
+                  <>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5, fontSize: '0.68rem', color: T.mutedDark, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={screenRecordMic} onChange={(e) => setScreenRecordMic(e.target.checked)} />
+                      🎤 Include microphone
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4, fontSize: '0.68rem', color: T.mutedDark, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={screenRecordCamera} onChange={(e) => setScreenRecordCamera(e.target.checked)} />
+                      📷 Include camera (webcam PIP)
+                    </label>
+                    {renderScreenRecordCameraOptions()}
+                  </>
                 )}
                 {renderScreenRecordingCaptureChecklist()}
                 {screenRecordingAudioWarning && (

@@ -287,6 +287,7 @@ export default function VideoEditorWorkspace() {
   const [playing, setPlaying] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [isRecordingScreen, setIsRecordingScreen] = useState(false);
+  const [screenRecordingAudioWarning, setScreenRecordingAudioWarning] = useState('');
   const screenRecorderRef = useRef(null);
   const [renderStatus, setRenderStatus] = useState('idle');
   const [renderProgress, setRenderProgress] = useState(0);
@@ -671,8 +672,20 @@ export default function VideoEditorWorkspace() {
       return;
     }
     setUploadError('');
+    setScreenRecordingAudioWarning('');
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      // Requesting audio:true does NOT guarantee the browser/OS actually
+      // grants an audio track — most notably, Chrome on macOS has never
+      // supported sharing SYSTEM audio this way at all (only a specific
+      // browser TAB's audio can be captured there), regardless of what's
+      // checked in the share picker. Surfacing that the moment recording
+      // starts (rather than only after the user finishes and finds a
+      // silent clip) is the one thing this app CAN do about a platform
+      // limitation it has no control over.
+      if (stream.getAudioTracks().length === 0) {
+        setScreenRecordingAudioWarning('Recording started, but no audio was shared — this recording will be silent. On macOS, Chrome can only capture a single browser TAB\'s audio this way (not your whole screen or system audio); on Windows, make sure "Share audio" is checked in the picker.');
+      }
       const chunks = [];
       const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
         .find((c) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported?.(c)) || '';
@@ -2458,6 +2471,11 @@ export default function VideoEditorWorkspace() {
                 <button onClick={isRecordingScreen ? handleStopScreenRecording : handleStartScreenRecording} style={{ ...smallBtn, width: '100%', background: isRecordingScreen ? '#DC2626' : 'white', color: isRecordingScreen ? 'white' : T.inkSecondary, borderColor: isRecordingScreen ? '#DC2626' : T.border }}>
                   {isRecordingScreen ? '⏹ Stop recording' : '⏺ Record screen'}
                 </button>
+                {screenRecordingAudioWarning && (
+                  <p style={{ fontSize: '0.66rem', color: '#92400E', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, padding: '6px 8px', margin: '6px 0 0', lineHeight: 1.4 }}>
+                    ⚠️ {screenRecordingAudioWarning}
+                  </p>
+                )}
               </div>
               <div>
                 <div style={{ fontSize: '0.7rem', color: T.mutedDark, marginBottom: 2 }}>Image overlay</div>
@@ -2800,9 +2818,6 @@ export default function VideoEditorWorkspace() {
               )}
             </div>
 
-            {overlayTracks.length === 0 && (
-              <p style={{ fontSize: '0.7rem', color: T.muted, margin: '0 0 8px' }}>Add a video or image overlay above to enable split-screen, picture-in-picture, or a video-call layout.</p>
-            )}
             {possibleDuplicateAudio && (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '7px 10px', borderRadius: 8, background: '#FFFBEB', border: '1px solid #FDE68A', marginBottom: 8 }}>
                 <span style={{ fontSize: '0.7rem', color: '#92400E' }}>
@@ -2875,6 +2890,15 @@ export default function VideoEditorWorkspace() {
               </div>
             )}
 
+            {overlayTracks.length === 0 && (
+              <div style={{ padding: '10px 0' }}>
+                <p style={{ fontSize: '0.76rem', color: T.inkSecondary, margin: '0 0 10px', lineHeight: 1.5 }}>
+                  Split screen, picture-in-picture, and video-call layouts all need a <strong>second video</strong> composed over your main one — add one below to unlock them.
+                </p>
+                <UploadBox accept="video/*" onFiles={handleOverlayFiles} maxSizeMB={MAX_UPLOAD_VIDEO_BYTES / (1024 * 1024)} compact compactLabel="+ Add video overlay" />
+                <p style={{ fontSize: '0.68rem', color: T.muted, margin: '8px 0 0' }}>An image overlay works too — add one from the Media panel.</p>
+              </div>
+            )}
             {overlayTracks.length > 0 && (() => {
               const activeTrack = overlayTracks.find((t) => t.id === selectedOverlayTrackId) || overlayTracks[0];
               return (

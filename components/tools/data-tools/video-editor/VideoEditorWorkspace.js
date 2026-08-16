@@ -14,7 +14,7 @@ import { downloadBlob } from '@/lib/dataTools/shared';
 import { extractVideoMetadata, extractImageMetadata, extractAudioMetadata, formatDuration } from '@/lib/media/metadata';
 import { validateUploadSize, MAX_UPLOAD_VIDEO_BYTES, MAX_UPLOAD_IMAGE_BYTES, MAX_UPLOAD_AUDIO_BYTES } from '@/lib/media/limits';
 import {
-  createTimeline, addSource, addClip, trimClip, splitClip, deleteClip, deleteClips, joinClips, reorderClip, duplicateClip, duplicateClips,
+  createTimeline, addSource, addClip, trimClip, splitClip, deleteClip, deleteClips, joinClips, moveClip, moveClips, duplicateClip, duplicateClips,
   setClipAudioMode,
   addOverlayTrack, removeOverlayTrack, setOverlayTrackMode, setOverlayTrackDividerRatio,
   setOverlayTrackPipCorner, setOverlayTrackPipPosition, setOverlayTrackPipSizeRatio, setOverlayTrackFlags, isOverlayTrackAudible,
@@ -30,7 +30,7 @@ import {
   getMasterGain, setMasterVolume, setMasterMuted, setMasterFade,
   addMarker, updateMarker, deleteMarker,
 } from '@/lib/media/timeline';
-import { drawCompositionFrame, drawTextOverlays, drawImageOverlays, drawShapeOverlays, computeLayoutRects, pipPositionFromPoint, getComposeSize, getFadeOpacity } from '@/lib/media/compositionLayouts';
+import { drawCompositionFrame, drawTextOverlays, drawImageOverlays, drawShapeOverlays, computeLayoutRects, pipPositionFromPoint, getComposeSize, getFadeOpacity, getTextOverlayBounds } from '@/lib/media/compositionLayouts';
 import { renderTimeline, renderTimelineAudio, isTimelineExportSupported, TimelineRenderCancelledError, TimelineRenderError } from '@/lib/media/timelineRender';
 import { extractThumbnails, thumbnailsForRange } from '@/lib/media/thumbnails';
 import { extractWaveformPeaks, drawWaveform } from '@/lib/media/waveform';
@@ -399,6 +399,13 @@ export default function VideoEditorWorkspace() {
   // doesn't spam the undo history — commit() only fires once, on release.
   const dragStateRef = useRef(null); // { trackId, dx, dy } grab offset within the overlay box, while dragging
   const livePipPositionRef = useRef(null); // { trackId, position: { x, y } } during an active drag, else null
+  // Same live-position-outside-state pattern, for dragging a text overlay
+  // directly on the preview — a separate ref rather than generalizing
+  // dragStateRef/livePipPositionRef, since text position is a plain 0..1
+  // anchor point (no pipSizeRatio-derived range math) and keeping the two
+  // completely separate avoids any risk to the already-verified PiP drag.
+  const dragTextStateRef = useRef(null); // { id, grabDx, grabDy } grab offset (in canvas px) from the overlay's own anchor point, while dragging
+  const liveTextPositionRef = useRef(null); // { id, x, y } during an active drag, else null
   const [isDraggingOverlay, setIsDraggingOverlay] = useState(false);
   const [selectedOverlayTrackId, setSelectedOverlayTrackId] = useState(null); // which overlay track's Composition controls are shown
 
@@ -713,6 +720,7 @@ export default function VideoEditorWorkspace() {
   // "select an overlay clip also selects its track's Composition panel"
   // behavior working on a plain click.
   function handleClipClick(e, clip, overlayTrackId) {
+    if (suppressClickRef.current) { suppressClickRef.current = false; return; }
     const clickedId = clip.id;
     if (e.ctrlKey || e.metaKey) {
       e.stopPropagation();
@@ -967,13 +975,22 @@ export default function VideoEditorWorkspace() {
       const insertAfter = mainNow.find((c) => c.sourceId === hit.clip.sourceId && Math.abs(c.sourceEnd - hit.sourceTime) < 0.1)
         || mainNow.find((c) => c.id === hit.clip.id)
         || mainNow[0];
-      const { timeline: withSource, source } = addSource(split, file, { width: composeW, height: composeH }, 'image');
+      // Ripple-insert: make a freezeDuration-wide gap right after
+      // insertAfter by shifting every later main-track clip right, then
+      // drop the freeze clip (appended at the end by addClip) into it via
+      // moveClip — mirrors deleteClip's ripple, just opening a gap instead
+      // of closing one.
+      const insertAt = insertAfter ? insertAfter.start + clipDuration(insertAfter) : 0;
+      const rippled = {
+        ...split,
+        clips: split.clips.map((c) => (c.track === MAIN_TRACK && c.start >= insertAt - 0.001 ? { ...c, start: c.start + freezeDuration } : c)),
+      };
+      const { timeline: withSource, source } = addSource(rippled, file, { width: composeW, height: composeH }, 'image');
       const withClip = addClip(withSource, source.id, MAIN_TRACK);
       const newClips = getTrackClips(withClip, MAIN_TRACK);
       const freezeClip = newClips[newClips.length - 1];
-      const targetIndex = insertAfter ? newClips.findIndex((c) => c.id === insertAfter.id) + 1 : newClips.length - 1;
-      const reordered = reorderClip(withClip, freezeClip.id, targetIndex);
-      return trimClip(reordered, freezeClip.id, { sourceStart: 0, sourceEnd: freezeDuration });
+      const moved = moveClip(withClip, freezeClip.id, insertAt);
+      return trimClip(moved, freezeClip.id, { sourceStart: 0, sourceEnd: freezeDuration });
     });
   }
 
@@ -998,16 +1015,6 @@ export default function VideoEditorWorkspace() {
     return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClipId, extraSelectedClipIds, playing, playhead, timeline, past, future]);
-
-  const dragIndexRef = useRef(null);
-  function handleDragStart(index) { dragIndexRef.current = index; }
-  function handleDrop(track, index) {
-    const from = dragIndexRef.current;
-    dragIndexRef.current = null;
-    if (from === null || from === index) return;
-    const clip = getTrackClips(timeline, track)[from];
-    commit((tl) => reorderClip(tl, clip.id, index));
-  }
 
   // ---- Drag-to-trim: pixel delta on the main track's own rendered width
   // converts to seconds via a single px-per-second ratio (the track's
@@ -1120,6 +1127,101 @@ export default function VideoEditorWorkspace() {
     if (drag) {
       setPast((p) => [...p, drag.preDragTimeline]);
       setFuture([]);
+    }
+  }
+
+  // ---- Drag-to-move: free-form repositioning of a main-track clip along
+  // its own track (Premiere-style — gaps allowed, overlaps rejected, see
+  // moveClip/moveClips in timeline.js). A plain pointerdown-then-move past
+  // MOVE_THRESHOLD_PX starts a drag; anything short of that threshold is
+  // left alone so the existing onClick (single/Ctrl/Shift multi-select,
+  // unchanged) still fires normally on a plain click. suppressClickRef
+  // swallows the synthetic click the browser still dispatches after a real
+  // drag's pointerup, so a drag never ALSO toggles selection. Dragging a
+  // clip that's part of the current multi-selection moves the whole group
+  // together via moveClips; dragging any other clip moves just that one. ----
+  const clipMoveDragRef = useRef(null);
+  const suppressClickRef = useRef(false);
+  const MOVE_THRESHOLD_PX = 4;
+
+  function handleClipBodyPointerDown(e, clip) {
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    const trackRect = mainTrackRef.current.getBoundingClientRect();
+    const pxPerSecond = trackRect.width / (totalDuration || 1);
+    const groupIds = selectionIdSet.has(clip.id) && selectionIds.length > 1 ? selectionIds : [clip.id];
+    const snapTargets = [
+      0,
+      playhead,
+      ...timeline.markers.map((m) => m.time),
+      ...getAllClipBoundaryTimes(timeline),
+    ];
+    clipMoveDragRef.current = {
+      clipId: clip.id,
+      groupIds,
+      startClientX: e.clientX,
+      startStart: clip.start,
+      pxPerSecond,
+      preDragTimeline: timeline,
+      snapTargets,
+      moved: false,
+    };
+    window.addEventListener('pointermove', handleClipBodyPointerMove);
+    window.addEventListener('pointerup', handleClipBodyPointerUp);
+  }
+  function handleClipBodyPointerMove(e) {
+    const drag = clipMoveDragRef.current;
+    if (!drag) return;
+    const dxPx = e.clientX - drag.startClientX;
+    if (!drag.moved && Math.abs(dxPx) < MOVE_THRESHOLD_PX) return;
+    drag.moved = true;
+    let deltaSeconds = dxPx / drag.pxPerSecond;
+    let didSnap = false;
+    if (!e.altKey) {
+      // Snaps the DRAGGED clip's own (would-be) start against the same
+      // candidate set trim-handle snapping uses — for a group drag this
+      // still anchors on the grabbed clip specifically, so the rest of the
+      // group lines up relative to it exactly as it was before the drag.
+      const rawStart = drag.startStart + deltaSeconds;
+      const thresholdSeconds = SNAP_PX / drag.pxPerSecond;
+      let nearest = null;
+      let nearestDist = thresholdSeconds;
+      for (const target of drag.snapTargets) {
+        const dist = Math.abs(target - rawStart);
+        if (dist <= nearestDist) { nearest = target; nearestDist = dist; }
+      }
+      if (nearest !== null) {
+        didSnap = true;
+        deltaSeconds = nearest - drag.startStart;
+      }
+    }
+    setTimeline(() => {
+      const result = drag.groupIds.length > 1
+        ? moveClips(drag.preDragTimeline, drag.groupIds, deltaSeconds)
+        : moveClip(drag.preDragTimeline, drag.clipId, Math.max(0, drag.startStart + deltaSeconds));
+      // moveClip/moveClips return the SAME object reference (not a copy)
+      // when the move is rejected (would overlap another clip) — cheap,
+      // reliable way to tell "actually moved" from "rejected, no-op" so a
+      // fully-rejected drag doesn't consume an undo step for nothing.
+      drag.appliedChange = result !== drag.preDragTimeline;
+      return result;
+    });
+    setSnappedHandle((prev) => {
+      const next = didSnap ? { clipId: drag.clipId, edge: 'move' } : null;
+      return (prev?.clipId === next?.clipId && prev?.edge === next?.edge) ? prev : next;
+    });
+  }
+  function handleClipBodyPointerUp() {
+    const drag = clipMoveDragRef.current;
+    clipMoveDragRef.current = null;
+    window.removeEventListener('pointermove', handleClipBodyPointerMove);
+    window.removeEventListener('pointerup', handleClipBodyPointerUp);
+    setSnappedHandle(null);
+    if (drag?.moved) {
+      suppressClickRef.current = true;
+      if (drag.appliedChange) {
+        setPast((p) => [...p, drag.preDragTimeline]);
+        setFuture([]);
+      }
     }
   }
 
@@ -1463,12 +1565,19 @@ export default function VideoEditorWorkspace() {
         }
       }
 
-      // A live drag overrides the dragged track's committed pipPosition for
-      // this frame only — nothing is written to state until pointerup, so
-      // the preview stays live without spamming undo history.
-      const drawTimeline = livePipPositionRef.current
+      // A live drag overrides the dragged track's committed pipPosition (or
+      // a dragged text overlay's committed x/y) for this frame only —
+      // nothing is written to state until pointerup, so the preview stays
+      // live without spamming undo history.
+      let drawTimeline = livePipPositionRef.current
         ? { ...timeline, overlayTracks: timeline.overlayTracks.map((t) => (t.id === livePipPositionRef.current.trackId ? { ...t, pipPosition: livePipPositionRef.current.position } : t)) }
         : timeline;
+      if (liveTextPositionRef.current) {
+        drawTimeline = {
+          ...drawTimeline,
+          textOverlays: drawTimeline.textOverlays.map((o) => (o.id === liveTextPositionRef.current.id ? { ...o, x: liveTextPositionRef.current.x, y: liveTextPositionRef.current.y } : o)),
+        };
+      }
 
       drawCompositionFrame(ctx, {
         timeline: drawTimeline,
@@ -1534,11 +1643,27 @@ export default function VideoEditorWorkspace() {
     return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
   }
 
-  // Hit-tests overlay tracks top-most first (last in overlayTracks = drawn
-  // last = visually on top), so a drag on overlapping tiles grabs whichever
-  // one is actually visible at that point.
+  // Hit-tests text overlays first (they draw last = visually topmost),
+  // then overlay tracks top-most first (last in overlayTracks = drawn last
+  // = visually on top) — so a drag anywhere grabs whichever element is
+  // actually visible at that point.
   function handleOverlayPointerDown(e) {
     const point = canvasPointFromEvent(e);
+    const ctx = canvasRef.current?.getContext('2d');
+    if (ctx) {
+      const activeTextOverlays = timeline.textOverlays.filter((o) => playhead >= o.start && (o.end == null || playhead < o.end));
+      for (let i = activeTextOverlays.length - 1; i >= 0; i--) {
+        const o = activeTextOverlays[i];
+        const b = getTextOverlayBounds(ctx, o, composeW, composeH);
+        if (!b || point.x < b.x || point.x > b.x + b.w || point.y < b.y || point.y > b.y + b.h) continue;
+        e.target.setPointerCapture(e.pointerId);
+        dragTextStateRef.current = { id: o.id, grabDx: point.x - (o.x ?? 0.5) * composeW, grabDy: point.y - (o.y ?? 0.85) * composeH };
+        liveTextPositionRef.current = { id: o.id, x: o.x ?? 0.5, y: o.y ?? 0.85 };
+        setIsDraggingOverlay(true);
+        setSelectedTextOverlayId(o.id);
+        return;
+      }
+    }
     const rects = computeLayoutRects(timeline, composeW, composeH);
     for (let i = timeline.overlayTracks.length - 1; i >= 0; i--) {
       const track = timeline.overlayTracks[i];
@@ -1555,6 +1680,13 @@ export default function VideoEditorWorkspace() {
   }
 
   function handleOverlayPointerMove(e) {
+    if (dragTextStateRef.current) {
+      const point = canvasPointFromEvent(e);
+      const x = Math.max(0, Math.min(1, (point.x - dragTextStateRef.current.grabDx) / composeW));
+      const y = Math.max(0, Math.min(1, (point.y - dragTextStateRef.current.grabDy) / composeH));
+      liveTextPositionRef.current = { id: dragTextStateRef.current.id, x, y };
+      return;
+    }
     if (!dragStateRef.current) return;
     const track = timeline.overlayTracks.find((t) => t.id === dragStateRef.current.trackId);
     if (!track) return;
@@ -1564,6 +1696,15 @@ export default function VideoEditorWorkspace() {
   }
 
   function handleOverlayPointerUp() {
+    if (dragTextStateRef.current) {
+      const { id } = dragTextStateRef.current;
+      const finalPosition = liveTextPositionRef.current;
+      dragTextStateRef.current = null;
+      setIsDraggingOverlay(false);
+      if (finalPosition) commit((tl) => updateTextOverlay(tl, id, { x: finalPosition.x, y: finalPosition.y }));
+      liveTextPositionRef.current = null;
+      return;
+    }
     if (!dragStateRef.current) return;
     const { trackId } = dragStateRef.current;
     const finalPosition = livePipPositionRef.current?.position;
@@ -1782,8 +1923,8 @@ export default function VideoEditorWorkspace() {
               onPointerCancel={handleOverlayPointerUp}
               style={{
                 maxWidth: '100%', maxHeight: 'clamp(220px, 46vh, 460px)', width: 'auto', height: 'auto', display: 'block',
-                touchAction: overlayTracks.some((t) => t.mode === 'pip') ? 'none' : 'auto',
-                cursor: overlayTracks.some((t) => t.mode === 'pip') ? (isDraggingOverlay ? 'grabbing' : 'grab') : 'default',
+                touchAction: (overlayTracks.some((t) => t.mode === 'pip') || timeline.textOverlays.length > 0) ? 'none' : 'auto',
+                cursor: (overlayTracks.some((t) => t.mode === 'pip') || timeline.textOverlays.length > 0) ? (isDraggingOverlay ? 'grabbing' : 'grab') : 'default',
               }}
             />
             <video ref={mainVideoRef} muted playsInline style={{ display: 'none' }} />
@@ -1796,9 +1937,9 @@ export default function VideoEditorWorkspace() {
               </Fragment>
             ))}
           </div>
-          {overlayTracks.some((t) => t.mode === 'pip') && (
+          {(overlayTracks.some((t) => t.mode === 'pip') || timeline.textOverlays.length > 0) && (
             <p style={{ fontSize: '0.68rem', color: T.muted, margin: '0 0 8px', textAlign: 'center' }}>
-              Drag an overlay directly on the preview to reposition it.
+              Drag an overlay or text layer directly on the preview to reposition it.
             </p>
           )}
 
@@ -1865,27 +2006,27 @@ export default function VideoEditorWorkspace() {
               this existed (see mainTrackRef's own comment above). */}
           <div style={{ overflowX: timelineZoom > 1 ? 'auto' : 'hidden', marginBottom: 10 }}>
             <div style={{ width: `${timelineZoom * 100}%`, minWidth: '100%' }}>
-              <div ref={mainTrackRef} onClick={clearSelectionIfEmptyClick} style={{ display: 'flex', gap: 3, minHeight: 46 }}>
-              {mainClips.map((clip, i) => {
+              <div ref={mainTrackRef} onClick={clearSelectionIfEmptyClick} style={{ position: 'relative', height: 46 }}>
+              {mainClips.map((clip) => {
                 const source = timeline.sources.find((s) => s.id === clip.sourceId);
                 const isPrimary = clip.id === selectedClipId;
                 const isSelected = selectionIdSet.has(clip.id);
+                const leftPct = totalDuration ? (clip.start / totalDuration) * 100 : 0;
+                const widthPct = totalDuration ? (clipDuration(clip) / totalDuration) * 100 : 100;
                 return (
                   <div
                     key={clip.id}
-                    draggable
-                    onDragStart={() => handleDragStart(i)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => handleDrop(MAIN_TRACK, i)}
+                    onPointerDown={(e) => handleClipBodyPointerDown(e, clip)}
                     onClick={(e) => handleClipClick(e, clip)}
                     style={{
-                      position: 'relative', flex: clipDuration(clip) || 1, minWidth: 44, height: 46, borderRadius: 7, cursor: 'grab',
+                      position: 'absolute', top: 0, left: `calc(${leftPct}% + 1px)`, width: `calc(max(24px, ${widthPct}%) - 2px)`,
+                      height: 46, borderRadius: 7, cursor: 'grab',
                       background: isSelected ? T.accentGradient : T.accentTint,
                       border: isPrimary ? `2px solid ${T.accentDark}` : isSelected ? `2px solid ${T.accentDark}90` : `1px solid ${T.border}`,
                       boxShadow: isSelected && !isPrimary ? `inset 0 0 0 1px white` : 'none',
                       overflow: 'hidden',
                     }}
-                    title={`${formatDuration(clipDuration(clip))} — click to edit (Ctrl/Cmd-click to multi-select, Shift-click for a range), drag to reorder, drag the side handles to trim`}
+                    title={`${formatDuration(clipDuration(clip))} — click to edit (Ctrl/Cmd-click to multi-select, Shift-click for a range), drag to reposition, drag the side handles to trim`}
                   >
                     <ClipThumbFilmstrip source={source} sourceStart={clip.sourceStart} sourceEnd={clip.sourceEnd} thumbnailsBySource={thumbnailsBySource} />
                     <ClipWaveform source={source} sourceStart={clip.sourceStart} sourceEnd={clip.sourceEnd} waveformBySource={waveformBySource} />
@@ -2404,7 +2545,7 @@ export default function VideoEditorWorkspace() {
                       onChange={(e) => handleUpdateTextOverlay(selectedTextOverlay.id, { end: parseFloat(e.target.value) || null })} style={numInput} />
                   </label>
                 </div>
-                <p style={{ fontSize: '0.66rem', color: T.muted, margin: 0 }}>Drag on the preview to reposition (coming soon) — for now, set position from templates above and fine-tune with Start/Until timing.</p>
+                <p style={{ fontSize: '0.66rem', color: T.muted, margin: 0 }}>Drag this text directly on the preview to reposition it, or pick a starting spot from the templates above.</p>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button onClick={() => { const next = duplicateTextOverlay(timeline, selectedTextOverlay.id); const newId = next.textOverlays[next.textOverlays.length - 1].id; commit(next); setSelectedTextOverlayId(newId); }} style={smallBtn}>⧉ Duplicate</button>
                   <button onClick={() => handleDeleteTextOverlay(selectedTextOverlay.id)} style={{ ...smallBtn, color: '#DC2626', borderColor: '#FCA5A5' }}>✕ Delete text</button>

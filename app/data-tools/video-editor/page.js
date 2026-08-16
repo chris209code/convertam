@@ -23,7 +23,7 @@ const FAQ = [
   { q: 'Can I split a clip into two?', a: 'Yes — move the playhead to where you want the cut and click Split at playhead. The clip becomes two independent clips you can trim, delete, or reorder separately.' },
   { q: 'Can I delete part of a video?', a: 'Yes — split at both edges of the part you don\'t want, select the middle piece, and delete it. The remaining clips automatically play back to back.' },
   { q: 'Can I join clips back together?', a: 'Yes — select a clip and click Join with next to merge it with the clip immediately after it on the same track.' },
-  { q: 'Can I reorder clips?', a: 'Yes — drag and drop any clip in the main track to change its position in the sequence.' },
+  { q: 'Can I reorder clips?', a: 'Yes — drag any clip in the main track left or right to move it wherever you want (Premiere-style free positioning), with snapping to the playhead, other clips\' edges, and markers. Clips can\'t overlap each other on the same track, but you can leave a gap for a deliberate pause. If you have several clips multi-selected, dragging any one of them moves the whole group together.' },
   { q: 'Does it have undo/redo?', a: 'Yes — every edit (trim, split, delete, join, reorder, composition changes) can be undone and redone.' },
   { q: 'What is split-screen composition?', a: 'Add a video or image overlay and choose Split screen (side by side or top/bottom) to show the main video and that overlay at once, divided by an adjustable line. Split screen only applies with exactly one overlay track.' },
   { q: 'What is picture-in-picture / video-call layout?', a: 'Choose Picture-in-picture to show your main video full-size with an overlay as a smaller, repositionable box in a corner — the familiar video-call layout, with adjustable corner and size. Add more overlay tracks and each gets its own independently positioned tile, for a multi-participant call.' },
@@ -66,6 +66,8 @@ const FAQ = [
   { q: 'Is there an audio level meter?', a: 'Yes — a live level meter sits under the Master audio controls, reading the final mixed output while you play the timeline back.' },
   { q: 'Can I select and edit multiple clips at once?', a: 'Yes — Ctrl/Cmd-click a clip to add it to your selection (click again to remove it), or Shift-click to select every clip between your last pick and the one you clicked. Delete or Duplicate then applies to the whole selection in one action, and one undo step. Click empty timeline space to clear the selection.' },
   { q: 'Does trimming snap to anything?', a: 'Yes — dragging a trim handle snaps to the playhead, the edges of clips on any track, and your markers, with a small highlight on the handle when it snaps. Hold Alt while dragging to bypass snapping for a precise freehand trim; the numeric Trim start/end inputs are never affected by snapping either way.' },
+  { q: 'Can I drag text directly on the preview to reposition it?', a: 'Yes — click and drag any text layer right on the preview canvas to move it; its X/Y position updates to match, so it stays exactly where you dropped it.' },
+  { q: 'Does the exported video have a watermark?', a: 'Yes — every export carries a small "convertam.app" mark in the bottom-right corner. It\'s only added to the downloaded file, never shown while you\'re editing, and isn\'t configurable.' },
 ];
 
 export default function VideoEditorPage() {
@@ -104,13 +106,13 @@ export default function VideoEditorPage() {
                 <li><strong>Multi-select</strong> — Ctrl/Cmd-click to add clips to a selection, Shift-click to select a range, then delete or duplicate all of them in one action (one undo step, original order preserved). Click empty timeline space to clear the selection.</li>
                 <li><strong>Delete</strong> — remove an unwanted segment, or every selected clip at once.</li>
                 <li><strong>Join</strong> — merge adjacent clips back together.</li>
-                <li><strong>Reorder</strong> — drag clips into a new sequence.</li>
+                <li><strong>Free-form positioning</strong> — drag any clip left or right to place it wherever you want on the timeline (gaps allowed, overlaps rejected), with snapping to the playhead, other clips&apos; edges, and markers; drag any clip in a multi-selection and the whole group moves together.</li>
                 <li><strong>Duplicate</strong> — one click to repeat a clip, or duplicate a whole multi-clip selection as one block.</li>
                 <li><strong>Freeze frame</strong> — turn the current frame into a still image dropped into the sequence.</li>
                 <li><strong>Undo/redo</strong> — step backward and forward through your edit history.</li>
                 <li><strong>Timeline thumbnails and waveform</strong> — see a filmstrip and audio waveform on every clip, not just a plain colored bar.</li>
                 <li><strong>Timeline zoom</strong> — zoom in for frame-accurate trims on a long clip, zoom back out for a quick overview; the main track and every overlay track scroll together.</li>
-                <li><strong>Text and titles</strong> — headings, subtitles, lower thirds, quotes, callouts, and watermark text, each with its own font size, color, background (with adjustable opacity), outline, drop shadow, character spacing, line spacing, multi-line text, an entrance animation (fade/slide/pop), and an optional custom uploaded font — one click to duplicate any text layer.</li>
+                <li><strong>Text and titles</strong> — headings, subtitles, lower thirds, quotes, callouts, and watermark text, each with its own font size, color, background (with adjustable opacity), outline, drop shadow, character spacing, line spacing, multi-line text, an entrance animation (fade/slide/pop), and an optional custom uploaded font — one click to duplicate any text layer, or drag it directly on the preview to reposition it.</li>
                 <li><strong>Logo / watermark image</strong> — upload an image, position it in a corner, and control its size and opacity.</li>
                 <li><strong>Rotate &amp; flip</strong> — rotate any clip 90°/180°/270° and flip it horizontally or vertically, useful for footage shot the wrong way or mirrored webcam captures.</li>
                 <li><strong>Speed</strong> — 0.25× to 4× per clip.</li>
@@ -135,7 +137,7 @@ export default function VideoEditorPage() {
                 <li><strong>Audio ducking</strong> — automatically lowers mixed-in background audio while a clip&apos;s own audio has signal, so voice and music don&apos;t fight for attention.</li>
                 <li><strong>Reframe for social platforms</strong> — Landscape (16:9), Square (1:1), or Vertical (9:16), with one-click YouTube/TikTok/Instagram/LinkedIn presets.</li>
                 <li><strong>Reframe background</strong> — when fitting the whole frame into a new shape leaves empty space, fill it with a solid color, a color gradient, a blurred/zoomed copy of your own video, or a custom uploaded image.</li>
-                <li><strong>Export controls</strong> — choose resolution (480p/720p/1080p), quality (small/balanced/high), and frame rate (original, or a fixed 24/30/60fps), with an estimated output size shown before you export and a Cancel button once it&apos;s running.</li>
+                <li><strong>Export controls</strong> — choose resolution (480p/720p/1080p), quality (small/balanced/high), and frame rate (original, or a fixed 24/30/60fps), with an estimated output size shown before you export and a Cancel button once it&apos;s running. Every export carries a small "convertam.app" mark in the bottom-right corner.</li>
                 <li><strong>Auto Captions</strong> — transcribe your edited timeline directly (no export needed first), edit the transcript, download SRT/VTT/TXT, or burn captions straight into your final exported video.</li>
                 <li><strong>Keyboard shortcuts</strong> — Space to play/pause, S to split, D to duplicate, Delete to remove, M to drop a marker, Ctrl/Cmd+Z to undo.</li>
               </ul>

@@ -288,7 +288,19 @@ export default function VideoEditorWorkspace() {
   const [uploadError, setUploadError] = useState('');
   const [isRecordingScreen, setIsRecordingScreen] = useState(false);
   const [screenRecordingAudioWarning, setScreenRecordingAudioWarning] = useState('');
+  const [screenRecordMic, setScreenRecordMic] = useState(true); // narrate over the recording by default; can be turned off before starting
+  // What was ACTUALLY captured, once a recording starts — video is always
+  // true while recording; mic/systemAudio are each independently 'on' |
+  // 'off' | 'denied' (mic only) so the UI can show real per-source status
+  // (e.g. mic on + system audio unavailable is not the same situation as
+  // mic denied + system audio on) rather than one combined message.
+  const [screenRecordingCaptureState, setScreenRecordingCaptureState] = useState(null);
   const screenRecorderRef = useRef(null);
+  // Extra teardown beyond the MediaRecorder itself, needed once mic audio
+  // is mixed in — the mic's own getUserMedia stream and the AudioContext
+  // doing the mixing aren't part of `stream` and won't stop/close on their
+  // own just because the display stream's tracks do.
+  const screenRecordingCleanupRef = useRef(null);
   const [renderStatus, setRenderStatus] = useState('idle');
   const [renderProgress, setRenderProgress] = useState(0);
   const [renderError, setRenderError] = useState('');
@@ -665,7 +677,16 @@ export default function VideoEditorWorkspace() {
   // getDisplayMedia, entirely client-side (no server ever sees the stream),
   // then feeds the finished recording through the exact same upload path a
   // real file would use — becoming the main video if the timeline is empty,
-  // or a new overlay track (e.g. a webcam already in place) otherwise. ----
+  // or a new overlay track (e.g. a webcam already in place) otherwise.
+  //
+  // getDisplayMedia's own `audio` option only ever captures SYSTEM/tab
+  // audio — never the microphone (a browser API limitation, not something
+  // this app controls) — so narrating over a recording needs a SEPARATE
+  // getUserMedia mic stream, mixed together with whatever system audio
+  // exists via a small Web Audio graph (the same "combine two live audio
+  // sources into one" technique the composed export path already uses for
+  // mixed/replaced clip audio) before either reaches MediaRecorder, since a
+  // recorder can only reliably capture one audio track per stream. ----
   async function handleStartScreenRecording() {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getDisplayMedia) {
       setUploadError('Screen recording isn\'t supported in this browser. Try a recent version of Chrome or Edge.');
@@ -673,26 +694,67 @@ export default function VideoEditorWorkspace() {
     }
     setUploadError('');
     setScreenRecordingAudioWarning('');
+    setScreenRecordingCaptureState(null);
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-      // Requesting audio:true does NOT guarantee the browser/OS actually
-      // grants an audio track — most notably, Chrome on macOS has never
-      // supported sharing SYSTEM audio this way at all (only a specific
-      // browser TAB's audio can be captured there), regardless of what's
-      // checked in the share picker. Surfacing that the moment recording
-      // starts (rather than only after the user finishes and finds a
-      // silent clip) is the one thing this app CAN do about a platform
-      // limitation it has no control over.
-      if (stream.getAudioTracks().length === 0) {
-        setScreenRecordingAudioWarning('Recording started, but no audio was shared — this recording will be silent. On macOS, Chrome can only capture a single browser TAB\'s audio this way (not your whole screen or system audio); on Windows, make sure "Share audio" is checked in the picker.');
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      const systemAudioTracks = displayStream.getAudioTracks();
+
+      let micStream = null;
+      let micDenied = false;
+      if (screenRecordMic && navigator.mediaDevices.getUserMedia) {
+        try {
+          micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch {
+          micDenied = true; // no mic, or permission denied — proceed with whatever system audio exists instead of failing the whole recording
+        }
       }
+
+      // Independent, per-source status — mic and system audio are two
+      // unrelated capabilities (see the module comment above); collapsing
+      // them into one combined message would hide which ONE actually
+      // failed when only one did.
+      setScreenRecordingCaptureState({
+        video: true,
+        mic: !screenRecordMic ? 'off' : micStream ? 'on' : 'denied',
+        systemAudio: systemAudioTracks.length > 0 ? 'on' : 'unavailable',
+      });
+
+      const recordedTracks = [...displayStream.getVideoTracks()];
+      let audioCtx = null;
+      if (systemAudioTracks.length && micStream) {
+        // Both sources exist — mix them into one track so both survive.
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const dest = audioCtx.createMediaStreamDestination();
+        audioCtx.createMediaStreamSource(new MediaStream(systemAudioTracks)).connect(dest);
+        audioCtx.createMediaStreamSource(micStream).connect(dest);
+        recordedTracks.push(...dest.stream.getAudioTracks());
+      } else if (micStream) {
+        recordedTracks.push(...micStream.getAudioTracks());
+      } else if (systemAudioTracks.length) {
+        recordedTracks.push(...systemAudioTracks);
+      }
+
+      if (!systemAudioTracks.length && !micStream) {
+        setScreenRecordingAudioWarning(
+          screenRecordMic && micDenied
+            ? 'Recording started, but both system audio and your microphone were unavailable — this recording will be silent. Check your browser\'s microphone permission for this site, or share a source with system audio.'
+            : 'Recording started, but no audio was shared — this recording will be silent. On macOS, Chrome can only capture a single browser TAB\'s audio this way (not your whole screen or system audio); on Windows, make sure "Share audio" is checked in the picker. Turn on "Include microphone" to narrate instead.'
+        );
+      } else if (screenRecordMic && micDenied) {
+        setScreenRecordingAudioWarning('Recording started, but your microphone wasn\'t available (check this site\'s microphone permission) — only system/tab audio will be included, no narration.');
+      }
+
+      const combinedStream = new MediaStream(recordedTracks);
       const chunks = [];
       const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
         .find((c) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported?.(c)) || '';
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const recorder = new MediaRecorder(combinedStream, mimeType ? { mimeType } : undefined);
       recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
       recorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
+        displayStream.getTracks().forEach((t) => t.stop());
+        micStream?.getTracks().forEach((t) => t.stop());
+        audioCtx?.close();
+        screenRecordingCleanupRef.current = null;
         setIsRecordingScreen(false);
         const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
         if (!blob.size) return;
@@ -702,8 +764,9 @@ export default function VideoEditorWorkspace() {
       };
       // Stops the recording if the user ends sharing via the browser's own
       // "Stop sharing" control, not just our in-app Stop button.
-      stream.getVideoTracks()[0]?.addEventListener('ended', () => { if (recorder.state !== 'inactive') recorder.stop(); });
+      displayStream.getVideoTracks()[0]?.addEventListener('ended', () => { if (recorder.state !== 'inactive') recorder.stop(); });
       screenRecorderRef.current = recorder;
+      screenRecordingCleanupRef.current = () => { micStream?.getTracks().forEach((t) => t.stop()); audioCtx?.close(); };
       recorder.start();
       setIsRecordingScreen(true);
     } catch (err) {
@@ -716,6 +779,30 @@ export default function VideoEditorWorkspace() {
   }
   function handleStopScreenRecording() {
     screenRecorderRef.current?.stop();
+  }
+
+  // Small ✓/⚠ readout of exactly what a screen recording actually
+  // captured, shown from the moment recording starts through however long
+  // the app keeps screenRecordingCaptureState around (until the next
+  // recording begins) — this is deliberately per-SOURCE (video/mic/system
+  // audio each shown independently) rather than one combined sentence, so
+  // "mic denied" and "system audio unavailable" never get conflated into
+  // a single ambiguous warning.
+  function renderScreenRecordingCaptureChecklist() {
+    if (!screenRecordingCaptureState) return null;
+    const s = screenRecordingCaptureState;
+    const row = (ok, label) => (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.68rem', color: ok ? '#166534' : '#92400E' }}>
+        <span>{ok ? '✓' : '⚠'}</span><span>{label}</span>
+      </div>
+    );
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 6, padding: '6px 8px', borderRadius: 8, background: '#F8FAFC', border: `1px solid ${T.border}` }}>
+        {row(true, 'Screen video')}
+        {row(s.mic === 'on', s.mic === 'on' ? 'Microphone' : s.mic === 'off' ? 'Microphone off (not requested)' : 'Microphone unavailable — check this site\'s mic permission')}
+        {row(s.systemAudio === 'on', s.systemAudio === 'on' ? 'System/tab audio' : 'System/tab audio unavailable (browser/OS limitation)')}
+      </div>
+    );
   }
 
   // A clip's 'replace'/'mix' audio comes from its own standalone 'audio'-
@@ -1950,8 +2037,20 @@ export default function VideoEditorWorkspace() {
           <button onClick={isRecordingScreen ? handleStopScreenRecording : handleStartScreenRecording} style={{ ...smallBtn, background: isRecordingScreen ? '#DC2626' : 'white', color: isRecordingScreen ? 'white' : T.inkSecondary, borderColor: isRecordingScreen ? '#DC2626' : T.border }}>
             {isRecordingScreen ? '⏹ Stop recording' : '⏺ Or record your screen'}
           </button>
+          {!isRecordingScreen && (
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 6, fontSize: '0.72rem', color: T.mutedDark, cursor: 'pointer' }}>
+              <input type="checkbox" checked={screenRecordMic} onChange={(e) => setScreenRecordMic(e.target.checked)} />
+              🎤 Include microphone (narrate over the recording)
+            </label>
+          )}
         </div>
         {uploadError && <div style={{ ...statusBox, marginTop: 12 }}>⚠️ {uploadError}</div>}
+        {renderScreenRecordingCaptureChecklist()}
+        {screenRecordingAudioWarning && (
+          <p style={{ fontSize: '0.7rem', color: '#92400E', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, padding: '7px 10px', margin: '10px 0 0', lineHeight: 1.4 }}>
+            ⚠️ {screenRecordingAudioWarning}
+          </p>
+        )}
         <p style={{ fontSize: '0.76rem', color: T.muted, marginTop: 10, textAlign: 'center' }}>
           Trim, cut, and reorder clips — or add a second video or image overlay for split-screen or picture-in-picture composition. Screen recording captures your screen locally in your browser and is never uploaded.
         </p>
@@ -2471,6 +2570,13 @@ export default function VideoEditorWorkspace() {
                 <button onClick={isRecordingScreen ? handleStopScreenRecording : handleStartScreenRecording} style={{ ...smallBtn, width: '100%', background: isRecordingScreen ? '#DC2626' : 'white', color: isRecordingScreen ? 'white' : T.inkSecondary, borderColor: isRecordingScreen ? '#DC2626' : T.border }}>
                   {isRecordingScreen ? '⏹ Stop recording' : '⏺ Record screen'}
                 </button>
+                {!isRecordingScreen && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5, fontSize: '0.68rem', color: T.mutedDark, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={screenRecordMic} onChange={(e) => setScreenRecordMic(e.target.checked)} />
+                    🎤 Include microphone
+                  </label>
+                )}
+                {renderScreenRecordingCaptureChecklist()}
                 {screenRecordingAudioWarning && (
                   <p style={{ fontSize: '0.66rem', color: '#92400E', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, padding: '6px 8px', margin: '6px 0 0', lineHeight: 1.4 }}>
                     ⚠️ {screenRecordingAudioWarning}

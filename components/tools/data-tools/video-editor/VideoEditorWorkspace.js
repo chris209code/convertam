@@ -2594,7 +2594,7 @@ export default function VideoEditorWorkspace() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div>
                 <div style={{ fontSize: '0.7rem', color: T.mutedDark, marginBottom: 2 }}>Main video</div>
-                <UploadBox accept="video/*" onFiles={handleMainFiles} maxSizeMB={MAX_UPLOAD_VIDEO_BYTES / (1024 * 1024)} compact compactLabel="↻ Replace this video" />
+                <UploadBox accept="video/*" onFiles={handleMainFiles} maxSizeMB={MAX_UPLOAD_VIDEO_BYTES / (1024 * 1024)} compact compactLabel="↻ Change video" />
               </div>
               <div>
                 <div style={{ fontSize: '0.7rem', color: T.mutedDark, marginBottom: 2 }}>Video overlay (split-screen / video call)</div>

@@ -17,7 +17,7 @@ import {
   createTimeline, addSource, addClip, trimClip, splitClip, deleteClip, deleteClips, joinClips, moveClip, moveClips, duplicateClip, duplicateClips,
   setClipAudioMode,
   addOverlayTrack, removeOverlayTrack, setOverlayTrackMode, setOverlayTrackDividerRatio,
-  setOverlayTrackPipCorner, setOverlayTrackPipPosition, setOverlayTrackPipSizeRatio, setOverlayTrackFlags, isOverlayTrackAudible,
+  setOverlayTrackPipCorner, setOverlayTrackPipPosition, setOverlayTrackPipSizeRatio, setOverlayTrackFlags, setOverlayTrackCutout, isOverlayTrackAudible,
   setFitMode, setBackgroundFill, setBackgroundType, setBackgroundGradient, setBackgroundImageSource, setFrameAspect,
   setClipSpeed, setClipFade, setClipFilters, setClipCropFocus, setClipCropZoom, setClipTransitionOut, setClipGain, setClipReversed, setClipDucking,
   rotateClip90, setClipFlip,
@@ -30,7 +30,8 @@ import {
   getMasterGain, setMasterVolume, setMasterMuted, setMasterFade,
   addMarker, updateMarker, deleteMarker,
 } from '@/lib/media/timeline';
-import { drawCompositionFrame, drawTextOverlays, drawImageOverlays, drawShapeOverlays, computeLayoutRects, pipPositionFromPoint, getComposeSize, getFadeOpacity, getTextOverlayBounds } from '@/lib/media/compositionLayouts';
+import { drawCompositionFrame, drawTextOverlays, drawImageOverlays, drawShapeOverlays, computeLayoutRects, pipPositionFromPoint, getComposeSize, getFadeOpacity, getTextOverlayBounds, buildCutoutCanvas } from '@/lib/media/compositionLayouts';
+import { ensureSegmenterLoaded, getPersonMaskCanvas } from '@/lib/media/segmentation';
 import { renderTimeline, renderTimelineAudio, isTimelineExportSupported, TimelineRenderCancelledError, TimelineRenderError } from '@/lib/media/timelineRender';
 import { extractThumbnails, thumbnailsForRange } from '@/lib/media/thumbnails';
 import { extractWaveformPeaks, drawWaveform } from '@/lib/media/waveform';
@@ -358,6 +359,8 @@ export default function VideoEditorWorkspace() {
         lastImageSourceIdRef: { current: null },
         replaceSrcNodeRef: { current: null },
         replaceLastClipIdRef: { current: null },
+        lastCutoutCanvas: null, // cached masked-person canvas — see the cutout block in the tick loop below
+        lastCutoutAt: 0,
       });
     }
     return overlayLayersRef.current.get(trackId);
@@ -1538,7 +1541,25 @@ export default function VideoEditorWorkspace() {
           }
         }
 
-        if (hit && !track.hidden) drawnOverlayLayers.push({ trackId: track.id, el: isImage ? s.imageEl : s.videoEl, clip: hit.clip, opacity });
+        // Person cutout: re-run segmentation at most ~10x/sec (not every
+        // tick — inference is too slow for that to stay smooth) and reuse
+        // the last successful mask in between, so the preview never flashes
+        // back to an un-cut-out frame while a fresh one is still computing.
+        let cutoutCanvas = null;
+        if (hit && !track.hidden && !isImage && track.cutoutEnabled && (track.mode || 'pip') === 'pip' && s.videoEl) {
+          const now = performance.now();
+          if (now - s.lastCutoutAt > 100) {
+            ensureSegmenterLoaded();
+            const mask = getPersonMaskCanvas(s.videoEl);
+            if (mask) {
+              s.lastCutoutCanvas = buildCutoutCanvas(s.videoEl, mask, track.cutoutFeather ?? 0.3);
+              s.lastCutoutAt = now;
+            }
+          }
+          cutoutCanvas = s.lastCutoutCanvas;
+        }
+
+        if (hit && !track.hidden) drawnOverlayLayers.push({ trackId: track.id, el: isImage ? s.imageEl : s.videoEl, clip: hit.clip, opacity, cutoutCanvas });
       }
 
       // 'crossfade' transition tail: draw the NEXT main-track clip, frozen
@@ -2835,6 +2856,44 @@ export default function VideoEditorWorkspace() {
                         <input type="range" min={0.15} max={0.5} step={0.02} value={activeTrack.pipSizeRatio}
                           onChange={(e) => commit((tl) => setOverlayTrackPipSizeRatio(tl, activeTrack.id, parseFloat(e.target.value)))} style={{ width: 120 }} />
                       </label>
+                    </div>
+                  )}
+                  {activeTrack.mode === 'pip' && (
+                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.border}` }}>
+                      <button
+                        onClick={() => { if (!activeTrack.cutoutEnabled) ensureSegmenterLoaded(); commit((tl) => setOverlayTrackCutout(tl, activeTrack.id, { cutoutEnabled: !activeTrack.cutoutEnabled })); }}
+                        style={{ ...smallBtn, background: activeTrack.cutoutEnabled ? T.accentGradient : 'white', color: activeTrack.cutoutEnabled ? 'white' : T.inkSecondary, border: activeTrack.cutoutEnabled ? 'none' : `1px solid ${T.border}` }}
+                      >
+                        🎭 {activeTrack.cutoutEnabled ? 'Person cutout on' : 'Person cutout (remove background)'}
+                      </button>
+                      {activeTrack.cutoutEnabled && (
+                        <div style={{ marginTop: 10, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <label style={fieldLabel}>Edge softness
+                            <input type="range" min={0} max={1} step={0.05} value={activeTrack.cutoutFeather ?? 0.3}
+                              onChange={(e) => commit((tl) => setOverlayTrackCutout(tl, activeTrack.id, { cutoutFeather: parseFloat(e.target.value) }))} style={{ width: 100 }} />
+                          </label>
+                          <button
+                            onClick={() => commit((tl) => setOverlayTrackCutout(tl, activeTrack.id, { cutoutShadow: !activeTrack.cutoutShadow }))}
+                            style={{ ...smallBtn, background: activeTrack.cutoutShadow ? T.accentGradient : 'white', color: activeTrack.cutoutShadow ? 'white' : T.inkSecondary, border: activeTrack.cutoutShadow ? 'none' : `1px solid ${T.border}` }}
+                          >
+                            Shadow
+                          </button>
+                          <button
+                            onClick={() => commit((tl) => setOverlayTrackCutout(tl, activeTrack.id, { cutoutOutline: !activeTrack.cutoutOutline }))}
+                            style={{ ...smallBtn, background: activeTrack.cutoutOutline ? T.accentGradient : 'white', color: activeTrack.cutoutOutline ? 'white' : T.inkSecondary, border: activeTrack.cutoutOutline ? 'none' : `1px solid ${T.border}` }}
+                          >
+                            Outline
+                          </button>
+                          {activeTrack.cutoutOutline && (
+                            <input type="color" value={activeTrack.cutoutOutlineColor} title="Outline color"
+                              onChange={(e) => commit((tl) => setOverlayTrackCutout(tl, activeTrack.id, { cutoutOutlineColor: e.target.value }))}
+                              style={{ width: 32, height: 28, padding: 0, border: `1px solid ${T.border}`, borderRadius: 6, cursor: 'pointer' }} />
+                          )}
+                          <span style={{ fontSize: '0.62rem', color: T.muted, fontWeight: 500, width: '100%' }}>
+                            Removes this overlay's background automatically, live in the preview and in the export — no green screen needed. Resize/move it like any other overlay above, and flip it from the Clip panel. To change what shows behind the person, replace the Main track's own video or image.
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

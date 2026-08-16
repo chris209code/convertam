@@ -3,7 +3,7 @@ import VideoEditorWorkspace from '../../../components/tools/data-tools/video-edi
 
 export const metadata = {
   title: 'Video Editor — Multi-Track, Video Call & Screen Recording | Convertam',
-  description: 'Trim, split, and reorder clips on a zoomable, snapping, multi-select timeline, add text/titles/shapes with entrance animations and a logo, rotate/flip/crop and pan, adjust speed and fades, apply filters, compose multi-track split-screen, picture-in-picture, or video-call layouts with per-track mute/solo/lock and a custom reframe background, record your screen, drop timeline markers, and generate Auto Captions straight from your edited timeline — entirely in your browser, no login required.',
+  description: 'Trim, split, and reorder clips on a zoomable, snapping, multi-select timeline, add text/titles/shapes with entrance animations and a logo, rotate/flip/crop and pan, adjust speed and fades, apply filters, compose multi-track split-screen, picture-in-picture, or video-call layouts with per-track mute/solo/lock and a custom reframe background, automatically remove a person\'s background for a cutout overlay (no green screen needed), record your screen, drop timeline markers, and generate Auto Captions straight from your edited timeline — entirely in your browser, no login required.',
   alternates: { canonical: '/data-tools/video-editor' },
 };
 
@@ -27,6 +27,7 @@ const FAQ = [
   { q: 'Does it have undo/redo?', a: 'Yes — every edit (trim, split, delete, join, reorder, composition changes) can be undone and redone.' },
   { q: 'What is split-screen composition?', a: 'Add a video or image overlay and choose Split screen (side by side or top/bottom) to show the main video and that overlay at once, divided by an adjustable line. Split screen only applies with exactly one overlay track.' },
   { q: 'What is picture-in-picture / video-call layout?', a: 'Choose Picture-in-picture to show your main video full-size with an overlay as a smaller, repositionable box in a corner — the familiar video-call layout, with adjustable corner and size. Add more overlay tracks and each gets its own independently positioned tile, for a multi-participant call.' },
+  { q: 'Can I remove the background from a person without a green screen?', a: 'Yes — with a video overlay in Picture-in-picture mode, click Person cutout (remove background). It automatically isolates the person using on-device machine learning (nothing is uploaded), live in the preview and in the export, so only they show over whatever\'s on your Main track underneath. You can soften the cut edge, add a drop shadow or a colored outline glow, and resize/move/flip it exactly like any other overlay.' },
   { q: 'Can I add more than one overlay video?', a: 'Yes — every time you add a video or image overlay, it becomes its own new overlay track rather than replacing an existing one, so you can stack up several participants, webcams, or graphics at once.' },
   { q: 'What are video-call templates?', a: 'With two or more overlay tracks, Bottom strip, Side strip, and Corners are one-click layouts that arrange every overlay tile at once — you can still drag any tile afterward to adjust it further.' },
   { q: 'Can I record my screen in Video Editor?', a: 'Yes — click Record screen (or "Or record your screen" before you\'ve uploaded anything) to capture your screen, a window, or a browser tab via your browser\'s own screen-sharing prompt. The recording happens entirely on your device and is added to the timeline once you stop it.' },
@@ -130,6 +131,7 @@ export default function VideoEditorPage() {
                 <li><strong>Track mute / solo / lock / hide</strong> — silence one overlay track&apos;s audio, solo it to hear it alone, lock a track to protect it from accidental edits, or hide it from the picture without deleting it.</li>
                 <li><strong>Split-screen</strong> — two videos side by side or stacked, with an adjustable divider.</li>
                 <li><strong>Picture-in-picture / video call</strong> — a main video with one or more repositionable, resizable overlay tiles, each independently positioned.</li>
+                <li><strong>Person cutout</strong> — automatically remove a picture-in-picture overlay's background (no green screen needed) using on-device machine learning, with edge softness, an optional drop shadow, and an optional colored outline glow — nothing uploaded, works live in the preview and the export.</li>
                 <li><strong>Video-call templates</strong> — Bottom strip, Side strip, or Corners one-click layouts that arrange every overlay tile at once for a multi-participant call.</li>
                 <li><strong>Screen recording</strong> — capture your screen, window, or tab directly in the browser and drop it straight into the timeline as the main video or an overlay.</li>
                 <li><strong>Shapes</strong> — rectangle, circle, line, and arrow annotations, each with its own color, fill, stroke width, position, and timing.</li>
@@ -220,6 +222,7 @@ export default function VideoEditorPage() {
                 <li><strong>Reversed clip preview:</strong> browsers can&apos;t natively play video backwards, so a reversed clip previews as a best-effort silent scrub rather than smooth playback — the exported video plays it backwards properly, with its audio correctly reversed too.</li>
                 <li><strong>Auto Captions rendering time:</strong> generating the timeline&apos;s audio for transcription happens in real time (roughly as long as your edited timeline&apos;s own length), since it plays the mix back to capture it — shorter than a full video export, but not instant for a long timeline.</li>
                 <li><strong>Multi-select scope:</strong> a selection can only include clips from one track at a time — it&apos;s for shared delete/duplicate actions on a sequence of clips, not for moving several clips freely across the timeline at once.</li>
+                <li><strong>Person cutout accuracy:</strong> background removal uses an on-device machine learning model tuned for a single person facing the camera in reasonable lighting — it isn&apos;t pixel-perfect chroma-key quality, works best with one clearly visible person, and the first time you enable it there&apos;s a brief pause while the (self-hosted, never uploaded-to) model loads.</li>
               </ul>
             </section>
 

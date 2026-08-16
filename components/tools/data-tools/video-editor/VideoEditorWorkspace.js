@@ -86,6 +86,22 @@ const TRACK_MODE_OPTIONS = [
   { id: 'split-tb', label: 'Split screen (top/bottom)' },
 ];
 
+// Left-rail categories — a pure navigation/IA concern (which existing
+// panel is docked and visible), not a new capability. "Edit" and "Canvas"
+// each reuse an already-existing panel rather than getting a brand-new
+// one of their own: Edit's controls are the always-visible Clip inspector
+// (see the return JSX), and Canvas shares the Composition panel since
+// frame aspect/fit/background live in that same panel today.
+const RAIL_CATEGORIES = [
+  { id: 'media', icon: '🗂️', label: 'Media' },
+  { id: 'edit', icon: '✂️', label: 'Edit' },
+  { id: 'audio', icon: '🔊', label: 'Audio' },
+  { id: 'text', icon: '🔤', label: 'Text' },
+  { id: 'captions', icon: '💬', label: 'Captions' },
+  { id: 'composition', icon: '🎛️', label: 'Composition' },
+  { id: 'canvas', icon: '🖼️', label: 'Canvas' },
+];
+
 // Named "video call" layouts: batch-apply pip position/size across however
 // many overlay tracks currently exist (up to the template's own slot
 // count), so a 2-4 participant call can be arranged in one click instead of
@@ -289,6 +305,14 @@ export default function VideoEditorWorkspace() {
   // scrollable container once zoomed in past 1x.
   const [timelineZoom, setTimelineZoom] = useState(1);
   const [fontUploadError, setFontUploadError] = useState('');
+  // Left-rail active category — purely a UI-organization concern (which
+  // existing panel is docked/visible), reusing every panel's existing
+  // state/handlers untouched; 'clip' isn't one of the rail buttons since
+  // that panel is now the ALWAYS-visible right inspector instead (see the
+  // return JSX), matching how a selected clip's own properties work in
+  // most real editors.
+  const [activeCategory, setActiveCategory] = useState('media');
+  const [exportPanelOpen, setExportPanelOpen] = useState(false);
   // Preview-only aspect-ratio-safe guides (action-safe/title-safe boxes) —
   // drawn directly on the canvas in the live preview loop, deliberately
   // OUTSIDE drawCompositionFrame (the function export also calls), so they
@@ -1922,8 +1946,53 @@ export default function VideoEditorWorkspace() {
     );
   }
 
+  const activeMainSource = mainClips[0] ? timeline.sources.find((s) => s.id === mainClips[0].sourceId) : null;
+
   return (
-    <div style={{ fontFamily: T.font }}>
+    <div className="ve-shell" style={{ fontFamily: T.font, background: '#0B1120', borderRadius: 14, overflow: 'hidden' }}>
+      {/* ---- Header: dark editor chrome, wraps the whole tool ---- */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 16px', background: '#0F172A', borderBottom: '1px solid #1E293B' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <span style={{ fontWeight: 800, color: 'white', fontSize: '0.88rem', flexShrink: 0 }}>🎬 Video Editor</span>
+          {activeMainSource && (
+            <span style={{ fontSize: '0.72rem', color: '#94A3B8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              · {activeMainSource.file.name}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => setExportPanelOpen((v) => !v)}
+          style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: exportPanelOpen ? 'white' : T.accentGradient, color: exportPanelOpen ? T.accentDark : 'white', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', fontFamily: T.font, flexShrink: 0 }}
+        >
+          ⬇ Export
+        </button>
+      </div>
+
+      <div className="ve-body">
+        {/* ---- Left icon rail: switches which tool panel is docked on the right.
+            Vertical sidebar on desktop; a horizontally-scrollable strip ABOVE
+            the content on narrow viewports (see the .ve-rail media query
+            below) rather than trying to squeeze a sidebar into 390px. ---- */}
+        <div className="ve-rail" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 2, padding: '10px 6px', background: '#0F172A', borderRight: '1px solid #1E293B', flexShrink: 0, overflowX: 'auto' }}>
+          {RAIL_CATEGORIES.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setActiveCategory(c.id)}
+              title={c.label}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: 56, padding: '7px 2px',
+                borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: T.font,
+                background: activeCategory === c.id ? T.accentGradient : 'transparent',
+                color: activeCategory === c.id ? 'white' : '#94A3B8',
+              }}
+            >
+              <span style={{ fontSize: '1.05rem', lineHeight: 1 }}>{c.icon}</span>
+              <span style={{ fontSize: '0.56rem', fontWeight: 700 }}>{c.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0, padding: 16, background: '#F8FAFC' }}>
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         {/* Left: preview, playback, timeline strips */}
         <div style={{ flex: '1 1 360px', minWidth: 300, maxWidth: 440 }}>
@@ -2371,6 +2440,7 @@ export default function VideoEditorWorkspace() {
             )}
           </div>
 
+          {activeCategory === 'media' && (<>
           {/* Media */}
           <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Media</div>
@@ -2459,6 +2529,9 @@ export default function VideoEditorWorkspace() {
             </div>
           )}
 
+          </>)}
+
+          {activeCategory === 'text' && (<>
           {/* Text & titles — always visible */}
           <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Text & titles</div>
@@ -2671,6 +2744,9 @@ export default function VideoEditorWorkspace() {
             )}
           </div>
 
+          </>)}
+
+          {(activeCategory === 'composition' || activeCategory === 'canvas') && (<>
           {/* Composition — always visible, not just after an overlay exists */}
           <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -2901,6 +2977,9 @@ export default function VideoEditorWorkspace() {
             })()}
           </div>
 
+          </>)}
+
+          {activeCategory === 'audio' && (<>
           {/* Master audio — applies on top of every clip's own volume/fades, across the whole timeline */}
           <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Master audio</div>
@@ -2935,6 +3014,9 @@ export default function VideoEditorWorkspace() {
             </div>
           </div>
 
+          </>)}
+
+          {exportPanelOpen && (<>
           {/* Export */}
           <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Export settings</div>
@@ -2994,6 +3076,9 @@ export default function VideoEditorWorkspace() {
             </p>
           )}
 
+          </>)}
+
+          {activeCategory === 'captions' && (<>
           {/* Captions — the one step in this tool that isn't purely local.
               Works straight off the current timeline (renders just its
               audio locally first — see the import comment above), so
@@ -3042,12 +3127,26 @@ export default function VideoEditorWorkspace() {
               </>
             )}
           </div>
+          </>)}
+
+          {activeCategory === 'edit' && !selectedClip && (
+            <p style={{ fontSize: '0.72rem', color: T.muted, textAlign: 'center', padding: '20px 0' }}>Select a clip on the timeline — its edit controls appear above, in the Clip panel.</p>
+          )}
 
           <p style={{ fontSize: '0.68rem', color: T.muted, marginTop: 10, textAlign: 'center' }}>
             Editing, composition, and export all happen locally in your browser — your video is never uploaded. Auto Captions is the one exception: it renders the edited timeline&apos;s audio locally, then sends a compressed copy of just that audio (never your video) to our transcription provider, processed for that request and not stored afterward.
           </p>
         </div>
       </div>
+        </div>
+      </div>
+      <style jsx>{`
+        .ve-body { display: flex; }
+        @media (max-width: 720px) {
+          .ve-body { flex-direction: column; }
+          .ve-rail { flex-direction: row !important; overflow-x: auto; border-right: none !important; border-bottom: 1px solid #1E293B; }
+        }
+      `}</style>
     </div>
   );
 }

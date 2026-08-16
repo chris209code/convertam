@@ -86,12 +86,16 @@ const TRACK_MODE_OPTIONS = [
   { id: 'split-tb', label: 'Split screen (top/bottom)' },
 ];
 
-// Left-rail categories — a pure navigation/IA concern (which existing
-// panel is docked and visible), not a new capability. "Edit" and "Canvas"
-// each reuse an already-existing panel rather than getting a brand-new
-// one of their own: Edit's controls are the always-visible Clip inspector
-// (see the return JSX), and Canvas shares the Composition panel since
-// frame aspect/fit/background live in that same panel today.
+// Left-rail categories — each one docks its own distinct panel (see the
+// return JSX): Edit (trim/split/join/freeze/silence/duplicate/delete),
+// Audio (per-clip audio mode/fades/volume/normalize, plus the project-
+// wide Master audio section), Effects (speed/filters/transitions/crop/
+// rotate/flip/reverse), Composition (mode selector, PIP, person cutout),
+// and Canvas (frame aspect, fit mode, background) — Composition and
+// Canvas both concern the overall frame but are genuinely different
+// concerns (layout vs. output shape), so they're separate panels, not a
+// shared one. A small always-visible "Clip" summary above all of these
+// just identifies what's selected.
 const RAIL_CATEGORIES = [
   { id: 'media', icon: '🗂️', label: 'Media' },
   { id: 'edit', icon: '✂️', label: 'Edit' },
@@ -100,6 +104,7 @@ const RAIL_CATEGORIES = [
   { id: 'captions', icon: '💬', label: 'Captions' },
   { id: 'composition', icon: '🎛️', label: 'Composition' },
   { id: 'canvas', icon: '🖼️', label: 'Canvas' },
+  { id: 'effects', icon: '🎨', label: 'Effects' },
 ];
 
 // Named "video call" layouts: batch-apply pip position/size across however
@@ -2318,7 +2323,12 @@ export default function VideoEditorWorkspace() {
 
         {/* Right: persistent tool panel — always rendered, not hidden behind a click */}
         <div style={{ flex: '1 1 300px', minWidth: 280, maxHeight: 'calc(100vh - 220px)', overflowY: 'auto', paddingRight: 2 }}>
-          {/* Clip */}
+          {/* Clip — identity/selection summary, always visible regardless of
+              which rail category is active (multi-select and locked-track
+              are states that block editing outright, so their own actions
+              stay reachable no matter what's selected on the left rail;
+              a single selected clip's actual editing controls live in the
+              Edit/Audio/Effects category panels below instead). */}
           <div style={{ background: T.accentTint, borderRadius: 10, padding: 12, marginBottom: 10 }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Clip</div>
             {selectionIds.length > 1 ? (
@@ -2343,214 +2353,239 @@ export default function VideoEditorWorkspace() {
               </>
             ) : selectedClip && selectedSource ? (
               <>
-                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: T.ink, marginBottom: 8, wordBreak: 'break-word' }}>
+                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: T.ink, marginBottom: selectedSource.kind === 'image' ? 0 : 4, wordBreak: 'break-word' }}>
                   {selectedSource.file.name} <span style={{ fontWeight: 500, color: T.mutedDark }}>({selectedClip.track === MAIN_TRACK ? 'main' : 'overlay'}{selectedSource.kind === 'image' ? ' · image' : ''})</span>
                 </div>
                 {selectedSource.kind === 'image' ? (
-                  <p style={{ fontSize: '0.72rem', color: T.mutedDark, margin: '0 0 8px' }}>
+                  <p style={{ fontSize: '0.72rem', color: T.mutedDark, margin: '4px 0 0' }}>
                     Static image — shown for the whole overlay duration. Drag it directly on the preview to reposition it.
                   </p>
                 ) : (
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
-                    <label style={fieldLabel}>Trim start
-                      <input type="number" step={0.1} min={0} max={selectedSource.duration}
-                        value={selectedClip.sourceStart.toFixed(2)}
-                        onChange={(e) => handleTrimChange('start', e.target.value)} style={numInput} />
-                    </label>
-                    <label style={fieldLabel}>Trim end
-                      <input type="number" step={0.1} min={0} max={selectedSource.duration}
-                        value={selectedClip.sourceEnd.toFixed(2)}
-                        onChange={(e) => handleTrimChange('end', e.target.value)} style={numInput} />
-                    </label>
-                    <label style={fieldLabel}>Audio
-                      <select value={selectedClip.audioMode} onChange={(e) => commit((tl) => setClipAudioMode(tl, selectedClip.id, e.target.value))} style={numInput}>
-                        <option value="keep">Keep</option>
-                        <option value="mute">Mute</option>
-                        <option value="replace">Replace…</option>
-                        <option value="mix">Mix with…</option>
-                      </select>
-                    </label>
-                    {(selectedClip.audioMode === 'replace' || selectedClip.audioMode === 'mix') && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 700, color: T.mutedDark }}>
-                          {selectedClipAudioSource ? selectedClipAudioSource.file.name : (selectedClip.audioMode === 'replace' ? 'Replacement audio' : 'Audio to mix in')}
-                        </span>
-                        <input type="file" accept="audio/*" onChange={(e) => handleReplaceAudioFile(e.target.files, selectedClip.audioMode)} style={{ fontSize: '0.7rem', maxWidth: 200 }} />
-                      </div>
-                    )}
-                    {selectedClip.audioMode === 'mix' && (
-                      <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 5 }} title="Automatically lowers the mixed-in audio's volume while this clip's own audio has signal (e.g. voice over music)">
-                        <input type="checkbox" checked={!!selectedClip.duckBackground} onChange={(e) => commit((tl) => setClipDucking(tl, selectedClip.id, e.target.checked))} />
-                        Duck background
-                      </label>
-                    )}
-                    <label style={fieldLabel}>Speed
-                      <select value={selectedClip.speed} onChange={(e) => commit((tl) => setClipSpeed(tl, selectedClip.id, parseFloat(e.target.value)))} style={numInput}>
-                        {SPEED_OPTIONS.map((s) => <option key={s} value={s}>{s}×</option>)}
-                      </select>
-                    </label>
-                  </div>
-                )}
-
-                {selectedSource.kind !== 'image' && (
-                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 8 }}>
-                    <label style={fieldLabel}>Fade in
-                      <input type="number" step={0.1} min={0} max={(selectedClip.sourceEnd - selectedClip.sourceStart) / 2}
-                        value={selectedClip.fadeIn.toFixed(1)}
-                        onChange={(e) => commit((tl) => setClipFade(tl, selectedClip.id, { fadeIn: parseFloat(e.target.value) || 0 }))} style={numInput} />
-                    </label>
-                    <label style={fieldLabel}>Fade out
-                      <input type="number" step={0.1} min={0} max={(selectedClip.sourceEnd - selectedClip.sourceStart) / 2}
-                        value={selectedClip.fadeOut.toFixed(1)}
-                        onChange={(e) => commit((tl) => setClipFade(tl, selectedClip.id, { fadeOut: parseFloat(e.target.value) || 0 }))} style={numInput} />
-                    </label>
-                    <label style={fieldLabel}>Volume {Math.round((selectedClip.gain ?? 1) * 100)}%
-                      <input type="range" min={0.1} max={3} step={0.05} value={selectedClip.gain ?? 1}
-                        onChange={(e) => commit((tl) => setClipGain(tl, selectedClip.id, parseFloat(e.target.value)))} style={{ width: 90 }} />
-                    </label>
-                    <button onClick={handleNormalizeAudio} disabled={normalizing} style={smallBtn}>{normalizing ? 'Analyzing…' : '🔊 Normalize audio'}</button>
-                  </div>
-                )}
-
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ ...fieldLabel, marginBottom: 4 }}>Filters</div>
-                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 6 }}>
-                    {Object.entries(FILTER_PRESETS).map(([id, values]) => (
-                      <button key={id} onClick={() => commit((tl) => setClipFilters(tl, selectedClip.id, values))} style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.68rem' }}>
-                        {id === 'none' ? 'Reset' : id[0].toUpperCase() + id.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                    <label style={fieldLabel}>Brightness
-                      <input type="range" min={0.5} max={1.5} step={0.02} value={selectedClip.filters.brightness}
-                        onChange={(e) => commit((tl) => setClipFilters(tl, selectedClip.id, { brightness: parseFloat(e.target.value) }))} style={{ width: 90 }} />
-                    </label>
-                    <label style={fieldLabel}>Contrast
-                      <input type="range" min={0.5} max={1.5} step={0.02} value={selectedClip.filters.contrast}
-                        onChange={(e) => commit((tl) => setClipFilters(tl, selectedClip.id, { contrast: parseFloat(e.target.value) }))} style={{ width: 90 }} />
-                    </label>
-                    <label style={fieldLabel}>Saturation
-                      <input type="range" min={0} max={2} step={0.02} value={selectedClip.filters.saturation}
-                        onChange={(e) => commit((tl) => setClipFilters(tl, selectedClip.id, { saturation: parseFloat(e.target.value) }))} style={{ width: 90 }} />
-                    </label>
-                  </div>
-                </div>
-
-                {selectedClip.track === MAIN_TRACK && mainClips.length > 1 && mainClips[mainClips.length - 1].id !== selectedClip.id && (
-                  <div style={{ marginBottom: 8 }}>
-                    <div style={{ ...fieldLabel, marginBottom: 4 }}>Transition to next clip</div>
-                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
-                      {TRANSITION_OPTIONS.map((t) => (
-                        <button key={t.id} onClick={() => handleSetTransition(selectedClip, t.id)}
-                          style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.68rem', background: selectedClip.transitionOut.type === t.id ? T.accentGradient : 'white', color: selectedClip.transitionOut.type === t.id ? 'white' : T.inkSecondary, border: selectedClip.transitionOut.type === t.id ? 'none' : `1px solid ${T.border}` }}>
-                          {t.label}
-                        </button>
-                      ))}
-                      {selectedClip.transitionOut.type !== 'cut' && (
-                        <input type="number" step={0.1} min={0.1} max={2} value={selectedClip.transitionOut.duration.toFixed(1)}
-                          onChange={(e) => handleTransitionDuration(selectedClip, parseFloat(e.target.value) || 0.5)}
-                          style={{ ...numInput, width: 56 }} title="Transition duration (seconds)" />
-                      )}
-                    </div>
-                    {selectedClip.transitionOut.type !== 'cut' && !BLEND_TRANSITION_TYPES.includes(selectedClip.transitionOut.type) && (
-                      <p style={{ fontSize: '0.64rem', color: T.muted, margin: '4px 0 0' }}>Sets this clip's fade-out and the next clip's fade-in to match{selectedClip.transitionOut.type !== 'fade' ? ', and the composition background color' : ''}.</p>
-                    )}
-                    {BLEND_TRANSITION_TYPES.includes(selectedClip.transitionOut.type) && (
-                      <p style={{ fontSize: '0.64rem', color: T.muted, margin: '4px 0 0' }}>Blends this clip's video directly into the next one — no fade through a color.</p>
-                    )}
-                  </div>
-                )}
-
-                {timeline.fitMode !== 'contain' && (
-                  <div style={{ marginBottom: 8, display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-                    <div>
-                      <div style={{ ...fieldLabel, marginBottom: 4 }}>Crop / pan <span style={{ fontWeight: 500, opacity: 0.8 }}>— which part stays in frame</span></div>
-                      <div
-                        onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); handleCropFocusPointer(e); }}
-                        onPointerMove={(e) => { if (e.buttons === 1) handleCropFocusPointer(e); }}
-                        style={{ position: 'relative', width: 72, height: 72, borderRadius: 8, border: `1px solid ${T.border}`, background: '#0F172A', cursor: 'crosshair' }}
-                      >
-                        <div style={{
-                          position: 'absolute', width: 12, height: 12, borderRadius: '50%', background: T.accentGradient, border: '2px solid white',
-                          left: `calc(${selectedClip.cropFocus.x * 100}% - 6px)`, top: `calc(${selectedClip.cropFocus.y * 100}% - 6px)`, pointerEvents: 'none',
-                        }} />
-                      </div>
-                    </div>
-                    <label style={fieldLabel}>Zoom {(selectedClip.cropZoom ?? 1).toFixed(1)}×
-                      <input type="range" min={1} max={3} step={0.1} value={selectedClip.cropZoom ?? 1}
-                        onChange={(e) => commit((tl) => setClipCropZoom(tl, selectedClip.id, parseFloat(e.target.value)))} style={{ width: 90 }} />
-                      <span style={{ fontSize: '0.62rem', color: T.muted, fontWeight: 500 }}>Crops in tighter — drag the pad to pan the crop.</span>
-                    </label>
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {selectedSource.kind !== 'image' && <button onClick={handleSplitAtPlayhead} style={smallBtn}>✂ Split at playhead</button>}
-                  {selectedSource.kind !== 'image' && <button onClick={() => handleJoinWithNext(selectedClip.track)} style={smallBtn}>⤵ Join with next</button>}
-                  {selectedClip.track === MAIN_TRACK && selectedSource.kind !== 'image' && <button onClick={handleFreezeFrame} style={smallBtn}>❄ Freeze frame</button>}
-                  {selectedClip.track === MAIN_TRACK && selectedSource.kind !== 'image' && <button onClick={handleFindSilence} disabled={silenceScanning} style={smallBtn}>{silenceScanning ? 'Scanning…' : '🔇 Find silence'}</button>}
-                  {selectedSource.kind !== 'image' && (
-                    <button
-                      onClick={() => commit((tl) => setClipReversed(tl, selectedClip.id, !selectedClip.reversed))}
-                      style={{ ...smallBtn, background: selectedClip.reversed ? T.accentGradient : 'white', color: selectedClip.reversed ? 'white' : T.inkSecondary }}
-                    >
-                      ⏪ {selectedClip.reversed ? 'Reversed' : 'Reverse'}
-                    </button>
-                  )}
-                  <button onClick={() => commit((tl) => rotateClip90(tl, selectedClip.id))} style={smallBtn} title={`Rotate 90° (currently ${selectedClip.rotation || 0}°)`}>
-                    ↻ Rotate{selectedClip.rotation ? ` ${selectedClip.rotation}°` : ''}
-                  </button>
-                  <button
-                    onClick={() => commit((tl) => setClipFlip(tl, selectedClip.id, { flipH: !selectedClip.flipH }))}
-                    style={{ ...smallBtn, background: selectedClip.flipH ? T.accentGradient : 'white', color: selectedClip.flipH ? 'white' : T.inkSecondary }}
-                  >
-                    ⇋ Flip H
-                  </button>
-                  <button
-                    onClick={() => commit((tl) => setClipFlip(tl, selectedClip.id, { flipV: !selectedClip.flipV }))}
-                    style={{ ...smallBtn, background: selectedClip.flipV ? T.accentGradient : 'white', color: selectedClip.flipV ? 'white' : T.inkSecondary }}
-                  >
-                    ⇵ Flip V
-                  </button>
-                  <button onClick={handleDuplicateSelected} style={smallBtn}>⧉ Duplicate</button>
-                  <button onClick={handleDeleteSelected} style={{ ...smallBtn, color: '#DC2626', borderColor: '#FCA5A5' }}>✕ Delete clip</button>
-                </div>
-
-                {selectedClip.reversed && (
-                  <p style={{ fontSize: '0.66rem', color: T.muted, margin: '6px 0 0' }}>
-                    Reversed clips preview silently as a best-effort scrub — the exported video plays this clip backwards with its audio correctly reversed too.
-                  </p>
-                )}
-
-                {silenceRanges !== null && (
-                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
-                    {silenceRanges.length === 0 ? (
-                      <p style={{ fontSize: '0.72rem', color: T.muted, margin: 0 }}>No silent stretches of 0.4s or longer found in this clip.</p>
-                    ) : (
-                      <>
-                        <p style={{ fontSize: '0.7rem', color: T.mutedDark, margin: '0 0 6px', fontWeight: 700 }}>{silenceRanges.length} silent stretch{silenceRanges.length === 1 ? '' : 'es'} found — review before removing:</p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8, maxHeight: 140, overflowY: 'auto' }}>
-                          {silenceRanges.map((r, i) => (
-                            <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', color: T.inkSecondary }}>
-                              <input type="checkbox" checked={r.selected} onChange={() => toggleSilenceRange(i)} />
-                              {formatDuration(r.start)} – {formatDuration(r.end)} <span style={{ color: T.muted }}>({(r.end - r.start).toFixed(1)}s)</span>
-                            </label>
-                          ))}
-                        </div>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button onClick={handleApplySilenceRemoval} disabled={!silenceRanges.some((r) => r.selected)} style={{ ...smallBtn, background: T.accentGradient, color: 'white', border: 'none' }}>Remove selected</button>
-                          <button onClick={() => setSilenceRanges(null)} style={smallBtn}>Cancel</button>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  <p style={{ fontSize: '0.66rem', color: T.muted, margin: 0 }}>Edit for trim/split/join, Audio for volume/replace, Effects for filters/crop/rotate.</p>
                 )}
               </>
             ) : (
-              <p style={{ fontSize: '0.72rem', color: T.muted, margin: 0 }}>Click a clip on the timeline to trim, split, join, delete it, or change its audio.</p>
+              <p style={{ fontSize: '0.72rem', color: T.muted, margin: 0 }}>Click a clip on the timeline to select it, then use Edit, Audio, or Effects on the left.</p>
             )}
           </div>
+
+          {activeCategory === 'edit' && (selectedClip && selectedSource && !isLockedSelected && selectionIds.length <= 1 ? (
+            <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Edit</div>
+              {selectedSource.kind !== 'image' && (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+                  <label style={fieldLabel}>Trim start
+                    <input type="number" step={0.1} min={0} max={selectedSource.duration}
+                      value={selectedClip.sourceStart.toFixed(2)}
+                      onChange={(e) => handleTrimChange('start', e.target.value)} style={numInput} />
+                  </label>
+                  <label style={fieldLabel}>Trim end
+                    <input type="number" step={0.1} min={0} max={selectedSource.duration}
+                      value={selectedClip.sourceEnd.toFixed(2)}
+                      onChange={(e) => handleTrimChange('end', e.target.value)} style={numInput} />
+                  </label>
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {selectedSource.kind !== 'image' && <button onClick={handleSplitAtPlayhead} style={smallBtn}>✂ Split at playhead</button>}
+                {selectedSource.kind !== 'image' && <button onClick={() => handleJoinWithNext(selectedClip.track)} style={smallBtn}>⤵ Join with next</button>}
+                {selectedClip.track === MAIN_TRACK && selectedSource.kind !== 'image' && <button onClick={handleFreezeFrame} style={smallBtn}>❄ Freeze frame</button>}
+                {selectedClip.track === MAIN_TRACK && selectedSource.kind !== 'image' && <button onClick={handleFindSilence} disabled={silenceScanning} style={smallBtn}>{silenceScanning ? 'Scanning…' : '🔇 Find silence'}</button>}
+                <button onClick={handleDuplicateSelected} style={smallBtn}>⧉ Duplicate</button>
+                <button onClick={handleDeleteSelected} style={{ ...smallBtn, color: '#DC2626', borderColor: '#FCA5A5' }}>✕ Delete clip</button>
+              </div>
+              {silenceRanges !== null && (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
+                  {silenceRanges.length === 0 ? (
+                    <p style={{ fontSize: '0.72rem', color: T.muted, margin: 0 }}>No silent stretches of 0.4s or longer found in this clip.</p>
+                  ) : (
+                    <>
+                      <p style={{ fontSize: '0.7rem', color: T.mutedDark, margin: '0 0 6px', fontWeight: 700 }}>{silenceRanges.length} silent stretch{silenceRanges.length === 1 ? '' : 'es'} found — review before removing:</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8, maxHeight: 140, overflowY: 'auto' }}>
+                        {silenceRanges.map((r, i) => (
+                          <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', color: T.inkSecondary }}>
+                            <input type="checkbox" checked={r.selected} onChange={() => toggleSilenceRange(i)} />
+                            {formatDuration(r.start)} – {formatDuration(r.end)} <span style={{ color: T.muted }}>({(r.end - r.start).toFixed(1)}s)</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={handleApplySilenceRemoval} disabled={!silenceRanges.some((r) => r.selected)} style={{ ...smallBtn, background: T.accentGradient, color: 'white', border: 'none' }}>Remove selected</button>
+                        <button onClick={() => setSilenceRanges(null)} style={smallBtn}>Cancel</button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p style={{ fontSize: '0.72rem', color: T.muted, textAlign: 'center', padding: '16px 0' }}>Select a single clip on the timeline to trim, split, join, freeze a frame, or find silence.</p>
+          ))}
+
+          {activeCategory === 'audio' && (selectedClip && selectedSource && !isLockedSelected && selectionIds.length <= 1 && selectedSource.kind !== 'image' && (
+            <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Clip audio</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+                <label style={fieldLabel}>Audio
+                  <select value={selectedClip.audioMode} onChange={(e) => commit((tl) => setClipAudioMode(tl, selectedClip.id, e.target.value))} style={numInput}>
+                    <option value="keep">Keep</option>
+                    <option value="mute">Mute</option>
+                    <option value="replace">Replace…</option>
+                    <option value="mix">Mix with…</option>
+                  </select>
+                </label>
+                {(selectedClip.audioMode === 'replace' || selectedClip.audioMode === 'mix') && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: T.mutedDark }}>
+                      {selectedClipAudioSource ? selectedClipAudioSource.file.name : (selectedClip.audioMode === 'replace' ? 'Replacement audio' : 'Audio to mix in')}
+                    </span>
+                    <input type="file" accept="audio/*" onChange={(e) => handleReplaceAudioFile(e.target.files, selectedClip.audioMode)} style={{ fontSize: '0.7rem', maxWidth: 200 }} />
+                  </div>
+                )}
+                {selectedClip.audioMode === 'mix' && (
+                  <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 5 }} title="Automatically lowers the mixed-in audio's volume while this clip's own audio has signal (e.g. voice over music)">
+                    <input type="checkbox" checked={!!selectedClip.duckBackground} onChange={(e) => commit((tl) => setClipDucking(tl, selectedClip.id, e.target.checked))} />
+                    Duck background
+                  </label>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <label style={fieldLabel}>Fade in
+                  <input type="number" step={0.1} min={0} max={(selectedClip.sourceEnd - selectedClip.sourceStart) / 2}
+                    value={selectedClip.fadeIn.toFixed(1)}
+                    onChange={(e) => commit((tl) => setClipFade(tl, selectedClip.id, { fadeIn: parseFloat(e.target.value) || 0 }))} style={numInput} />
+                </label>
+                <label style={fieldLabel}>Fade out
+                  <input type="number" step={0.1} min={0} max={(selectedClip.sourceEnd - selectedClip.sourceStart) / 2}
+                    value={selectedClip.fadeOut.toFixed(1)}
+                    onChange={(e) => commit((tl) => setClipFade(tl, selectedClip.id, { fadeOut: parseFloat(e.target.value) || 0 }))} style={numInput} />
+                </label>
+                <label style={fieldLabel}>Volume {Math.round((selectedClip.gain ?? 1) * 100)}%
+                  <input type="range" min={0.1} max={3} step={0.05} value={selectedClip.gain ?? 1}
+                    onChange={(e) => commit((tl) => setClipGain(tl, selectedClip.id, parseFloat(e.target.value)))} style={{ width: 90 }} />
+                </label>
+                <button onClick={handleNormalizeAudio} disabled={normalizing} style={smallBtn}>{normalizing ? 'Analyzing…' : '🔊 Normalize audio'}</button>
+              </div>
+            </div>
+          ))}
+
+          {activeCategory === 'effects' && (selectedClip && selectedSource && !isLockedSelected && selectionIds.length <= 1 ? (
+            <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Effects</div>
+              {selectedSource.kind !== 'image' && (
+                <label style={{ ...fieldLabel, display: 'inline-flex', marginBottom: 10 }}>Speed
+                  <select value={selectedClip.speed} onChange={(e) => commit((tl) => setClipSpeed(tl, selectedClip.id, parseFloat(e.target.value)))} style={numInput}>
+                    {SPEED_OPTIONS.map((s) => <option key={s} value={s}>{s}×</option>)}
+                  </select>
+                </label>
+              )}
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ ...fieldLabel, marginBottom: 4 }}>Filters</div>
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 6 }}>
+                  {Object.entries(FILTER_PRESETS).map(([id, values]) => (
+                    <button key={id} onClick={() => commit((tl) => setClipFilters(tl, selectedClip.id, values))} style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.68rem' }}>
+                      {id === 'none' ? 'Reset' : id[0].toUpperCase() + id.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <label style={fieldLabel}>Brightness
+                    <input type="range" min={0.5} max={1.5} step={0.02} value={selectedClip.filters.brightness}
+                      onChange={(e) => commit((tl) => setClipFilters(tl, selectedClip.id, { brightness: parseFloat(e.target.value) }))} style={{ width: 90 }} />
+                  </label>
+                  <label style={fieldLabel}>Contrast
+                    <input type="range" min={0.5} max={1.5} step={0.02} value={selectedClip.filters.contrast}
+                      onChange={(e) => commit((tl) => setClipFilters(tl, selectedClip.id, { contrast: parseFloat(e.target.value) }))} style={{ width: 90 }} />
+                  </label>
+                  <label style={fieldLabel}>Saturation
+                    <input type="range" min={0} max={2} step={0.02} value={selectedClip.filters.saturation}
+                      onChange={(e) => commit((tl) => setClipFilters(tl, selectedClip.id, { saturation: parseFloat(e.target.value) }))} style={{ width: 90 }} />
+                  </label>
+                </div>
+              </div>
+
+              {selectedClip.track === MAIN_TRACK && mainClips.length > 1 && mainClips[mainClips.length - 1].id !== selectedClip.id && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ ...fieldLabel, marginBottom: 4 }}>Transition to next clip</div>
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {TRANSITION_OPTIONS.map((t) => (
+                      <button key={t.id} onClick={() => handleSetTransition(selectedClip, t.id)}
+                        style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.68rem', background: selectedClip.transitionOut.type === t.id ? T.accentGradient : 'white', color: selectedClip.transitionOut.type === t.id ? 'white' : T.inkSecondary, border: selectedClip.transitionOut.type === t.id ? 'none' : `1px solid ${T.border}` }}>
+                        {t.label}
+                      </button>
+                    ))}
+                    {selectedClip.transitionOut.type !== 'cut' && (
+                      <input type="number" step={0.1} min={0.1} max={2} value={selectedClip.transitionOut.duration.toFixed(1)}
+                        onChange={(e) => handleTransitionDuration(selectedClip, parseFloat(e.target.value) || 0.5)}
+                        style={{ ...numInput, width: 56 }} title="Transition duration (seconds)" />
+                    )}
+                  </div>
+                  {selectedClip.transitionOut.type !== 'cut' && !BLEND_TRANSITION_TYPES.includes(selectedClip.transitionOut.type) && (
+                    <p style={{ fontSize: '0.64rem', color: T.muted, margin: '4px 0 0' }}>Sets this clip's fade-out and the next clip's fade-in to match{selectedClip.transitionOut.type !== 'fade' ? ', and the composition background color' : ''}.</p>
+                  )}
+                  {BLEND_TRANSITION_TYPES.includes(selectedClip.transitionOut.type) && (
+                    <p style={{ fontSize: '0.64rem', color: T.muted, margin: '4px 0 0' }}>Blends this clip's video directly into the next one — no fade through a color.</p>
+                  )}
+                </div>
+              )}
+
+              {timeline.fitMode !== 'contain' && (
+                <div style={{ marginBottom: 10, display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ ...fieldLabel, marginBottom: 4 }}>Crop / pan <span style={{ fontWeight: 500, opacity: 0.8 }}>— which part stays in frame</span></div>
+                    <div
+                      onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); handleCropFocusPointer(e); }}
+                      onPointerMove={(e) => { if (e.buttons === 1) handleCropFocusPointer(e); }}
+                      style={{ position: 'relative', width: 72, height: 72, borderRadius: 8, border: `1px solid ${T.border}`, background: '#0F172A', cursor: 'crosshair' }}
+                    >
+                      <div style={{
+                        position: 'absolute', width: 12, height: 12, borderRadius: '50%', background: T.accentGradient, border: '2px solid white',
+                        left: `calc(${selectedClip.cropFocus.x * 100}% - 6px)`, top: `calc(${selectedClip.cropFocus.y * 100}% - 6px)`, pointerEvents: 'none',
+                      }} />
+                    </div>
+                  </div>
+                  <label style={fieldLabel}>Zoom {(selectedClip.cropZoom ?? 1).toFixed(1)}×
+                    <input type="range" min={1} max={3} step={0.1} value={selectedClip.cropZoom ?? 1}
+                      onChange={(e) => commit((tl) => setClipCropZoom(tl, selectedClip.id, parseFloat(e.target.value)))} style={{ width: 90 }} />
+                    <span style={{ fontSize: '0.62rem', color: T.muted, fontWeight: 500 }}>Crops in tighter — drag the pad to pan the crop.</span>
+                  </label>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {selectedSource.kind !== 'image' && (
+                  <button
+                    onClick={() => commit((tl) => setClipReversed(tl, selectedClip.id, !selectedClip.reversed))}
+                    style={{ ...smallBtn, background: selectedClip.reversed ? T.accentGradient : 'white', color: selectedClip.reversed ? 'white' : T.inkSecondary }}
+                  >
+                    ⏪ {selectedClip.reversed ? 'Reversed' : 'Reverse'}
+                  </button>
+                )}
+                <button onClick={() => commit((tl) => rotateClip90(tl, selectedClip.id))} style={smallBtn} title={`Rotate 90° (currently ${selectedClip.rotation || 0}°)`}>
+                  ↻ Rotate{selectedClip.rotation ? ` ${selectedClip.rotation}°` : ''}
+                </button>
+                <button
+                  onClick={() => commit((tl) => setClipFlip(tl, selectedClip.id, { flipH: !selectedClip.flipH }))}
+                  style={{ ...smallBtn, background: selectedClip.flipH ? T.accentGradient : 'white', color: selectedClip.flipH ? 'white' : T.inkSecondary }}
+                >
+                  ⇋ Flip H
+                </button>
+                <button
+                  onClick={() => commit((tl) => setClipFlip(tl, selectedClip.id, { flipV: !selectedClip.flipV }))}
+                  style={{ ...smallBtn, background: selectedClip.flipV ? T.accentGradient : 'white', color: selectedClip.flipV ? 'white' : T.inkSecondary }}
+                >
+                  ⇵ Flip V
+                </button>
+              </div>
+              {selectedClip.reversed && (
+                <p style={{ fontSize: '0.66rem', color: T.muted, margin: '6px 0 0' }}>
+                  Reversed clips preview silently as a best-effort scrub — the exported video plays this clip backwards with its audio correctly reversed too.
+                </p>
+              )}
+            </div>
+          ) : (
+            <p style={{ fontSize: '0.72rem', color: T.muted, textAlign: 'center', padding: '16px 0' }}>Select a single clip on the timeline to adjust speed, filters, transitions, crop, or rotation.</p>
+          ))}
 
           {activeCategory === 'media' && (<>
           {/* Media */}
@@ -2870,11 +2905,13 @@ export default function VideoEditorWorkspace() {
 
           </>)}
 
-          {(activeCategory === 'composition' || activeCategory === 'canvas') && (<>
-          {/* Composition — always visible, not just after an overlay exists */}
+          {activeCategory === 'canvas' && (<>
+          {/* Canvas — output frame shape, fit, and background; a separate
+              concern from Composition's overlay LAYOUT (split/PIP/cutout)
+              below, even though both affect the final frame. */}
           <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, textTransform: 'uppercase', letterSpacing: 0.3 }}>Composition</div>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, textTransform: 'uppercase', letterSpacing: 0.3 }}>Canvas</div>
               <button onClick={() => setShowSafeGuides((v) => !v)} title="Preview-only guides — never appear in the exported video"
                 style={{ ...smallBtn, padding: '4px 8px', fontSize: '0.64rem', background: showSafeGuides ? T.accentGradient : 'white', color: showSafeGuides ? 'white' : T.inkSecondary, border: showSafeGuides ? 'none' : `1px solid ${T.border}` }}>
                 ⛶ Safe guides
@@ -2924,19 +2961,6 @@ export default function VideoEditorWorkspace() {
               )}
             </div>
 
-            {possibleDuplicateAudio && (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '7px 10px', borderRadius: 8, background: '#FFFBEB', border: '1px solid #FDE68A', marginBottom: 8 }}>
-                <span style={{ fontSize: '0.7rem', color: '#92400E' }}>
-                  ⚠️ Main and an overlay both keep their own audio — may sound duplicated if this is one conversation captured twice.
-                </span>
-                <button
-                  onClick={() => commit((tl) => ({ ...tl, clips: tl.clips.map((c) => (c.track !== MAIN_TRACK && c.audioMode === 'keep' ? { ...c, audioMode: 'mute' } : c)) }))}
-                  style={{ ...smallBtn, flexShrink: 0 }}
-                >
-                  Mute overlay audio
-                </button>
-              </div>
-            )}
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 8 }}>
               <div>
                 <div style={{ ...fieldLabel, marginBottom: 4 }}>Fit</div>
@@ -2980,6 +3004,29 @@ export default function VideoEditorWorkspace() {
             {timeline.fitMode === 'contain' && timeline.backgroundType === 'image' && (
               <div style={{ marginBottom: 8 }}>
                 <UploadBox accept="image/png,image/jpeg,image/webp" onFiles={handleBackgroundImageFile} maxSizeMB={MAX_UPLOAD_IMAGE_BYTES / (1024 * 1024)} compact compactLabel={timeline.backgroundImageSourceId ? '↻ Replace background image' : '+ Add background image'} />
+              </div>
+            )}
+          </div>
+          </>)}
+
+          {activeCategory === 'composition' && (<>
+          {/* Composition — overlay LAYOUT: split-screen/PIP/video-call/
+              person cutout. Always visible, not just after an overlay
+              exists (see the empty-state uploader below). */}
+          <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Composition</div>
+
+            {possibleDuplicateAudio && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '7px 10px', borderRadius: 8, background: '#FFFBEB', border: '1px solid #FDE68A', marginBottom: 10 }}>
+                <span style={{ fontSize: '0.7rem', color: '#92400E' }}>
+                  ⚠️ Main and an overlay both keep their own audio — may sound duplicated if this is one conversation captured twice.
+                </span>
+                <button
+                  onClick={() => commit((tl) => ({ ...tl, clips: tl.clips.map((c) => (c.track !== MAIN_TRACK && c.audioMode === 'keep' ? { ...c, audioMode: 'mute' } : c)) }))}
+                  style={{ ...smallBtn, flexShrink: 0 }}
+                >
+                  Mute overlay audio
+                </button>
               </div>
             )}
 
@@ -3258,10 +3305,6 @@ export default function VideoEditorWorkspace() {
             )}
           </div>
           </>)}
-
-          {activeCategory === 'edit' && !selectedClip && (
-            <p style={{ fontSize: '0.72rem', color: T.muted, textAlign: 'center', padding: '20px 0' }}>Select a clip on the timeline — its edit controls appear above, in the Clip panel.</p>
-          )}
 
           <p style={{ fontSize: '0.68rem', color: T.muted, marginTop: 10, textAlign: 'center' }}>
             Editing, composition, and export all happen locally in your browser — your video is never uploaded. Auto Captions is the one exception: it renders the edited timeline&apos;s audio locally, then sends a compressed copy of just that audio (never your video) to our transcription provider, processed for that request and not stored afterward.

@@ -413,6 +413,7 @@ export default function CVImproverWorkspace() {
   // so it clears the Career Session too rather than leaving stale job
   // context around for whatever gets typed in next.
   function startOver() {
+    if (!window.confirm('Start over? This clears your CV text, target role, and improved result — nothing here is saved elsewhere.')) return;
     setStructured(null); setCvText(''); setTargetPosition(''); setJobDescription('');
     setCompanyName(''); setIndustry('');
     setSuggestionState({}); setActiveView('improved'); setShowFinalResults(false); setStatus(''); setError(''); setUploadedName('');
@@ -669,9 +670,13 @@ export default function CVImproverWorkspace() {
 
           <div style={{ marginBottom: 20 }} className="no-print">
             <label style={labelStyle}>Paste Your CV / Resume Text</label>
-            <textarea ref={cvFieldRef} value={cvText} onChange={(e) => { setCvText(e.target.value); if (error === CV_REQUIRED_MESSAGE) setError(''); }}
-              placeholder="Paste your full CV here, or upload one above. Include your name, contact details, experience, education, skills..."
-              style={{ ...inputStyle, minHeight: 220, resize: 'vertical', lineHeight: 1.6, ...(error === CV_REQUIRED_MESSAGE ? { border: '1px solid #DC2626', boxShadow: '0 0 0 1px #DC2626' } : {}) }} />
+            {/* disabled while uploading: file extraction is async and can take a few
+                seconds on a large PDF/DOCX — without this, typing here during that
+                window gets silently overwritten the instant extraction resolves and
+                calls setCvText(text), discarding whatever the candidate just typed. */}
+            <textarea ref={cvFieldRef} value={cvText} disabled={uploading} onChange={(e) => { setCvText(e.target.value); if (error === CV_REQUIRED_MESSAGE) setError(''); }}
+              placeholder={uploading ? 'Reading your file…' : 'Paste your full CV here, or upload one above. Include your name, contact details, experience, education, skills...'}
+              style={{ ...inputStyle, minHeight: 220, resize: 'vertical', lineHeight: 1.6, ...(uploading ? { opacity: 0.6, cursor: 'wait' } : {}), ...(error === CV_REQUIRED_MESSAGE ? { border: '1px solid #DC2626', boxShadow: '0 0 0 1px #DC2626' } : {}) }} />
             {error === CV_REQUIRED_MESSAGE ? (
               <p style={{ fontSize: '0.75rem', color: '#DC2626', fontWeight: 600, marginTop: 4 }}>⚠ {CV_REQUIRED_MESSAGE}</p>
             ) : (

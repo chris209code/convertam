@@ -123,6 +123,20 @@ const RAIL_CATEGORIES = [
   { id: 'effects', icon: '🎨', label: 'Effects' },
 ];
 
+// What each rail category's right-hand panel shows before a main video
+// exists — a one-line preview of what unlocks once a video is uploaded,
+// shown while the panel itself has nothing real to operate on yet.
+const EMPTY_CATEGORY_COPY = {
+  media: 'Upload your main video on the left. Once it\'s in, add a second video or image overlay here for split-screen, picture-in-picture, or a logo/watermark.',
+  edit: 'Once your video is on the timeline, select a clip here to trim, split, duplicate, speed up/slow down, or add fades.',
+  audio: 'Select a clip here to replace, mute, or mix its audio, adjust volume and ducking, or clean up background noise.',
+  text: 'Add titles, captions-style text, or lower-thirds here once your video is loaded, with presets for size, color, and animation.',
+  captions: 'Auto Captions transcribes your edited timeline once a video is loaded, or burn in your own .srt/.vtt file here — no transcription required.',
+  composition: 'Add a second video overlay to unlock split-screen, picture-in-picture, and video-call layouts here.',
+  canvas: 'Choose a landscape, square, or vertical frame and a background fill here — works the moment your video is uploaded.',
+  effects: 'Select a clip here to apply color filters, crop, rotate, or flip it.',
+};
+
 // Named "video call" layouts: batch-apply pip position/size across however
 // many overlay tracks currently exist (up to the template's own slot
 // count), so a 2-4 participant call can be arranged in one click instead of
@@ -2049,22 +2063,85 @@ export default function VideoEditorWorkspace() {
   const isBurningAnything = isBurning || isBurningSubtitles;
   const supported = isTimelineExportSupported();
 
+  // Empty state shows the SAME editor chrome (header + tool rail) as the
+  // loaded state below, rather than a bare upload box, so the tool doesn't
+  // visually "jump" once a video lands — only the preview/panel content
+  // swaps in. The canvas, playback loop, and every panel that reads
+  // selectedClip/selectedSource stay gated behind mainClips.length (via the
+  // early return this replaces used to be) because those still assume a
+  // real clip exists; the rail is clickable here purely to preview each
+  // category's empty-state copy, not to operate on anything yet.
   if (!mainClips.length) {
+    const activeCategoryMeta = RAIL_CATEGORIES.find((c) => c.id === activeCategory);
     return (
-      <div style={{ fontFamily: T.font }}>
-        <UploadBox
-          accept="video/*"
-          onFiles={handleMainFiles}
-          maxSizeMB={MAX_UPLOAD_VIDEO_BYTES / (1024 * 1024)}
-          label="Click to choose a video to start editing, or drag it here"
-        />
-        {uploadError && <div style={{ ...statusBox, marginTop: 12 }}>⚠️ {uploadError}</div>}
-        <p style={{ fontSize: '0.76rem', color: T.muted, marginTop: 10, textAlign: 'center' }}>
-          Trim, cut, and reorder clips — or add a second video or image overlay for split-screen or picture-in-picture composition.{' '}
-          Need to record your screen first? Use{' '}
-          <Link href="/screen-recorder" style={{ color: T.accentDark, fontWeight: 700, textDecoration: 'none' }}>Screen Recorder</Link>
-          {' '}— your finished recording opens straight back here.
-        </p>
+      <div className="ve-shell" style={{ fontFamily: T.font, background: '#0B1120', borderRadius: 14, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 16px', background: '#0F172A', borderBottom: '1px solid #1E293B' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            <span style={{ fontWeight: 800, color: 'white', fontSize: '0.88rem', flexShrink: 0 }}>🎬 Video Editor</span>
+          </div>
+        </div>
+
+        <div className="ve-body">
+          <div className="ve-rail" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 2, padding: '10px 6px', background: '#0F172A', borderRight: '1px solid #1E293B', flexShrink: 0, overflowX: 'auto' }}>
+            {RAIL_CATEGORIES.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setActiveCategory(c.id)}
+                title={c.label}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, width: 56, padding: '7px 2px',
+                  borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: T.font,
+                  background: activeCategory === c.id ? T.accentGradient : 'transparent',
+                  color: activeCategory === c.id ? 'white' : '#94A3B8',
+                }}
+              >
+                <span style={{ fontSize: '1.05rem', lineHeight: 1 }}>{c.icon}</span>
+                <span style={{ fontSize: '0.56rem', fontWeight: 700 }}>{c.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div style={{ flex: 1, minWidth: 0, padding: 16, background: '#F8FAFC' }}>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              {/* Left: preview area — the drop box stands in for the canvas until a video exists */}
+              <div style={{ flex: '1 1 360px', minWidth: 300, maxWidth: 440 }}>
+                <UploadBox
+                  accept="video/*"
+                  onFiles={handleMainFiles}
+                  maxSizeMB={MAX_UPLOAD_VIDEO_BYTES / (1024 * 1024)}
+                  label="Click to choose a video to start editing, or drag it here"
+                />
+                {uploadError && <div style={{ ...statusBox, marginTop: 12 }}>⚠️ {uploadError}</div>}
+                <p style={{ fontSize: '0.76rem', color: T.muted, marginTop: 10, textAlign: 'center' }}>
+                  Trim, cut, and reorder clips — or add a second video or image overlay for split-screen or picture-in-picture composition.{' '}
+                  Need to record your screen first? Use{' '}
+                  <Link href="/screen-recorder" style={{ color: T.accentDark, fontWeight: 700, textDecoration: 'none' }}>Screen Recorder</Link>
+                  {' '}— your finished recording opens straight back here.
+                </p>
+              </div>
+
+              {/* Right: preview of the selected rail category, before it has anything to operate on */}
+              <div style={{ flex: '1 1 260px', minWidth: 260 }}>
+                <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12 }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                    {activeCategoryMeta?.icon} {activeCategoryMeta?.label}
+                  </div>
+                  <p style={{ fontSize: '0.76rem', color: T.muted, textAlign: 'center', padding: '20px 8px', margin: 0 }}>
+                    {EMPTY_CATEGORY_COPY[activeCategory] || 'Upload a video on the left to get started.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <style jsx>{`
+          .ve-body { display: flex; }
+          @media (max-width: 720px) {
+            .ve-body { flex-direction: column; }
+            .ve-rail { flex-direction: row !important; overflow-x: auto; border-right: none !important; border-bottom: 1px solid #1E293B; }
+          }
+        `}</style>
       </div>
     );
   }

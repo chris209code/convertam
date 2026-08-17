@@ -33,6 +33,7 @@ const FAQ = [
   { q: 'What format is the recording?', a: 'A .webm file (VP9 or VP8 video with Opus audio, whichever your browser supports), downloadable directly or usable straight in Video Editor, which can export it to MP4.' },
   { q: 'Can I stop the recording early?', a: 'Yes — click the in-app Stop Recording button, or use your browser\'s own "Stop sharing" control; either one ends the recording the same way.' },
   { q: 'Why is my recording silent even though I shared audio?', a: 'A live per-source checklist appears the moment recording starts, showing exactly what was captured (screen video, microphone, system/tab audio, webcam) — check it if something seems off. The most common cause is a browser/OS limitation on system audio sharing (see the system/tab audio question above), not a bug; turning on the microphone sidesteps that entirely.' },
+  { q: 'Can I clean up my microphone audio while recording?', a: 'Yes — check "Enhance voice" next to the microphone option before you start. It reduces hum/buzz and low rumble on your mic input live, using plain signal processing (not AI), so narration sounds clearer straight out of the recording. It won\'t remove every kind of background noise, but it genuinely helps.' },
 ];
 
 export default function ScreenRecorderPage() {
@@ -68,6 +69,7 @@ export default function ScreenRecorderPage() {
               <ul style={ul}>
                 <li><strong>Screen, window, or tab capture</strong> — your browser&apos;s own screen-sharing prompt lets you pick exactly what to record.</li>
                 <li><strong>Optional microphone</strong> — narrate over your recording, on by default with a genuine off switch. Mixed together with any system/tab audio your browser shares, so both survive in the final recording.</li>
+                <li><strong>Enhance voice</strong> — an optional checkbox (when the microphone is on) that reduces hum/buzz and low rumble on your mic input in real time as you record, for clearer narration in noisy rooms.</li>
                 <li><strong>Optional webcam picture-in-picture</strong> — show your face in a movable, resizable corner box over the screen recording, or leave it off entirely for a screen-only capture.</li>
                 <li><strong>Live capture checklist</strong> — see exactly what&apos;s actually being captured (screen video, microphone, system audio, webcam) the moment recording starts, so you know immediately if something didn&apos;t come through.</li>
                 <li><strong>Instant preview</strong> — watch the finished recording right on the page before you decide what to do with it.</li>

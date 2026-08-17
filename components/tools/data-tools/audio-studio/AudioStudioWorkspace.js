@@ -13,6 +13,7 @@ import { transcriptToSrt, transcriptToVtt } from '@/lib/media/captions';
 import { transcriptToPlainText } from '@/lib/media/transcript';
 import { renderCaptionedVideo, isCaptionedVideoSupported, RenderCancelledError } from '@/lib/media/renderCaptionedVideo';
 import { terminateFFmpeg } from '@/lib/media/ffmpegClient';
+import { cleanAudioFile, CLEANUP_INTENSITIES } from '@/lib/media/audioCleanup';
 import { DEFAULT_BACKGROUND } from '@/lib/media/videoCompose';
 import WaveformPlayer from '../shared/WaveformPlayer';
 import TranscriptEditor from '../shared/TranscriptEditor';
@@ -52,6 +53,17 @@ export default function AudioStudioWorkspace() {
   const renderStartRef = useRef(0);
   const [videoOptions, setVideoOptions] = useState({ background: DEFAULT_BACKGROUND, showWaveform: true });
 
+  // ---- Audio Cleanup: pure client-side Web Audio DSP (see
+  // lib/media/audioCleanup.js) — reduces hum/rumble/hiss and can level
+  // out volume, entirely separate from transcription/captioning above. ----
+  const [cleanupIntensity, setCleanupIntensity] = useState('medium');
+  const [cleanupReduceHum, setCleanupReduceHum] = useState(true);
+  const [cleanupVoiceEnhance, setCleanupVoiceEnhance] = useState(false);
+  const [cleanupNormalize, setCleanupNormalize] = useState(true);
+  const [cleanupStatus, setCleanupStatus] = useState('idle'); // idle | processing | error
+  const [cleanupError, setCleanupError] = useState('');
+  const [cleanedResult, setCleanedResult] = useState(null); // { blob, url } | null
+
   useEffect(() => {
     (async () => {
       const handoff = await receiveBlobHandoff('audio-studio');
@@ -86,6 +98,7 @@ export default function AudioStudioWorkspace() {
   function reset() {
     if (cancelTokenRef.current) cancelTokenRef.current.cancelled = true;
     if (fileUrl) URL.revokeObjectURL(fileUrl);
+    if (cleanedResult?.url) URL.revokeObjectURL(cleanedResult.url);
     setFile(null);
     setFileUrl(null);
     setMetadata(null);
@@ -99,6 +112,33 @@ export default function AudioStudioWorkspace() {
     setRenderError('');
     setRenderEta('');
     setVideoOptions({ background: DEFAULT_BACKGROUND, showWaveform: true });
+    setCleanupStatus('idle');
+    setCleanupError('');
+    setCleanedResult(null);
+  }
+
+  async function handleCleanAudio() {
+    if (!file) return;
+    setCleanupStatus('processing');
+    setCleanupError('');
+    try {
+      const { blob } = await cleanAudioFile(file, {
+        intensity: cleanupIntensity,
+        reduceHum: cleanupReduceHum,
+        voiceEnhance: cleanupVoiceEnhance,
+        normalize: cleanupNormalize,
+      });
+      if (cleanedResult?.url) URL.revokeObjectURL(cleanedResult.url);
+      setCleanedResult({ blob, url: URL.createObjectURL(blob) });
+      setCleanupStatus('idle');
+    } catch (err) {
+      setCleanupStatus('error');
+      setCleanupError(err.message || 'Could not clean this audio. Please try again.');
+    }
+  }
+  function handleDownloadCleaned() {
+    if (!cleanedResult || !file) return;
+    downloadBlob(cleanedResult.blob, 'audio/wav', `${baseName(file.name)}-cleaned.wav`);
   }
 
   async function handleTranscribe() {
@@ -244,6 +284,57 @@ export default function AudioStudioWorkspace() {
           <WaveformPlayer ref={playerRef} src={fileUrl} peaks={peaks} duration={metadata?.duration} onTimeUpdate={setCurrentTime} />
         </div>
       )}
+
+      <div style={{ padding: '14px 16px', borderRadius: 12, background: 'white', border: `1px solid ${T.border}`, marginBottom: 18 }}>
+        <h3 style={{ margin: '0 0 6px', fontSize: '0.9rem', color: T.ink }}>Audio Cleanup</h3>
+        <p style={{ margin: '0 0 12px', fontSize: '0.76rem', color: T.mutedDark }}>
+          Reduces background hum, low-end rumble, and quiet hiss between speech, with optional voice clarity and volume leveling — plain signal processing, not AI. It genuinely helps a noisy recording sound cleaner, but won&apos;t remove every kind of noise perfectly.
+        </p>
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+          <div>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: T.mutedDark, marginBottom: 4 }}>Intensity</div>
+            <div style={{ display: 'flex', gap: 5 }}>
+              {CLEANUP_INTENSITIES.map((level) => (
+                <button key={level} onClick={() => setCleanupIntensity(level)}
+                  style={{ ...smallBtn, padding: '5px 12px', fontSize: '0.72rem', textTransform: 'capitalize', background: cleanupIntensity === level ? T.accentGradient : 'white', color: cleanupIntensity === level ? 'white' : T.inkSecondary, border: cleanupIntensity === level ? 'none' : `1px solid ${T.border}` }}>
+                  {level}
+                </button>
+              ))}
+            </div>
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.76rem', color: T.inkSecondary, cursor: 'pointer' }}>
+            <input type="checkbox" checked={cleanupReduceHum} onChange={(e) => setCleanupReduceHum(e.target.checked)} />
+            Reduce hum/buzz
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.76rem', color: T.inkSecondary, cursor: 'pointer' }}>
+            <input type="checkbox" checked={cleanupVoiceEnhance} onChange={(e) => setCleanupVoiceEnhance(e.target.checked)} />
+            Voice enhancement
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.76rem', color: T.inkSecondary, cursor: 'pointer' }}>
+            <input type="checkbox" checked={cleanupNormalize} onChange={(e) => setCleanupNormalize(e.target.checked)} />
+            Normalize volume
+          </label>
+        </div>
+        <button onClick={handleCleanAudio} disabled={cleanupStatus === 'processing'} style={{ ...smallBtn, background: cleanupStatus === 'processing' ? '#94A3B8' : T.accentGradient, color: 'white', border: 'none', fontWeight: 700 }}>
+          {cleanupStatus === 'processing' ? 'Cleaning…' : '🧹 Clean Audio'}
+        </button>
+        {cleanupStatus === 'error' && <div style={{ ...statusBox, marginTop: 10 }}>⚠️ {cleanupError}</div>}
+        {cleanedResult && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.border}` }}>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              <div style={{ flex: '1 1 200px', minWidth: 180 }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: T.mutedDark, marginBottom: 4 }}>Original</div>
+                <audio controls src={fileUrl} style={{ width: '100%', height: 32 }} />
+              </div>
+              <div style={{ flex: '1 1 200px', minWidth: 180 }}>
+                <div style={{ fontSize: '0.68rem', fontWeight: 700, color: T.mutedDark, marginBottom: 4 }}>Cleaned</div>
+                <audio controls src={cleanedResult.url} style={{ width: '100%', height: 32 }} />
+              </div>
+            </div>
+            <button onClick={handleDownloadCleaned} style={{ ...smallBtn, marginTop: 10 }}>⬇ Download cleaned audio (WAV)</button>
+          </div>
+        )}
+      </div>
 
       {!transcript && (
         <div style={{ textAlign: 'center', padding: '16px 0' }}>

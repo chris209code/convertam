@@ -24,6 +24,7 @@ import Link from 'next/link';
 import { T } from '../smart-parser/theme';
 import { getPipRange, CORNER_PRESETS, drawCover } from '@/lib/media/compositionLayouts';
 import { sendBlobToTool } from '@/lib/media/blobHandoff';
+import { buildCleanupFilterChain } from '@/lib/media/audioCleanup';
 
 const PIP_CORNER_OPTIONS = [
   { id: 'top-left', label: 'Top left', icon: '↖' },
@@ -51,6 +52,7 @@ function downloadBlob(blob, filename) {
 
 export default function ScreenRecorderWorkspace() {
   const [recordMic, setRecordMic] = useState(true);
+  const [micCleanup, setMicCleanup] = useState(false); // "Enhance voice" — live hum/rumble filtering on the mic track, see lib/media/audioCleanup.js
   const [recordCamera, setRecordCamera] = useState(false);
   const [cameraCorner, setCameraCorner] = useState('bottom-right');
   const [cameraSizeRatio, setCameraSizeRatio] = useState(0.22);
@@ -209,14 +211,30 @@ export default function ScreenRecorderWorkspace() {
 
       const recordedTracks = [videoTrack];
       let audioCtx = null;
-      if (systemAudioTracks.length && micStream) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      // "Enhance voice" runs the SAME live filter chain (highpass + hum
+      // notches + presence EQ) as lib/media/audioCleanup.js's offline
+      // cleanAudioBuffer — just applied to the live mic MediaStream before
+      // it's mixed in, rather than to an already-recorded buffer. The
+      // gate/normalize passes in the offline version need a full buffer
+      // to analyze, so they aren't part of this live path; hum/rumble
+      // reduction and voice presence are.
+      let micStreamForMixing = micStream;
+      if (micStream && micCleanup) {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        const micSource = audioCtx.createMediaStreamSource(micStream);
+        const micDest = audioCtx.createMediaStreamDestination();
+        const cleanOutput = buildCleanupFilterChain(audioCtx, micSource, { intensity: 'medium', reduceHum: true, voiceEnhance: true });
+        cleanOutput.connect(micDest);
+        micStreamForMixing = micDest.stream;
+      }
+      if (systemAudioTracks.length && micStreamForMixing) {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
         const dest = audioCtx.createMediaStreamDestination();
         audioCtx.createMediaStreamSource(new MediaStream(systemAudioTracks)).connect(dest);
-        audioCtx.createMediaStreamSource(micStream).connect(dest);
+        audioCtx.createMediaStreamSource(micStreamForMixing).connect(dest);
         recordedTracks.push(...dest.stream.getAudioTracks());
-      } else if (micStream) {
-        recordedTracks.push(...micStream.getAudioTracks());
+      } else if (micStreamForMixing) {
+        recordedTracks.push(...micStreamForMixing.getAudioTracks());
       } else if (systemAudioTracks.length) {
         recordedTracks.push(...systemAudioTracks);
       }
@@ -362,6 +380,12 @@ export default function ScreenRecorderWorkspace() {
                   <input type="checkbox" checked={recordMic} onChange={(e) => setRecordMic(e.target.checked)} />
                   🎤 Include microphone
                 </label>
+                {recordMic && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.74rem', color: T.mutedDark, cursor: 'pointer', marginLeft: 18 }} title="Reduces hum, rumble, and boosts speech clarity live while recording — plain signal processing, not AI">
+                    <input type="checkbox" checked={micCleanup} onChange={(e) => setMicCleanup(e.target.checked)} />
+                    ✨ Enhance voice (reduce hum &amp; boost clarity)
+                  </label>
+                )}
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.8rem', color: T.inkSecondary, cursor: 'pointer' }}>
                   <input type="checkbox" checked={recordCamera} onChange={(e) => setRecordCamera(e.target.checked)} />
                   📷 Include webcam (picture-in-picture)

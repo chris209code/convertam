@@ -39,6 +39,7 @@ import { extractThumbnails, thumbnailsForRange } from '@/lib/media/thumbnails';
 import { extractWaveformPeaks, drawWaveform } from '@/lib/media/waveform';
 import { detectSilence } from '@/lib/media/silenceDetect';
 import { computeNormalizationGain } from '@/lib/media/normalizeAudio';
+import { cleanAudioFile } from '@/lib/media/audioCleanup';
 import { duckGainAtTime } from '@/lib/media/ducking';
 // Auto Captions reuses the exact same transcription/caption engine as
 // Audio Studio and Video Studio — no separate implementation. It runs on
@@ -53,7 +54,8 @@ import { duckGainAtTime } from '@/lib/media/ducking';
 // renders the actual final video (once) and burns the captions into that
 // same pass, rather than reusing a separate, possibly-stale earlier export.
 import { transcribeMedia, TranscriptionError } from '@/lib/media/providers/geminiTranscription';
-import { transcriptToSrt, transcriptToVtt, transcriptToAss, DEFAULT_CAPTION_STYLE } from '@/lib/media/captions';
+import { transcriptToSrt, transcriptToVtt, transcriptToAss, transcriptToCaptionCues, DEFAULT_CAPTION_STYLE } from '@/lib/media/captions';
+import { parseSubtitleFile } from '@/lib/media/subtitleParse';
 import { transcriptToPlainText } from '@/lib/media/transcript';
 import { burnAssSubtitles, FfmpegLoadError, FfmpegRenderError, FfmpegCancelledError } from '@/lib/media/ffmpegClient';
 import TranscriptEditor from '../shared/TranscriptEditor';
@@ -70,6 +72,18 @@ const BURN_STATUS_LABEL = {
   loading: 'Loading video engine…',
   burning: 'Burning captions into video…',
 };
+
+const BURN_SUBTITLE_STATUS_LABEL = {
+  'rendering-video': 'Rendering final video…',
+  loading: 'Loading video engine…',
+  burning: 'Burning subtitles into video…',
+};
+
+const SUBTITLE_POSITION_OPTIONS = [
+  { id: 'bottom', label: 'Bottom' },
+  { id: 'middle', label: 'Middle' },
+  { id: 'top', label: 'Top' },
+];
 
 const RENDER_STATUS_LABEL = {
   preparing: 'Preparing…',
@@ -303,6 +317,8 @@ export default function VideoEditorWorkspace() {
   const [silenceRanges, setSilenceRanges] = useState(null); // null = not run yet; [] = ran, found none; [{ start, end, selected }] = ran, found some — never applied until the user confirms
   const [silenceScanning, setSilenceScanning] = useState(false);
   const [normalizing, setNormalizing] = useState(false);
+  const [cleaningClipAudio, setCleaningClipAudio] = useState(false);
+  const [clipCleanupError, setClipCleanupError] = useState('');
   // Timeline zoom — a multiplier on the track strips' own width (they're
   // flex-proportional to clip duration already, see mainTrackRef's comment
   // below) rather than a fixed px-per-second, so 1x still exactly fits the
@@ -348,6 +364,23 @@ export default function VideoEditorWorkspace() {
   const audioRenderCancelRef = useRef(null);
   const exportCancelRef = useRef(null);
   const burnStartRef = useRef(0);
+
+  // ---- Burn Subtitles: user supplies an existing .srt/.vtt file instead
+  // of generating one with Auto Captions — no transcription, no AI, kept
+  // as a fully separate state machine from transcript/burnStatus above so
+  // the two features can't collide, even though the actual burn-in at the
+  // end reuses the exact same transcriptToAss + burnAssSubtitles pipeline
+  // Auto Captions already uses (see handleBurnSubtitles). ----
+  const [uploadedSubtitle, setUploadedSubtitle] = useState(null); // { segments: [{start,end,text}] } | null
+  const [subtitleFileName, setSubtitleFileName] = useState('');
+  const [subtitleParseError, setSubtitleParseError] = useState('');
+  const [subtitleStyle, setSubtitleStyle] = useState(DEFAULT_CAPTION_STYLE);
+  const [burnSubtitleStatus, setBurnSubtitleStatus] = useState('idle'); // idle | rendering-video | loading | burning | error
+  const [burnSubtitleProgress, setBurnSubtitleProgress] = useState(0);
+  const [burnSubtitleError, setBurnSubtitleError] = useState('');
+  const [burnSubtitleEta, setBurnSubtitleEta] = useState('');
+  const burnSubtitleCancelRef = useRef(null);
+  const burnSubtitleStartRef = useRef(0);
 
   const canvasRef = useRef(null);
   const mainVideoRef = useRef(null);
@@ -889,6 +922,31 @@ export default function VideoEditorWorkspace() {
       setUploadError('Could not analyze this clip\'s audio.');
     } finally {
       setNormalizing(false);
+    }
+  }
+
+  // ---- Audio Cleanup: reduces hum/rumble/hiss, no AI (see
+  // lib/media/audioCleanup.js — the same engine Audio Studio and Screen
+  // Recorder use). If the clip is already set to Replace/Mix, cleans that
+  // audio source; otherwise cleans the clip's own video/audio source
+  // within its trim range, then routes the result through the existing
+  // Replace-audio mechanism — reusing that infrastructure end to end
+  // (export, live preview) rather than adding a parallel audio path. ----
+  async function handleCleanClipAudio() {
+    if (!selectedClip || !selectedSource) return;
+    setCleaningClipAudio(true);
+    setClipCleanupError('');
+    try {
+      const usingReplacement = (selectedClip.audioMode === 'replace' || selectedClip.audioMode === 'mix') && selectedClipAudioSource;
+      const sourceFile = usingReplacement ? selectedClipAudioSource.file : selectedSource.file;
+      const range = usingReplacement ? {} : { startSeconds: selectedClip.sourceStart, endSeconds: selectedClip.sourceEnd };
+      const { blob } = await cleanAudioFile(sourceFile, { intensity: 'medium', reduceHum: true, voiceEnhance: false, normalize: false, ...range });
+      const file = new File([blob], 'cleaned-audio.wav', { type: 'audio/wav' });
+      await handleReplaceAudioFile([file], 'replace');
+    } catch (err) {
+      setClipCleanupError(err.message || 'Could not clean this clip\'s audio. Please try again.');
+    } finally {
+      setCleaningClipAudio(false);
     }
   }
 
@@ -1897,9 +1955,98 @@ export default function VideoEditorWorkspace() {
     if (burnCancelRef.current) burnCancelRef.current.cancelled = true;
   }
 
+  // Burn Subtitles: no transcription, no AI — the user already has an
+  // .srt/.vtt file and just wants it hardcoded into the video's pixels.
+  async function handleSubtitleFile(files) {
+    const f = files[0];
+    if (!f) return;
+    setSubtitleParseError('');
+    try {
+      const text = await f.text();
+      const parsed = parseSubtitleFile(text, f.name);
+      if (!parsed.segments.length) {
+        setSubtitleParseError('No subtitle cues were found in this file. Confirm it\'s a valid .srt or .vtt file.');
+        return;
+      }
+      setUploadedSubtitle(parsed);
+      setSubtitleFileName(f.name);
+    } catch {
+      setSubtitleParseError('Could not read this file. Confirm it\'s a valid .srt or .vtt file.');
+    }
+  }
+  function handleRemoveSubtitle() {
+    setUploadedSubtitle(null);
+    setSubtitleFileName('');
+    setSubtitleParseError('');
+  }
+
+  // Same render-then-burn pipeline as Auto Captions' handleBurnCaptions
+  // (render the current edited timeline fresh, then burn styled subtitles
+  // into that render) — only the source of the cues differs: an uploaded
+  // file's segments here, transcript.segments there. transcriptToAss
+  // doesn't care which produced them, since both are the same
+  // { segments: [{start,end,text}] } shape.
+  async function handleBurnSubtitles() {
+    if (!uploadedSubtitle || !mainClips.length) return;
+    setBurnSubtitleError('');
+    setBurnSubtitleStatus('rendering-video');
+    setBurnSubtitleProgress(0);
+    setBurnSubtitleEta('');
+    const cancelToken = { cancelled: false };
+    burnSubtitleCancelRef.current = cancelToken;
+    burnSubtitleStartRef.current = Date.now();
+    try {
+      const videoBlob = await renderTimeline(timeline, {
+        onStatus: () => {},
+        onProgress: setBurnSubtitleProgress,
+        cancelToken,
+      });
+      if (cancelToken.cancelled) throw new TimelineRenderCancelledError();
+      setBurnSubtitleProgress(0);
+      setBurnSubtitleStatus('loading');
+      const videoFile = new File([videoBlob], 'edited-video.mp4', { type: 'video/mp4' });
+      const assText = transcriptToAss(uploadedSubtitle, subtitleStyle);
+      setBurnSubtitleStatus('burning');
+      burnSubtitleStartRef.current = Date.now();
+      const mp4Blob = await burnAssSubtitles({
+        videoFile,
+        assText,
+        onProgress: (p) => {
+          setBurnSubtitleProgress(p);
+          const elapsedSec = (Date.now() - burnSubtitleStartRef.current) / 1000;
+          setBurnSubtitleEta(p > 0.03 ? `~${formatDuration(Math.max(0, elapsedSec / p - elapsedSec))} remaining` : '');
+        },
+        cancelToken,
+      });
+      downloadBlob(mp4Blob, 'video/mp4', 'edited-video-subtitled.mp4');
+      setBurnSubtitleStatus('idle');
+      setBurnSubtitleEta('');
+    } catch (err) {
+      if (err instanceof FfmpegCancelledError || err instanceof TimelineRenderCancelledError || cancelToken.cancelled) {
+        setBurnSubtitleStatus('idle');
+        setBurnSubtitleProgress(0);
+        setBurnSubtitleEta('');
+      } else {
+        setBurnSubtitleStatus('error');
+        setBurnSubtitleError(err instanceof FfmpegLoadError || err instanceof FfmpegRenderError || err instanceof TimelineRenderError ? err.message : 'Could not burn subtitles into this video. Please try again.');
+      }
+    } finally {
+      burnSubtitleCancelRef.current = null;
+    }
+  }
+  function handleCancelBurnSubtitles() {
+    if (burnSubtitleCancelRef.current) burnSubtitleCancelRef.current.cancelled = true;
+  }
+
   const isExporting = renderStatus === 'preparing' || renderStatus === 'rendering' || renderStatus === 'finalizing';
   const isTranscribing = transcribeStatus === 'preparing-audio' || transcribeStatus === 'rendering-audio' || transcribeStatus === 'preparing' || transcribeStatus === 'transcribing' || transcribeStatus === 'merging';
   const isBurning = burnStatus === 'rendering-video' || burnStatus === 'loading' || burnStatus === 'burning';
+  // ffmpeg.wasm is a single lazy-loaded singleton (see ffmpegClient.js) —
+  // it can't run two exec() calls at once, so Auto Captions' burn and
+  // Burn Subtitles' burn must never overlap even though they're otherwise
+  // fully independent state machines.
+  const isBurningSubtitles = burnSubtitleStatus === 'rendering-video' || burnSubtitleStatus === 'loading' || burnSubtitleStatus === 'burning';
+  const isBurningAnything = isBurning || isBurningSubtitles;
   const supported = isTimelineExportSupported();
 
   if (!mainClips.length) {
@@ -1993,6 +2140,37 @@ export default function VideoEditorWorkspace() {
                 cursor: (overlayTracks.some((t) => t.mode === 'pip') || timeline.textOverlays.length > 0) ? (isDraggingOverlay ? 'grabbing' : 'grab') : 'default',
               }}
             />
+            {uploadedSubtitle && (() => {
+              const cue = transcriptToCaptionCues(uploadedSubtitle).find((c) => playhead >= c.start && playhead < c.end);
+              if (!cue) return null;
+              const scale = subtitleStyle.fontSize / DEFAULT_CAPTION_STYLE.fontSize;
+              const hasBackground = (subtitleStyle.backgroundOpacity ?? 0) > 0;
+              return (
+                <div
+                  style={{
+                    position: 'absolute', left: '6%', right: '6%', textAlign: 'center', pointerEvents: 'none', zIndex: 4,
+                    top: subtitleStyle.position === 'top' ? '5%' : subtitleStyle.position === 'middle' ? '50%' : 'auto',
+                    bottom: subtitleStyle.position === 'bottom' ? '6%' : 'auto',
+                    transform: subtitleStyle.position === 'middle' ? 'translateY(-50%)' : 'none',
+                  }}
+                >
+                  {cue.lines.map((line, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: 'inline-block', color: subtitleStyle.color, fontWeight: 700, lineHeight: 1.3,
+                        fontSize: `${1.05 * scale}rem`,
+                        ...(hasBackground
+                          ? { background: `rgba(0,0,0,${subtitleStyle.backgroundOpacity})`, padding: '2px 8px', borderRadius: 4 }
+                          : { textShadow: `1px 1px 0 ${subtitleStyle.outlineColor}, -1px -1px 0 ${subtitleStyle.outlineColor}, 1px -1px 0 ${subtitleStyle.outlineColor}, -1px 1px 0 ${subtitleStyle.outlineColor}` }),
+                      }}
+                    >
+                      {line}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
             <video ref={mainVideoRef} muted playsInline style={{ display: 'none' }} />
             <video ref={mainCrossfadeVideoRef} muted playsInline style={{ display: 'none' }} />
             {overlayTracks.map((track) => (
@@ -2324,7 +2502,11 @@ export default function VideoEditorWorkspace() {
                     onChange={(e) => commit((tl) => setClipGain(tl, selectedClip.id, parseFloat(e.target.value)))} style={{ width: 90 }} />
                 </label>
                 <button onClick={handleNormalizeAudio} disabled={normalizing} style={smallBtn}>{normalizing ? 'Analyzing…' : '🔊 Normalize audio'}</button>
+                <button onClick={handleCleanClipAudio} disabled={cleaningClipAudio} style={smallBtn} title="Reduces hum, rumble, and background hiss in this clip's audio — plain signal processing, not AI">
+                  {cleaningClipAudio ? 'Cleaning…' : '🧹 Clean audio'}
+                </button>
               </div>
+              {clipCleanupError && <div style={{ ...statusBox, marginTop: 8 }}>⚠️ {clipCleanupError}</div>}
             </div>
           ))}
 
@@ -3139,7 +3321,7 @@ export default function VideoEditorWorkspace() {
                   <button onClick={handleDownloadTxt} style={smallBtn}>⬇ TXT</button>
                   <button onClick={() => { setTranscript(null); setTranscribeStatus('idle'); }} style={smallBtn}>Re-transcribe</button>
                 </div>
-                <button onClick={handleBurnCaptions} disabled={isBurning} style={{ ...primaryBtn(isBurning), width: '100%', marginTop: 8, padding: '10px 20px', fontSize: '0.85rem' }}>
+                <button onClick={handleBurnCaptions} disabled={isBurningAnything} style={{ ...primaryBtn(isBurningAnything), width: '100%', marginTop: 8, padding: '10px 20px', fontSize: '0.85rem' }}>
                   {isBurning ? `${BURN_STATUS_LABEL[burnStatus] || 'Working…'} ${Math.round(burnProgress * 100)}%${burnEta ? ` — ${burnEta}` : ''}` : '🔥 Burn captions & export final video'}
                 </button>
                 {isBurning && (
@@ -3152,10 +3334,88 @@ export default function VideoEditorWorkspace() {
               </>
             )}
           </div>
+
+          {/* Burn Subtitles — separate from Auto Captions above: no
+              transcription, no AI, the user already has an .srt/.vtt file.
+              Reuses the exact same styled ffmpeg burn-in engine (see
+              handleBurnSubtitles), just with an uploaded file's cues
+              instead of a generated transcript's. */}
+          <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginTop: 10 }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Burn Subtitles</div>
+            {!mainClips.length ? (
+              <p style={{ fontSize: '0.72rem', color: T.muted, margin: 0 }}>Add a clip to the timeline, then burn a subtitle file into it here.</p>
+            ) : !uploadedSubtitle ? (
+              <>
+                <p style={{ fontSize: '0.7rem', color: T.muted, margin: '0 0 8px' }}>Already have captions? Upload an .srt or .vtt file to burn them directly into your video — no transcription needed.</p>
+                <UploadBox accept=".srt,.vtt,text/vtt,application/x-subrip" onFiles={handleSubtitleFile} maxSizeMB={5} compact compactLabel="+ Upload .srt or .vtt file" />
+                {subtitleParseError && <div style={{ ...statusBox, marginTop: 8 }}>⚠️ {subtitleParseError}</div>}
+              </>
+            ) : (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+                  <span style={{ fontSize: '0.72rem', color: T.inkSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    📄 {subtitleFileName} · {uploadedSubtitle.segments.length} cue{uploadedSubtitle.segments.length === 1 ? '' : 's'}
+                  </span>
+                  <button onClick={handleRemoveSubtitle} style={{ ...smallBtn, padding: '5px 10px', flexShrink: 0 }}>Remove</button>
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+                  <label style={fieldLabel}>Font size {subtitleStyle.fontSize}px
+                    <input type="range" min={16} max={56} step={2} value={subtitleStyle.fontSize}
+                      onChange={(e) => setSubtitleStyle((s) => ({ ...s, fontSize: parseInt(e.target.value, 10) }))} style={{ width: 110 }} />
+                  </label>
+                  <div>
+                    <div style={{ ...fieldLabel, marginBottom: 4 }}>Position</div>
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      {SUBTITLE_POSITION_OPTIONS.map((p) => (
+                        <button key={p.id} onClick={() => setSubtitleStyle((s) => ({ ...s, position: p.id }))}
+                          style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.68rem', background: subtitleStyle.position === p.id ? T.accentGradient : 'white', color: subtitleStyle.position === p.id ? 'white' : T.inkSecondary, border: subtitleStyle.position === p.id ? 'none' : `1px solid ${T.border}` }}>
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+                  <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6 }}>Text color
+                    <input type="color" value={subtitleStyle.color} onChange={(e) => setSubtitleStyle((s) => ({ ...s, color: e.target.value }))} style={{ width: 32, height: 28, padding: 0, border: `1px solid ${T.border}`, borderRadius: 6, cursor: 'pointer' }} />
+                  </label>
+                  <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6 }}>Outline color
+                    <input type="color" value={subtitleStyle.outlineColor} onChange={(e) => setSubtitleStyle((s) => ({ ...s, outlineColor: e.target.value }))} style={{ width: 32, height: 28, padding: 0, border: `1px solid ${T.border}`, borderRadius: 6, cursor: 'pointer' }} />
+                  </label>
+                  <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={(subtitleStyle.backgroundOpacity ?? 0) > 0} onChange={(e) => setSubtitleStyle((s) => ({ ...s, backgroundOpacity: e.target.checked ? 0.6 : 0 }))} />
+                    Background box
+                  </label>
+                  {(subtitleStyle.backgroundOpacity ?? 0) > 0 && (
+                    <label style={fieldLabel}>Opacity {Math.round(subtitleStyle.backgroundOpacity * 100)}%
+                      <input type="range" min={0.2} max={1} step={0.05} value={subtitleStyle.backgroundOpacity}
+                        onChange={(e) => setSubtitleStyle((s) => ({ ...s, backgroundOpacity: parseFloat(e.target.value) }))} style={{ width: 90 }} />
+                    </label>
+                  )}
+                </div>
+
+                <button onClick={handleBurnSubtitles} disabled={isBurningAnything} style={{ ...primaryBtn(isBurningAnything), width: '100%', padding: '10px 20px', fontSize: '0.85rem' }}>
+                  {isBurningSubtitles ? `${BURN_SUBTITLE_STATUS_LABEL[burnSubtitleStatus] || 'Working…'} ${Math.round(burnSubtitleProgress * 100)}%${burnSubtitleEta ? ` — ${burnSubtitleEta}` : ''}` : '🔥 Burn subtitles & export final video'}
+                </button>
+                {isBurningSubtitles && (
+                  <>
+                    <p style={{ margin: '6px 0 0', fontSize: '0.68rem', color: T.muted }}>Keep this tab open while the final video renders.</p>
+                    <button onClick={handleCancelBurnSubtitles} style={{ ...smallBtn, marginTop: 6 }}>Cancel</button>
+                  </>
+                )}
+                {burnSubtitleStatus === 'error' && <div style={{ ...statusBox, marginTop: 8 }}>⚠️ {burnSubtitleError}</div>}
+                <p style={{ fontSize: '0.64rem', color: T.muted, margin: '8px 0 0' }}>
+                  Burned into the video&apos;s actual pixels — permanent, and not something a viewer can turn off. Cue timestamps are relative to this timeline as it is right now; if you trim, retime, or otherwise change the timeline afterward, re-burn so they stay in sync.
+                </p>
+              </>
+            )}
+          </div>
           </>)}
 
           <p style={{ fontSize: '0.68rem', color: T.muted, marginTop: 10, textAlign: 'center' }}>
-            Editing, composition, and export all happen locally in your browser — your video is never uploaded. Auto Captions is the one exception: it renders the edited timeline&apos;s audio locally, then sends a compressed copy of just that audio (never your video) to our transcription provider, processed for that request and not stored afterward.
+            Editing, composition, and export all happen locally in your browser — your video is never uploaded. Auto Captions is the one exception: it renders the edited timeline&apos;s audio locally, then sends a compressed copy of just that audio (never your video) to our transcription provider, processed for that request and not stored afterward. Burn Subtitles never sends anything anywhere — it works entirely from the file you upload.
           </p>
         </div>
       </div>

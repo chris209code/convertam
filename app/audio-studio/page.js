@@ -20,6 +20,7 @@ const SCHEMA = {
 
 const FAQ = [
   { q: 'Can I transcribe MP3?', a: 'Yes — MP3, WAV, M4A, AAC, OGG, and WebM audio are all supported.' },
+  { q: 'Can Audio Studio clean up a noisy recording?', a: 'Yes — Audio Cleanup reduces mains hum/buzz, low-end rumble, and quiet background hiss between speech, with optional voice-clarity EQ and volume normalization. It\'s plain signal processing (Web Audio filters, not AI), runs entirely in your browser, and genuinely helps — but it won\'t perfectly remove every kind of background noise, and it never claims to.' },
   { q: 'Can I edit the transcript?', a: 'Yes — click any line to edit its text, merge it with the next line, delete it, or search across the whole transcript.' },
   { q: 'Can I download SRT?', a: 'Yes, along with WebVTT (.vtt) and a plain-text transcript.' },
   { q: 'Can I create a video from audio?', a: 'Yes — Create Captioned Video turns your audio plus a branded background and waveform into a downloadable MP4 with your transcript burned in as captions.' },
@@ -67,6 +68,7 @@ export default function AudioStudioPage() {
                 <li><strong>Generate captions</strong> — download the transcript as SRT or WebVTT, the two subtitle formats supported by virtually every video platform and player.</li>
                 <li><strong>Create a captioned video</strong> — turn the audio, a waveform visualization, and your captions into a downloadable MP4.</li>
                 <li><strong>Export the transcript</strong> — plain text, ready to paste anywhere or hand off to another Convertam tool.</li>
+                <li><strong>Audio Cleanup</strong> — reduce background hum, low-end rumble, and quiet hiss between speech, with optional voice clarity and volume normalization; download the cleaned file directly.</li>
               </ul>
             </section>
 

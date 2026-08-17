@@ -93,7 +93,15 @@ export async function POST(request) {
       schema: TRANSCRIBE_SCHEMA,
       hasImage: false,
       inputSizeApprox: buf.length,
-      maxOutputTokens: 8192,
+      // A 3-minute chunk of dense, exclamatory dialogue (short back-to-back
+      // lines, each its own timestamped JSON segment) can genuinely need
+      // more than 8192 tokens of structured output once per-segment field
+      // overhead is counted — that's what silently truncated a real user's
+      // transcript before geminiClient's finishReason==='MAX_TOKENS' check
+      // existed to catch it. Gemini 2.5 Flash supports up to 65536 output
+      // tokens; 32768 is a generous margin above any observed real chunk
+      // without approaching that ceiling.
+      maxOutputTokens: 32768,
       timeoutMs: 55000,
     });
 

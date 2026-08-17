@@ -53,6 +53,7 @@ export default function sitemap() {
     'data-tools/audio-studio',
     'data-tools/video-studio',
     'data-tools/video-editor',
+    'data-tools/screen-recorder',
   ].map((path) => ({
     url: `${BASE_URL}/${path}`,
     lastModified: new Date(),

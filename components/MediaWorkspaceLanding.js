@@ -24,6 +24,15 @@ const VIDEO_TOOLS = [
     cta: 'Open Editor',
   },
   {
+    slug: 'screen-recorder',
+    href: '/data-tools/screen-recorder',
+    icon: '🎥',
+    title: 'Screen Recorder',
+    desc: 'Record your screen, mic, and webcam.',
+    chips: ['Screen', 'Microphone', 'Webcam PIP', 'Local'],
+    cta: 'Start Recording',
+  },
+  {
     slug: 'video-transcriber',
     href: '/data-tools/video-studio',
     icon: '🎙️',
@@ -90,7 +99,8 @@ const FAQS = [
   { q: 'Is my audio or video uploaded to a server?', a: 'Editing, trimming, composing, and caption burn-in all happen locally on your device — the file itself is never uploaded. The one exception is transcription: when you ask for a transcript, the audio is sent for processing and is not stored afterward.' },
   { q: 'Can I combine two videos into a split-screen or picture-in-picture layout?', a: 'Yes — Video Editor supports side-by-side, top/bottom, and picture-in-picture (video-call style) composition from any number of video or image overlays, with draggable positioning and real MP4 export.' },
   { q: 'Can Video Editor remove a person’s background automatically?', a: 'Yes — Person Cutout uses an on-device machine learning model to isolate a person from their background on a picture-in-picture overlay, no green screen needed, live in the preview and in the export.' },
-  { q: 'Can I move work between these tools?', a: 'Video Studio’s Extract Audio can hand the extracted WAV straight to Audio Studio without a manual download-and-reupload. Video Editor’s own Auto Captions and Video Studio’s transcription both work in one step within their own tool.' },
+  { q: 'Can I move work between these tools?', a: 'Yes — Screen Recorder’s “Open in Video Editor” hands a finished recording straight to Video Editor’s timeline, and Video Studio’s Extract Audio can hand the extracted WAV straight to Audio Studio, both without a manual download-and-reupload. Video Editor’s own Auto Captions and Video Studio’s transcription both work in one step within their own tool.' },
+  { q: 'Can I create a video without showing my face or recording my voice?', a: 'Yes — Screen Recorder’s microphone and webcam are both independently optional and off by default for the webcam (the mic defaults on but is a genuine toggle). Leave both off for a silent, faceless screen-only recording.' },
 ];
 
 const faqSchema = {
@@ -193,7 +203,7 @@ export default function MediaWorkspaceLanding({ relatedCategories }) {
       {/* ---- Workflow ---- */}
       <section className="mw-section">
         <h2 className="mw-h2">Your media workflow</h2>
-        <p className="mw-workflow-sub">These tools are built to work together — most steps happen within one tool; Video Studio’s Extract Audio can also hand its WAV straight to Audio Studio without a re-upload.</p>
+        <p className="mw-workflow-sub">These tools are built to work together — most steps happen within one tool; Screen Recorder can hand a finished recording straight to Video Editor, and Video Studio’s Extract Audio can hand its WAV straight to Audio Studio, both without a re-upload.</p>
         <div className="mw-workflow">
           {WORKFLOW_STEPS.map((s, i) => (
             <div className="mw-workflow-step" key={s.label}>

@@ -2,8 +2,8 @@ import Link from 'next/link';
 import VideoEditorWorkspace from '../../../components/tools/data-tools/video-editor/VideoEditorWorkspace';
 
 export const metadata = {
-  title: 'Video Editor — Multi-Track, Video Call & Screen Recording | Convertam',
-  description: 'Trim, split, and reorder clips on a zoomable, snapping, multi-select timeline, add text/titles/shapes with entrance animations and a logo, rotate/flip/crop and pan, adjust speed and fades, apply filters, compose multi-track split-screen, picture-in-picture, or video-call layouts with per-track mute/solo/lock and a custom reframe background, automatically remove a person\'s background for a cutout overlay (no green screen needed), record your screen, drop timeline markers, and generate Auto Captions straight from your edited timeline — entirely in your browser, no login required.',
+  title: 'Video Editor — Multi-Track, Composition & Auto Captions | Convertam',
+  description: 'Trim, split, and reorder clips on a zoomable, snapping, multi-select timeline, add text/titles/shapes with entrance animations and a logo, rotate/flip/crop and pan, adjust speed and fades, apply filters, compose multi-track split-screen, picture-in-picture, or video-call layouts with per-track mute/solo/lock and a custom reframe background, automatically remove a person\'s background for a cutout overlay (no green screen needed), drop timeline markers, and generate Auto Captions straight from your edited timeline — entirely in your browser, no login required.',
   alternates: { canonical: '/data-tools/video-editor' },
 };
 
@@ -13,7 +13,7 @@ const SCHEMA = {
   name: 'Video Editor',
   applicationCategory: 'MultimediaApplication',
   operatingSystem: 'Any (runs in browser)',
-  description: 'A browser-based non-destructive video editor: trim, split, delete, join, and reorder clips; add text/titles, shapes, a logo/watermark, speed changes, fades, and color filters; compose multi-track split-screen, picture-in-picture, and video-call layouts from any number of video sources; record your screen directly in the browser.',
+  description: 'A browser-based non-destructive video editor: trim, split, delete, join, and reorder clips; add text/titles, shapes, a logo/watermark, speed changes, fades, and color filters; compose multi-track split-screen, picture-in-picture, and video-call layouts from any number of video sources.',
   offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
   url: 'https://www.convertam.app/data-tools/video-editor',
 };
@@ -30,7 +30,7 @@ const FAQ = [
   { q: 'Can I remove the background from a person without a green screen?', a: 'Yes — with a video overlay in Picture-in-picture mode, click Person cutout (remove background). It automatically isolates the person using on-device machine learning (nothing is uploaded), live in the preview and in the export, so only they show over whatever\'s on your Main track underneath. You can soften the cut edge, add a drop shadow or a colored outline glow, and resize/move/flip it exactly like any other overlay.' },
   { q: 'Can I add more than one overlay video?', a: 'Yes — every time you add a video or image overlay, it becomes its own new overlay track rather than replacing an existing one, so you can stack up several participants, webcams, or graphics at once.' },
   { q: 'What are video-call templates?', a: 'With two or more overlay tracks, Bottom strip, Side strip, and Corners are one-click layouts that arrange every overlay tile at once — you can still drag any tile afterward to adjust it further.' },
-  { q: 'Can I record my screen in Video Editor?', a: 'Yes — click Record screen (or "Or record your screen" before you\'ve uploaded anything) to capture your screen, a window, or a browser tab via your browser\'s own screen-sharing prompt. Your microphone is included by default too (an "Include microphone" checkbox lets you turn that off), so you can narrate over the recording. The recording happens entirely on your device and is added to the timeline once you stop it.' },
+  { q: 'Can I record my screen in Video Editor?', a: 'Screen recording now lives in its own dedicated Screen Recorder tool — with an optional microphone and an optional webcam picture-in-picture. Once you stop recording there, click "Open in Video Editor" and it lands straight on your timeline, ready to trim, compose, caption, and export, with no manual upload step.' },
   { q: 'Can I draw shapes or arrows on my video?', a: 'Yes — the Shapes panel adds rectangle, circle, line, and arrow annotations, each with its own color, filled or outline style, stroke width, position, and start/end timing.' },
   { q: 'Can I control audio from each video separately?', a: 'Yes — each clip has its own audio setting (Keep or Mute), so you can choose which video\'s sound plays during composed sections.' },
   { q: 'Can I export a vertical video for TikTok or Reels?', a: 'Yes — choose the Vertical (9:16) frame in the Composition panel. It works with a single video too, no overlay needed; the export is simply reframed to that shape. Square (1:1) and Landscape (16:9) are also available.' },
@@ -82,7 +82,7 @@ export default function VideoEditorPage() {
           <div style={{ maxWidth: 760, margin: '0 auto 32px', textAlign: 'center' }}>
             <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '2rem', fontWeight: 800, color: '#0F172A', marginBottom: 10 }}>Video Editor</h1>
             <p style={{ fontSize: '1rem', color: '#475569', lineHeight: 1.6 }}>
-              Trim, split, and reorder clips on a real timeline with drag-to-trim handles, add text/titles/shapes and a logo, adjust speed and fades, apply color filters, then compose multi-track split-screen, picture-in-picture, or video-call layouts from any number of videos — or record your screen directly — all in your browser.
+              Trim, split, and reorder clips on a real timeline with drag-to-trim handles, add text/titles/shapes and a logo, adjust speed and fades, apply color filters, then compose multi-track split-screen, picture-in-picture, or video-call layouts from any number of videos — all in your browser. Need to create a new recording first? Use <Link href="/data-tools/screen-recorder" style={{ color: '#0E7490', fontWeight: 700 }}>Screen Recorder</Link>, then open it straight here.
             </p>
           </div>
 
@@ -133,7 +133,6 @@ export default function VideoEditorPage() {
                 <li><strong>Picture-in-picture / video call</strong> — a main video with one or more repositionable, resizable overlay tiles, each independently positioned.</li>
                 <li><strong>Person cutout</strong> — automatically remove a picture-in-picture overlay's background (no green screen needed) using on-device machine learning, with edge softness, an optional drop shadow, and an optional colored outline glow — nothing uploaded, works live in the preview and the export.</li>
                 <li><strong>Video-call templates</strong> — Bottom strip, Side strip, or Corners one-click layouts that arrange every overlay tile at once for a multi-participant call.</li>
-                <li><strong>Screen recording</strong> — capture your screen, window, or tab directly in the browser and drop it straight into the timeline as the main video or an overlay.</li>
                 <li><strong>Shapes</strong> — rectangle, circle, line, and arrow annotations, each with its own color, fill, stroke width, position, and timing.</li>
                 <li><strong>Per-clip audio</strong> — keep, mute, replace, or mix in different audio per clip.</li>
                 <li><strong>Audio ducking</strong> — automatically lowers mixed-in background audio while a clip&apos;s own audio has signal, so voice and music don&apos;t fight for attention.</li>
@@ -167,9 +166,9 @@ export default function VideoEditorPage() {
             </section>
 
             <section style={{ marginBottom: 36 }}>
-              <h2 style={sectionH2}>Screen recording</h2>
+              <h2 style={sectionH2}>Need to record something first?</h2>
               <p>
-                Click <strong>Record screen</strong> to capture your screen, a specific window, or a browser tab using your browser&apos;s own screen-sharing permission — no extension or download required. The recording happens entirely on your device; stop it with the in-app button or your browser&apos;s own &quot;Stop sharing&quot; control, and it&apos;s added straight to the timeline as your main video (if you haven&apos;t uploaded one yet) or as a new overlay track (for a webcam-plus-screen tutorial layout).
+                Video Editor is exclusively for editing video you already have. To create a new recording, use the separate <Link href="/data-tools/screen-recorder" style={{ color: '#0E7490', fontWeight: 700 }}>Screen Recorder</Link> tool — it captures your screen, a window, or a browser tab, with an optional microphone and an optional webcam picture-in-picture, entirely in your browser. Once you stop recording there, one click on &quot;Open in Video Editor&quot; hands it straight to your timeline here, ready to trim, compose, and export.
               </p>
             </section>
 
@@ -196,7 +195,7 @@ export default function VideoEditorPage() {
                 <li><strong>Reaction and commentary videos</strong> — picture-in-picture your face over gameplay or footage.</li>
                 <li><strong>Interview and comparison videos</strong> — split screen two speakers or two angles side by side.</li>
                 <li><strong>Multi-participant video calls or panels</strong> — arrange three or four speakers with a video-call template.</li>
-                <li><strong>Tutorials and product demos</strong> — record your screen, add a webcam overlay and shape annotations to point things out.</li>
+                <li><strong>Tutorials and product demos</strong> — bring in a Screen Recorder recording, then add shape annotations, text, and captions to point things out.</li>
               </ul>
             </section>
 
@@ -208,7 +207,7 @@ export default function VideoEditorPage() {
             <section style={{ marginBottom: 36 }}>
               <h2 style={sectionH2}>Privacy and temporary processing</h2>
               <p>
-                Editing, composition, screen recording, and export all happen locally in your browser — your video is never uploaded for those steps, and a screen recording never leaves your device unless you choose to export it. Auto Captions is the one exception: it first renders just your edited timeline&apos;s audio locally (never the video), then sends a compressed copy of that rendered audio to our transcription provider, processed for that single request and not stored afterward. If you don&apos;t use Auto Captions, nothing about your video — or its audio — ever reaches Convertam&apos;s servers.
+                Editing, composition, and export all happen locally in your browser — your video is never uploaded for those steps. Auto Captions is the one exception: it first renders just your edited timeline&apos;s audio locally (never the video), then sends a compressed copy of that rendered audio to our transcription provider, processed for that single request and not stored afterward. If you don&apos;t use Auto Captions, nothing about your video — or its audio — ever reaches Convertam&apos;s servers.
               </p>
             </section>
 
@@ -218,7 +217,6 @@ export default function VideoEditorPage() {
                 <li><strong>Overlay tiles, not an equal grid:</strong> with picture-in-picture and video-call layouts, the main track stays full-size underneath and overlays are placed as smaller tiles on top — there&apos;s no mode that shrinks every participant, main track included, into equal-size grid cells.</li>
                 <li><strong>Rendering speed:</strong> export runs in your browser, so it takes real processing time proportional to your video&apos;s length, composition, effects, and your device&apos;s power — using speed, fades, filters, text, shapes, extra overlay tracks, or a watermark takes longer to export than a straight trim.</li>
                 <li><strong>Crossfade&apos;s incoming clip:</strong> during the blend, the next clip is held on its own first frame (not actively playing) while it dissolves in — this avoids any jump or repeat once its own official slot begins, at the cost of that clip not visibly moving until the crossfade finishes.</li>
-                <li><strong>Screen recording audio:</strong> your microphone is captured directly (an "Include microphone" checkbox, on by default, appears next to Record screen) and mixed together with any system/tab audio your browser shares, so narrating over a recording works regardless of platform. Whether system/tab audio itself can be shared depends on your browser and OS — Chrome on macOS can only capture a single browser tab&apos;s own audio this way, never your whole screen or system sound, regardless of what you check in the share picker; Windows generally supports sharing full system audio. The editor warns you the moment a recording starts with no audio at all, rather than only after you&apos;re done.</li>
                 <li><strong>Reversed clip preview:</strong> browsers can&apos;t natively play video backwards, so a reversed clip previews as a best-effort silent scrub rather than smooth playback — the exported video plays it backwards properly, with its audio correctly reversed too.</li>
                 <li><strong>Auto Captions rendering time:</strong> generating the timeline&apos;s audio for transcription happens in real time (roughly as long as your edited timeline&apos;s own length), since it plays the mix back to capture it — shorter than a full video export, but not instant for a long timeline.</li>
                 <li><strong>Multi-select scope:</strong> a selection can only include clips from one track at a time — it&apos;s for shared delete/duplicate actions on a sequence of clips, not for moving several clips freely across the timeline at once.</li>
@@ -240,6 +238,7 @@ export default function VideoEditorPage() {
           <div style={{ maxWidth: 760, margin: '40px auto 0', paddingTop: 24, borderTop: '1px solid #E2E8F0' }}>
             <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Related Tools</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <Link href="/data-tools/screen-recorder" style={relatedLink}>Screen Recorder →</Link>
               <Link href="/data-tools/video-studio" style={relatedLink}>Video Studio →</Link>
               <Link href="/data-tools/audio-studio" style={relatedLink}>Audio Studio →</Link>
               <Link href="/data-tools" style={relatedLink}>All Data Tools →</Link>

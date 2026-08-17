@@ -50,12 +50,23 @@ export default function sitemap() {
     'data-tools/sql-studio',
     'data-tools/base64',
     'data-tools/url-encoder',
-    'data-tools/audio-studio',
-    'data-tools/video-studio',
-    'data-tools/video-editor',
-    'data-tools/screen-recorder',
   ].map((path) => ({
     url: `${BASE_URL}/${path}`,
+    lastModified: new Date(),
+    changeFrequency: 'monthly',
+    priority: 0.8,
+  }));
+
+  // Media Workspace's own tools — flat top-level routes like every other
+  // suite's tools (see lib/toolSections/mediaWorkspace.js), not nested
+  // under /data-tools/ despite living in components/tools/data-tools/*.
+  const mediaWorkspaceToolPages = [
+    'video-editor',
+    'screen-recorder',
+    'audio-studio',
+    'video-studio',
+  ].map((slug) => ({
+    url: `${BASE_URL}/${slug}`,
     lastModified: new Date(),
     changeFrequency: 'monthly',
     priority: 0.8,
@@ -110,6 +121,7 @@ export default function sitemap() {
     })),
     ...categoryPages,
     ...dataToolPages,
+    ...mediaWorkspaceToolPages,
     ...toolPages,
     learnHomePage,
     ...learnCategoryPages,

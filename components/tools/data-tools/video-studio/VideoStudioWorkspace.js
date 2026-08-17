@@ -113,7 +113,7 @@ export default function VideoStudioWorkspace() {
         setExtractStatus('idle');
         return;
       }
-      window.location.href = '/data-tools/audio-studio';
+      window.location.href = '/audio-studio';
     } catch (err) {
       setExtractStatus('error');
       setExtractError(err.message || 'Could not extract audio from this video.');

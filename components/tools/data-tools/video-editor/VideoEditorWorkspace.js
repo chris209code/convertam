@@ -1915,7 +1915,7 @@ export default function VideoEditorWorkspace() {
         <p style={{ fontSize: '0.76rem', color: T.muted, marginTop: 10, textAlign: 'center' }}>
           Trim, cut, and reorder clips — or add a second video or image overlay for split-screen or picture-in-picture composition.{' '}
           Need to record your screen first? Use{' '}
-          <Link href="/data-tools/screen-recorder" style={{ color: T.accentDark, fontWeight: 700, textDecoration: 'none' }}>Screen Recorder</Link>
+          <Link href="/screen-recorder" style={{ color: T.accentDark, fontWeight: 700, textDecoration: 'none' }}>Screen Recorder</Link>
           {' '}— your finished recording opens straight back here.
         </p>
       </div>
@@ -2461,7 +2461,7 @@ export default function VideoEditorWorkspace() {
               </div>
               <div>
                 <div style={{ fontSize: '0.7rem', color: T.mutedDark, marginBottom: 2 }}>Need a new recording?</div>
-                <Link href="/data-tools/screen-recorder" style={{ ...smallBtn, width: '100%', display: 'block', textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}>
+                <Link href="/screen-recorder" style={{ ...smallBtn, width: '100%', display: 'block', textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}>
                   🎥 Open Screen Recorder
                 </Link>
                 <p style={{ fontSize: '0.64rem', color: T.muted, margin: '4px 0 0' }}>Record your screen, mic, and webcam in a separate tab — it opens straight back here when you&apos;re done.</p>

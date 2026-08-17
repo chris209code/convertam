@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import ScreenRecorderWorkspace from '../../../components/tools/data-tools/screen-recorder/ScreenRecorderWorkspace';
+import ScreenRecorderWorkspace from '../../components/tools/data-tools/screen-recorder/ScreenRecorderWorkspace';
 
 export const metadata = {
   title: 'Screen Recorder — Mic & Webcam PIP, Free & Local | Convertam',
   description: 'Record your screen, window, or browser tab directly in your browser — with an optional microphone and an optional webcam picture-in-picture. Nothing is uploaded; download the recording or open it straight in Video Editor.',
-  alternates: { canonical: '/data-tools/screen-recorder' },
+  alternates: { canonical: '/screen-recorder' },
 };
 
 const SCHEMA = {
@@ -15,7 +15,7 @@ const SCHEMA = {
   operatingSystem: 'Any (runs in browser)',
   description: 'A browser-based screen recorder: capture your screen, a window, or a browser tab, with an optional microphone and an optional webcam picture-in-picture composited live into the recording, entirely on-device.',
   offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-  url: 'https://www.convertam.app/data-tools/screen-recorder',
+  url: 'https://www.convertam.app/screen-recorder',
 };
 
 const FAQ = [
@@ -41,7 +41,7 @@ export default function ScreenRecorderPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(SCHEMA) }} />
       <main style={{ width: '100%', minHeight: '100vh', background: 'linear-gradient(180deg, #ECFEFF 0%, #F8FEFF 100%)' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 4% 64px' }}>
-          <Link href="/data-tools" style={{ fontSize: '0.8rem', color: '#0E7490', textDecoration: 'none', marginBottom: 12, display: 'inline-block' }}>← Back to Data Tools</Link>
+          <Link href="/media-workspace" style={{ fontSize: '0.8rem', color: '#0E7490', textDecoration: 'none', marginBottom: 12, display: 'inline-block' }}>← Back to Media Workspace</Link>
 
           <div style={{ maxWidth: 760, margin: '0 auto 32px', textAlign: 'center' }}>
             <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '2rem', fontWeight: 800, color: '#0F172A', marginBottom: 10 }}>Screen Recorder</h1>
@@ -144,10 +144,10 @@ export default function ScreenRecorderPage() {
           <div style={{ maxWidth: 760, margin: '40px auto 0', paddingTop: 24, borderTop: '1px solid #E2E8F0' }}>
             <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Related Tools</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              <Link href="/data-tools/video-editor" style={relatedLink}>Video Editor →</Link>
-              <Link href="/data-tools/video-studio" style={relatedLink}>Video Studio →</Link>
-              <Link href="/data-tools/audio-studio" style={relatedLink}>Audio Studio →</Link>
-              <Link href="/data-tools" style={relatedLink}>All Data Tools →</Link>
+              <Link href="/video-editor" style={relatedLink}>Video Editor →</Link>
+              <Link href="/video-studio" style={relatedLink}>Video Studio →</Link>
+              <Link href="/audio-studio" style={relatedLink}>Audio Studio →</Link>
+              <Link href="/media-workspace" style={relatedLink}>All Media Workspace →</Link>
             </div>
           </div>
         </div>

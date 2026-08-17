@@ -84,6 +84,14 @@ const nextConfig = {
       // lingering backlinks/cache — redirect rather than 404 for anyone
       // still following an old link.
       { source: '/screenshot-studio', destination: '/image-tools', permanent: true },
+      // Video Editor, Screen Recorder, Video Studio, and Audio Studio moved
+      // out from under /data-tools/* to their own flat top-level routes,
+      // matching every other suite's tools — preserves any existing
+      // indexed/bookmarked links to the old nested paths.
+      { source: '/data-tools/video-editor', destination: '/video-editor', permanent: true },
+      { source: '/data-tools/screen-recorder', destination: '/screen-recorder', permanent: true },
+      { source: '/data-tools/video-studio', destination: '/video-studio', permanent: true },
+      { source: '/data-tools/audio-studio', destination: '/audio-studio', permanent: true },
     ];
   },
 };

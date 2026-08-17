@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import VideoEditorWorkspace from '../../../components/tools/data-tools/video-editor/VideoEditorWorkspace';
+import VideoEditorWorkspace from '../../components/tools/data-tools/video-editor/VideoEditorWorkspace';
 
 export const metadata = {
   title: 'Video Editor — Multi-Track, Composition & Auto Captions | Convertam',
   description: 'Trim, split, and reorder clips on a zoomable, snapping, multi-select timeline, add text/titles/shapes with entrance animations and a logo, rotate/flip/crop and pan, adjust speed and fades, apply filters, compose multi-track split-screen, picture-in-picture, or video-call layouts with per-track mute/solo/lock and a custom reframe background, automatically remove a person\'s background for a cutout overlay (no green screen needed), drop timeline markers, and generate Auto Captions straight from your edited timeline — entirely in your browser, no login required.',
-  alternates: { canonical: '/data-tools/video-editor' },
+  alternates: { canonical: '/video-editor' },
 };
 
 const SCHEMA = {
@@ -15,7 +15,7 @@ const SCHEMA = {
   operatingSystem: 'Any (runs in browser)',
   description: 'A browser-based non-destructive video editor: trim, split, delete, join, and reorder clips; add text/titles, shapes, a logo/watermark, speed changes, fades, and color filters; compose multi-track split-screen, picture-in-picture, and video-call layouts from any number of video sources.',
   offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-  url: 'https://www.convertam.app/data-tools/video-editor',
+  url: 'https://www.convertam.app/video-editor',
 };
 
 const FAQ = [
@@ -77,12 +77,12 @@ export default function VideoEditorPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(SCHEMA) }} />
       <main style={{ width: '100%', minHeight: '100vh', background: 'linear-gradient(180deg, #ECFEFF 0%, #F8FEFF 100%)' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 4% 64px' }}>
-          <Link href="/data-tools" style={{ fontSize: '0.8rem', color: '#0E7490', textDecoration: 'none', marginBottom: 12, display: 'inline-block' }}>← Back to Data Tools</Link>
+          <Link href="/media-workspace" style={{ fontSize: '0.8rem', color: '#0E7490', textDecoration: 'none', marginBottom: 12, display: 'inline-block' }}>← Back to Media Workspace</Link>
 
           <div style={{ maxWidth: 760, margin: '0 auto 32px', textAlign: 'center' }}>
             <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '2rem', fontWeight: 800, color: '#0F172A', marginBottom: 10 }}>Video Editor</h1>
             <p style={{ fontSize: '1rem', color: '#475569', lineHeight: 1.6 }}>
-              Trim, split, and reorder clips on a real timeline with drag-to-trim handles, add text/titles/shapes and a logo, adjust speed and fades, apply color filters, then compose multi-track split-screen, picture-in-picture, or video-call layouts from any number of videos — all in your browser. Need to create a new recording first? Use <Link href="/data-tools/screen-recorder" style={{ color: '#0E7490', fontWeight: 700 }}>Screen Recorder</Link>, then open it straight here.
+              Trim, split, and reorder clips on a real timeline with drag-to-trim handles, add text/titles/shapes and a logo, adjust speed and fades, apply color filters, then compose multi-track split-screen, picture-in-picture, or video-call layouts from any number of videos — all in your browser. Need to create a new recording first? Use <Link href="/screen-recorder" style={{ color: '#0E7490', fontWeight: 700 }}>Screen Recorder</Link>, then open it straight here.
             </p>
           </div>
 
@@ -168,7 +168,7 @@ export default function VideoEditorPage() {
             <section style={{ marginBottom: 36 }}>
               <h2 style={sectionH2}>Need to record something first?</h2>
               <p>
-                Video Editor is exclusively for editing video you already have. To create a new recording, use the separate <Link href="/data-tools/screen-recorder" style={{ color: '#0E7490', fontWeight: 700 }}>Screen Recorder</Link> tool — it captures your screen, a window, or a browser tab, with an optional microphone and an optional webcam picture-in-picture, entirely in your browser. Once you stop recording there, one click on &quot;Open in Video Editor&quot; hands it straight to your timeline here, ready to trim, compose, and export.
+                Video Editor is exclusively for editing video you already have. To create a new recording, use the separate <Link href="/screen-recorder" style={{ color: '#0E7490', fontWeight: 700 }}>Screen Recorder</Link> tool — it captures your screen, a window, or a browser tab, with an optional microphone and an optional webcam picture-in-picture, entirely in your browser. Once you stop recording there, one click on &quot;Open in Video Editor&quot; hands it straight to your timeline here, ready to trim, compose, and export.
               </p>
             </section>
 
@@ -238,10 +238,10 @@ export default function VideoEditorPage() {
           <div style={{ maxWidth: 760, margin: '40px auto 0', paddingTop: 24, borderTop: '1px solid #E2E8F0' }}>
             <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Related Tools</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              <Link href="/data-tools/screen-recorder" style={relatedLink}>Screen Recorder →</Link>
-              <Link href="/data-tools/video-studio" style={relatedLink}>Video Studio →</Link>
-              <Link href="/data-tools/audio-studio" style={relatedLink}>Audio Studio →</Link>
-              <Link href="/data-tools" style={relatedLink}>All Data Tools →</Link>
+              <Link href="/screen-recorder" style={relatedLink}>Screen Recorder →</Link>
+              <Link href="/video-studio" style={relatedLink}>Video Studio →</Link>
+              <Link href="/audio-studio" style={relatedLink}>Audio Studio →</Link>
+              <Link href="/media-workspace" style={relatedLink}>All Media Workspace →</Link>
             </div>
           </div>
         </div>

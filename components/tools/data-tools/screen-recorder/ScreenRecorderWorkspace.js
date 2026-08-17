@@ -298,7 +298,7 @@ export default function ScreenRecorderWorkspace() {
       setSendingToEditor(false);
       return;
     }
-    window.location.href = '/data-tools/video-editor';
+    window.location.href = '/video-editor';
   }
 
   function renderCaptureChecklist() {
@@ -403,7 +403,7 @@ export default function ScreenRecorderWorkspace() {
 
           <p style={{ fontSize: '0.78rem', color: T.muted, marginTop: 14, textAlign: 'center', lineHeight: 1.5 }}>
             Recording happens entirely in your browser and is never uploaded. Already have a recording to edit?{' '}
-            <Link href="/data-tools/video-editor" style={{ color: T.accentDark, fontWeight: 700, textDecoration: 'none' }}>Open Video Editor</Link>.
+            <Link href="/video-editor" style={{ color: T.accentDark, fontWeight: 700, textDecoration: 'none' }}>Open Video Editor</Link>.
           </p>
         </div>
       )}

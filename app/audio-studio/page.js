@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import AudioStudioWorkspace from '../../../components/tools/data-tools/audio-studio/AudioStudioWorkspace';
+import AudioStudioWorkspace from '../../components/tools/data-tools/audio-studio/AudioStudioWorkspace';
 
 export const metadata = {
   title: 'Audio Studio — Transcribe Audio & Create Captioned Videos | Convertam',
   description: 'Transcribe audio to text, edit the transcript, generate SRT and VTT captions, and turn audio into a captioned video or audiogram — entirely in your browser, no login required.',
-  alternates: { canonical: '/data-tools/audio-studio' },
+  alternates: { canonical: '/audio-studio' },
 };
 
 const SCHEMA = {
@@ -15,7 +15,7 @@ const SCHEMA = {
   operatingSystem: 'Any (runs in browser)',
   description: 'A browser-based audio workspace: AI transcription, an editable transcript, SRT/VTT caption export, and audio-to-captioned-video / audiogram creation.',
   offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-  url: 'https://www.convertam.app/data-tools/audio-studio',
+  url: 'https://www.convertam.app/audio-studio',
 };
 
 const FAQ = [
@@ -37,7 +37,7 @@ export default function AudioStudioPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(SCHEMA) }} />
       <main style={{ width: '100%', minHeight: '100vh', background: 'linear-gradient(180deg, #ECFEFF 0%, #F8FEFF 100%)' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 4% 64px' }}>
-          <Link href="/data-tools" style={{ fontSize: '0.8rem', color: '#0E7490', textDecoration: 'none', marginBottom: 12, display: 'inline-block' }}>← Back to Data Tools</Link>
+          <Link href="/media-workspace" style={{ fontSize: '0.8rem', color: '#0E7490', textDecoration: 'none', marginBottom: 12, display: 'inline-block' }}>← Back to Media Workspace</Link>
 
           <div style={{ maxWidth: 760, margin: '0 auto 32px', textAlign: 'center' }}>
             <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '2rem', fontWeight: 800, color: '#0F172A', marginBottom: 10 }}>Audio Studio</h1>
@@ -156,10 +156,10 @@ export default function AudioStudioPage() {
           <div style={{ maxWidth: 760, margin: '40px auto 0', paddingTop: 24, borderTop: '1px solid #E2E8F0' }}>
             <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Related Tools</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              <Link href="/data-tools/video-studio" style={relatedLink}>Video Studio →</Link>
+              <Link href="/video-studio" style={relatedLink}>Video Studio →</Link>
               <Link href="/data-tools/text-cleaner" style={relatedLink}>Text Cleaner Studio →</Link>
               <Link href="/data-tools/smart-parser" style={relatedLink}>Smart Parser →</Link>
-              <Link href="/data-tools" style={relatedLink}>All Data Tools →</Link>
+              <Link href="/media-workspace" style={relatedLink}>Media Workspace →</Link>
             </div>
           </div>
         </div>

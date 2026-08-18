@@ -330,6 +330,15 @@ export default function VideoEditorWorkspace() {
   const [waveformBySource, setWaveformBySource] = useState({}); // sourceId -> peaks[] | 'loading' | 'error'
   const [silenceRanges, setSilenceRanges] = useState(null); // null = not run yet; [] = ran, found none; [{ start, end, selected }] = ran, found some — never applied until the user confirms
   const [silenceScanning, setSilenceScanning] = useState(false);
+  // Manual cut-out: mark a start and end point on the selected clip (via the
+  // playhead, same source-time capture handleSplitAtPlayhead already uses),
+  // queue up as many ranges as needed, review, then remove them all in one
+  // commit — the "point A to point B" / "click where to cut and drop that
+  // part" workflow, built on the exact same split+split+delete composite
+  // handleApplySilenceRemoval already established for auto-detected ranges.
+  const [manualCutStart, setManualCutStart] = useState(null); // pending start (source time) until an end is marked
+  const [manualCutRanges, setManualCutRanges] = useState([]); // [{ start, end }], source time, queued for the selected clip's source
+  const [isFullscreenPreview, setIsFullscreenPreview] = useState(false);
   const [normalizing, setNormalizing] = useState(false);
   const [cleaningClipAudio, setCleaningClipAudio] = useState(false);
   const [clipCleanupError, setClipCleanupError] = useState('');
@@ -397,6 +406,7 @@ export default function VideoEditorWorkspace() {
   const burnSubtitleStartRef = useRef(0);
 
   const canvasRef = useRef(null);
+  const previewWrapRef = useRef(null);
   const mainVideoRef = useRef(null);
   const rafRef = useRef(null);
   const lastMainClipRef = useRef(null);
@@ -1011,6 +1021,91 @@ export default function VideoEditorWorkspace() {
     setExtraSelectedClipIds([]);
   }
 
+  // ---- Manual cut-out: mark start/end on the selected clip via the
+  // playhead (same source-time capture as handleSplitAtPlayhead), queue as
+  // many ranges as needed, then remove them all in one commit — reuses the
+  // exact split+split+delete composite handleApplySilenceRemoval already
+  // proved out, just driven by manually marked points instead of detected
+  // silence. ----
+  function currentClipSourceTime() {
+    if (!selectedClip) return null;
+    const hit = findActiveClipAt(timeline, selectedClip.track, playhead);
+    if (!hit || hit.clip.id !== selectedClip.id) return null;
+    return hit.sourceTime;
+  }
+  function handleMarkCutStart() {
+    const t = currentClipSourceTime();
+    if (t == null) return;
+    setManualCutStart(t);
+  }
+  function handleMarkCutEnd() {
+    const t = currentClipSourceTime();
+    if (t == null || manualCutStart == null) return;
+    const start = Math.min(manualCutStart, t);
+    const end = Math.max(manualCutStart, t);
+    setManualCutStart(null);
+    if (end - start < 0.1) return;
+    setManualCutRanges((prev) => [...prev, { start, end }].sort((a, b) => a.start - b.start));
+  }
+  function removeManualCutRange(index) {
+    setManualCutRanges((prev) => prev.filter((_, i) => i !== index));
+  }
+  function handleApplyManualCuts() {
+    if (!manualCutRanges.length || !selectedClip) return;
+    const originalSourceId = selectedClip.sourceId;
+    commit((tl) => {
+      let next = tl;
+      for (const range of manualCutRanges) {
+        const target = next.clips.find((c) => c.sourceId === originalSourceId && c.sourceStart <= range.start + 0.02 && c.sourceEnd >= range.end - 0.02);
+        if (!target) continue;
+        const afterFirstSplit = splitClip(next, target.id, range.start);
+        const midCandidate = afterFirstSplit.clips.find((c) => c.sourceId === originalSourceId && Math.abs(c.sourceStart - range.start) < 0.06 && c.sourceEnd > range.start);
+        if (!midCandidate) { next = afterFirstSplit; continue; }
+        const afterSecondSplit = splitClip(afterFirstSplit, midCandidate.id, range.end);
+        const toDelete = afterSecondSplit.clips.find((c) => c.sourceId === originalSourceId && Math.abs(c.sourceStart - range.start) < 0.06 && Math.abs(c.sourceEnd - range.end) < 0.06);
+        next = toDelete ? deleteClip(afterSecondSplit, toDelete.id) : afterSecondSplit;
+      }
+      return next;
+    });
+    setManualCutRanges([]);
+    setManualCutStart(null);
+    setSelectedClipId(null);
+    setExtraSelectedClipIds([]);
+  }
+
+  // A gap before the selected clip (from a free-form drag, or a deleted
+  // neighbor that didn't ripple onto a different track) means playback
+  // stops dead on empty space before resuming — findActiveClipAt renders
+  // nothing during a gap. "Close gap" snaps the clip flush against
+  // whatever's immediately before it on its own track (or 0 if it's
+  // first), the one-click version of dragging it there yourself (which
+  // already snaps to the same boundary — see handleClipBodyPointerMove).
+  function gapBeforeClip(clip) {
+    if (!clip) return 0;
+    const trackClips = getTrackClips(timeline, clip.track);
+    const idx = trackClips.findIndex((c) => c.id === clip.id);
+    const prevEnd = idx > 0 ? trackClips[idx - 1].start + clipDuration(trackClips[idx - 1]) : 0;
+    return Math.max(0, clip.start - prevEnd);
+  }
+  function handleCloseGapBeforeSelected() {
+    if (!selectedClip) return;
+    const trackClips = getTrackClips(timeline, selectedClip.track);
+    const idx = trackClips.findIndex((c) => c.id === selectedClip.id);
+    const prevEnd = idx > 0 ? trackClips[idx - 1].start + clipDuration(trackClips[idx - 1]) : 0;
+    commit((tl) => moveClip(tl, selectedClip.id, prevEnd));
+  }
+
+  function toggleFullscreenPreview() {
+    const el = previewWrapRef.current;
+    if (!el) return;
+    const fsElement = document.fullscreenElement || document.webkitFullscreenElement;
+    if (fsElement) {
+      (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+    } else {
+      (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+    }
+  }
+
   function handleTransitionDuration(clip, duration) {
     const mainList = getTrackClips(timeline, MAIN_TRACK);
     const idx = mainList.findIndex((c) => c.id === clip.id);
@@ -1092,6 +1187,18 @@ export default function VideoEditorWorkspace() {
     return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClipId, extraSelectedClipIds, playing, playhead, timeline, past, future]);
+
+  useEffect(() => {
+    function onFsChange() {
+      setIsFullscreenPreview(!!(document.fullscreenElement || document.webkitFullscreenElement));
+    }
+    document.addEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('webkitfullscreenchange', onFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFsChange);
+      document.removeEventListener('webkitfullscreenchange', onFsChange);
+    };
+  }, []);
 
   // ---- Drag-to-trim: pixel delta on the main track's own rendered width
   // converts to seconds via a single px-per-second ratio (the track's
@@ -2203,7 +2310,24 @@ export default function VideoEditorWorkspace() {
               object-fit: contain would, so Landscape/Square/Vertical all fit
               the same on-screen budget instead of Vertical alone towering
               over everything else. */}
-          <div style={{ background: '#0F172A', borderRadius: 10, overflow: 'hidden', marginBottom: 8, position: 'relative', maxHeight: 'clamp(220px, 46vh, 460px)', display: 'flex', justifyContent: 'center' }}>
+          <div
+            ref={previewWrapRef}
+            style={{
+              background: '#0F172A', borderRadius: isFullscreenPreview ? 0 : 10, overflow: 'hidden', marginBottom: 8, position: 'relative',
+              maxHeight: isFullscreenPreview ? '100vh' : 'clamp(220px, 46vh, 460px)',
+              display: 'flex', justifyContent: 'center', alignItems: 'center',
+            }}
+          >
+            <button
+              onClick={toggleFullscreenPreview}
+              title={isFullscreenPreview ? 'Exit fullscreen' : 'Fullscreen preview — see exactly what your export will look like'}
+              style={{
+                position: 'absolute', top: 8, right: 8, zIndex: 5, padding: '6px 9px', borderRadius: 6, border: 'none',
+                background: 'rgba(15,23,42,0.7)', color: 'white', cursor: 'pointer', fontSize: '0.85rem', lineHeight: 1, fontFamily: T.font,
+              }}
+            >
+              {isFullscreenPreview ? '⤢ Exit' : '⛶ Fullscreen'}
+            </button>
             <canvas
               ref={canvasRef}
               width={composeW}
@@ -2213,7 +2337,7 @@ export default function VideoEditorWorkspace() {
               onPointerUp={handleOverlayPointerUp}
               onPointerCancel={handleOverlayPointerUp}
               style={{
-                maxWidth: '100%', maxHeight: 'clamp(220px, 46vh, 460px)', width: 'auto', height: 'auto', display: 'block',
+                maxWidth: '100%', maxHeight: isFullscreenPreview ? '100vh' : 'clamp(220px, 46vh, 460px)', width: 'auto', height: 'auto', display: 'block',
                 touchAction: (overlayTracks.some((t) => t.mode === 'pip') || timeline.textOverlays.length > 0) ? 'none' : 'auto',
                 cursor: (overlayTracks.some((t) => t.mode === 'pip') || timeline.textOverlays.length > 0) ? (isDraggingOverlay ? 'grabbing' : 'grab') : 'default',
               }}
@@ -2487,6 +2611,12 @@ export default function VideoEditorWorkspace() {
           {activeCategory === 'edit' && (selectedClip && selectedSource && !isLockedSelected && selectionIds.length <= 1 ? (
             <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
               <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Edit</div>
+              {gapBeforeClip(selectedClip) > 0.05 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', padding: '8px 10px', borderRadius: 8, background: '#FFFBEB', border: '1px solid #FDE68A', marginBottom: 10 }}>
+                  <span style={{ fontSize: '0.7rem', color: '#92400E' }}>⚠ {gapBeforeClip(selectedClip).toFixed(1)}s gap before this clip — playback pauses here instead of flowing straight through.</span>
+                  <button onClick={handleCloseGapBeforeSelected} style={{ ...smallBtn, padding: '5px 10px', flexShrink: 0 }}>⇤ Close gap</button>
+                </div>
+              )}
               {selectedSource.kind !== 'image' && (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
                   <label style={fieldLabel}>Trim start
@@ -2509,6 +2639,41 @@ export default function VideoEditorWorkspace() {
                 <button onClick={handleDuplicateSelected} style={smallBtn}>⧉ Duplicate</button>
                 <button onClick={handleDeleteSelected} style={{ ...smallBtn, color: '#DC2626', borderColor: '#FCA5A5' }}>✕ Delete clip</button>
               </div>
+              {selectedSource.kind !== 'image' && (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
+                  <p style={{ fontSize: '0.7rem', fontWeight: 700, color: T.mutedDark, margin: '0 0 6px' }}>Cut out a range (point A → B)</p>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <button onClick={handleMarkCutStart} style={smallBtn}>▶ Mark start ({formatDuration(playhead)})</button>
+                    <button onClick={handleMarkCutEnd} disabled={manualCutStart == null} style={smallBtn}>■ Mark end ({formatDuration(playhead)})</button>
+                    {manualCutStart != null && <button onClick={() => setManualCutStart(null)} style={{ ...smallBtn, padding: '5px 8px' }}>Cancel</button>}
+                  </div>
+                  {manualCutStart != null && (
+                    <p style={{ fontSize: '0.68rem', color: T.muted, margin: '6px 0 0' }}>
+                      Start marked at {formatDuration(manualCutStart)} — scrub or play to where the unwanted part ends, then click Mark end.
+                    </p>
+                  )}
+                  {manualCutRanges.length > 0 && (
+                    <div style={{ marginTop: 8 }}>
+                      <p style={{ fontSize: '0.68rem', color: T.mutedDark, margin: '0 0 6px', fontWeight: 700 }}>{manualCutRanges.length} range{manualCutRanges.length === 1 ? '' : 's'} marked for removal:</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8, maxHeight: 120, overflowY: 'auto' }}>
+                        {manualCutRanges.map((r, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.7rem', color: T.inkSecondary }}>
+                            <span>{formatDuration(r.start)} – {formatDuration(r.end)} <span style={{ color: T.muted }}>({(r.end - r.start).toFixed(1)}s)</span></span>
+                            <button onClick={() => removeManualCutRange(i)} style={{ ...smallBtn, padding: '2px 7px', fontSize: '0.65rem' }}>✕</button>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={handleApplyManualCuts} style={{ ...smallBtn, background: T.accentGradient, color: 'white', border: 'none' }}>✂ Remove marked ranges</button>
+                        <button onClick={() => setManualCutRanges([])} style={smallBtn}>Clear all</button>
+                      </div>
+                    </div>
+                  )}
+                  <p style={{ fontSize: '0.66rem', color: T.muted, margin: '8px 0 0' }}>
+                    Play or scrub the preview to each point, mark start then end, and repeat for as many parts as you want to drop — everything after gets pulled back to close the gap.
+                  </p>
+                </div>
+              )}
               {silenceRanges !== null && (
                 <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
                   {silenceRanges.length === 0 ? (
@@ -2534,7 +2699,7 @@ export default function VideoEditorWorkspace() {
               )}
             </div>
           ) : (
-            <p style={{ fontSize: '0.72rem', color: T.muted, textAlign: 'center', padding: '16px 0' }}>Select a single clip on the timeline to trim, split, join, freeze a frame, or find silence.</p>
+            <p style={{ fontSize: '0.72rem', color: T.muted, textAlign: 'center', padding: '16px 0' }}>Select a single clip on the timeline to trim, split, join, cut out a range, freeze a frame, or find silence.</p>
           ))}
 
           {activeCategory === 'audio' && (selectedClip && selectedSource && !isLockedSelected && selectionIds.length <= 1 && selectedSource.kind !== 'image' && (

@@ -23,8 +23,9 @@ const FAQ = [
   { q: 'Why not truly unlimited?', a: 'Everything here runs entirely in your browser (nothing is ever uploaded to a server), and the video engine has to hold the file in your browser tab\'s own memory to process it. 2GB is a real, tested ceiling for what a modern desktop browser tab can handle without crashing — four times Video Editor\'s normal limit, not a fake "unlimited" that would silently hang on a genuinely huge file.' },
   { q: 'What does Compress actually do?', a: 'It re-encodes your video at a lower resolution and/or quality setting you choose, which reduces file size — the same trade-off any video compressor makes. Higher compression (smaller resolution, smaller quality) means a smaller file but a less sharp picture.' },
   { q: 'What does Split actually do?', a: 'It cuts your video into consecutive parts of whatever length you choose (e.g. every 5 minutes), without re-encoding — so it\'s fast and lossless. Each cut lands on the nearest keyframe rather than an exact frame, so a part\'s length can be off by a couple of seconds; that\'s a disclosed trade-off for speed, not a bug.' },
-  { q: 'Can I get frame-accurate cuts instead?', a: 'Not from this tool — Split is built for quickly getting a huge file down to postable-sized pieces, not precision editing. Once a part is small enough, open it in Video Editor for frame-accurate trimming.' },
-  { q: 'What happens after I compress or split my video?', a: 'Download the result directly, or click "Open in Video Editor" to send it straight there without a manual download-then-reupload step — the same local, in-browser handoff Screen Recorder already uses.' },
+  { q: 'Can I get frame-accurate cuts instead?', a: 'Not from Split — it\'s built for quickly getting a huge file down to postable-sized pieces, not precision editing. Trim (below) gets you closer: mark exactly the points you want, in your own preview, before any file size comes down.' },
+  { q: 'What does Trim do, and how is it different from Split?', a: 'Split cuts a video into equal-length consecutive parts. Trim is for cutting out a specific point A to point B range and keeping just that — or scrubbing the preview, marking as many cut points as you want, and dropping only the parts between them, with everything else stitched back together into one file. Same lossless, no-re-encode approach as Split (and the same keyframe-snapping caveat), just driven by where you actually click instead of a fixed interval.' },
+  { q: 'What happens after I compress, split, or trim my video?', a: 'Download the result directly, or click "Open in Video Editor" to send it straight there without a manual download-then-reupload step — the same local, in-browser handoff Screen Recorder already uses.' },
   { q: 'Does this tool upload my video anywhere?', a: 'No — compressing and splitting both happen entirely in your browser, at any file size this tool accepts. Nothing about your video ever reaches Convertam\'s servers.' },
 ];
 
@@ -52,7 +53,7 @@ export default function CompressVideoPage() {
             <section style={{ marginBottom: 36 }}>
               <h2 style={sectionH2}>What is Compress &amp; Split Video?</h2>
               <p>
-                Every other video tool on Convertam — Video Editor, Video Studio — caps uploads at 500MB, because their own editing and export work genuinely can&apos;t handle more inside a browser tab. Compress &amp; Split Video is the deliberate exception: a single-purpose tool that accepts files up to 2GB for exactly one job — getting an oversized video down to a size those other tools can open. Pick Compress to shrink the file itself, or Split to cut it into smaller consecutive parts, then send the result straight into Video Editor to keep working.
+                Every other video tool on Convertam — Video Editor, Video Studio — caps uploads at 500MB, because their own editing and export work genuinely can&apos;t handle more inside a browser tab. Compress &amp; Split Video is the deliberate exception: a single-purpose tool that accepts files up to 2GB for exactly one job — getting an oversized video down to a size those other tools can open. Pick Compress to shrink the file itself, Split to cut it into equal consecutive parts, or Trim to cut out exactly the point-A-to-B range (or ranges) you actually want, then send the result straight into Video Editor to keep working.
               </p>
             </section>
 
@@ -61,15 +62,16 @@ export default function CompressVideoPage() {
               <ul style={ul}>
                 <li><strong>Compress</strong> — re-encode at a lower resolution (1080p/720p/480p) and quality (high/balanced/small) to shrink file size, with a before/after size comparison.</li>
                 <li><strong>Split</strong> — cut into consecutive parts of a chosen length (2/5/10/15 minutes), fast and lossless, no re-encoding.</li>
+                <li><strong>Trim</strong> — keep just a point-A-to-B range, or scrub the preview, mark as many cut points as you want, and drop only the parts between them — the rest is stitched back into one file.</li>
                 <li><strong>Download individually or all at once</strong> — every compressed file or split part downloads on its own, or as one ZIP for a full split.</li>
-                <li><strong>Open in Video Editor</strong> — send the compressed video or any split part straight into Video Editor, with no manual re-upload.</li>
+                <li><strong>Open in Video Editor</strong> — send the compressed, split, or trimmed video straight into Video Editor, with no manual re-upload.</li>
               </ul>
             </section>
 
             <section style={{ marginBottom: 36 }}>
-              <h2 style={sectionH2}>Compress vs. Split — which do I need?</h2>
+              <h2 style={sectionH2}>Compress vs. Split vs. Trim — which do I need?</h2>
               <p>
-                <strong>Compress</strong> keeps your video as one file but makes it smaller by re-encoding at a lower resolution and/or quality — the right choice when you want the whole video, just lighter. <strong>Split</strong> keeps the original quality but breaks the video into several smaller files — the right choice when you need the full quality preserved, or when you only actually need to work with part of a long recording at a time. Both get you to the same place: a file (or files) small enough for Video Editor or Video Studio&apos;s normal 500MB limit.
+                <strong>Compress</strong> keeps your video as one file but makes it smaller by re-encoding at a lower resolution and/or quality — the right choice when you want the whole video, just lighter. <strong>Split</strong> keeps the original quality but breaks the video into several equal-length files — the right choice when you need full quality preserved, or only want to work with part of a long recording at a time, and don&apos;t care exactly where the cuts fall. <strong>Trim</strong> also keeps full quality, but lets you choose exactly where the cuts fall — a specific range to keep, or specific parts to drop — the right choice when you already know what you don&apos;t want. All three get you to the same place: a file (or files) small enough for Video Editor or Video Studio&apos;s normal 500MB limit.
               </p>
             </section>
 
@@ -98,7 +100,7 @@ export default function CompressVideoPage() {
             <section style={{ marginBottom: 36 }}>
               <h2 style={sectionH2}>Privacy and temporary processing</h2>
               <p>
-                Compressing and splitting both happen entirely in your browser — your video, at any size this tool accepts, is never uploaded to a server. The handoff to Video Editor uses your browser&apos;s own local Cache Storage, not a server round trip.
+                Compressing, splitting, and trimming all happen entirely in your browser — your video, at any size this tool accepts, is never uploaded to a server. The handoff to Video Editor uses your browser&apos;s own local Cache Storage, not a server round trip.
               </p>
             </section>
 
@@ -107,8 +109,8 @@ export default function CompressVideoPage() {
               <ul style={ul}>
                 <li><strong>Upload limit:</strong> 2GB, not literally unlimited — a real, tested ceiling for what a browser tab can process without crashing, stated plainly here rather than promised as infinite.</li>
                 <li><strong>Compress speed:</strong> a full re-encode runs entirely in your browser, so it takes real time proportional to your video&apos;s length and your device&apos;s power.</li>
-                <li><strong>Split accuracy:</strong> cuts land on the nearest keyframe, not an exact frame — parts can be off by a couple of seconds. Use Video Editor afterward for frame-accurate trimming.</li>
-                <li><strong>No composition or captions here:</strong> this tool only shrinks or cuts a single file — trimming, overlays, captions, and export controls all live in Video Editor.</li>
+                <li><strong>Split and Trim accuracy:</strong> cuts land on the nearest keyframe, not an exact frame — parts can be off by a couple of seconds. Use Video Editor afterward for frame-accurate trimming.</li>
+                <li><strong>No composition or captions here:</strong> this tool only shrinks or cuts a single file — overlays, captions, and export controls all live in Video Editor.</li>
               </ul>
             </section>
 

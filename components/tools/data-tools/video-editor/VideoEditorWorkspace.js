@@ -819,6 +819,16 @@ export default function VideoEditorWorkspace() {
     setSelectedClipId(clickedId);
     setExtraSelectedClipIds([]);
     if (overlayTrackId !== undefined) setSelectedOverlayTrackId(overlayTrackId);
+    // Clicking a clip moves the playhead to exactly the point clicked
+    // within it — "click where you want to cut" should mean literally
+    // that, not select-the-clip-then-separately-drag-a-thin-slider-to-
+    // the-same-spot. Skipped for the ctrl/multi-select and successful
+    // shift-range branches above (those return early), since those
+    // clicks are about building a selection, not picking a cut point.
+    const rect = e.currentTarget.getBoundingClientRect();
+    const frac = rect.width > 0 ? Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)) : 0;
+    setPlaying(false);
+    setPlayhead(clip.start + frac * clipDuration(clip));
   }
   function clearSelectionIfEmptyClick(e) {
     if (e.target !== e.currentTarget) return;
@@ -2423,7 +2433,7 @@ export default function VideoEditorWorkspace() {
                       boxShadow: isSelected && !isPrimary ? `inset 0 0 0 1px white` : 'none',
                       overflow: 'hidden',
                     }}
-                    title={`${formatDuration(clipDuration(clip))} — click to edit (Ctrl/Cmd-click to multi-select, Shift-click for a range), drag to reposition, drag the side handles to trim`}
+                    title={`${formatDuration(clipDuration(clip))} — click anywhere on the clip to select it and move the cut line there (Ctrl/Cmd-click to multi-select, Shift-click for a range), drag to reposition, drag the side handles to trim`}
                   >
                     <ClipThumbFilmstrip source={source} sourceStart={clip.sourceStart} sourceEnd={clip.sourceEnd} thumbnailsBySource={thumbnailsBySource} />
                     <ClipWaveform source={source} sourceStart={clip.sourceStart} sourceEnd={clip.sourceEnd} waveformBySource={waveformBySource} />
@@ -2509,6 +2519,16 @@ export default function VideoEditorWorkspace() {
               })}
             </div>
           </div>
+          {selectedClip && !isLockedSelected && selectionIds.length <= 1 && selectedSource?.kind !== 'image' && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              <button onClick={handleSplitAtPlayhead} style={quickActionBtn} title="Cuts the selected clip in two at the white line above">
+                <span style={{ fontSize: '1.1rem' }}>✂</span> Split
+              </button>
+              <button onClick={handleDeleteSelected} style={{ ...quickActionBtn, color: '#DC2626', borderColor: '#FCA5A5' }} title="Removes the selected clip; everything after it slides over to close the gap">
+                <span style={{ fontSize: '1.1rem' }}>🗑</span> Delete
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Right: persistent tool panel — always rendered, not hidden behind a click */}
@@ -2583,7 +2603,7 @@ export default function VideoEditorWorkspace() {
                 </div>
               )}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {selectedSource.kind !== 'image' && <button onClick={handleSplitAtPlayhead} style={smallBtn}>✂ Split at playhead</button>}
+                {selectedSource.kind !== 'image' && <button onClick={handleSplitAtPlayhead} style={smallBtn}>✂ Split</button>}
                 {selectedSource.kind !== 'image' && <button onClick={() => handleJoinWithNext(selectedClip.track)} style={smallBtn}>⤵ Join with next</button>}
                 {selectedClip.track === MAIN_TRACK && selectedSource.kind !== 'image' && <button onClick={handleFreezeFrame} style={smallBtn}>❄ Freeze frame</button>}
                 {selectedClip.track === MAIN_TRACK && selectedSource.kind !== 'image' && <button onClick={handleFindSilence} disabled={silenceScanning} style={smallBtn}>{silenceScanning ? 'Scanning…' : '🔇 Find silence'}</button>}
@@ -2592,7 +2612,7 @@ export default function VideoEditorWorkspace() {
               </div>
               {selectedSource.kind !== 'image' && (
                 <p style={{ fontSize: '0.68rem', color: T.muted, margin: '8px 0 0' }}>
-                  To remove part of a clip: move the playhead (the white line) to where you want to cut, click Split at playhead, then click the piece you don&apos;t want and Delete it — everything after closes the gap automatically.
+                  To remove part of a clip: click on the clip exactly where you want to cut (that moves the white line there and selects it), click Split, do the same at the other end of the part you don&apos;t want, then click that middle piece and Delete it — everything after closes the gap automatically. The Split and Delete buttons are also right under the timeline for quick access.
                 </p>
               )}
               {silenceRanges !== null && (
@@ -3598,6 +3618,12 @@ export default function VideoEditorWorkspace() {
 
 const playBtn = { width: 40, height: 40, borderRadius: '50%', border: 'none', background: T.accentGradient, color: 'white', fontSize: '1rem', cursor: 'pointer', flexShrink: 0 };
 const smallBtn = { padding: '7px 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: 'white', fontSize: '0.76rem', fontWeight: 700, color: T.inkSecondary, cursor: 'pointer', fontFamily: T.font };
+// The two essential cutting actions, right under the timeline itself
+// rather than buried in the side panel — the same "icons directly below
+// the strip" layout a CapCut-style editor uses, since that's the one
+// place a first-time user is already looking right after they've clicked
+// a clip.
+const quickActionBtn = { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 14px', borderRadius: 10, border: `1px solid ${T.border}`, background: 'white', fontSize: '0.82rem', fontWeight: 700, color: T.inkSecondary, cursor: 'pointer', fontFamily: T.font };
 const trackFlagBtn = { width: 22, height: 22, borderRadius: 5, border: `1px solid ${T.border}`, background: 'white', fontSize: '0.62rem', fontWeight: 800, color: T.inkSecondary, cursor: 'pointer', fontFamily: T.font, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 };
 const primaryBtn = (disabled) => ({ padding: '13px 32px', borderRadius: 12, border: 'none', background: disabled ? '#94A3B8' : T.accentGradient, color: 'white', fontSize: '0.95rem', fontWeight: 700, cursor: disabled ? 'default' : 'pointer', fontFamily: T.font });
 const statusBox = { padding: '10px 14px', borderRadius: 10, background: T.dangerTint, border: '1px solid #FECACA', color: '#991B1B', fontSize: '0.82rem', fontWeight: 600 };

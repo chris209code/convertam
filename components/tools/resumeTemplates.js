@@ -88,13 +88,13 @@ export function normalizeBulletLines(exp) {
 // what silently swallowed the bullet glyph before. The bullet character
 // here is real rendered text content in its own column, so it physically
 // cannot be stripped by CSS the way a list-marker can.
-function BulletList({ lines, keyPrefix, className, style, liStyle }) {
+function BulletList({ lines, keyPrefix, className, style, liStyle, marker }) {
   if (!lines.length) return null;
   return (
     <div className={className || 'cv-job-bullets'} style={{ margin: '4px 0 0', ...style }}>
       {lines.map((l, i) => (
         <div key={`${keyPrefix}-${i}`} className="cv-bullet-row" style={{ display: 'grid', gridTemplateColumns: '12px 1fr', alignItems: 'start', columnGap: 4, marginBottom: 4, ...liStyle }}>
-          <span className="cv-bullet-marker" style={{ lineHeight: 'inherit' }}>•</span>
+          <span className="cv-bullet-marker" style={{ lineHeight: 'inherit' }}>{marker || '•'}</span>
           <span className="cv-bullet-text" style={{ minWidth: 0, lineHeight: 'inherit' }}>{l}</span>
         </div>
       ))}
@@ -103,23 +103,30 @@ function BulletList({ lines, keyPrefix, className, style, liStyle }) {
 }
 
 // exp.achievements is a Convertam CV Improver addition (a role's quantified
-// results, kept separate from its day-to-day duties). Achievements are
-// deliberately NOT rendered here, under the role they came from — they get
-// their own standalone section (see groupAchievementsByRole below and each
-// template's "Achievements" section), the same level as Skills, Education
-// and Certifications, so this only ever renders the flat responsibilities
-// list. No per-role achievement styling needed here any more.
-export function ExpBullets({ exp, className, style, liStyle }) {
+// results, kept separate from its day-to-day duties in the underlying data
+// so tense/classification rules stay clean — but rendered directly under
+// the SAME role here, right after its responsibilities, with a ★ marker
+// instead of • so they still read as distinct "here's what I achieved"
+// lines. An earlier version pulled every role's achievements out into one
+// standalone "Achievements" section at the bottom of the CV, re-printing
+// each role/company name as a group heading there too — which reads as the
+// entire Work Experience section appearing a second time, not a summary.
+export function ExpBullets({ exp, className, style, liStyle, achievementLiStyle }) {
   const responsibilityLines = normalizeBulletLines(exp);
-  return <BulletList lines={responsibilityLines} keyPrefix="b" className={className} style={style} liStyle={liStyle} />;
+  const achievementLines = (Array.isArray(exp.achievements) ? exp.achievements : []).map((a) => String(a).trim()).filter(Boolean);
+  return (
+    <>
+      <BulletList lines={responsibilityLines} keyPrefix="b" className={className} style={style} liStyle={liStyle} />
+      {achievementLines.length > 0 && (
+        <BulletList lines={achievementLines} keyPrefix="a" className={className} style={style} liStyle={{ ...liStyle, ...achievementLiStyle }} marker="★" />
+      )}
+    </>
+  );
 }
 
-// Turns the per-role achievements every experience entry may carry into the
-// data a standalone "Achievements" section needs: one group per role that
-// actually has any, in the same order as the experience list, each with its
-// own bullets — so achievements read as a single dedicated section grouped
-// by job title (matching Skills/Education/Certifications) instead of being
-// scattered under each individual role.
+// Kept for any other caller that still wants achievements grouped by role
+// independently of ExpBullets — no longer used by the templates below,
+// which now render each role's achievements inline via ExpBullets instead.
 export function groupAchievementsByRole(experience) {
   return (experience || [])
     .map((exp) => ({
@@ -135,7 +142,6 @@ export function groupAchievementsByRole(experience) {
 // ---------------------------------------------------------------------------
 export function ClassicProfessional({ data }) {
   const { form, experience, education, certifications, skills, contact } = data;
-  const achievementGroups = groupAchievementsByRole(experience);
   const S = {
     page: { fontFamily: 'Georgia, "Times New Roman", serif', color: '#1A1A1A', padding: '18mm 16mm' },
     name: { fontSize: 28, fontWeight: 800, textAlign: 'center', letterSpacing: 1, margin: 0 },
@@ -220,19 +226,6 @@ export function ClassicProfessional({ data }) {
         </section>
       )}
 
-      {achievementGroups.length > 0 && (
-        <section style={{ marginBottom: 6 }}>
-          <p style={S.sectionHead}><Icon.award /> Achievements</p>
-          {achievementGroups.map((group, i) => (
-            <div key={i} style={{ marginBottom: 10, breakInside: 'avoid' }}>
-              <p style={{ ...S.entrySub, fontWeight: 700, color: '#1A1A1A', margin: '0 0 2px' }}>{[group.role, group.company].filter(Boolean).join(' — ')}</p>
-              <BulletList lines={group.items} keyPrefix={`ach${i}`} style={S.body} />
-            </div>
-          ))}
-          <hr style={S.sectionRule} />
-        </section>
-      )}
-
       {skills.length > 0 && (
         <section style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
           <p style={S.sectionHead}><Icon.gear /> Core Skills</p>
@@ -250,7 +243,6 @@ export function ClassicProfessional({ data }) {
 // ---------------------------------------------------------------------------
 export function ExecutiveMinimal({ data }) {
   const { form, experience, education, certifications, skills, contact } = data;
-  const achievementGroups = groupAchievementsByRole(experience);
   const green = '#2F5D4F';
   const S = {
     page: { fontFamily: "'Segoe UI', Arial, sans-serif", color: '#1E293B', padding: '18mm 16mm' },
@@ -340,18 +332,6 @@ export function ExecutiveMinimal({ data }) {
         </section>
       )}
 
-      {achievementGroups.length > 0 && (
-        <section style={{ marginBottom: 6 }}>
-          <p style={S.sectionHead}><Icon.award style={{ color: green }} /> Achievements</p>
-          {achievementGroups.map((group, i) => (
-            <div key={i} style={{ marginBottom: 10, breakInside: 'avoid' }}>
-              <p style={{ ...S.entrySub, fontWeight: 700, color: '#1E293B', margin: '0 0 2px' }}>{[group.role, group.company].filter(Boolean).join(' — ')}</p>
-              <BulletList lines={group.items} keyPrefix={`ach${i}`} style={S.body} />
-            </div>
-          ))}
-          <hr style={S.sectionRule} />
-        </section>
-      )}
 
       {skills.length > 0 && (
         <section style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
@@ -431,7 +411,6 @@ function MPSidebar({ data }) {
   const hasExperience = data.experience?.length > 0;
   const hasEducation = data.education?.length > 0;
   const hasProjects = data.projects?.length > 0;
-  const hasAchievements = data.achievements?.length > 0;
 
   return (
     <div style={{ display: 'flex', alignItems: 'stretch', width: '100%', background: '#fff' }}>
@@ -505,20 +484,6 @@ function MPSidebar({ data }) {
           </div>
         )}
 
-        {hasAchievements && (
-          <div style={{ marginTop: 22 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f172a', borderBottom: `2px solid ${accent}`, paddingBottom: 5, marginBottom: 12 }}><MPIcon.trophy style={{ color: accent }} />Achievements</div>
-            {data.achievements.map((group, i) => (
-              <div key={i} style={{ marginBottom: 12, breakInside: 'avoid' }}>
-                <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0f172a' }}>{[group.role, group.company].filter(Boolean).join(' · ')}</div>
-                <ul style={{ margin: '3px 0 0', paddingLeft: 18 }}>
-                  {group.items.map((a, j) => <li key={j} style={{ fontSize: 14, lineHeight: 1.55, color: '#374151', marginBottom: 4 }}>{a}</li>)}
-                </ul>
-              </div>
-            ))}
-          </div>
-        )}
-
         {hasEducation && (
           <div style={{ marginTop: 22 }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0f172a', borderBottom: `2px solid ${accent}`, paddingBottom: 5, marginBottom: 12 }}><MPIcon.cap style={{ color: accent }} />Education</div>
@@ -557,7 +522,6 @@ function MPCentered({ data }) {
   const hasExperience = data.experience?.length > 0;
   const hasEducation = data.education?.length > 0;
   const hasProjects = data.projects?.length > 0;
-  const hasAchievements = data.achievements?.length > 0;
   const hasSkills = data.skills?.length > 0;
   const hasCerts = data.certifications?.length > 0;
 
@@ -601,19 +565,6 @@ function MPCentered({ data }) {
         </div>
       )}
 
-      {hasAchievements && (
-        <div style={{ marginTop: 8, paddingTop: 28, borderTop: '1px solid #e5e7eb' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: accent, marginBottom: 14 }}><MPIcon.trophy />Achievements</div>
-          <div style={{ maxWidth: 560, margin: '0 auto' }}>
-            {data.achievements.map((group, i) => (
-              <div key={i} style={{ marginBottom: 12, breakInside: 'avoid' }}>
-                <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0f172a', textAlign: 'center' }}>{[group.role, group.company].filter(Boolean).join(' — ')}</div>
-                {group.items.map((a, j) => <div key={j} style={{ fontSize: 14, lineHeight: 1.6, color: '#374151', textAlign: 'center', marginTop: 4 }}>{a}</div>)}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {hasEducation && (
         <div style={{ marginTop: 8, paddingTop: 28, borderTop: '1px solid #e5e7eb', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
@@ -669,7 +620,6 @@ function MPHeaderBand({ data }) {
   const hasExperience = data.experience?.length > 0;
   const hasEducation = data.education?.length > 0;
   const hasProjects = data.projects?.length > 0;
-  const hasAchievements = data.achievements?.length > 0;
   const hasSkills = data.skills?.length > 0;
   const hasCerts = data.certifications?.length > 0;
   const hasLanguages = data.languages?.length > 0;
@@ -725,19 +675,6 @@ function MPHeaderBand({ data }) {
                   <div key={i} style={{ marginBottom: 12, breakInside: 'avoid' }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{proj.name}</div>
                     <p style={{ fontSize: 13.5, lineHeight: 1.55, color: '#374151', margin: '3px 0 0' }}>{proj.description}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-            {hasAchievements && (
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: accent, paddingBottom: 6, borderBottom: `1px solid ${accent}`, marginBottom: 14 }}><MPIcon.trophy />Achievements</div>
-                {data.achievements.map((group, i) => (
-                  <div key={i} style={{ marginBottom: 10, breakInside: 'avoid' }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{[group.role, group.company].filter(Boolean).join(' · ')}</div>
-                    <ul style={{ margin: '3px 0 0', paddingLeft: 17 }}>
-                      {group.items.map((a, j) => <li key={j} style={{ fontSize: 13.5, lineHeight: 1.55, color: '#374151', marginBottom: 4 }}>{a}</li>)}
-                    </ul>
                   </div>
                 ))}
               </div>

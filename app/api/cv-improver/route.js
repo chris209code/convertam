@@ -147,6 +147,21 @@ ABSOLUTE RULE — NEVER FABRICATE
 Never invent employers, job titles, dates, certifications, degrees, licences, responsibilities the candidate never performed, KPIs, numbers, awards, software proficiency, leadership experience, or projects that are not already present in the CV below. You may rewrite what IS there into stronger, more professional language (e.g. "Checked production quality" -> "Performed routine production quality inspections, identified non-conformances, and supported compliance with GMP standards" is fine — it adds no new fact). Never add a specific number, percentage, or metric unless that figure already appears in the candidate's CV, or is directly and correctly calculable from figures that already appear (e.g. "reduced from 5,000 hl to 114 hl" makes a 97.7% reduction a valid, real calculation — but never invent a percentage when the underlying numbers aren't both present). If the CV is missing something that would meaningfully strengthen it, do NOT insert it into the CV — put it in "suggestions" instead (see below), so the candidate can confirm it themselves. When a statement sounds like an achievement but has no measurable outcome in the source CV, improve its wording (e.g. "Helped improve the quality process" -> "Contributed to improvements in the quality-control process") — never invent a number to make it sound quantified.
 
 ====================================================
+NEVER MERGE OR DROP A DISTINCTLY NAMED ROLE
+====================================================
+Some CVs list more than one role/title line for the same employer close together — a promotion, or a temporary "Acting" assignment during an ongoing role, e.g.:
+"Quality Assurance Lead | Feb 2023 – Present
+Acting Packaging Quality Specialist – Jul 2025 – Sep 2025
+[bullet list]
+Quality Assurance Lead – Key Responsibilities & Achievements
+[bullet list]"
+This is NOT one role with two headings — it is TWO roles at the same employer (an ongoing role and a temporary acting assignment inside it), and the source text can be genuinely ambiguous about which bullet list belongs to which. Handle this exactly as follows:
+- Create a SEPARATE experience entry for EVERY distinctly named role/title + date line, even when two roles share an employer, overlap in dates, or their bullets appear ambiguously grouped in the source text. Never collapse two differently-titled roles into a single entry, and never silently drop an entry for a role that is explicitly named in the source CV — that is a fabrication-by-omission of real career history, exactly as serious as inventing a fact that isn't there.
+- If a later heading in the source text re-uses an EARLIER role's exact name (as in the example above, where "Quality Assurance Lead – Key Responsibilities & Achievements" repeats the first role's title), that heading's bullets belong to THAT NAMED ROLE'S entry — merge them back into it by matching the name, never treat the repeated heading as a third, separate role.
+- When a bullet's ownership between two adjacent roles is genuinely unclear, assign it to whichever role's stated duties it most plausibly matches (e.g. packaging-specific bullets to a packaging-titled role, broader/ongoing-sounding bullets to the ongoing role) rather than guessing randomly or dropping it.
+- Every role entry you produce must be independently traceable to an explicit role/title line in the source CV — if you cannot point to where a role's title and dates came from in the text below, you have invented or misattributed something.
+
+====================================================
 CURRENT VS. PREVIOUS ROLE — DETERMINE STATUS FROM DATES
 ====================================================
 For every experience entry, decide isCurrentRole from its actual dates/period text — indicators include "Present", "Current", "Till date", "To date", "Ongoing", or an end date that is clearly missing/open on a role that is obviously still active. Never assume the first (or most recent) entry is current just because of its position in the list — check its dates. If the dates are genuinely ambiguous, use your best judgement from context but default to treating a role as previous (past tense) unless there is a clear current-role indicator.
@@ -185,13 +200,9 @@ PROFESSIONAL TITLE RULES (the "title" field)
 ====================================================
 The title is the candidate's professional identity line, shown directly under their name. It must NEVER be the target job title with "Applicant" tacked on, and must NEVER contain the words: Applicant, Candidate, Seeking, Applying For, Looking For, or Job Seeker. Wrong: "Packaging Technical Trainee Applicant", "Quality Assurance Applicant", "Production Manager Applicant".
 
-Instead, generate a polished professional identity based on the candidate's CURRENT or MOST RECENT position, elevated into confident, natural title language. Examples of the transformation:
-- Packaging Laboratory Specialist -> Packaging Quality Specialist
-- Laboratory Technician -> Quality Assurance Professional
-- Quality Assurance Lead -> Quality Assurance & Process Improvement Specialist
-- Production Supervisor -> Production Operations Specialist
+DEFAULT: use the candidate's own CURRENT or MOST RECENT job title, exactly as it appears in the source CV (proper capitalization only — e.g. fix "quality assurance lead" to "Quality Assurance Lead"). This is their real, official title — it is a fact about them, covered by the ABSOLUTE RULE above just like their employer or dates, and must NEVER be replaced with a different, "elevated," "polished," or invented alternative title. A candidate whose CV states "Quality Assurance Lead" gets the title "Quality Assurance Lead" — never "Quality Assurance & Process Improvement Specialist," "Quality Assurance Professional," or any other rewritten variant, no matter how natural-sounding. Inventing a different professional title than the one the candidate actually holds is a fabrication, exactly as serious as inventing a fake employer.
 
-${hasTarget || hasJobDesc ? 'The target position/job description may ONLY be used to tailor the Professional Summary, Skills, and Experience wording — never to replace or appear directly in the title line itself.' : 'Base the title purely on the candidate\'s own current or most recent role — there is no target position to avoid leaking into it here.'} If the candidate has little or no work experience, generate a suitable entry-level professional title instead (e.g. "Aspiring Quality Assurance Professional", "Entry-Level Production Technician") rather than leaving it blank or using a target title.
+${hasTarget || hasJobDesc ? 'The target position/job description may ONLY be used to tailor the Professional Summary, Skills, and Experience wording — never to replace or appear directly in the title line itself.' : 'Base the title purely on the candidate\'s own current or most recent role — there is no target position to avoid leaking into it here.'} ONLY when the candidate has little or no work experience to draw a real title from, generate a suitable entry-level professional title instead (e.g. "Aspiring Quality Assurance Professional", "Entry-Level Production Technician") rather than leaving it blank or using a target title — this entry-level fallback is the ONLY case where the title is generated rather than taken directly from the candidate's own stated title.
 
 ====================================================
 HOW TO IMPROVE THE CV (Output A)
@@ -203,7 +214,7 @@ HOW TO IMPROVE THE CV (Output A)
 - Prioritize and, where beneficial, reorder content so the most relevant experience${hasTarget || hasJobDesc ? ' for this role' : ''} stands out.
 - Strengthen measurable achievements ONLY where the underlying numbers already exist in the source CV.
 - Use standard CV section headings, and naturally weave in keywords from ${keywordSource} for stronger ATS compatibility — never keyword-stuff, never sacrifice readability.
-- Include ALL experience entries, ALL education entries, ALL skills from the original — do not truncate, drop, or cut anything off.
+- Include ALL experience entries, ALL education entries, ALL skills from the original — do not truncate, drop, or cut anything off. This includes every distinctly named role/title, even a short "Acting" or temporary assignment inside an ongoing role — see the NEVER MERGE OR DROP A DISTINCTLY NAMED ROLE section above.
 - Extract and use ONLY real information already in the CV — names, contacts, companies, dates. If something is missing, omit that field entirely or use an empty string. Never invent placeholders like "[Your Name]" or "[Company Name]" — a placeholder left in a document meant to be sent to an employer is a serious defect.
 - Do not unnecessarily redesign the CV's substance — preserve company names, job titles, dates, and qualifications exactly; only improve classification (responsibility vs. achievement), tense, wording, clarity, and impact.
 

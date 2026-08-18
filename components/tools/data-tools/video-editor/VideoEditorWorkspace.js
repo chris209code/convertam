@@ -330,14 +330,6 @@ export default function VideoEditorWorkspace() {
   const [waveformBySource, setWaveformBySource] = useState({}); // sourceId -> peaks[] | 'loading' | 'error'
   const [silenceRanges, setSilenceRanges] = useState(null); // null = not run yet; [] = ran, found none; [{ start, end, selected }] = ran, found some — never applied until the user confirms
   const [silenceScanning, setSilenceScanning] = useState(false);
-  // Manual cut-out: mark a start and end point on the selected clip (via the
-  // playhead, same source-time capture handleSplitAtPlayhead already uses),
-  // queue up as many ranges as needed, review, then remove them all in one
-  // commit — the "point A to point B" / "click where to cut and drop that
-  // part" workflow, built on the exact same split+split+delete composite
-  // handleApplySilenceRemoval already established for auto-detected ranges.
-  const [manualCutStart, setManualCutStart] = useState(null); // pending start (source time) until an end is marked
-  const [manualCutRanges, setManualCutRanges] = useState([]); // [{ start, end }], source time, queued for the selected clip's source
   const [isFullscreenPreview, setIsFullscreenPreview] = useState(false);
   const [normalizing, setNormalizing] = useState(false);
   const [cleaningClipAudio, setCleaningClipAudio] = useState(false);
@@ -844,11 +836,22 @@ export default function VideoEditorWorkspace() {
     }));
   }
 
+  // Splits whatever clip currently sits at the playhead on the selected
+  // clip's own track — NOT only the exact clip that was selected before
+  // this call. A prior split leaves the playhead inside a brand-new clip
+  // (the split's second half), so requiring an exact id match here made a
+  // second split silently no-op unless the user re-clicked the timeline in
+  // between; auto-following the playhead instead lets "move playhead, hit
+  // Split, repeat" work as one continuous motion, same as it visually reads.
   function handleSplitAtPlayhead() {
     if (!selectedClip) return;
     const hit = findActiveClipAt(timeline, selectedClip.track, playhead);
-    if (!hit || hit.clip.id !== selectedClip.id) return;
-    commit((tl) => splitClip(tl, selectedClip.id, hit.sourceTime));
+    if (!hit) return;
+    if (hit.clip.id !== selectedClip.id) {
+      setSelectedClipId(hit.clip.id);
+      setExtraSelectedClipIds([]);
+    }
+    commit((tl) => splitClip(tl, hit.clip.id, hit.sourceTime));
   }
 
   // Handles both the single-clip "Delete clip" button and a multi-select
@@ -1017,58 +1020,6 @@ export default function VideoEditorWorkspace() {
       return next;
     });
     setSilenceRanges(null);
-    setSelectedClipId(null);
-    setExtraSelectedClipIds([]);
-  }
-
-  // ---- Manual cut-out: mark start/end on the selected clip via the
-  // playhead (same source-time capture as handleSplitAtPlayhead), queue as
-  // many ranges as needed, then remove them all in one commit — reuses the
-  // exact split+split+delete composite handleApplySilenceRemoval already
-  // proved out, just driven by manually marked points instead of detected
-  // silence. ----
-  function currentClipSourceTime() {
-    if (!selectedClip) return null;
-    const hit = findActiveClipAt(timeline, selectedClip.track, playhead);
-    if (!hit || hit.clip.id !== selectedClip.id) return null;
-    return hit.sourceTime;
-  }
-  function handleMarkCutStart() {
-    const t = currentClipSourceTime();
-    if (t == null) return;
-    setManualCutStart(t);
-  }
-  function handleMarkCutEnd() {
-    const t = currentClipSourceTime();
-    if (t == null || manualCutStart == null) return;
-    const start = Math.min(manualCutStart, t);
-    const end = Math.max(manualCutStart, t);
-    setManualCutStart(null);
-    if (end - start < 0.1) return;
-    setManualCutRanges((prev) => [...prev, { start, end }].sort((a, b) => a.start - b.start));
-  }
-  function removeManualCutRange(index) {
-    setManualCutRanges((prev) => prev.filter((_, i) => i !== index));
-  }
-  function handleApplyManualCuts() {
-    if (!manualCutRanges.length || !selectedClip) return;
-    const originalSourceId = selectedClip.sourceId;
-    commit((tl) => {
-      let next = tl;
-      for (const range of manualCutRanges) {
-        const target = next.clips.find((c) => c.sourceId === originalSourceId && c.sourceStart <= range.start + 0.02 && c.sourceEnd >= range.end - 0.02);
-        if (!target) continue;
-        const afterFirstSplit = splitClip(next, target.id, range.start);
-        const midCandidate = afterFirstSplit.clips.find((c) => c.sourceId === originalSourceId && Math.abs(c.sourceStart - range.start) < 0.06 && c.sourceEnd > range.start);
-        if (!midCandidate) { next = afterFirstSplit; continue; }
-        const afterSecondSplit = splitClip(afterFirstSplit, midCandidate.id, range.end);
-        const toDelete = afterSecondSplit.clips.find((c) => c.sourceId === originalSourceId && Math.abs(c.sourceStart - range.start) < 0.06 && Math.abs(c.sourceEnd - range.end) < 0.06);
-        next = toDelete ? deleteClip(afterSecondSplit, toDelete.id) : afterSecondSplit;
-      }
-      return next;
-    });
-    setManualCutRanges([]);
-    setManualCutStart(null);
     setSelectedClipId(null);
     setExtraSelectedClipIds([]);
   }
@@ -2640,39 +2591,9 @@ export default function VideoEditorWorkspace() {
                 <button onClick={handleDeleteSelected} style={{ ...smallBtn, color: '#DC2626', borderColor: '#FCA5A5' }}>✕ Delete clip</button>
               </div>
               {selectedSource.kind !== 'image' && (
-                <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
-                  <p style={{ fontSize: '0.7rem', fontWeight: 700, color: T.mutedDark, margin: '0 0 6px' }}>Cut out a range (point A → B)</p>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <button onClick={handleMarkCutStart} style={smallBtn}>▶ Mark start ({formatDuration(playhead)})</button>
-                    <button onClick={handleMarkCutEnd} disabled={manualCutStart == null} style={smallBtn}>■ Mark end ({formatDuration(playhead)})</button>
-                    {manualCutStart != null && <button onClick={() => setManualCutStart(null)} style={{ ...smallBtn, padding: '5px 8px' }}>Cancel</button>}
-                  </div>
-                  {manualCutStart != null && (
-                    <p style={{ fontSize: '0.68rem', color: T.muted, margin: '6px 0 0' }}>
-                      Start marked at {formatDuration(manualCutStart)} — scrub or play to where the unwanted part ends, then click Mark end.
-                    </p>
-                  )}
-                  {manualCutRanges.length > 0 && (
-                    <div style={{ marginTop: 8 }}>
-                      <p style={{ fontSize: '0.68rem', color: T.mutedDark, margin: '0 0 6px', fontWeight: 700 }}>{manualCutRanges.length} range{manualCutRanges.length === 1 ? '' : 's'} marked for removal:</p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8, maxHeight: 120, overflowY: 'auto' }}>
-                        {manualCutRanges.map((r, i) => (
-                          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.7rem', color: T.inkSecondary }}>
-                            <span>{formatDuration(r.start)} – {formatDuration(r.end)} <span style={{ color: T.muted }}>({(r.end - r.start).toFixed(1)}s)</span></span>
-                            <button onClick={() => removeManualCutRange(i)} style={{ ...smallBtn, padding: '2px 7px', fontSize: '0.65rem' }}>✕</button>
-                          </div>
-                        ))}
-                      </div>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button onClick={handleApplyManualCuts} style={{ ...smallBtn, background: T.accentGradient, color: 'white', border: 'none' }}>✂ Remove marked ranges</button>
-                        <button onClick={() => setManualCutRanges([])} style={smallBtn}>Clear all</button>
-                      </div>
-                    </div>
-                  )}
-                  <p style={{ fontSize: '0.66rem', color: T.muted, margin: '8px 0 0' }}>
-                    Play or scrub the preview to each point, mark start then end, and repeat for as many parts as you want to drop — everything after gets pulled back to close the gap.
-                  </p>
-                </div>
+                <p style={{ fontSize: '0.68rem', color: T.muted, margin: '8px 0 0' }}>
+                  To remove part of a clip: move the playhead (the white line) to where you want to cut, click Split at playhead, then click the piece you don&apos;t want and Delete it — everything after closes the gap automatically.
+                </p>
               )}
               {silenceRanges !== null && (
                 <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
@@ -2699,7 +2620,7 @@ export default function VideoEditorWorkspace() {
               )}
             </div>
           ) : (
-            <p style={{ fontSize: '0.72rem', color: T.muted, textAlign: 'center', padding: '16px 0' }}>Select a single clip on the timeline to trim, split, join, cut out a range, freeze a frame, or find silence.</p>
+            <p style={{ fontSize: '0.72rem', color: T.muted, textAlign: 'center', padding: '16px 0' }}>Select a single clip on the timeline to trim, split, join, freeze a frame, or find silence.</p>
           ))}
 
           {activeCategory === 'audio' && (selectedClip && selectedSource && !isLockedSelected && selectionIds.length <= 1 && selectedSource.kind !== 'image' && (

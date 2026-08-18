@@ -21,7 +21,7 @@ const SCHEMA = {
 const FAQ = [
   { q: 'Can I trim a video?', a: 'Yes — select a clip and set its trim start and end points with precise numeric inputs. Trimming never modifies your original file; it only changes what part of it plays.' },
   { q: 'Can I split a clip into two?', a: 'Yes — move the playhead to where you want the cut and click Split at playhead. The clip becomes two independent clips you can trim, delete, or reorder separately.' },
-  { q: 'Can I delete part of a video?', a: 'Yes, two ways. Split at both edges of the part you don\'t want, select the middle piece, and delete it — the remaining clips automatically play back to back. Or use Cut out a range in the Edit panel: mark a start and end point (point A to point B) with the Mark start/Mark end buttons while scrubbing the preview, queue up as many ranges as you want to drop, and remove them all in one click — same result, no manual selecting.' },
+  { q: 'Can I delete part of a video?', a: 'Yes — move the playhead to where you want to cut, click Split at playhead, do the same at the other edge of the part you don\'t want, then click the middle piece and Delete it. The remaining clips automatically play back to back with no gap.' },
   { q: 'Can I join clips back together?', a: 'Yes — select a clip and click Join with next to merge it with the clip immediately after it on the same track.' },
   { q: 'Can I reorder clips?', a: 'Yes — drag any clip in the main track left or right to move it wherever you want (Premiere-style free positioning), with snapping to the playhead, other clips\' edges, and markers. Clips can\'t overlap each other on the same track, but you can leave a gap for a deliberate pause. If you have several clips multi-selected, dragging any one of them moves the whole group together.' },
   { q: 'If I add a second video, will it play right after the first with no gap?', a: 'Yes — adding another video always appends it immediately after your last main-track clip, so playback flows straight through with no pause. If a drag (or any other edit) does leave a gap, selecting the clip after it shows a warning with a one-click Close gap button that snaps it flush again.' },
@@ -107,8 +107,7 @@ export default function VideoEditorPage() {
               <h2 style={sectionH2}>What can Video Editor do?</h2>
               <ul style={ul}>
                 <li><strong>Trim</strong> — drag either edge of a clip on the timeline, or set precise numeric in/out points. Dragging snaps to the playhead, other clips&apos; edges, and markers for a clean cut, with a small on-screen highlight when it snaps — hold Alt to drag without snapping.</li>
-                <li><strong>Split</strong> — cut a clip in two at the playhead.</li>
-                <li><strong>Cut out a range</strong> — mark a start and end point on a clip (point A to point B), or mark several cut points and drop only the parts you don&apos;t want — everything else is pulled back together with no gap, in one commit.</li>
+                <li><strong>Split</strong> — cut a clip in two at the playhead. To remove a section from the middle, split at both edges of the part you don&apos;t want, then select that piece and delete it.</li>
                 <li><strong>Multi-select</strong> — Ctrl/Cmd-click to add clips to a selection, Shift-click to select a range, then delete or duplicate all of them in one action (one undo step, original order preserved). Click empty timeline space to clear the selection.</li>
                 <li><strong>Delete</strong> — remove an unwanted segment, or every selected clip at once.</li>
                 <li><strong>Join</strong> — merge adjacent clips back together.</li>

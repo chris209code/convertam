@@ -173,6 +173,7 @@ const ALL_TOOLS = [
   { name: 'Video Studio', href: '/video-studio' },
   { name: 'Video Editor', href: '/video-editor' },
   { name: 'Screen Recorder', href: '/screen-recorder' },
+  { name: 'Compress & Split Video', href: '/compress-video' },
   { name: 'QR Code Generator', href: '/qr-code-generator' },
   { name: 'Password Studio', href: '/password-generator' },
   { name: 'Text Case Converter', href: '/text-case-converter' },

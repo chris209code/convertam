@@ -149,6 +149,7 @@ export default function VideoStudioPage() {
             <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Related Tools</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               <Link href="/audio-studio" style={relatedLink}>Audio Studio →</Link>
+              <Link href="/compress-video" style={relatedLink}>Compress & Split Video →</Link>
               <Link href="/data-tools/text-cleaner" style={relatedLink}>Text Cleaner Studio →</Link>
               <Link href="/data-tools/smart-parser" style={relatedLink}>Smart Parser →</Link>
               <Link href="/media-workspace" style={relatedLink}>Media Workspace →</Link>

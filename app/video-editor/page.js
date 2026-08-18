@@ -245,6 +245,7 @@ export default function VideoEditorPage() {
               <Link href="/screen-recorder" style={relatedLink}>Screen Recorder →</Link>
               <Link href="/video-studio" style={relatedLink}>Video Studio →</Link>
               <Link href="/audio-studio" style={relatedLink}>Audio Studio →</Link>
+              <Link href="/compress-video" style={relatedLink}>Compress & Split Video →</Link>
               <Link href="/media-workspace" style={relatedLink}>All Media Workspace →</Link>
             </div>
           </div>

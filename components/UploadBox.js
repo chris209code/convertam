@@ -7,7 +7,7 @@ const DEFAULT_MAX_SIZE_MB = 100;
 // maxSizeMB is optional — every existing caller keeps the original 100MB
 // ceiling unchanged; only a caller that explicitly needs a different limit
 // (e.g. Video Studio's larger video files) passes its own.
-export default function UploadBox({ accept, multiple, onFiles, label, compact, compactLabel, maxSizeMB }) {
+export default function UploadBox({ accept, multiple, onFiles, label, compact, compactLabel, maxSizeMB, oversizedHint }) {
   const MAX_SIZE_MB = maxSizeMB || DEFAULT_MAX_SIZE_MB;
   const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
   const inputRef = useRef(null);
@@ -21,7 +21,9 @@ export default function UploadBox({ accept, multiple, onFiles, label, compact, c
   function validateFiles(files) {
     const oversized = files.filter(f => f.size > MAX_SIZE_BYTES);
     if (oversized.length) {
-      setSizeError(`File too large — maximum size is ${MAX_SIZE_MB}MB. Please compress or split the file first.`);
+      setSizeError(
+        <>File too large — maximum size is {MAX_SIZE_MB}MB. {oversizedHint || 'Please compress or split the file first.'}</>
+      );
       return false;
     }
     setSizeError('');

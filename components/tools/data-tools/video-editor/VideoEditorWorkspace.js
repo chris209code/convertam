@@ -2110,6 +2110,7 @@ export default function VideoEditorWorkspace() {
                   onFiles={handleMainFiles}
                   maxSizeMB={MAX_UPLOAD_VIDEO_BYTES / (1024 * 1024)}
                   label="Click to choose a video to start editing, or drag it here"
+                  oversizedHint={<>Use <Link href="/compress-video" style={{ color: T.accentDark, fontWeight: 700 }}>Compress &amp; Split Video</Link> to shrink or cut it down first.</>}
                 />
                 {uploadError && <div style={{ ...statusBox, marginTop: 12 }}>⚠️ {uploadError}</div>}
                 <p style={{ fontSize: '0.76rem', color: T.muted, marginTop: 10, textAlign: 'center' }}>
@@ -2712,7 +2713,7 @@ export default function VideoEditorWorkspace() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div>
                 <div style={{ fontSize: '0.7rem', color: T.mutedDark, marginBottom: 2 }}>Main video</div>
-                <UploadBox accept="video/*" onFiles={handleMainFiles} maxSizeMB={MAX_UPLOAD_VIDEO_BYTES / (1024 * 1024)} compact compactLabel="+ Add another video" />
+                <UploadBox accept="video/*" onFiles={handleMainFiles} maxSizeMB={MAX_UPLOAD_VIDEO_BYTES / (1024 * 1024)} compact compactLabel="+ Add another video" oversizedHint={<>Use <Link href="/compress-video" style={{ color: T.accentDark, fontWeight: 700 }}>Compress &amp; Split Video</Link> to shrink or cut it down first.</>} />
               </div>
               <div>
                 <div style={{ fontSize: '0.7rem', color: T.mutedDark, marginBottom: 2 }}>Video overlay (split-screen / video call)</div>

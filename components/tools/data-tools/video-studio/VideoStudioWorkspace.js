@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import Link from 'next/link';
 import UploadBox from '@/components/UploadBox';
 import { T } from '../smart-parser/theme';
 import { downloadBlob, sendToTool } from '@/lib/dataTools/shared';
@@ -311,6 +312,7 @@ export default function VideoStudioWorkspace() {
                     onFiles={handleFiles}
                     maxSizeMB={MAX_UPLOAD_VIDEO_BYTES / (1024 * 1024)}
                     label="Click to choose a video file, or drag it here"
+                    oversizedHint={<>Use <Link href="/compress-video" style={{ color: T.accentDark, fontWeight: 700 }}>Compress &amp; Split Video</Link> to shrink or cut it down first.</>}
                   />
                   <p style={{ fontSize: '0.76rem', color: T.muted, marginTop: 10, textAlign: 'center' }}>
                     MP4, WebM, MOV, and other formats your browser can play are supported.

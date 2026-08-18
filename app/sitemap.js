@@ -65,6 +65,7 @@ export default function sitemap() {
     'screen-recorder',
     'audio-studio',
     'video-studio',
+    'compress-video',
   ].map((slug) => ({
     url: `${BASE_URL}/${slug}`,
     lastModified: new Date(),

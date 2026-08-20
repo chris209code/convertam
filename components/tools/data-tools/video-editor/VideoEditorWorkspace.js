@@ -213,6 +213,12 @@ const SOCIAL_PRESETS = [
 
 const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 
+// A DIFFERENT control from SPEED_OPTIONS above — that one is a per-clip
+// property (Effects panel, setClipSpeed) that changes actual duration and
+// export output; this is purely how fast the editor plays the timeline
+// back for review (see the previewRate state and render effect).
+const PREVIEW_SPEED_OPTIONS = [0.25, 0.5, 1, 1.5, 2];
+
 const FILTER_PRESETS = {
   none: { brightness: 1, contrast: 1, saturation: 1, grayscale: 0 },
   grayscale: { brightness: 1, contrast: 1.05, saturation: 1, grayscale: 1 },
@@ -320,6 +326,12 @@ export default function VideoEditorWorkspace() {
   const [extraSelectedClipIds, setExtraSelectedClipIds] = useState([]);
   const [playhead, setPlayhead] = useState(0); // timeline-relative seconds
   const [playing, setPlaying] = useState(false);
+  // Preview-only playback speed — how fast the EDITOR plays the timeline
+  // back for review, entirely separate from a clip's own Speed (Effects
+  // panel, setClipSpeed) which changes actual duration/export. This never
+  // touches the timeline data model at all, just how fast wall-clock time
+  // is translated into playhead advancement below (see the render effect).
+  const [previewRate, setPreviewRate] = useState(1);
   const [uploadError, setUploadError] = useState('');
   const [renderStatus, setRenderStatus] = useState('idle');
   const [renderProgress, setRenderProgress] = useState(0);
@@ -607,6 +619,16 @@ export default function VideoEditorWorkspace() {
       playStartRef.current = { atWall: performance.now(), atPlayhead: playhead };
     }
     setPlaying(next);
+  }
+
+  // Changing preview speed mid-playback needs the same re-anchor
+  // handleEditCursorPointerDown uses for the same reason: elapsedWall keeps
+  // accumulating from playStartRef's OLD snapshot, so retroactively
+  // applying a new rate to time that already elapsed under the old one
+  // would jump the playhead instead of smoothly changing pace from here.
+  function handlePreviewSpeed(rate) {
+    setPreviewRate(rate);
+    if (playing) playStartRef.current = { atWall: performance.now(), atPlayhead: playhead };
   }
 
   // Releases the AudioContext when the workspace unmounts — nothing to do
@@ -1616,7 +1638,7 @@ export default function VideoEditorWorkspace() {
 
       if (mainHit) {
         await loadClip(mainVideoRef.current, mainHit.clip, lastMainClipRef);
-        mainVideoRef.current.playbackRate = mainHit.clip.speed || 1;
+        mainVideoRef.current.playbackRate = (mainHit.clip.speed || 1) * previewRate;
         if (mainHit.clip.reversed) {
           // Native <video> has no reverse-playback mode — approximated here
           // by scrubbing currentTime backward every frame instead of letting
@@ -1694,13 +1716,13 @@ export default function VideoEditorWorkspace() {
           // Best-effort scrub-backward preview — see the main track's
           // identical handling above for why native playback can't do this.
           await loadClip(s.videoEl, hit.clip, s.lastClipIdRef);
-          s.videoEl.playbackRate = hit.clip.speed || 1;
+          s.videoEl.playbackRate = (hit.clip.speed || 1) * previewRate;
           if (!s.videoEl.paused) s.videoEl.pause();
           const mirroredTime = hit.clip.sourceEnd - (hit.sourceTime - hit.clip.sourceStart);
           s.videoEl.currentTime = Math.max(0, mirroredTime);
         } else if (hit && s.videoEl) {
           await loadClip(s.videoEl, hit.clip, s.lastClipIdRef);
-          s.videoEl.playbackRate = hit.clip.speed || 1;
+          s.videoEl.playbackRate = (hit.clip.speed || 1) * previewRate;
           if (Math.abs(s.videoEl.currentTime - hit.sourceTime) > 0.15) {
             s.videoEl.currentTime = hit.sourceTime;
           }
@@ -1832,7 +1854,14 @@ export default function VideoEditorWorkspace() {
 
       if (playing && playStartRef.current) {
         const elapsedWall = (performance.now() - playStartRef.current.atWall) / 1000;
-        const next = playStartRef.current.atPlayhead + elapsedWall;
+        // previewRate here is what actually makes 0.25×/2×/etc. slow or
+        // speed up the EDIT view: real seconds elapsed are scaled before
+        // being added to the timeline position, so at 0.25× the playhead
+        // (and the edit cursor riding on it) crawls through the SAME
+        // timeline four times slower than the wall clock — no change to
+        // any clip's own duration or export speed, just how fast this
+        // preview walks across it.
+        const next = playStartRef.current.atPlayhead + elapsedWall * previewRate;
         if (next >= totalDuration) {
           setPlaying(false);
           setPlayhead(totalDuration);
@@ -1845,7 +1874,7 @@ export default function VideoEditorWorkspace() {
     rafRef.current = requestAnimationFrame(tick);
     return () => { cancelled = true; if (rafRef.current) cancelAnimationFrame(rafRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeline, playhead, playing]);
+  }, [timeline, playhead, playing, previewRate]);
 
   // ---- Free-drag PiP repositioning (mouse + touch via Pointer Events) ----
   function canvasPointFromEvent(e) {
@@ -2426,6 +2455,25 @@ export default function VideoEditorWorkspace() {
             <span style={{ fontSize: '0.72rem', color: T.mutedDark, minWidth: 76, textAlign: 'right' }}>
               {formatDuration(playhead)} / {formatDuration(totalDuration)}
             </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: T.mutedDark }}>Preview speed</span>
+            {PREVIEW_SPEED_OPTIONS.map((r) => (
+              <button
+                key={r}
+                onClick={() => handlePreviewSpeed(r)}
+                style={{
+                  ...smallBtn, padding: '4px 9px', fontSize: '0.7rem',
+                  background: previewRate === r ? T.accentGradient : 'white',
+                  color: previewRate === r ? 'white' : T.inkSecondary,
+                  border: previewRate === r ? 'none' : `1px solid ${T.border}`,
+                }}
+                title={`Play the editor's preview at ${r}× — for reviewing footage while you find a split point; doesn't change any clip's actual duration or export speed`}
+              >
+                {r}×
+              </button>
+            ))}
           </div>
 
           {timeline.markers.length > 0 && (

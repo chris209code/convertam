@@ -598,10 +598,12 @@ export default function VideoEditorWorkspace() {
     const next = !playing;
     if (next) {
       ensureAudioGraph();
+      // playhead is already wherever the edit cursor last put it (see
+      // handleClipClick/handleEditCursorPointerDown), so playback resumes
+      // from exactly that point — never jumps back to 0:00.
       playStartRef.current = { atWall: performance.now(), atPlayhead: playhead };
-      // Pressing Play is real playback, not "still positioning a cut" —
-      // hands the preview back to the playhead exclusively (see the
-      // render effect's own comment on how the two are kept separate).
+      // The fixed red cursor marker no longer means anything once playback
+      // is actually moving forward past it.
       setEditCursor(null);
     }
     setPlaying(next);
@@ -823,7 +825,10 @@ export default function VideoEditorWorkspace() {
     // Plain click selects AND drops the edit cursor exactly where clicked
     // — "click a clip, a cursor appears at that point" — using the clip's
     // OWN bounding box, not the whole track (this is a per-clip cursor,
-    // works identically for a main-track or an overlay-track clip).
+    // works identically for a main-track or an overlay-track clip). Also
+    // moves the actual playhead there (not just a visual overlay) so the
+    // preview jumps immediately AND, if Play is pressed afterward, playback
+    // resumes from this exact point instead of wherever it last was.
     setSelectedClipId(clickedId);
     setExtraSelectedClipIds([]);
     if (overlayTrackId !== undefined) setSelectedOverlayTrackId(overlayTrackId);
@@ -832,7 +837,10 @@ export default function VideoEditorWorkspace() {
     if (clipDuration(clip) > 0) {
       const rect = e.currentTarget.getBoundingClientRect();
       const frac = rect.width > 0 ? Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)) : 0;
-      setEditCursor({ clipId: clickedId, time: clip.start + frac * clipDuration(clip) });
+      const time = clip.start + frac * clipDuration(clip);
+      setEditCursor({ clipId: clickedId, time });
+      setPlaying(false);
+      setPlayhead(time);
     }
   }
   function clearSelectionIfEmptyClick(e) {
@@ -1303,15 +1311,14 @@ export default function VideoEditorWorkspace() {
     }
   }
 
-  // ---- Edit cursor: a thin vertical line that lives ON the currently
-  // selected clip — NOT the round Play button's own playhead/slider, which
-  // stays exactly what it was (ordinary playback position, untouched by
-  // any of this). Clicking a clip sets { clipId, time } to the exact point
-  // clicked; dragging the cursor handle (rendered only on the selected
-  // clip, see the JSX below) moves it, clamped to that clip's own span.
-  // Whenever it's set, the preview shows that exact frame instead of the
-  // playback position (see the render effect's own comment) so scrubbing
-  // it previews the frame right up until Split cuts there. Split is
+  // ---- Edit cursor: a thin red line that lives ON the currently selected
+  // clip, marking the exact point Split will cut. Clicking a clip sets
+  // { clipId, time } to the exact point clicked; dragging the cursor
+  // handle (rendered only on the selected clip, see the JSX below) moves
+  // it, clamped to that clip's own span. Both ALSO move the real playhead
+  // to that same time — not just a visual overlay — so the preview jumps
+  // there immediately and, if Play is pressed afterward, playback resumes
+  // from exactly that point rather than wherever it last was. Split is
   // disabled with no cursor set — there is no other fallback position. ----
   const [editCursor, setEditCursor] = useState(null); // { clipId, time } | null
   const editCursorDragRef = useRef(null);
@@ -1320,6 +1327,7 @@ export default function VideoEditorWorkspace() {
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
+    setPlaying(false);
     // The handle is rendered as a direct child of the clip's own div, so
     // its immediate parent IS the clip's bounding box — exactly the
     // frame of reference "drag left/right across the selected clip" needs.
@@ -1327,7 +1335,13 @@ export default function VideoEditorWorkspace() {
     const dur = clipDuration(clip);
     const seekToClientX = (clientX) => {
       const frac = clipRect.width > 0 ? Math.min(1, Math.max(0, (clientX - clipRect.left) / clipRect.width)) : 0;
-      setEditCursor({ clipId: clip.id, time: clip.start + frac * dur });
+      const time = clip.start + frac * dur;
+      // Moves the REAL playhead too, live, every step of the drag — not
+      // just a visual overlay — so the preview and the eventual "resume
+      // playback from here" position both stay exactly in sync with
+      // wherever the cursor currently is, right up to release.
+      setEditCursor({ clipId: clip.id, time });
+      setPlayhead(time);
     };
     editCursorDragRef.current = true;
     function onMove(ev) { seekToClientX(ev.clientX); }
@@ -1585,15 +1599,7 @@ export default function VideoEditorWorkspace() {
       if (cancelled) return;
       if (playing && !playStartRef.current) playStartRef.current = { atWall: performance.now(), atPlayhead: playhead };
 
-      // The edit cursor (see handleEditCursorPointerDown/handleClipClick)
-      // owns the preview while it's active — dragging it must show the
-      // exact frame it's over, distinct from the round Play button's own
-      // playhead. It only applies while paused and still pointed at the
-      // clip that's currently selected; the moment either stops being
-      // true (Play pressed, selection changed), playhead takes back over.
-      const previewTime = (!playing && editCursor && editCursor.clipId === selectedClipId) ? editCursor.time : playhead;
-
-      const mainHit = findActiveClipAt(timeline, MAIN_TRACK, previewTime);
+      const mainHit = findActiveClipAt(timeline, MAIN_TRACK, playhead);
 
       if (mainHit) {
         await loadClip(mainVideoRef.current, mainHit.clip, lastMainClipRef);
@@ -1664,7 +1670,7 @@ export default function VideoEditorWorkspace() {
       const drawnOverlayLayers = [];
       for (const track of timeline.overlayTracks) {
         const s = getOverlayLayerState(track.id);
-        const hit = findActiveClipAt(timeline, track.id, previewTime);
+        const hit = findActiveClipAt(timeline, track.id, playhead);
         const source = hit ? timeline.sources.find((so) => so.id === hit.clip.sourceId) : null;
         const isImage = source?.kind === 'image';
 
@@ -1792,9 +1798,9 @@ export default function VideoEditorWorkspace() {
       // same shared functions the composed export uses per frame, so what
       // the preview shows is exactly what gets exported.
       timeline.imageOverlays.forEach((o) => { if (o.sourceId) ensureImageOverlayElement(o.sourceId); });
-      drawImageOverlays(ctx, { timeline: drawTimeline, timelineSeconds: previewTime, imageElements: imageOverlayElsRef.current });
-      drawShapeOverlays(ctx, { timeline: drawTimeline, timelineSeconds: previewTime });
-      drawTextOverlays(ctx, { timeline: drawTimeline, timelineSeconds: previewTime });
+      drawImageOverlays(ctx, { timeline: drawTimeline, timelineSeconds: playhead, imageElements: imageOverlayElsRef.current });
+      drawShapeOverlays(ctx, { timeline: drawTimeline, timelineSeconds: playhead });
+      drawTextOverlays(ctx, { timeline: drawTimeline, timelineSeconds: playhead });
 
       // Safe-zone guides — preview only, drawn after everything else so
       // they're always visible on top, and never passed through
@@ -1826,7 +1832,7 @@ export default function VideoEditorWorkspace() {
     rafRef.current = requestAnimationFrame(tick);
     return () => { cancelled = true; if (rafRef.current) cancelAnimationFrame(rafRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeline, playhead, playing, editCursor, selectedClipId]);
+  }, [timeline, playhead, playing]);
 
   // ---- Free-drag PiP repositioning (mouse + touch via Pointer Events) ----
   function canvasPointFromEvent(e) {
@@ -2690,7 +2696,7 @@ export default function VideoEditorWorkspace() {
               </div>
               {selectedSource.kind !== 'image' && (
                 <p style={{ fontSize: '0.68rem', color: T.muted, margin: '8px 0 0' }}>
-                  Click a clip to select it — a red edit cursor drops exactly where you clicked. Drag that cursor left/right to fine-tune the exact frame (the preview follows it), then click Split. This is separate from the round Play button and its slider, which only control normal playback. To remove part of a clip: split at both edges of the part you don&apos;t want, select that middle piece, and Delete it — everything after closes the gap automatically. Drag a clip{"'"}s body left or right to reorder it, or use the Reorder buttons above for a precise move to either end. This all works the same way for overlay clips.
+                  Click a clip to select it — a red edit cursor drops exactly where you clicked, the preview jumps there immediately, and pressing Play afterward resumes from that exact point instead of the start. Drag the cursor left/right to fine-tune the exact frame (the preview follows it live), then click Split. To remove part of a clip: split at both edges of the part you don&apos;t want, select that middle piece, and Delete it — everything after closes the gap automatically. Drag a clip{"'"}s body left or right to reorder it, or use the Reorder buttons above for a precise move to either end. This all works the same way for overlay clips.
                 </p>
               )}
               {silenceRanges !== null && (

@@ -600,11 +600,11 @@ export default function VideoEditorWorkspace() {
       ensureAudioGraph();
       // playhead is already wherever the edit cursor last put it (see
       // handleClipClick/handleEditCursorPointerDown), so playback resumes
-      // from exactly that point — never jumps back to 0:00.
+      // from exactly that point — never jumps back to 0:00. The cursor
+      // itself stays put (not cleared) — its position is read straight
+      // off playhead everywhere it's drawn, so it keeps tracking forward
+      // right along with playback instead of disappearing.
       playStartRef.current = { atWall: performance.now(), atPlayhead: playhead };
-      // The fixed red cursor marker no longer means anything once playback
-      // is actually moving forward past it.
-      setEditCursor(null);
     }
     setPlaying(next);
   }
@@ -838,7 +838,7 @@ export default function VideoEditorWorkspace() {
       const rect = e.currentTarget.getBoundingClientRect();
       const frac = rect.width > 0 ? Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)) : 0;
       const time = clip.start + frac * clipDuration(clip);
-      setEditCursor({ clipId: clickedId, time });
+      setEditCursorClipId(clickedId);
       setPlaying(false);
       setPlayhead(time);
     }
@@ -867,13 +867,15 @@ export default function VideoEditorWorkspace() {
   // between; auto-following the playhead instead lets "move playhead, hit
   // Split, repeat" work as one continuous motion, same as it visually reads.
   function handleSplitAtCursor() {
-    if (!selectedClip || editCursor?.clipId !== selectedClip.id) return;
-    // editCursor.time is timeline-absolute (like clip.start); splitClip
-    // wants a point in the SOURCE file's own timeline, so undo the same
+    if (!selectedClip || editCursorClipId !== selectedClip.id) return;
+    // playhead is timeline-absolute (like clip.start); splitClip wants a
+    // point in the SOURCE file's own timeline, so undo the same
     // start-offset + speed math findActiveClipAt uses elsewhere.
-    const sourceTime = selectedClip.sourceStart + (editCursor.time - selectedClip.start) * (selectedClip.speed || 1);
+    const sourceTime = selectedClip.sourceStart + (playhead - selectedClip.start) * (selectedClip.speed || 1);
     commit((tl) => splitClip(tl, selectedClip.id, sourceTime));
-    setEditCursor(null);
+    // The cursor stays visible — splitClip keeps the FIRST piece's id, so
+    // it's still pointing at a valid clip, now sitting right at that
+    // piece's own end (the exact spot the cut just happened).
   }
 
   // Handles both the single-clip "Delete clip" button and a multi-select
@@ -895,7 +897,7 @@ export default function VideoEditorWorkspace() {
     });
     setSelectedClipId(null);
     setExtraSelectedClipIds([]);
-    setEditCursor(null);
+    setEditCursorClipId(null);
     if (track !== MAIN_TRACK && selectedOverlayTrackId === track) setSelectedOverlayTrackId(null);
   }
 
@@ -1312,22 +1314,24 @@ export default function VideoEditorWorkspace() {
   }
 
   // ---- Edit cursor: a thin red line that lives ON the currently selected
-  // clip, marking the exact point Split will cut. Clicking a clip sets
-  // { clipId, time } to the exact point clicked; dragging the cursor
-  // handle (rendered only on the selected clip, see the JSX below) moves
-  // it, clamped to that clip's own span. Both ALSO move the real playhead
-  // to that same time — not just a visual overlay — so the preview jumps
-  // there immediately and, if Play is pressed afterward, playback resumes
-  // from exactly that point rather than wherever it last was. Split is
-  // disabled with no cursor set — there is no other fallback position. ----
-  const [editCursor, setEditCursor] = useState(null); // { clipId, time } | null
+  // clip and marks the exact point Split will cut. It's just WHICH clip
+  // currently owns it (editCursorClipId) — its actual position is always
+  // read straight off the real playhead (see the JSX below), so it's
+  // permanently synced with wherever the preview/playback position is,
+  // including while playing: the playhead keeps advancing every frame
+  // regardless of this, so the cursor visibly moves right along with it
+  // rather than freezing or disappearing when Play is pressed. Clicking a
+  // clip sets both the cursor and the playhead to the point clicked;
+  // dragging the handle (rendered only on the selected clip) moves both
+  // together, clamped to that clip's own span. Split is disabled with no
+  // cursor set — there is no other fallback position. ----
+  const [editCursorClipId, setEditCursorClipId] = useState(null);
   const editCursorDragRef = useRef(null);
 
   function handleEditCursorPointerDown(e, clip) {
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    setPlaying(false);
     // The handle is rendered as a direct child of the clip's own div, so
     // its immediate parent IS the clip's bounding box — exactly the
     // frame of reference "drag left/right across the selected clip" needs.
@@ -1336,17 +1340,26 @@ export default function VideoEditorWorkspace() {
     const seekToClientX = (clientX) => {
       const frac = clipRect.width > 0 ? Math.min(1, Math.max(0, (clientX - clipRect.left) / clipRect.width)) : 0;
       const time = clip.start + frac * dur;
-      // Moves the REAL playhead too, live, every step of the drag — not
-      // just a visual overlay — so the preview and the eventual "resume
-      // playback from here" position both stay exactly in sync with
-      // wherever the cursor currently is, right up to release.
-      setEditCursor({ clipId: clip.id, time });
+      setEditCursorClipId(clip.id);
       setPlayhead(time);
+      // If playback was already running, dragging the cursor shouldn't
+      // stop it — "the video jumps there and playback continues from the
+      // new position." The RAF loop in the render effect advances from
+      // playStartRef's own snapshot each frame, so that snapshot has to
+      // be re-anchored to the dragged position too, or the very next
+      // frame would fight the drag and snap back to the old advancing value.
+      if (playing) playStartRef.current = { atWall: performance.now(), atPlayhead: time };
     };
     editCursorDragRef.current = true;
     function onMove(ev) { seekToClientX(ev.clientX); }
     function onUp() {
       editCursorDragRef.current = null;
+      // The browser still fires a plain 'click' on this handle's PARENT
+      // (the clip div) right after pointerup, regardless of how far the
+      // drag moved — left unswallowed, that click would re-run
+      // handleClipClick and force-pause playback, undoing "playback
+      // continues from the new position" the instant the drag ends.
+      suppressClickRef.current = true;
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     }
@@ -2499,7 +2512,7 @@ export default function VideoEditorWorkspace() {
                           title="Drag to trim the end (snaps to the playhead, other clip edges, and markers — hold Alt to bypass)"
                           style={trimHandleStyle('right', snappedHandle?.clipId === clip.id && snappedHandle?.edge === 'end')}
                         />
-                        {editCursor?.clipId === clip.id && (
+                        {editCursorClipId === clip.id && (
                           // The edit cursor — where Split actually cuts. Lives
                           // ON this clip specifically (positioned as a % of
                           // ITS OWN span, not the whole timeline), separate
@@ -2509,7 +2522,7 @@ export default function VideoEditorWorkspace() {
                             title="Drag to choose exactly where Split cuts this clip"
                             style={{
                               position: 'absolute', top: -6, bottom: -6,
-                              left: `calc(${Math.min(100, Math.max(0, ((editCursor.time - clip.start) / (clipDuration(clip) || 1)) * 100))}% - 7px)`,
+                              left: `calc(${Math.min(100, Math.max(0, ((playhead - clip.start) / (clipDuration(clip) || 1)) * 100))}% - 7px)`,
                               width: 14, zIndex: 6, cursor: 'ew-resize',
                               display: 'flex', flexDirection: 'column', alignItems: 'center', touchAction: 'none',
                             }}
@@ -2572,13 +2585,13 @@ export default function VideoEditorWorkspace() {
                             title="Click to select and drop the edit cursor there — the same click-to-position-then-Split workflow as the Main track above"
                           >
                             {isImage ? '🖼 Image' : formatDuration(clipDuration(clip))}
-                            {isOverlayPrimary && !isImage && editCursor?.clipId === clip.id && (
+                            {isOverlayPrimary && !isImage && editCursorClipId === clip.id && (
                               <div
                                 onPointerDown={(e) => handleEditCursorPointerDown(e, clip)}
                                 title="Drag to choose exactly where Split cuts this clip"
                                 style={{
                                   position: 'absolute', top: -4, bottom: -4,
-                                  left: `calc(${Math.min(100, Math.max(0, ((editCursor.time - clip.start) / (clipDuration(clip) || 1)) * 100))}% - 6px)`,
+                                  left: `calc(${Math.min(100, Math.max(0, ((playhead - clip.start) / (clipDuration(clip) || 1)) * 100))}% - 6px)`,
                                   width: 12, zIndex: 6, cursor: 'ew-resize', background: 'transparent',
                                 }}
                               >
@@ -2596,7 +2609,7 @@ export default function VideoEditorWorkspace() {
           </div>
           {selectedClip && !isLockedSelected && selectionIds.length <= 1 && selectedSource?.kind !== 'image' && (
             <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <button onClick={handleSplitAtCursor} disabled={editCursor?.clipId !== selectedClip.id} style={{ ...quickActionBtn, opacity: editCursor?.clipId !== selectedClip.id ? 0.5 : 1 }} title={editCursor?.clipId === selectedClip.id ? 'Cuts the selected clip in two at the edit cursor' : 'Click the clip to drop an edit cursor first'}>
+              <button onClick={handleSplitAtCursor} disabled={editCursorClipId !== selectedClip.id} style={{ ...quickActionBtn, opacity: editCursorClipId !== selectedClip.id ? 0.5 : 1 }} title={editCursorClipId === selectedClip.id ? 'Cuts the selected clip in two at the edit cursor' : 'Click the clip to drop an edit cursor first'}>
                 <span style={{ fontSize: '1.1rem' }}>✂</span> Split
               </button>
               <button onClick={handleDeleteSelected} style={{ ...quickActionBtn, color: '#DC2626', borderColor: '#FCA5A5' }} title="Removes the selected clip; everything after it slides over to close the gap">
@@ -2678,7 +2691,7 @@ export default function VideoEditorWorkspace() {
                 </div>
               )}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {selectedSource.kind !== 'image' && <button onClick={handleSplitAtCursor} disabled={editCursor?.clipId !== selectedClip.id} style={{ ...smallBtn, opacity: editCursor?.clipId !== selectedClip.id ? 0.5 : 1 }} title={editCursor?.clipId === selectedClip.id ? 'Cut at the edit cursor' : 'Click the clip to drop an edit cursor first'}>✂ Split</button>}
+                {selectedSource.kind !== 'image' && <button onClick={handleSplitAtCursor} disabled={editCursorClipId !== selectedClip.id} style={{ ...smallBtn, opacity: editCursorClipId !== selectedClip.id ? 0.5 : 1 }} title={editCursorClipId === selectedClip.id ? 'Cut at the edit cursor' : 'Click the clip to drop an edit cursor first'}>✂ Split</button>}
                 {selectedSource.kind !== 'image' && <button onClick={() => handleJoinWithNext(selectedClip.track)} style={smallBtn}>⤵ Join with next</button>}
                 {selectedClip.track === MAIN_TRACK && selectedSource.kind !== 'image' && <button onClick={handleFreezeFrame} style={smallBtn}>❄ Freeze frame</button>}
                 {selectedClip.track === MAIN_TRACK && selectedSource.kind !== 'image' && <button onClick={handleFindSilence} disabled={silenceScanning} style={smallBtn}>{silenceScanning ? 'Scanning…' : '🔇 Find silence'}</button>}

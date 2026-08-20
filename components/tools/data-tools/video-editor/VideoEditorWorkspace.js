@@ -816,10 +816,8 @@ export default function VideoEditorWorkspace() {
         }
       }
     }
-    // Plain-click positioning/selection is handled by
-    // handleClipScrubPointerDown (fires on pointerdown, before this click
-    // event) — this only runs for the ctrl/shift multi-select paths above
-    // that returned early, or as a harmless no-op re-confirmation otherwise.
+    // Plain click just selects — positioning the playhead is its own
+    // separate drag (startPlayheadScrub), not tied to clicking a clip.
     setSelectedClipId(clickedId);
     setExtraSelectedClipIds([]);
     if (overlayTrackId !== undefined) setSelectedOverlayTrackId(overlayTrackId);
@@ -1292,23 +1290,21 @@ export default function VideoEditorWorkspace() {
     }
   }
 
-  // ---- Scrub: clicking OR dragging across a clip moves the white cut
-  // line there live, using the whole timeline's own pixel width (not just
-  // the one clip under the cursor), so dragging can freely sweep across
-  // clip boundaries the same way scrubbing a normal video player would.
-  // Plain cursor throughout — this is the everyday interaction, not a
-  // "grab to move" gesture, so it should never look like one. Reordering
-  // a clip's position is a separate, explicit action (the Move buttons
-  // below), not tied to dragging the clip body at all. ----
-  const scrubDragRef = useRef(null);
-  const suppressClickRef = useRef(false);
+  // ---- Playhead scrub: a dedicated, persistent, ALWAYS-visible vertical
+  // line spanning the timeline — its own drag target, entirely separate
+  // from dragging a clip to reorder it. Dragging it (or clicking empty
+  // timeline background) live-updates the playhead across the whole
+  // timeline's width, sweeping freely across clip boundaries the way
+  // scrubbing a normal video player does; the preview redraws on every
+  // change since the render loop already depends on `playhead` regardless
+  // of play/pause state. Split/Delete act on whatever's selected — this
+  // only controls WHERE, never triggers an edit by itself. ----
+  const playheadDragRef = useRef(null);
 
-  function handleClipScrubPointerDown(e, clip, overlayTrackId) {
-    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  function startPlayheadScrub(e) {
+    if (e.button !== 0) return;
+    e.preventDefault();
     e.stopPropagation();
-    setSelectedClipId(clip.id);
-    setExtraSelectedClipIds([]);
-    if (overlayTrackId !== undefined) setSelectedOverlayTrackId(overlayTrackId);
     setPlaying(false);
     const trackRect = mainTrackRef.current.getBoundingClientRect();
     const seekToClientX = (clientX) => {
@@ -1316,19 +1312,76 @@ export default function VideoEditorWorkspace() {
       setPlayhead(frac * (totalDuration || 0));
     };
     seekToClientX(e.clientX);
-    scrubDragRef.current = { moved: false, startClientX: e.clientX };
-    function onMove(ev) {
-      if (Math.abs(ev.clientX - scrubDragRef.current.startClientX) > 2) scrubDragRef.current.moved = true;
-      seekToClientX(ev.clientX);
-    }
+    playheadDragRef.current = true;
+    function onMove(ev) { seekToClientX(ev.clientX); }
     function onUp() {
-      if (scrubDragRef.current?.moved) suppressClickRef.current = true;
-      scrubDragRef.current = null;
+      playheadDragRef.current = null;
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     }
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
+  }
+  // Only starts a scrub when the pointerdown landed on the track's own
+  // background (empty space, or the thin gap between clips) — clicking an
+  // actual clip is handled by that clip's own pointerdown (drag-to-reorder)
+  // instead, exactly like clearSelectionIfEmptyClick's own target check.
+  function handleTrackBackgroundPointerDown(e) {
+    if (e.target !== e.currentTarget) return;
+    startPlayheadScrub(e);
+  }
+
+  // ---- Drag-to-reorder: grabbing a clip's body and dragging it left/right
+  // swaps it into a new position in its track's sequence — this is the
+  // "drag either clip left/right to reorder the sequence" gesture;
+  // positioning the CUT point is the playhead's own separate drag above.
+  // Deliberately NOT a free-pixel-position drag (that would either reject
+  // the move outright when it overlaps a packed neighbor — clips almost
+  // always ARE packed with no gap — or leave a stray gap behind): while
+  // dragging, only a CSS transform on the one grabbed clip moves (no data
+  // mutation, so nothing can visually collide or reject mid-drag); on
+  // release, the clip's dragged CENTER position decides its new index
+  // (compared against every other clip's own center) and the whole track
+  // is repacked via moveClipToIndex in one commit — always a clean
+  // gapless reorder, never a rejected drag or a leftover gap. ----
+  const clipMoveDragRef = useRef(null);
+  const suppressClickRef = useRef(false);
+  const MOVE_THRESHOLD_PX = 4;
+  const [clipDragVisual, setClipDragVisual] = useState(null); // { clipId, offsetPx } — purely visual until drop
+
+  function handleClipBodyPointerDown(e, clip) {
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    e.stopPropagation();
+    const trackRect = mainTrackRef.current.getBoundingClientRect();
+    const pxPerSecond = trackRect.width / (totalDuration || 1);
+    clipMoveDragRef.current = { clipId: clip.id, startClientX: e.clientX, startStart: clip.start, pxPerSecond, moved: false, lastDxPx: 0 };
+    window.addEventListener('pointermove', handleClipBodyPointerMove);
+    window.addEventListener('pointerup', handleClipBodyPointerUp);
+  }
+  function handleClipBodyPointerMove(e) {
+    const drag = clipMoveDragRef.current;
+    if (!drag) return;
+    const dxPx = e.clientX - drag.startClientX;
+    if (!drag.moved && Math.abs(dxPx) < MOVE_THRESHOLD_PX) return;
+    drag.moved = true;
+    drag.lastDxPx = dxPx;
+    setClipDragVisual({ clipId: drag.clipId, offsetPx: dxPx });
+  }
+  function handleClipBodyPointerUp() {
+    const drag = clipMoveDragRef.current;
+    clipMoveDragRef.current = null;
+    window.removeEventListener('pointermove', handleClipBodyPointerMove);
+    window.removeEventListener('pointerup', handleClipBodyPointerUp);
+    setClipDragVisual(null);
+    if (!drag?.moved) return;
+    suppressClickRef.current = true;
+    const clip = timeline.clips.find((c) => c.id === drag.clipId);
+    if (!clip) return;
+    const deltaSeconds = drag.lastDxPx / drag.pxPerSecond;
+    const newCenter = drag.startStart + deltaSeconds + clipDuration(clip) / 2;
+    const others = getTrackClips(timeline, clip.track).filter((c) => c.id !== clip.id);
+    const targetIndex = others.filter((o) => o.start + clipDuration(o) / 2 < newCenter).length;
+    commit((tl) => moveClipToIndex(tl, clip.track, clip.id, targetIndex));
   }
 
   // ---- Text overlays ----
@@ -2373,28 +2426,31 @@ export default function VideoEditorWorkspace() {
               px-per-second, so 100% still exactly fits the panel like before
               this existed (see mainTrackRef's own comment above). */}
           <div style={{ overflowX: timelineZoom > 1 ? 'auto' : 'hidden', marginBottom: 10 }}>
-            <div style={{ width: `${timelineZoom * 100}%`, minWidth: '100%' }}>
-              <div ref={mainTrackRef} onClick={clearSelectionIfEmptyClick} style={{ position: 'relative', height: 46 }}>
+            <div style={{ width: `${timelineZoom * 100}%`, minWidth: '100%', position: 'relative' }}>
+              <div ref={mainTrackRef} onClick={clearSelectionIfEmptyClick} onPointerDown={handleTrackBackgroundPointerDown} style={{ position: 'relative', height: 46, cursor: 'col-resize' }}>
               {mainClips.map((clip) => {
                 const source = timeline.sources.find((s) => s.id === clip.sourceId);
                 const isPrimary = clip.id === selectedClipId;
                 const isSelected = selectionIdSet.has(clip.id);
+                const isDragging = clipDragVisual?.clipId === clip.id;
                 const leftPct = totalDuration ? (clip.start / totalDuration) * 100 : 0;
                 const widthPct = totalDuration ? (clipDuration(clip) / totalDuration) * 100 : 100;
                 return (
                   <div
                     key={clip.id}
-                    onPointerDown={(e) => handleClipScrubPointerDown(e, clip)}
+                    onPointerDown={(e) => handleClipBodyPointerDown(e, clip)}
                     onClick={(e) => handleClipClick(e, clip)}
                     style={{
                       position: 'absolute', top: 0, left: `calc(${leftPct}% + 1px)`, width: `calc(max(24px, ${widthPct}%) - 2px)`,
-                      height: 46, borderRadius: 7, cursor: 'pointer',
+                      height: 46, borderRadius: 7, cursor: 'grab',
                       background: isSelected ? T.accentGradient : T.accentTint,
                       border: isPrimary ? `2px solid ${T.accentDark}` : isSelected ? `2px solid ${T.accentDark}90` : `1px solid ${T.border}`,
-                      boxShadow: isSelected && !isPrimary ? `inset 0 0 0 1px white` : 'none',
+                      boxShadow: isDragging ? '0 6px 16px rgba(0,0,0,0.35)' : isSelected && !isPrimary ? `inset 0 0 0 1px white` : 'none',
                       overflow: 'hidden',
+                      transform: isDragging ? `translateX(${clipDragVisual.offsetPx}px)` : 'none',
+                      zIndex: isDragging ? 20 : 1,
                     }}
-                    title={`${formatDuration(clipDuration(clip))} — click or drag across the clip to move the cut line there and select it (Ctrl/Cmd-click to multi-select, Shift-click for a range); use the Move buttons to reorder, or drag the side handles to trim`}
+                    title={`${formatDuration(clipDuration(clip))} — click to select, drag to reorder it on the timeline (Ctrl/Cmd-click to multi-select, Shift-click for a range); drag the black playhead line to position a cut, drag the side handles to trim`}
                   >
                     <ClipThumbFilmstrip source={source} sourceStart={clip.sourceStart} sourceEnd={clip.sourceEnd} thumbnailsBySource={thumbnailsBySource} />
                     <ClipWaveform source={source} sourceStart={clip.sourceStart} sourceEnd={clip.sourceEnd} waveformBySource={waveformBySource} />
@@ -2478,11 +2534,30 @@ export default function VideoEditorWorkspace() {
                   </div>
                 );
               })}
+              {/* Persistent playhead — the vertical editing cursor. Its own
+                  drag target (startPlayheadScrub), entirely separate from
+                  dragging a clip's own body to reorder it. top/bottom span
+                  the full stack of main + overlay tracks via this
+                  wrapper's own position:relative, so it's always visible
+                  and draggable no matter which track you're working on. */}
+              <div
+                onPointerDown={startPlayheadScrub}
+                style={{
+                  position: 'absolute', top: -8, bottom: 0,
+                  left: `calc(${totalDuration ? (playhead / totalDuration) * 100 : 0}% - 8px)`,
+                  width: 16, zIndex: 10, cursor: 'col-resize',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', touchAction: 'none',
+                }}
+                title="Drag to move the playhead — the editing position Split and Delete use"
+              >
+                <div style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '7px solid #0F172A', flexShrink: 0 }} />
+                <div style={{ width: 2, flex: 1, background: '#0F172A' }} />
+              </div>
             </div>
           </div>
           {selectedClip && !isLockedSelected && selectionIds.length <= 1 && selectedSource?.kind !== 'image' && (
             <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <button onClick={handleSplitAtPlayhead} style={quickActionBtn} title="Cuts the selected clip in two at the white line above">
+              <button onClick={handleSplitAtPlayhead} style={quickActionBtn} title="Cuts the selected clip in two at the playhead">
                 <span style={{ fontSize: '1.1rem' }}>✂</span> Split
               </button>
               <button onClick={handleDeleteSelected} style={{ ...quickActionBtn, color: '#DC2626', borderColor: '#FCA5A5' }} title="Removes the selected clip; everything after it slides over to close the gap">
@@ -2582,7 +2657,7 @@ export default function VideoEditorWorkspace() {
               </div>
               {selectedSource.kind !== 'image' && (
                 <p style={{ fontSize: '0.68rem', color: T.muted, margin: '8px 0 0' }}>
-                  To remove part of a clip: click on the clip exactly where you want to cut (that moves the white line there and selects it), click Split, do the same at the other end of the part you don&apos;t want, then click that middle piece and Delete it — everything after closes the gap automatically. The Split and Delete buttons are also right under the timeline for quick access. Use the Reorder buttons above to move a clip earlier, later, or straight to either end — no dragging required. This all works the same way for overlay clips; position the cut line using the Main track above, since that timeline is shared across every track.
+                  To remove part of a clip: drag the black playhead line to exactly where you want to cut, select the clip, click Split, do the same at the other end of the part you don&apos;t want, then select that middle piece and Delete it — everything after closes the gap automatically. The Split and Delete buttons are also right under the timeline for quick access. Drag a clip{"'"}s body left or right to reorder it, or use the Reorder buttons above for a precise move to either end. This all works the same way for overlay clips; position the playhead using the Main track above, since it&apos;s shared across every track.
                 </p>
               )}
               {silenceRanges !== null && (

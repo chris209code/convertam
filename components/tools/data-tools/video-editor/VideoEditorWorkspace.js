@@ -599,6 +599,10 @@ export default function VideoEditorWorkspace() {
     if (next) {
       ensureAudioGraph();
       playStartRef.current = { atWall: performance.now(), atPlayhead: playhead };
+      // Pressing Play is real playback, not "still positioning a cut" —
+      // hands the preview back to the playhead exclusively (see the
+      // render effect's own comment on how the two are kept separate).
+      setEditCursor(null);
     }
     setPlaying(next);
   }
@@ -816,11 +820,20 @@ export default function VideoEditorWorkspace() {
         }
       }
     }
-    // Plain click just selects — positioning the playhead is its own
-    // separate drag (startPlayheadScrub), not tied to clicking a clip.
+    // Plain click selects AND drops the edit cursor exactly where clicked
+    // — "click a clip, a cursor appears at that point" — using the clip's
+    // OWN bounding box, not the whole track (this is a per-clip cursor,
+    // works identically for a main-track or an overlay-track clip).
     setSelectedClipId(clickedId);
     setExtraSelectedClipIds([]);
     if (overlayTrackId !== undefined) setSelectedOverlayTrackId(overlayTrackId);
+    // Image clips have no time dimension to cut (clipDuration is 0) — the
+    // cursor is meaningless there, so it's simply never set.
+    if (clipDuration(clip) > 0) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const frac = rect.width > 0 ? Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)) : 0;
+      setEditCursor({ clipId: clickedId, time: clip.start + frac * clipDuration(clip) });
+    }
   }
   function clearSelectionIfEmptyClick(e) {
     if (e.target !== e.currentTarget) return;
@@ -845,15 +858,14 @@ export default function VideoEditorWorkspace() {
   // second split silently no-op unless the user re-clicked the timeline in
   // between; auto-following the playhead instead lets "move playhead, hit
   // Split, repeat" work as one continuous motion, same as it visually reads.
-  function handleSplitAtPlayhead() {
-    if (!selectedClip) return;
-    const hit = findActiveClipAt(timeline, selectedClip.track, playhead);
-    if (!hit) return;
-    if (hit.clip.id !== selectedClip.id) {
-      setSelectedClipId(hit.clip.id);
-      setExtraSelectedClipIds([]);
-    }
-    commit((tl) => splitClip(tl, hit.clip.id, hit.sourceTime));
+  function handleSplitAtCursor() {
+    if (!selectedClip || editCursor?.clipId !== selectedClip.id) return;
+    // editCursor.time is timeline-absolute (like clip.start); splitClip
+    // wants a point in the SOURCE file's own timeline, so undo the same
+    // start-offset + speed math findActiveClipAt uses elsewhere.
+    const sourceTime = selectedClip.sourceStart + (editCursor.time - selectedClip.start) * (selectedClip.speed || 1);
+    commit((tl) => splitClip(tl, selectedClip.id, sourceTime));
+    setEditCursor(null);
   }
 
   // Handles both the single-clip "Delete clip" button and a multi-select
@@ -875,6 +887,7 @@ export default function VideoEditorWorkspace() {
     });
     setSelectedClipId(null);
     setExtraSelectedClipIds([]);
+    setEditCursor(null);
     if (track !== MAIN_TRACK && selectedOverlayTrackId === track) setSelectedOverlayTrackId(null);
   }
 
@@ -1155,7 +1168,7 @@ export default function VideoEditorWorkspace() {
       }
       if (e.key === ' ') { e.preventDefault(); handleTogglePlay(); }
       else if (e.key === 'Delete' || e.key === 'Backspace') { if (selectedClipId) { e.preventDefault(); handleDeleteSelected(); } }
-      else if (e.key.toLowerCase() === 's') { handleSplitAtPlayhead(); }
+      else if (e.key.toLowerCase() === 's') { handleSplitAtCursor(); }
       else if (e.key.toLowerCase() === 'd') { handleDuplicateSelected(); }
       else if (e.key.toLowerCase() === 'm') { commit((tl) => addMarker(tl, playhead)); }
     }
@@ -1290,45 +1303,41 @@ export default function VideoEditorWorkspace() {
     }
   }
 
-  // ---- Playhead scrub: a dedicated, persistent, ALWAYS-visible vertical
-  // line spanning the timeline — its own drag target, entirely separate
-  // from dragging a clip to reorder it. Dragging it (or clicking empty
-  // timeline background) live-updates the playhead across the whole
-  // timeline's width, sweeping freely across clip boundaries the way
-  // scrubbing a normal video player does; the preview redraws on every
-  // change since the render loop already depends on `playhead` regardless
-  // of play/pause state. Split/Delete act on whatever's selected — this
-  // only controls WHERE, never triggers an edit by itself. ----
-  const playheadDragRef = useRef(null);
+  // ---- Edit cursor: a thin vertical line that lives ON the currently
+  // selected clip — NOT the round Play button's own playhead/slider, which
+  // stays exactly what it was (ordinary playback position, untouched by
+  // any of this). Clicking a clip sets { clipId, time } to the exact point
+  // clicked; dragging the cursor handle (rendered only on the selected
+  // clip, see the JSX below) moves it, clamped to that clip's own span.
+  // Whenever it's set, the preview shows that exact frame instead of the
+  // playback position (see the render effect's own comment) so scrubbing
+  // it previews the frame right up until Split cuts there. Split is
+  // disabled with no cursor set — there is no other fallback position. ----
+  const [editCursor, setEditCursor] = useState(null); // { clipId, time } | null
+  const editCursorDragRef = useRef(null);
 
-  function startPlayheadScrub(e) {
+  function handleEditCursorPointerDown(e, clip) {
     if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    setPlaying(false);
-    const trackRect = mainTrackRef.current.getBoundingClientRect();
+    // The handle is rendered as a direct child of the clip's own div, so
+    // its immediate parent IS the clip's bounding box — exactly the
+    // frame of reference "drag left/right across the selected clip" needs.
+    const clipRect = e.currentTarget.parentElement.getBoundingClientRect();
+    const dur = clipDuration(clip);
     const seekToClientX = (clientX) => {
-      const frac = trackRect.width > 0 ? Math.min(1, Math.max(0, (clientX - trackRect.left) / trackRect.width)) : 0;
-      setPlayhead(frac * (totalDuration || 0));
+      const frac = clipRect.width > 0 ? Math.min(1, Math.max(0, (clientX - clipRect.left) / clipRect.width)) : 0;
+      setEditCursor({ clipId: clip.id, time: clip.start + frac * dur });
     };
-    seekToClientX(e.clientX);
-    playheadDragRef.current = true;
+    editCursorDragRef.current = true;
     function onMove(ev) { seekToClientX(ev.clientX); }
     function onUp() {
-      playheadDragRef.current = null;
+      editCursorDragRef.current = null;
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     }
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
-  }
-  // Only starts a scrub when the pointerdown landed on the track's own
-  // background (empty space, or the thin gap between clips) — clicking an
-  // actual clip is handled by that clip's own pointerdown (drag-to-reorder)
-  // instead, exactly like clearSelectionIfEmptyClick's own target check.
-  function handleTrackBackgroundPointerDown(e) {
-    if (e.target !== e.currentTarget) return;
-    startPlayheadScrub(e);
   }
 
   // ---- Drag-to-reorder: grabbing a clip's body and dragging it left/right
@@ -1576,7 +1585,15 @@ export default function VideoEditorWorkspace() {
       if (cancelled) return;
       if (playing && !playStartRef.current) playStartRef.current = { atWall: performance.now(), atPlayhead: playhead };
 
-      const mainHit = findActiveClipAt(timeline, MAIN_TRACK, playhead);
+      // The edit cursor (see handleEditCursorPointerDown/handleClipClick)
+      // owns the preview while it's active — dragging it must show the
+      // exact frame it's over, distinct from the round Play button's own
+      // playhead. It only applies while paused and still pointed at the
+      // clip that's currently selected; the moment either stops being
+      // true (Play pressed, selection changed), playhead takes back over.
+      const previewTime = (!playing && editCursor && editCursor.clipId === selectedClipId) ? editCursor.time : playhead;
+
+      const mainHit = findActiveClipAt(timeline, MAIN_TRACK, previewTime);
 
       if (mainHit) {
         await loadClip(mainVideoRef.current, mainHit.clip, lastMainClipRef);
@@ -1647,7 +1664,7 @@ export default function VideoEditorWorkspace() {
       const drawnOverlayLayers = [];
       for (const track of timeline.overlayTracks) {
         const s = getOverlayLayerState(track.id);
-        const hit = findActiveClipAt(timeline, track.id, playhead);
+        const hit = findActiveClipAt(timeline, track.id, previewTime);
         const source = hit ? timeline.sources.find((so) => so.id === hit.clip.sourceId) : null;
         const isImage = source?.kind === 'image';
 
@@ -1775,9 +1792,9 @@ export default function VideoEditorWorkspace() {
       // same shared functions the composed export uses per frame, so what
       // the preview shows is exactly what gets exported.
       timeline.imageOverlays.forEach((o) => { if (o.sourceId) ensureImageOverlayElement(o.sourceId); });
-      drawImageOverlays(ctx, { timeline: drawTimeline, timelineSeconds: playhead, imageElements: imageOverlayElsRef.current });
-      drawShapeOverlays(ctx, { timeline: drawTimeline, timelineSeconds: playhead });
-      drawTextOverlays(ctx, { timeline: drawTimeline, timelineSeconds: playhead });
+      drawImageOverlays(ctx, { timeline: drawTimeline, timelineSeconds: previewTime, imageElements: imageOverlayElsRef.current });
+      drawShapeOverlays(ctx, { timeline: drawTimeline, timelineSeconds: previewTime });
+      drawTextOverlays(ctx, { timeline: drawTimeline, timelineSeconds: previewTime });
 
       // Safe-zone guides — preview only, drawn after everything else so
       // they're always visible on top, and never passed through
@@ -1809,7 +1826,7 @@ export default function VideoEditorWorkspace() {
     rafRef.current = requestAnimationFrame(tick);
     return () => { cancelled = true; if (rafRef.current) cancelAnimationFrame(rafRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeline, playhead, playing]);
+  }, [timeline, playhead, playing, editCursor, selectedClipId]);
 
   // ---- Free-drag PiP repositioning (mouse + touch via Pointer Events) ----
   function canvasPointFromEvent(e) {
@@ -2427,7 +2444,7 @@ export default function VideoEditorWorkspace() {
               this existed (see mainTrackRef's own comment above). */}
           <div style={{ overflowX: timelineZoom > 1 ? 'auto' : 'hidden', marginBottom: 10 }}>
             <div style={{ width: `${timelineZoom * 100}%`, minWidth: '100%', position: 'relative' }}>
-              <div ref={mainTrackRef} onClick={clearSelectionIfEmptyClick} onPointerDown={handleTrackBackgroundPointerDown} style={{ position: 'relative', height: 46, cursor: 'col-resize' }}>
+              <div ref={mainTrackRef} onClick={clearSelectionIfEmptyClick} style={{ position: 'relative', height: 46 }}>
               {mainClips.map((clip) => {
                 const source = timeline.sources.find((s) => s.id === clip.sourceId);
                 const isPrimary = clip.id === selectedClipId;
@@ -2450,7 +2467,7 @@ export default function VideoEditorWorkspace() {
                       transform: isDragging ? `translateX(${clipDragVisual.offsetPx}px)` : 'none',
                       zIndex: isDragging ? 20 : 1,
                     }}
-                    title={`${formatDuration(clipDuration(clip))} — click to select, drag to reorder it on the timeline (Ctrl/Cmd-click to multi-select, Shift-click for a range); drag the black playhead line to position a cut, drag the side handles to trim`}
+                    title={`${formatDuration(clipDuration(clip))} — click to select and drop the edit cursor there, drag the clip's body to reorder it on the timeline (Ctrl/Cmd-click to multi-select, Shift-click for a range), drag the side handles to trim`}
                   >
                     <ClipThumbFilmstrip source={source} sourceStart={clip.sourceStart} sourceEnd={clip.sourceEnd} thumbnailsBySource={thumbnailsBySource} />
                     <ClipWaveform source={source} sourceStart={clip.sourceStart} sourceEnd={clip.sourceEnd} waveformBySource={waveformBySource} />
@@ -2476,6 +2493,26 @@ export default function VideoEditorWorkspace() {
                           title="Drag to trim the end (snaps to the playhead, other clip edges, and markers — hold Alt to bypass)"
                           style={trimHandleStyle('right', snappedHandle?.clipId === clip.id && snappedHandle?.edge === 'end')}
                         />
+                        {editCursor?.clipId === clip.id && (
+                          // The edit cursor — where Split actually cuts. Lives
+                          // ON this clip specifically (positioned as a % of
+                          // ITS OWN span, not the whole timeline), separate
+                          // from the round Play button's own playhead/slider.
+                          <div
+                            onPointerDown={(e) => handleEditCursorPointerDown(e, clip)}
+                            title="Drag to choose exactly where Split cuts this clip"
+                            style={{
+                              position: 'absolute', top: -6, bottom: -6,
+                              left: `calc(${Math.min(100, Math.max(0, ((editCursor.time - clip.start) / (clipDuration(clip) || 1)) * 100))}% - 7px)`,
+                              width: 14, zIndex: 6, cursor: 'ew-resize',
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', touchAction: 'none',
+                            }}
+                          >
+                            <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '6px solid #DC2626', flexShrink: 0 }} />
+                            <div style={{ width: 2, flex: 1, background: '#DC2626' }} />
+                            <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderBottom: '6px solid #DC2626', flexShrink: 0 }} />
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -2513,20 +2550,35 @@ export default function VideoEditorWorkspace() {
                       {trackClips.map((clip) => {
                         const clipSource = timeline.sources.find((s) => s.id === clip.sourceId);
                         const isImage = clipSource?.kind === 'image';
+                        const isOverlayPrimary = clip.id === selectedClipId;
                         return (
                           <div
                             key={clip.id}
-                            onClick={(e) => { e.stopPropagation(); setSelectedClipId(clip.id); setExtraSelectedClipIds([]); setSelectedOverlayTrackId(track.id); }}
+                            onClick={(e) => handleClipClick(e, clip, track.id)}
                             style={{
+                              position: 'relative',
                               flex: isImage ? 1 : (clipDuration(clip) || 1), minWidth: 40, height: 32, borderRadius: 7, cursor: 'pointer',
                               background: clip.id === selectedClipId ? T.accentGradient : '#F1F5F9',
                               border: clip.id === selectedClipId ? `2px solid ${T.accentDark}` : `1px solid ${T.border}`,
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               fontSize: '0.64rem', fontWeight: 700, color: clip.id === selectedClipId ? 'white' : T.inkSecondary,
                             }}
-                            title="Click to select this overlay clip — position the cut line using the Main track above (this strip isn't a precise timeline, just a summary), then use the Split / Delete buttons"
+                            title="Click to select and drop the edit cursor there — the same click-to-position-then-Split workflow as the Main track above"
                           >
                             {isImage ? '🖼 Image' : formatDuration(clipDuration(clip))}
+                            {isOverlayPrimary && !isImage && editCursor?.clipId === clip.id && (
+                              <div
+                                onPointerDown={(e) => handleEditCursorPointerDown(e, clip)}
+                                title="Drag to choose exactly where Split cuts this clip"
+                                style={{
+                                  position: 'absolute', top: -4, bottom: -4,
+                                  left: `calc(${Math.min(100, Math.max(0, ((editCursor.time - clip.start) / (clipDuration(clip) || 1)) * 100))}% - 6px)`,
+                                  width: 12, zIndex: 6, cursor: 'ew-resize', background: 'transparent',
+                                }}
+                              >
+                                <div style={{ position: 'absolute', left: 5, top: 0, bottom: 0, width: 2, background: '#DC2626' }} />
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -2534,30 +2586,11 @@ export default function VideoEditorWorkspace() {
                   </div>
                 );
               })}
-              {/* Persistent playhead — the vertical editing cursor. Its own
-                  drag target (startPlayheadScrub), entirely separate from
-                  dragging a clip's own body to reorder it. top/bottom span
-                  the full stack of main + overlay tracks via this
-                  wrapper's own position:relative, so it's always visible
-                  and draggable no matter which track you're working on. */}
-              <div
-                onPointerDown={startPlayheadScrub}
-                style={{
-                  position: 'absolute', top: -8, bottom: 0,
-                  left: `calc(${totalDuration ? (playhead / totalDuration) * 100 : 0}% - 8px)`,
-                  width: 16, zIndex: 10, cursor: 'col-resize',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', touchAction: 'none',
-                }}
-                title="Drag to move the playhead — the editing position Split and Delete use"
-              >
-                <div style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '7px solid #0F172A', flexShrink: 0 }} />
-                <div style={{ width: 2, flex: 1, background: '#0F172A' }} />
-              </div>
             </div>
           </div>
           {selectedClip && !isLockedSelected && selectionIds.length <= 1 && selectedSource?.kind !== 'image' && (
             <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <button onClick={handleSplitAtPlayhead} style={quickActionBtn} title="Cuts the selected clip in two at the playhead">
+              <button onClick={handleSplitAtCursor} disabled={editCursor?.clipId !== selectedClip.id} style={{ ...quickActionBtn, opacity: editCursor?.clipId !== selectedClip.id ? 0.5 : 1 }} title={editCursor?.clipId === selectedClip.id ? 'Cuts the selected clip in two at the edit cursor' : 'Click the clip to drop an edit cursor first'}>
                 <span style={{ fontSize: '1.1rem' }}>✂</span> Split
               </button>
               <button onClick={handleDeleteSelected} style={{ ...quickActionBtn, color: '#DC2626', borderColor: '#FCA5A5' }} title="Removes the selected clip; everything after it slides over to close the gap">
@@ -2639,7 +2672,7 @@ export default function VideoEditorWorkspace() {
                 </div>
               )}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {selectedSource.kind !== 'image' && <button onClick={handleSplitAtPlayhead} style={smallBtn}>✂ Split</button>}
+                {selectedSource.kind !== 'image' && <button onClick={handleSplitAtCursor} disabled={editCursor?.clipId !== selectedClip.id} style={{ ...smallBtn, opacity: editCursor?.clipId !== selectedClip.id ? 0.5 : 1 }} title={editCursor?.clipId === selectedClip.id ? 'Cut at the edit cursor' : 'Click the clip to drop an edit cursor first'}>✂ Split</button>}
                 {selectedSource.kind !== 'image' && <button onClick={() => handleJoinWithNext(selectedClip.track)} style={smallBtn}>⤵ Join with next</button>}
                 {selectedClip.track === MAIN_TRACK && selectedSource.kind !== 'image' && <button onClick={handleFreezeFrame} style={smallBtn}>❄ Freeze frame</button>}
                 {selectedClip.track === MAIN_TRACK && selectedSource.kind !== 'image' && <button onClick={handleFindSilence} disabled={silenceScanning} style={smallBtn}>{silenceScanning ? 'Scanning…' : '🔇 Find silence'}</button>}
@@ -2657,7 +2690,7 @@ export default function VideoEditorWorkspace() {
               </div>
               {selectedSource.kind !== 'image' && (
                 <p style={{ fontSize: '0.68rem', color: T.muted, margin: '8px 0 0' }}>
-                  To remove part of a clip: drag the black playhead line to exactly where you want to cut, select the clip, click Split, do the same at the other end of the part you don&apos;t want, then select that middle piece and Delete it — everything after closes the gap automatically. The Split and Delete buttons are also right under the timeline for quick access. Drag a clip{"'"}s body left or right to reorder it, or use the Reorder buttons above for a precise move to either end. This all works the same way for overlay clips; position the playhead using the Main track above, since it&apos;s shared across every track.
+                  Click a clip to select it — a red edit cursor drops exactly where you clicked. Drag that cursor left/right to fine-tune the exact frame (the preview follows it), then click Split. This is separate from the round Play button and its slider, which only control normal playback. To remove part of a clip: split at both edges of the part you don&apos;t want, select that middle piece, and Delete it — everything after closes the gap automatically. Drag a clip{"'"}s body left or right to reorder it, or use the Reorder buttons above for a precise move to either end. This all works the same way for overlay clips.
                 </p>
               )}
               {silenceRanges !== null && (

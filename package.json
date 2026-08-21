@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@breezystack/lamejs": "^1.2.7",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "@mediapipe/tasks-vision": "^1.0.1",

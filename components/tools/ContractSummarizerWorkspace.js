@@ -18,11 +18,29 @@ function labelStyle(label) {
   return LABEL_COLORS[label] || { bg: '#F1F5F9', border: '#E2E8F0', text: '#334155' };
 }
 
-function Field({ label, value }) {
+const LABEL_EMOJI = {
+  Important: '🔵',
+  'Worth reviewing': '🟡',
+  'Potential concern': '🔴',
+  'Significant obligation': '🟠',
+};
+
+// A small "here's where this came from" line, shown wherever the model gave
+// a location — never fabricated, so simply omitted when it couldn't
+// determine one (see the reference rule in lib/contractSummarize/prompt.js).
+function LocationNote({ location, style }) {
+  if (!location) return null;
+  return <p style={{ margin: '4px 0 0', fontSize: '0.72rem', color: '#94A3B8', ...style }}>📍 {location}</p>;
+}
+
+// Renders a {value, location} pair — the shape every date/money/termination
+// field uses so the reader can trace each fact back to the contract.
+function Field({ label, field }) {
   return (
     <div style={{ padding: 14, background: CARD_BG, borderRadius: 10 }}>
       <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', margin: '0 0 4px' }}>{label}</p>
-      <p style={{ margin: 0, fontSize: '0.9rem', color: '#0F172A' }}>{value || 'Not specified in the contract.'}</p>
+      <p style={{ margin: 0, fontSize: '0.9rem', color: '#0F172A' }}>{field?.value || 'Not specified in the contract.'}</p>
+      <LocationNote location={field?.location} />
     </div>
   );
 }
@@ -36,13 +54,13 @@ function ClauseCard({ item }) {
   return (
     <div style={{ padding: 14, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 10, marginBottom: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
-        <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: '#0F172A' }}>{item.topic}</p>
+        <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: '#0F172A' }}>{LABEL_EMOJI[item.label] ? `${LABEL_EMOJI[item.label]} ` : ''}{item.topic}</p>
         {item.label && (
           <span style={{ fontSize: '0.68rem', fontWeight: 700, color: s.text, background: 'white', border: `1px solid ${s.border}`, borderRadius: 999, padding: '2px 8px', whiteSpace: 'nowrap' }}>{item.label}</span>
         )}
       </div>
       <p style={{ margin: 0, fontSize: '0.86rem', color: '#1E293B', lineHeight: 1.55 }}>{item.explanation}</p>
-      {item.location && <p style={{ margin: '6px 0 0', fontSize: '0.72rem', color: '#64748B' }}>📍 {item.location}</p>}
+      <LocationNote location={item.location} />
     </div>
   );
 }
@@ -187,11 +205,13 @@ export default function ContractSummarizerWorkspace() {
 
   function copySummary() {
     if (!result) return;
+    const loc = (l) => (l ? ` (${l})` : '');
+    const fv = (field) => `${field?.value || 'Not specified in the contract.'}${loc(field?.location)}`;
     const clauseLines = (arr, heading) => (arr && arr.length
-      ? [heading, ...arr.map((c) => `- [${c.label || '—'}] ${c.topic}: ${c.explanation}${c.location ? ` (${c.location})` : ''}`), '']
+      ? [heading, ...arr.map((c) => `- [${c.label || '—'}] ${c.topic}: ${c.explanation}${loc(c.location)}`), '']
       : []);
     const perspectiveLines = (arr, heading) => (arr && arr.length
-      ? [heading, ...arr.map((p) => `- ${p.point}: ${p.explanation}${p.location ? ` (${p.location})` : ''}`), '']
+      ? [heading, ...arr.map((p) => `- ${p.point}: ${p.explanation}${loc(p.location)}`), '']
       : []);
 
     const lines = [
@@ -199,44 +219,41 @@ export default function ContractSummarizerWorkspace() {
       result.quickSummary || '',
       '',
       'KEY PARTIES:',
-      ...(result.parties || []).map((p) => `- ${p.name} — ${p.role}`),
+      ...(result.parties || []).map((p) => `- ${p.name} — ${p.role}${loc(p.location)}`),
       '',
       'IMPORTANT DATES & DEADLINES:',
-      `Effective date: ${result.importantDates?.effectiveDate || '—'}`,
-      `End date: ${result.importantDates?.endDate || '—'}`,
-      `Renewal: ${result.importantDates?.renewalDates || '—'}`,
-      `Notice periods: ${result.importantDates?.noticePeriods || '—'}`,
-      `Payment due dates: ${result.importantDates?.paymentDueDates || '—'}`,
-      `Other deadlines: ${result.importantDates?.otherDeadlines || '—'}`,
+      `Effective date: ${fv(result.importantDates?.effectiveDate)}`,
+      `End date: ${fv(result.importantDates?.endDate)}`,
+      `Renewal: ${fv(result.importantDates?.renewalDates)}`,
+      `Notice periods: ${fv(result.importantDates?.noticePeriods)}`,
+      `Payment due dates: ${fv(result.importantDates?.paymentDueDates)}`,
+      `Other deadlines: ${fv(result.importantDates?.otherDeadlines)}`,
       '',
       `${result.obligations?.partyALabel || 'PARTY A'} OBLIGATIONS:`,
-      ...(result.obligations?.partyAObligations || []).map((o) => `- ${o}`),
+      ...(result.obligations?.partyAObligations || []).map((o) => `- ${o.text}${loc(o.location)}`),
       '',
       `${result.obligations?.partyBLabel || 'PARTY B'} OBLIGATIONS:`,
-      ...(result.obligations?.partyBObligations || []).map((o) => `- ${o}`),
+      ...(result.obligations?.partyBObligations || []).map((o) => `- ${o.text}${loc(o.location)}`),
       '',
       'MONEY & PAYMENT TERMS:',
-      `Contract value: ${result.moneyAndPayment?.contractValue || '—'}`,
-      `Fees: ${result.moneyAndPayment?.fees || '—'}`,
-      `Payment schedule: ${result.moneyAndPayment?.paymentSchedule || '—'}`,
-      `Deposits: ${result.moneyAndPayment?.deposits || '—'}`,
-      `Late-payment fees: ${result.moneyAndPayment?.latePaymentFees || '—'}`,
-      `Penalties: ${result.moneyAndPayment?.penalties || '—'}`,
-      `Refund terms: ${result.moneyAndPayment?.refundTerms || '—'}`,
-      `Commissions: ${result.moneyAndPayment?.commissions || '—'}`,
+      `Contract value: ${fv(result.moneyAndPayment?.contractValue)}`,
+      `Fees: ${fv(result.moneyAndPayment?.fees)}`,
+      `Payment schedule: ${fv(result.moneyAndPayment?.paymentSchedule)}`,
+      `Deposits: ${fv(result.moneyAndPayment?.deposits)}`,
+      `Late-payment fees: ${fv(result.moneyAndPayment?.latePaymentFees)}`,
+      `Penalties: ${fv(result.moneyAndPayment?.penalties)}`,
+      `Refund terms: ${fv(result.moneyAndPayment?.refundTerms)}`,
+      `Commissions: ${fv(result.moneyAndPayment?.commissions)}`,
       '',
       ...clauseLines(result.importantClauses, 'IMPORTANT CLAUSES & POTENTIAL CONCERNS:'),
-      'LEGAL JARGON EXPLAINED:',
-      ...(result.legalJargon || []).map((t) => `- ${t.term}: ${t.plainEnglish} (Why it matters: ${t.whyItMatters})`),
-      '',
       'TERMINATION & EXIT:',
-      `How to terminate: ${result.terminationAndExit?.howToTerminate || '—'}`,
-      `Required notice: ${result.terminationAndExit?.requiredNotice || '—'}`,
-      `Grounds: ${result.terminationAndExit?.groundsForTermination || '—'}`,
-      `Early termination: ${result.terminationAndExit?.earlyTerminationConditions || '—'}`,
-      `Penalties: ${result.terminationAndExit?.penalties || '—'}`,
-      `After termination: ${result.terminationAndExit?.afterTermination || '—'}`,
-      `Differs between parties: ${result.terminationAndExit?.differsBetweenParties || '—'}`,
+      `How to terminate: ${fv(result.terminationAndExit?.howToTerminate)}`,
+      `Required notice: ${fv(result.terminationAndExit?.requiredNotice)}`,
+      `Grounds: ${fv(result.terminationAndExit?.groundsForTermination)}`,
+      `Early termination: ${fv(result.terminationAndExit?.earlyTerminationConditions)}`,
+      `Penalties: ${fv(result.terminationAndExit?.penalties)}`,
+      `After termination: ${fv(result.terminationAndExit?.afterTermination)}`,
+      `Differs between parties: ${fv(result.terminationAndExit?.differsBetweenParties)}`,
       '',
       ...clauseLines(result.otherClauses, 'OTHER IMPORTANT CLAUSES:'),
       ...(result.conflictingClauses?.length ? ['POSSIBLY CONFLICTING CLAUSES:', ...result.conflictingClauses.map((c) => `- ${c.description} (${c.clauseALocation || '?'} vs ${c.clauseBLocation || '?'})`), ''] : []),
@@ -249,7 +266,7 @@ export default function ContractSummarizerWorkspace() {
         ...perspectiveLines(result.userPerspective.favorableTerms, 'Terms that favor you:'),
         ...perspectiveLines(result.userPerspective.unfavorableTerms, 'Terms that may work against you:'),
         ...perspectiveLines(result.userPerspective.payAttentionTerms, 'Terms to pay attention to:'),
-        ...(result.userPerspective.comparisons?.length ? ['Comparisons:', ...result.userPerspective.comparisons.map((c) => `- ${c.topic} — You: ${c.yourParty} | Other party: ${c.otherParty}${c.whyItMatters ? ` (${c.whyItMatters})` : ''}`), ''] : []),
+        ...(result.userPerspective.comparisons?.length ? ['Comparisons:', ...result.userPerspective.comparisons.map((c) => `- ${c.topic} — You: ${c.yourParty}${loc(c.yourPartyLocation)} | Other party: ${c.otherParty}${loc(c.otherPartyLocation)}${c.whyItMatters ? ` — ${c.whyItMatters}` : ''}`), ''] : []),
       ] : []),
       'This summary is AI-generated for informational and clarity purposes only and does not constitute formal legal advice. Consult a qualified legal professional for binding legal guidance.',
     ].join('\n');
@@ -361,6 +378,7 @@ export default function ContractSummarizerWorkspace() {
                 <div key={i} style={{ padding: 12, background: CARD_BG, borderRadius: 10 }}>
                   <p style={{ margin: '0 0 2px', fontSize: '0.9rem', fontWeight: 700, color: '#0F172A' }}>{p.name}</p>
                   <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748B' }}>{p.role}</p>
+                  <LocationNote location={p.location} />
                 </div>
               ))}
             </div>
@@ -370,12 +388,12 @@ export default function ContractSummarizerWorkspace() {
           <div style={{ marginBottom: 16 }}>
             <SectionTitle>Important Dates &amp; Deadlines</SectionTitle>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Field label="Effective / Start Date" value={result.importantDates?.effectiveDate} />
-              <Field label="End Date" value={result.importantDates?.endDate} />
-              <Field label="Renewal Dates" value={result.importantDates?.renewalDates} />
-              <Field label="Notice Periods" value={result.importantDates?.noticePeriods} />
-              <Field label="Payment Due Dates" value={result.importantDates?.paymentDueDates} />
-              <Field label="Other Deadlines" value={result.importantDates?.otherDeadlines} />
+              <Field label="Effective / Start Date" field={result.importantDates?.effectiveDate} />
+              <Field label="End Date" field={result.importantDates?.endDate} />
+              <Field label="Renewal Dates" field={result.importantDates?.renewalDates} />
+              <Field label="Notice Periods" field={result.importantDates?.noticePeriods} />
+              <Field label="Payment Due Dates" field={result.importantDates?.paymentDueDates} />
+              <Field label="Other Deadlines" field={result.importantDates?.otherDeadlines} />
             </div>
           </div>
 
@@ -386,13 +404,23 @@ export default function ContractSummarizerWorkspace() {
               <div style={{ padding: 14, background: CARD_BG, borderRadius: 10 }}>
                 <p style={{ margin: '0 0 8px', fontSize: '0.82rem', fontWeight: 700, color: '#0F172A' }}>{result.obligations?.partyALabel || 'Party A'}'s obligations</p>
                 <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {(result.obligations?.partyAObligations || []).map((o, i) => <li key={i} style={{ fontSize: '0.86rem', color: '#1E293B', marginBottom: 6 }}>{o}</li>)}
+                  {(result.obligations?.partyAObligations || []).map((o, i) => (
+                    <li key={i} style={{ fontSize: '0.86rem', color: '#1E293B', marginBottom: 8 }}>
+                      {o.text}
+                      <LocationNote location={o.location} style={{ marginTop: 2 }} />
+                    </li>
+                  ))}
                 </ul>
               </div>
               <div style={{ padding: 14, background: CARD_BG, borderRadius: 10 }}>
                 <p style={{ margin: '0 0 8px', fontSize: '0.82rem', fontWeight: 700, color: '#0F172A' }}>{result.obligations?.partyBLabel || 'Party B'}'s obligations</p>
                 <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {(result.obligations?.partyBObligations || []).map((o, i) => <li key={i} style={{ fontSize: '0.86rem', color: '#1E293B', marginBottom: 6 }}>{o}</li>)}
+                  {(result.obligations?.partyBObligations || []).map((o, i) => (
+                    <li key={i} style={{ fontSize: '0.86rem', color: '#1E293B', marginBottom: 8 }}>
+                      {o.text}
+                      <LocationNote location={o.location} style={{ marginTop: 2 }} />
+                    </li>
+                  ))}
                 </ul>
               </div>
             </div>
@@ -402,14 +430,14 @@ export default function ContractSummarizerWorkspace() {
           <div style={{ marginBottom: 16 }}>
             <SectionTitle>Money &amp; Payment Terms</SectionTitle>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Field label="Contract Value" value={result.moneyAndPayment?.contractValue} />
-              <Field label="Fees" value={result.moneyAndPayment?.fees} />
-              <Field label="Payment Schedule" value={result.moneyAndPayment?.paymentSchedule} />
-              <Field label="Deposits" value={result.moneyAndPayment?.deposits} />
-              <Field label="Late-Payment Fees" value={result.moneyAndPayment?.latePaymentFees} />
-              <Field label="Penalties" value={result.moneyAndPayment?.penalties} />
-              <Field label="Refund Terms" value={result.moneyAndPayment?.refundTerms} />
-              <Field label="Commissions" value={result.moneyAndPayment?.commissions} />
+              <Field label="Contract Value" field={result.moneyAndPayment?.contractValue} />
+              <Field label="Fees" field={result.moneyAndPayment?.fees} />
+              <Field label="Payment Schedule" field={result.moneyAndPayment?.paymentSchedule} />
+              <Field label="Deposits" field={result.moneyAndPayment?.deposits} />
+              <Field label="Late-Payment Fees" field={result.moneyAndPayment?.latePaymentFees} />
+              <Field label="Penalties" field={result.moneyAndPayment?.penalties} />
+              <Field label="Refund Terms" field={result.moneyAndPayment?.refundTerms} />
+              <Field label="Commissions" field={result.moneyAndPayment?.commissions} />
             </div>
           </div>
 
@@ -421,39 +449,26 @@ export default function ContractSummarizerWorkspace() {
             </div>
           )}
 
-          {/* 7. Legal Jargon Explained */}
-          {result.legalJargon?.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <SectionTitle>Legal Jargon Explained</SectionTitle>
-              {result.legalJargon.map((t, i) => (
-                <div key={i} style={{ padding: 12, background: CARD_BG, borderRadius: 10, marginBottom: 8 }}>
-                  <p style={{ margin: '0 0 4px', fontSize: '0.88rem', fontWeight: 700, color: '#0F172A' }}>{t.term}</p>
-                  <p style={{ margin: '0 0 4px', fontSize: '0.84rem', color: '#1E293B' }}>{t.plainEnglish}</p>
-                  <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748B' }}><em>Why it matters:</em> {t.whyItMatters}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* 8. Termination & Exit */}
+          {/* 7. Termination & Exit */}
           <div style={{ marginBottom: 16 }}>
             <SectionTitle>Termination &amp; Exit</SectionTitle>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
-              <Field label="How to Terminate" value={result.terminationAndExit?.howToTerminate} />
-              <Field label="Required Notice" value={result.terminationAndExit?.requiredNotice} />
-              <Field label="Grounds for Termination" value={result.terminationAndExit?.groundsForTermination} />
-              <Field label="Early Termination Conditions" value={result.terminationAndExit?.earlyTerminationConditions} />
-              <Field label="Penalties" value={result.terminationAndExit?.penalties} />
-              <Field label="After Termination" value={result.terminationAndExit?.afterTermination} />
+              <Field label="How to Terminate" field={result.terminationAndExit?.howToTerminate} />
+              <Field label="Required Notice" field={result.terminationAndExit?.requiredNotice} />
+              <Field label="Grounds for Termination" field={result.terminationAndExit?.groundsForTermination} />
+              <Field label="Early Termination Conditions" field={result.terminationAndExit?.earlyTerminationConditions} />
+              <Field label="Penalties" field={result.terminationAndExit?.penalties} />
+              <Field label="After Termination" field={result.terminationAndExit?.afterTermination} />
             </div>
-            {result.terminationAndExit?.differsBetweenParties && (
+            {result.terminationAndExit?.differsBetweenParties?.value && (
               <div style={{ padding: 12, background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, fontSize: '0.84rem', color: '#92400E' }}>
-                <strong>Difference between parties:</strong> {result.terminationAndExit.differsBetweenParties}
+                <strong>Difference between parties:</strong> {result.terminationAndExit.differsBetweenParties.value}
+                <LocationNote location={result.terminationAndExit.differsBetweenParties.location} style={{ color: '#B45309' }} />
               </div>
             )}
           </div>
 
-          {/* 9. Other Important Clauses */}
+          {/* 8. Other Important Clauses */}
           {result.otherClauses?.length > 0 && (
             <div style={{ marginBottom: 16 }}>
               <SectionTitle>Other Important Clauses</SectionTitle>
@@ -483,7 +498,7 @@ export default function ContractSummarizerWorkspace() {
             </div>
           )}
 
-          {/* 10. Plain-English Bottom Line */}
+          {/* 9. Plain-English Bottom Line */}
           <div style={{ padding: 14, background: '#EFF6FF', borderRadius: 10, marginBottom: 16 }}>
             <SectionTitle>Plain-English Bottom Line</SectionTitle>
             <p style={{ margin: 0, fontSize: '0.9rem', color: '#1E293B', lineHeight: 1.6 }}>{result.bottomLine}</p>
@@ -530,8 +545,8 @@ export default function ContractSummarizerWorkspace() {
                         {result.userPerspective.comparisons.map((c, i) => (
                           <tr key={i}>
                             <td style={{ padding: '6px 8px', borderBottom: '1px solid #F1F5F9', fontWeight: 600, color: '#0F172A' }}>{c.topic}</td>
-                            <td style={{ padding: '6px 8px', borderBottom: '1px solid #F1F5F9', color: '#1E293B' }}>{c.yourParty}</td>
-                            <td style={{ padding: '6px 8px', borderBottom: '1px solid #F1F5F9', color: '#1E293B' }}>{c.otherParty}</td>
+                            <td style={{ padding: '6px 8px', borderBottom: '1px solid #F1F5F9', color: '#1E293B' }}>{c.yourParty}<LocationNote location={c.yourPartyLocation} /></td>
+                            <td style={{ padding: '6px 8px', borderBottom: '1px solid #F1F5F9', color: '#1E293B' }}>{c.otherParty}<LocationNote location={c.otherPartyLocation} /></td>
                             <td style={{ padding: '6px 8px', borderBottom: '1px solid #F1F5F9', color: '#64748B' }}>{c.whyItMatters}</td>
                           </tr>
                         ))}

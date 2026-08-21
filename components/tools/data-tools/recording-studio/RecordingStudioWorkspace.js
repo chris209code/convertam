@@ -12,13 +12,13 @@ import { cleanAudioBuffer } from '@/lib/media/audioCleanup';
 import { detectSilenceInBuffer, SILENCE_AGGRESSIVENESS } from '@/lib/media/silenceDetect';
 import {
   createAudioTimeline, addTrack, removeTrack, renameTrack, setTrackGain, setTrackPan, setTrackMuted, setTrackSolo,
-  setTrackArmed, setTrackEffect, setTrackDuck, isTrackAudible, addSource, addClip, getTrackClips, clipDuration, getTotalDuration,
+  setTrackEffect, setTrackDuck, isTrackAudible, addSource, addClip, getTrackClips, clipDuration, getTotalDuration,
   trimClip, splitClip, deleteClip, duplicateClip, moveClip, setClipGain, setClipFade, setClipSpeed,
-  setMasterVolume, setMasterMuted, setMasterLimiter, clipsOverlapRange, crossfadeClips, removeSilenceFromClip,
+  setMasterVolume, setMasterMuted, setMasterLimiter, crossfadeClips, removeSilenceFromClip,
 } from '@/lib/media/audioTimeline';
 import {
   createAudioContext, buildTrackChain, applyTrackChainParams, buildMasterChain, applyMasterChainParams,
-  scheduleTimelinePlayback, stopAllScheduled, startMicCapture, stopMicCapture, describeMicError,
+  scheduleTimelinePlayback, stopAllScheduled,
 } from '@/lib/media/audioEngine';
 import { renderTimelineToWav, renderTimelineToMp3 } from '@/lib/media/audioTimelineRender';
 import LevelMeter from '../shared/LevelMeter';
@@ -101,10 +101,7 @@ export default function RecordingStudioWorkspace() {
 
   useEffect(() => { setPendingSilence(null); }, [selectedClipId]);
 
-  const [isRecording, setIsRecording] = useState(false);
-  const [liveCleanup, setLiveCleanup] = useState(true);
-  const [monitorWhileRecording, setMonitorWhileRecording] = useState(true);
-  const [micError, setMicError] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
   const [status, setStatus] = useState('');
 
   const [exportFormat, setExportFormat] = useState('wav');
@@ -118,9 +115,6 @@ export default function RecordingStudioWorkspace() {
   const scheduledRef = useRef([]);
   const playStartRef = useRef({ atWall: 0, atPlayhead: 0 });
   const rafRef = useRef(null);
-  const recordingRef = useRef(null);
-  const recordStartPlayheadRef = useRef(0);
-  const recordingLevelAnalyserRef = useRef(null);
 
   const timelineRef = useRef(timeline);
   const playingRef = useRef(playing);
@@ -286,9 +280,6 @@ export default function RecordingStudioWorkspace() {
   function handleAddTrack() {
     commit((tl) => addTrack(tl, `Track ${tl.tracks.length + 1}`).timeline);
   }
-  function handleArmTrack(trackId) {
-    commit((tl) => ({ ...tl, tracks: tl.tracks.map((t) => ({ ...t, armed: t.id === trackId })) }));
-  }
 
   // ---- Import ----
   async function importBlob(blob, name) {
@@ -296,7 +287,7 @@ export default function RecordingStudioWorkspace() {
     try {
       const file = blob instanceof File ? blob : new File([blob], name, { type: blob.type || 'audio/webm' });
       const sizeError = validateUploadSize(file, 'audio');
-      if (sizeError) { setMicError(sizeError); setStatus(''); return; }
+      if (sizeError) { setErrorMsg(sizeError); setStatus(''); return; }
       const buffer = await decodeAudioFile(file);
       commit((tl) => {
         const { timeline: tl2, track } = addTrack(tl, name.replace(/\.[^.]+$/, '') || `Track ${tl.tracks.length + 1}`);
@@ -304,7 +295,7 @@ export default function RecordingStudioWorkspace() {
         return addClip(tl3, track.id, source.id, {}).timeline;
       });
     } catch {
-      setMicError('Could not read this audio file — it may be an unsupported or corrupted format.');
+      setErrorMsg('Could not read this audio file — it may be an unsupported or corrupted format.');
     } finally {
       setStatus('');
     }
@@ -313,92 +304,6 @@ export default function RecordingStudioWorkspace() {
     const files = Array.from(e.target.files || []);
     e.target.value = '';
     files.forEach((f) => importBlob(f, f.name));
-  }
-
-  // ---- Recording ----
-  async function handleToggleRecord() {
-    if (isRecording) {
-      const rec = recordingRef.current;
-      if (rec) rec.mediaRecorder.stop();
-      return;
-    }
-    setMicError('');
-    const armedTrack = timeline.tracks.find((t) => t.armed) || timeline.tracks[0];
-    try {
-      const ctx = ensureAudioGraph();
-      let tl = timeline;
-      let targetTrack = armedTrack;
-      if (!targetTrack) {
-        const { timeline: tl2, track } = addTrack(tl, 'Track 1');
-        tl = tl2; targetTrack = track;
-        commit(() => tl);
-      }
-      const { mediaRecorder, micStream, cleanupNodes } = await startMicCapture({ ctx, liveCleanup, cleanupIntensity: 'medium' });
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
-      ctx.createMediaStreamSource(micStream).connect(analyser);
-      recordingLevelAnalyserRef.current = analyser;
-
-      const chunks = [];
-      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-      mediaRecorder.onstop = async () => {
-        stopMicCapture({ micStream, cleanupNodes });
-        recordingRef.current = null;
-        setIsRecording(false);
-        recordingLevelAnalyserRef.current = null;
-        const blob = new Blob(chunks, { type: mediaRecorder.mimeType || 'audio/webm' });
-        const startTime = recordStartPlayheadRef.current;
-        await finalizeRecording(blob, targetTrack.id, startTime);
-        if (playingRef.current) { stopPlayback(); setPlaying(false); }
-        // Land the playhead back where recording began — with nothing
-        // playing back before, the monitor loop below (when it ran at all)
-        // had no total duration to bound itself against and free-runs past
-        // "now," so leaving it wherever that drifted to would strand it
-        // past the very clip that was just recorded.
-        setPlayhead(startTime);
-      };
-
-      recordingRef.current = { mediaRecorder, micStream, cleanupNodes };
-      recordStartPlayheadRef.current = playhead;
-      mediaRecorder.start();
-      setIsRecording(true);
-      // Only start the monitor playback if there's actually something to
-      // overdub against — on an empty timeline (recording the first-ever
-      // clip) there's nothing to hear yet, and starting it anyway would run
-      // the transport against a zero total duration with nothing to stop it.
-      if (monitorWhileRecording && !playing && tl.clips.length > 0) {
-        startOrRestartPlayback(playhead);
-        setPlaying(true);
-      }
-    } catch (err) {
-      setMicError(describeMicError(err));
-    }
-  }
-
-  async function finalizeRecording(blob, trackId, startTime) {
-    setStatus('Processing your recording…');
-    try {
-      const file = new File([blob], 'recording', { type: blob.type });
-      const buffer = await decodeAudioFile(file);
-      commit((tl) => {
-        const overlaps = clipsOverlapRange(tl, trackId, startTime, buffer.duration);
-        let workingTl = tl;
-        let finalTrackId = trackId;
-        if (overlaps) {
-          const original = tl.tracks.find((t) => t.id === trackId);
-          const takeNumber = tl.tracks.filter((t) => t.name.startsWith(`${original?.name} (Take`)).length + 2;
-          const { timeline: tl2, track } = addTrack(workingTl, `${original?.name || 'Track'} (Take ${takeNumber})`);
-          workingTl = tl2;
-          finalTrackId = track.id;
-        }
-        const { timeline: tl3, source } = addSource(workingTl, { name: `Recording ${new Date().toLocaleTimeString()}`, buffer });
-        return addClip(tl3, finalTrackId, source.id, { start: startTime }).timeline;
-      });
-    } catch {
-      setMicError('Could not process the recording. Please try again.');
-    } finally {
-      setStatus('');
-    }
   }
 
   // ---- Clip editing ----
@@ -431,7 +336,7 @@ export default function RecordingStudioWorkspace() {
         };
       });
     } catch {
-      setMicError('Could not clean this clip\'s audio. Please try again.');
+      setErrorMsg('Could not clean this clip\'s audio. Please try again.');
     } finally {
       setStatus('');
     }
@@ -452,7 +357,7 @@ export default function RecordingStudioWorkspace() {
         };
       });
     } catch {
-      setMicError('Could not normalize this clip. Please try again.');
+      setErrorMsg('Could not normalize this clip. Please try again.');
     } finally {
       setStatus('');
     }
@@ -477,7 +382,7 @@ export default function RecordingStudioWorkspace() {
         };
       });
     } catch {
-      setMicError('Could not enhance this clip\'s audio. Please try again.');
+      setErrorMsg('Could not enhance this clip\'s audio. Please try again.');
     } finally {
       setStatus('');
     }
@@ -610,9 +515,9 @@ export default function RecordingStudioWorkspace() {
         </div>
       </div>
 
-      {(micError || status) && (
-        <div style={{ padding: '8px 16px', background: micError ? '#7F1D1D' : '#0F172A', color: micError ? '#FECACA' : '#94A3B8', fontSize: '0.78rem' }}>
-          {micError ? `⚠ ${micError}` : status}
+      {(errorMsg || status) && (
+        <div style={{ padding: '8px 16px', background: errorMsg ? '#7F1D1D' : '#0F172A', color: errorMsg ? '#FECACA' : '#94A3B8', fontSize: '0.78rem' }}>
+          {errorMsg ? `⚠ ${errorMsg}` : status}
         </div>
       )}
 
@@ -622,14 +527,6 @@ export default function RecordingStudioWorkspace() {
           {playing ? '⏸' : '▶'}
         </button>
         <button onClick={handleStop} title="Stop" style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: '#1E293B', color: 'white', fontSize: '0.85rem', cursor: 'pointer' }}>⏹</button>
-        <button
-          onClick={handleToggleRecord}
-          title={isRecording ? 'Stop recording' : 'Record onto the armed track'}
-          style={{ width: 34, height: 34, borderRadius: '50%', border: 'none', background: isRecording ? '#DC2626' : '#334155', color: 'white', fontSize: '0.85rem', cursor: 'pointer' }}
-        >
-          {isRecording ? '■' : '●'}
-        </button>
-        {isRecording && <LevelMeter analyserRef={recordingLevelAnalyserRef} width={70} />}
 
         <span style={{ color: 'white', fontSize: '0.78rem', fontVariantNumeric: 'tabular-nums', minWidth: 90 }}>
           {formatDuration(playhead)} / {formatDuration(totalDuration)}
@@ -650,24 +547,13 @@ export default function RecordingStudioWorkspace() {
           <button onClick={() => setZoomIndex((z) => clamp(z + 1, 0, ZOOM_LEVELS.length - 1))} style={iconBtn(false)}>+</button>
         </div>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.7rem', color: '#94A3B8' }}>
-          <input type="checkbox" checked={liveCleanup} onChange={(e) => setLiveCleanup(e.target.checked)} />
-          Reduce noise while recording
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.7rem', color: '#94A3B8' }}>
-          <input type="checkbox" checked={monitorWhileRecording} onChange={(e) => setMonitorWhileRecording(e.target.checked)} />
-          Listen to other tracks while recording
-        </label>
-        {monitorWhileRecording && (
-          <span style={{ fontSize: '0.68rem', color: '#64748B' }}>🎧 Headphones recommended — without them the mic can pick up other tracks and cause feedback.</span>
-        )}
       </div>
 
       {/* Timeline */}
       {timeline.tracks.length === 0 ? (
         <div style={{ padding: '40px 16px', textAlign: 'center', background: '#F8FAFC' }}>
-          <p style={{ fontSize: '0.95rem', fontWeight: 700, color: T.ink, marginBottom: 8 }}>Add a track to get started</p>
-          <p style={{ fontSize: '0.82rem', color: T.mutedDark, marginBottom: 16 }}>Record from your microphone, or import an audio file — either creates its own track.</p>
+          <p style={{ fontSize: '0.95rem', fontWeight: 700, color: T.ink, marginBottom: 8 }}>Import an audio file to get started</p>
+          <p style={{ fontSize: '0.82rem', color: T.mutedDark, marginBottom: 16 }}>Each file you import lands on its own track, ready to edit and mix.</p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
             <button onClick={handleAddTrack} style={{ ...smallBtn, padding: '10px 20px' }}>+ Add Track</button>
             <label style={{ ...smallBtn, padding: '10px 20px', background: T.accentGradient, color: 'white', border: 'none' }}>
@@ -686,7 +572,6 @@ export default function RecordingStudioWorkspace() {
               return (
                 <div key={track.id} style={{ height: TRACK_HEIGHT, borderBottom: `1px solid ${T.border}`, padding: '6px 8px', background: audible ? 'white' : '#F1F5F9', display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <button onClick={() => handleArmTrack(track.id)} title="Arm for recording" style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${track.armed ? '#DC2626' : T.border}`, background: track.armed ? '#DC2626' : 'transparent', cursor: 'pointer', flexShrink: 0, padding: 0 }} />
                     <input
                       type="text"
                       value={track.name}
@@ -874,7 +759,7 @@ export default function RecordingStudioWorkspace() {
       </div>
 
       <p style={{ margin: 0, padding: '8px 16px', fontSize: '0.68rem', color: '#64748B', background: '#0B1120' }}>
-        Everything here — recording, editing, effects, and export — runs locally in your browser. Nothing is uploaded to a server.
+        Everything here — editing, effects, and export — runs locally in your browser. Nothing is uploaded to a server.
       </p>
     </div>
   );

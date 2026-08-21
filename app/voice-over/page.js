@@ -26,6 +26,7 @@ const FAQ = [
   { q: 'What happens to the video\'s original audio?', a: 'You choose: keep it and adjust its volume, mute it entirely, or mix it together with your narration at whatever balance you set. Nothing happens to it automatically.' },
   { q: 'Does it clean up background noise in my recording?', a: 'Yes — turn on "Reduce noise while recording" for live noise reduction as you narrate, or use the "Clean" button on any take afterward. Both use real signal processing (a highpass filter for rumble, notch filters for electrical hum, a gentle noise gate for hiss) — it reduces noise, it doesn\'t claim to remove it perfectly.' },
   { q: 'Is the exported file a real MP4?', a: 'Yes — a genuine MP4 with your mixed audio permanently combined into it, not a preview-only overlay. The video itself is never re-encoded (so picture quality is untouched); only the audio track is replaced with the final mix.' },
+  { q: 'What does "Auto-duck original audio" do?', a: 'It automatically lowers the video\'s own volume whenever your narration is actually speaking, and brings it back up during natural pauses — the same technique podcasts and YouTube narration use so the voice-over never has to fight the original sound. You can hear it working live in the preview, and the exported video always matches exactly what you previewed.' },
   { q: 'Does this upload my video or recordings anywhere?', a: 'No — recording, mixing, and export all happen locally in your browser. Nothing is ever uploaded to a server.' },
   { q: 'Is this tool free?', a: 'Yes, completely free with no login required.' },
 ];
@@ -66,8 +67,11 @@ export default function VoiceOverPage() {
                 <li><strong>Multiple takes</strong> — record as many as you want; nothing is ever overwritten, and you pick your favorite.</li>
                 <li><strong>Trim</strong> — drag a take&apos;s waveform edges to cut off a rough start or a long pause at the end.</li>
                 <li><strong>Mix control</strong> — independent volume for your narration and the original video audio, or mute the original entirely.</li>
+                <li><strong>Auto-duck the original audio</strong> — automatically lower the video&apos;s own volume while you&apos;re actually narrating, and restore it during pauses, so your voice never has to fight the original sound.</li>
                 <li><strong>Noise reduction</strong> — live while recording, or applied afterward to a specific take.</li>
-                <li><strong>Preview before export</strong> — hear the actual mix, at your chosen volumes, before committing to a render.</li>
+                <li><strong>Enhance Voice</strong> — a one-click preset combining noise reduction, a voice-presence EQ boost, and loudness normalization.</li>
+                <li><strong>Remove pauses</strong> — find long silences in a take at your choice of sensitivity, review how much they add up to, then cut them in one click.</li>
+                <li><strong>Preview before export</strong> — hear the actual mix, at your chosen volumes — including auto-ducking — before committing to a render.</li>
                 <li><strong>Real MP4 export</strong> — your narration is permanently combined into a genuine video file, with the original picture quality untouched.</li>
               </ul>
             </section>

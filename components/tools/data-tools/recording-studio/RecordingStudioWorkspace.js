@@ -9,11 +9,12 @@ import { formatDuration } from '@/lib/media/metadata';
 import { decodeAudioFile, sliceAudioBuffer } from '@/lib/media/audioEncode';
 import { peaksFromAudioBuffer, drawWaveform } from '@/lib/media/waveform';
 import { cleanAudioBuffer } from '@/lib/media/audioCleanup';
+import { detectSilenceInBuffer, SILENCE_AGGRESSIVENESS } from '@/lib/media/silenceDetect';
 import {
   createAudioTimeline, addTrack, removeTrack, renameTrack, setTrackGain, setTrackPan, setTrackMuted, setTrackSolo,
-  setTrackArmed, setTrackEffect, isTrackAudible, addSource, addClip, getTrackClips, clipDuration, getTotalDuration,
+  setTrackArmed, setTrackEffect, setTrackDuck, isTrackAudible, addSource, addClip, getTrackClips, clipDuration, getTotalDuration,
   trimClip, splitClip, deleteClip, duplicateClip, moveClip, setClipGain, setClipFade, setClipSpeed,
-  setMasterVolume, setMasterMuted, setMasterLimiter, clipsOverlapRange,
+  setMasterVolume, setMasterMuted, setMasterLimiter, clipsOverlapRange, crossfadeClips, removeSilenceFromClip,
 } from '@/lib/media/audioTimeline';
 import {
   createAudioContext, buildTrackChain, applyTrackChainParams, buildMasterChain, applyMasterChainParams,
@@ -94,6 +95,11 @@ export default function RecordingStudioWorkspace() {
   const [zoomIndex, setZoomIndex] = useState(2);
   const [selectedClipId, setSelectedClipId] = useState(null);
   const [expandedEffectsTrackId, setExpandedEffectsTrackId] = useState(null);
+  const [silenceAggr, setSilenceAggr] = useState('medium');
+  const [pendingSilence, setPendingSilence] = useState(null); // { clipId, ranges, totalSeconds }
+  const [crossfadeSeconds, setCrossfadeSeconds] = useState(0.5);
+
+  useEffect(() => { setPendingSilence(null); }, [selectedClipId]);
 
   const [isRecording, setIsRecording] = useState(false);
   const [liveCleanup, setLiveCleanup] = useState(true);
@@ -451,6 +457,58 @@ export default function RecordingStudioWorkspace() {
       setStatus('');
     }
   }
+  // A single one-click preset combining noise reduction, a voice-presence
+  // EQ boost, and loudness normalization — the common "just make my voice
+  // sound good" case that would otherwise take three separate actions
+  // (Clean, then manually reasoning about EQ, then Normalize).
+  async function handleEnhanceVoiceClip() {
+    if (!selectedClip) return;
+    const source = timeline.sources.find((s) => s.id === selectedClip.sourceId);
+    if (!source) return;
+    setStatus('Enhancing voice…');
+    try {
+      const slice = sliceAudioBuffer(source.buffer, selectedClip.sourceStart, selectedClip.sourceEnd);
+      const enhanced = await cleanAudioBuffer(slice, { intensity: 'medium', reduceHum: true, voiceEnhance: true, normalize: true });
+      commit((tl) => {
+        const { timeline: tl2, source: newSource } = addSource(tl, { name: `${source.name} (enhanced)`, buffer: enhanced });
+        return {
+          ...tl2,
+          clips: tl2.clips.map((c) => (c.id === selectedClip.id ? { ...c, sourceId: newSource.id, sourceStart: 0, sourceEnd: enhanced.duration } : c)),
+        };
+      });
+    } catch {
+      setMicError('Could not enhance this clip\'s audio. Please try again.');
+    } finally {
+      setStatus('');
+    }
+  }
+  // Detects pauses first and shows them for confirmation rather than
+  // cutting immediately — same "never silently act" posture as Video
+  // Editor's own silence detection, since what counts as "dead air worth
+  // cutting" is ultimately the user's own call.
+  function handleFindPauses() {
+    if (!selectedClip) return;
+    const source = timeline.sources.find((s) => s.id === selectedClip.sourceId);
+    if (!source) return;
+    const ranges = detectSilenceInBuffer(source.buffer, selectedClip.sourceStart, selectedClip.sourceEnd, SILENCE_AGGRESSIVENESS[silenceAggr]);
+    if (!ranges.length) {
+      setStatus('No pauses found in this clip.');
+      setTimeout(() => setStatus(''), 2500);
+      return;
+    }
+    const totalSeconds = ranges.reduce((sum, r) => sum + (r.end - r.start), 0);
+    setPendingSilence({ clipId: selectedClip.id, ranges, totalSeconds });
+  }
+  function handleApplyRemoveSilence() {
+    if (!pendingSilence) return;
+    commit((tl) => removeSilenceFromClip(tl, pendingSilence.clipId, pendingSilence.ranges));
+    setPendingSilence(null);
+    setSelectedClipId(null);
+  }
+  function handleCrossfadeWithNext(nextClipId) {
+    if (!selectedClip) return;
+    commit((tl) => crossfadeClips(tl, selectedClip.id, nextClipId, crossfadeSeconds));
+  }
 
   // ---- Drag: move / trim ----
   function handleClipMoveStart(e, clip) {
@@ -600,6 +658,9 @@ export default function RecordingStudioWorkspace() {
           <input type="checkbox" checked={monitorWhileRecording} onChange={(e) => setMonitorWhileRecording(e.target.checked)} />
           Listen to other tracks while recording
         </label>
+        {monitorWhileRecording && (
+          <span style={{ fontSize: '0.68rem', color: '#64748B' }}>🎧 Headphones recommended — without them the mic can pick up other tracks and cause feedback.</span>
+        )}
       </div>
 
       {/* Timeline */}
@@ -712,7 +773,9 @@ export default function RecordingStudioWorkspace() {
       {expandedEffectsTrackId && timeline.tracks.find((t) => t.id === expandedEffectsTrackId) && (
         <TrackEffectsPanel
           track={timeline.tracks.find((t) => t.id === expandedEffectsTrackId)}
+          allTracks={timeline.tracks}
           onChange={(patch) => commit((tl) => setTrackEffect(tl, expandedEffectsTrackId, patch))}
+          onDuckChange={(duckAgainst) => commit((tl) => setTrackDuck(tl, expandedEffectsTrackId, duckAgainst))}
           onClose={() => setExpandedEffectsTrackId(null)}
         />
       )}
@@ -726,6 +789,41 @@ export default function RecordingStudioWorkspace() {
           <button onClick={handleDeleteClip} style={{ ...smallBtn, color: T.danger }}>🗑 Delete</button>
           <button onClick={handleCleanClip} style={smallBtn}>🧹 Clean Audio</button>
           <button onClick={handleNormalizeClip} style={smallBtn}>📶 Normalize</button>
+          <button onClick={handleEnhanceVoiceClip} style={smallBtn}>🎙️ Enhance Voice</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <select value={silenceAggr} onChange={(e) => setSilenceAggr(e.target.value)} style={{ ...smallBtn, padding: '6px 8px' }}>
+              <option value="light">Light</option>
+              <option value="medium">Medium</option>
+              <option value="aggressive">Aggressive</option>
+            </select>
+            <button onClick={handleFindPauses} style={smallBtn}>🔇 Find Pauses</button>
+          </div>
+          {selectedTrack && (() => {
+            const trackClips = getTrackClips(timeline, selectedTrack.id);
+            const idx = trackClips.findIndex((c) => c.id === selectedClip.id);
+            const nextClip = trackClips[idx + 1];
+            if (!nextClip) return null;
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button onClick={() => handleCrossfadeWithNext(nextClip.id)} style={smallBtn} title="Overlaps this clip's end with the next clip's start, fading between them">🔀 Crossfade next</button>
+                <input
+                  type="number" min={0.1} max={5} step={0.1} value={crossfadeSeconds}
+                  onChange={(e) => setCrossfadeSeconds(Math.max(0.1, parseFloat(e.target.value) || 0.5))}
+                  style={{ width: 46, padding: '4px 6px', borderRadius: 6, border: `1px solid ${T.border}` }}
+                />
+                <span style={{ fontSize: '0.7rem', color: T.mutedDark }}>sec</span>
+              </div>
+            );
+          })()}
+          {pendingSilence && pendingSilence.clipId === selectedClip.id && (
+            <div style={{ width: '100%', display: 'flex', gap: 8, alignItems: 'center', padding: '4px 0 0' }}>
+              <span style={{ fontSize: '0.74rem', color: T.mutedDark }}>
+                Found {pendingSilence.ranges.length} pause{pendingSilence.ranges.length === 1 ? '' : 's'} totaling {pendingSilence.totalSeconds.toFixed(1)}s
+              </span>
+              <button onClick={handleApplyRemoveSilence} style={{ ...smallBtn, background: T.accentGradient, color: 'white', border: 'none' }}>Remove them</button>
+              <button onClick={() => setPendingSilence(null)} style={smallBtn}>Cancel</button>
+            </div>
+          )}
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', color: T.mutedDark }}>
             Gain
             <input type="range" min={0} max={2} step={0.05} value={selectedClip.gain} onChange={(e) => commit((tl) => setClipGain(tl, selectedClip.id, parseFloat(e.target.value)))} />
@@ -782,11 +880,24 @@ export default function RecordingStudioWorkspace() {
   );
 }
 
-function TrackEffectsPanel({ track, onChange, onClose }) {
+function TrackEffectsPanel({ track, allTracks, onChange, onDuckChange, onClose }) {
   const e = track.effects;
   return (
     <div style={{ padding: '12px 16px', background: '#EFF6FF', borderTop: `1px solid ${T.accentBorder}`, display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'center' }}>
       <span style={{ fontSize: '0.76rem', fontWeight: 700, color: T.ink }}>Effects · {track.name}</span>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', color: T.mutedDark }} title="Automatically lowers this track's volume whenever the chosen track has signal — e.g. duck background music under a vocal track">
+        Duck under
+        <select
+          value={track.duckAgainst || ''}
+          onChange={(ev) => onDuckChange(ev.target.value || null)}
+          style={{ padding: '4px 6px', borderRadius: 6, border: `1px solid ${T.border}`, fontSize: '0.72rem' }}
+        >
+          <option value="">None</option>
+          {allTracks.filter((t) => t.id !== track.id).map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+      </label>
       <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', color: T.mutedDark }}>
         Bass
         <input type="range" min={-12} max={12} step={1} value={e.bassDb} onChange={(ev) => onChange({ bassDb: parseFloat(ev.target.value) })} />

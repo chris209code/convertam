@@ -22,9 +22,11 @@ import { downloadBlob } from '@/lib/dataTools/shared';
 import { sendBlobToTool, receiveBlobHandoff } from '@/lib/media/blobHandoff';
 import { extractVideoMetadata, formatDuration } from '@/lib/media/metadata';
 import { validateUploadSize, MAX_UPLOAD_VIDEO_BYTES } from '@/lib/media/limits';
-import { decodeAudioFile, sliceAudioBuffer, audioBufferToWavBlob } from '@/lib/media/audioEncode';
+import { decodeAudioFile, sliceAudioBuffer, audioBufferToWavBlob, removeRangesFromBuffer } from '@/lib/media/audioEncode';
 import { peaksFromAudioBuffer, drawWaveform } from '@/lib/media/waveform';
 import { cleanAudioBuffer } from '@/lib/media/audioCleanup';
+import { detectSilenceInBuffer, SILENCE_AGGRESSIVENESS } from '@/lib/media/silenceDetect';
+import { rmsWindowAt, applyDuckHold, presenceToGain, RMS_PRESENCE_THRESHOLD } from '@/lib/media/ducking';
 import { createAudioContext, startMicCapture, stopMicCapture, describeMicError } from '@/lib/media/audioEngine';
 import { addAudioTrackToVideo, terminateFFmpeg, isFfmpegSupported, FfmpegLoadError, FfmpegRenderError, FfmpegCancelledError } from '@/lib/media/ffmpegClient';
 import LevelMeter from '../shared/LevelMeter';
@@ -38,7 +40,7 @@ const statusBox = { padding: '10px 14px', borderRadius: 10, background: T.danger
 const sectionCard = { background: 'white', border: `1px solid ${T.border}`, borderRadius: 14, padding: 16, marginBottom: 16 };
 const sectionTitle = { margin: '0 0 10px', fontSize: '0.92rem', fontWeight: 800, color: T.ink };
 
-function TakeCard({ take, active, busy, onSelect, onDelete, onTrimChange, onClean }) {
+function TakeCard({ take, active, busy, onSelect, onDelete, onTrimChange, onClean, onEnhance, onFindPauses, pendingSilence, onApplyRemoveSilence, onCancelPendingSilence }) {
   const canvasRef = useRef(null);
   const barRef = useRef(null);
   const dur = take.buffer.duration;
@@ -91,8 +93,10 @@ function TakeCard({ take, active, busy, onSelect, onDelete, onTrimChange, onClea
         <span style={{ fontSize: '0.82rem', fontWeight: 700, color: T.ink }}>
           {active ? '✓ ' : ''}{take.name}{take.cleaned ? ' · cleaned' : ''}
         </span>
-        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
           <button onClick={(e) => { e.stopPropagation(); onClean(take.id); }} disabled={busy} style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.72rem' }}>🧹 Clean</button>
+          <button onClick={(e) => { e.stopPropagation(); onEnhance(take.id); }} disabled={busy} style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.72rem' }}>🎙️ Enhance</button>
+          <button onClick={(e) => { e.stopPropagation(); onFindPauses(take.id); }} disabled={busy} style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.72rem' }}>🔇 Find Pauses</button>
           <button onClick={(e) => { e.stopPropagation(); onDelete(take.id); }} style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.72rem', color: T.danger }}>🗑</button>
         </div>
       </div>
@@ -116,6 +120,15 @@ function TakeCard({ take, active, busy, onSelect, onDelete, onTrimChange, onClea
       <p style={{ margin: '6px 0 0', fontSize: '0.7rem', color: T.mutedDark }}>
         Uses {formatDuration(take.trimStart)}–{formatDuration(take.trimEnd)} of {formatDuration(dur)} · starts at {formatDuration(take.offset)} in the video
       </p>
+      {pendingSilence && pendingSilence.takeId === take.id && (
+        <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#F1F5F9' }}>
+          <span style={{ fontSize: '0.72rem', color: T.mutedDark }}>
+            Found {pendingSilence.ranges.length} pause{pendingSilence.ranges.length === 1 ? '' : 's'} totaling {pendingSilence.totalSeconds.toFixed(1)}s
+          </span>
+          <button onClick={() => onApplyRemoveSilence(take.id)} style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.72rem', background: T.accentGradient, color: 'white', border: 'none' }}>Remove them</button>
+          <button onClick={onCancelPendingSilence} style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.72rem' }}>Cancel</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -138,8 +151,12 @@ export default function VoiceOverWorkspace() {
   const [voiceVolume, setVoiceVolume] = useState(1);
   const [videoVolume, setVideoVolume] = useState(1);
   const [videoMuted, setVideoMuted] = useState(false);
+  const [duckOriginal, setDuckOriginal] = useState(false);
   const [previewPlaying, setPreviewPlaying] = useState(false);
   const [previewAudioUrl, setPreviewAudioUrl] = useState(null);
+
+  const [silenceAggr, setSilenceAggr] = useState('medium');
+  const [pendingSilence, setPendingSilence] = useState(null); // { takeId, ranges, totalSeconds }
 
   const [exportBusy, setExportBusy] = useState(false);
   const [exportStage, setExportStage] = useState('');
@@ -166,8 +183,26 @@ export default function VoiceOverWorkspace() {
   const recordOffsetRef = useRef(0);
   const recordingLevelAnalyserRef = useRef(null);
   const cancelExportRef = useRef(null);
+  const duckCurveRef = useRef(null); // { curve, step } — precomputed from the active take, indexed by video.currentTime during live preview
 
   const activeTake = takes.find((t) => t.id === activeTakeId) || null;
+
+  // Builds the "is the narration actually speaking" gain curve once per
+  // take/trim/duck-toggle change, indexed by TIMELINE (video) time — reused
+  // identically by both the live preview loop below and the export mixdown,
+  // so what's previewed always matches what gets exported.
+  function buildNarrationDuckCurve(take, videoDuration, stepSeconds = 0.05) {
+    const data = take.buffer.getChannelData(0);
+    const sampleRate = take.buffer.sampleRate;
+    const n = Math.max(1, Math.ceil(videoDuration / stepSeconds));
+    const present = new Array(n).fill(false);
+    for (let i = 0; i < n; i++) {
+      const takeSourceTime = take.trimStart + (i * stepSeconds - take.offset);
+      if (takeSourceTime < take.trimStart || takeSourceTime >= take.trimEnd) continue;
+      present[i] = rmsWindowAt(data, sampleRate, takeSourceTime) > RMS_PRESENCE_THRESHOLD;
+    }
+    return presenceToGain(applyDuckHold(present));
+  }
 
   useEffect(() => {
     (async () => {
@@ -200,6 +235,37 @@ export default function VoiceOverWorkspace() {
     if (audioPreviewRef.current) audioPreviewRef.current.volume = voiceVolume;
   }, [voiceVolume]);
 
+  // Precompute the duck curve once per take/trim/toggle change rather than
+  // recomputing it every animation frame during preview.
+  useEffect(() => {
+    if (duckOriginal && activeTake && videoMeta?.duration) {
+      duckCurveRef.current = { curve: buildNarrationDuckCurve(activeTake, videoMeta.duration), step: 0.05 };
+    } else {
+      duckCurveRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duckOriginal, activeTakeId, activeTake?.buffer, activeTake?.trimStart, activeTake?.trimEnd, activeTake?.offset, videoMeta?.duration]);
+
+  // While the mix preview is actually playing, continuously modulate the
+  // video's own volume by the precomputed duck curve, indexed by the
+  // video's current playback time — the same curve the export mixdown
+  // applies via setValueCurveAtTime, so preview and export always agree.
+  useEffect(() => {
+    if (!previewPlaying) return undefined;
+    let raf;
+    function tick() {
+      const video = videoRef.current;
+      if (video) {
+        const dc = duckCurveRef.current;
+        const duckFactor = dc ? dc.curve[Math.max(0, Math.min(dc.curve.length - 1, Math.floor(video.currentTime / dc.step)))] : 1;
+        video.volume = videoMuted ? 0 : videoVolume * duckFactor;
+      }
+      raf = requestAnimationFrame(tick);
+    }
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [previewPlaying, videoVolume, videoMuted]);
+
   async function handleVideoFile(file) {
     const sizeError = validateUploadSize(file, 'video');
     if (sizeError) { setMetaError(sizeError); return; }
@@ -230,6 +296,8 @@ export default function VoiceOverWorkspace() {
     setVoiceVolume(1);
     setVideoVolume(1);
     setVideoMuted(false);
+    setDuckOriginal(false);
+    setPendingSilence(null);
     setExportBusy(false);
     setExportError('');
     setExportResult(null);
@@ -311,10 +379,11 @@ export default function VoiceOverWorkspace() {
   }
 
   // ---- Takes ----
-  function handleSelectTake(id) { setActiveTakeId(id); }
+  function handleSelectTake(id) { setActiveTakeId(id); setPendingSilence(null); }
   function handleDeleteTake(id) {
     setTakes((prev) => prev.filter((t) => t.id !== id));
     setActiveTakeId((cur) => (cur === id ? null : cur));
+    setPendingSilence((p) => (p?.takeId === id ? null : p));
   }
   function handleTrimChange(id, patch) {
     setTakes((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
@@ -332,6 +401,47 @@ export default function VoiceOverWorkspace() {
     } finally {
       setStatus('');
     }
+  }
+  // One-click preset combining noise reduction, a voice-presence EQ boost,
+  // and loudness normalization — the common "just make my voice sound
+  // good" case, distinct from the plain Clean button above.
+  async function handleEnhanceTake(id) {
+    const take = takes.find((t) => t.id === id);
+    if (!take) return;
+    setStatus('Enhancing voice…');
+    try {
+      const enhanced = await cleanAudioBuffer(take.buffer, { intensity: 'medium', reduceHum: true, voiceEnhance: true, normalize: true });
+      const peaks = peaksFromAudioBuffer(enhanced, 300);
+      setTakes((prev) => prev.map((t) => (t.id === id ? { ...t, buffer: enhanced, peaks, cleaned: true } : t)));
+    } catch {
+      setMicError('Could not enhance this take. Please try again.');
+    } finally {
+      setStatus('');
+    }
+  }
+  // Detects pauses first and shows them for confirmation rather than
+  // cutting immediately — what counts as "dead air worth cutting" is
+  // ultimately the user's own call.
+  function handleFindPausesTake(id) {
+    const take = takes.find((t) => t.id === id);
+    if (!take) return;
+    const ranges = detectSilenceInBuffer(take.buffer, take.trimStart, take.trimEnd, SILENCE_AGGRESSIVENESS[silenceAggr]);
+    if (!ranges.length) {
+      setStatus('No pauses found in this take.');
+      setTimeout(() => setStatus(''), 2500);
+      return;
+    }
+    const totalSeconds = ranges.reduce((sum, r) => sum + (r.end - r.start), 0);
+    setPendingSilence({ takeId: id, ranges, totalSeconds });
+  }
+  function handleApplyRemoveSilenceTake(id) {
+    if (!pendingSilence || pendingSilence.takeId !== id) return;
+    const take = takes.find((t) => t.id === id);
+    if (!take) return;
+    const trimmed = removeRangesFromBuffer(take.buffer, pendingSilence.ranges);
+    const peaks = peaksFromAudioBuffer(trimmed, 300);
+    setTakes((prev) => prev.map((t) => (t.id === id ? { ...t, buffer: trimmed, peaks, trimStart: 0, trimEnd: trimmed.duration } : t)));
+    setPendingSilence(null);
   }
 
   // ---- Preview ----
@@ -393,7 +503,14 @@ export default function VoiceOverWorkspace() {
         const src = ctx.createBufferSource();
         src.buffer = originalBuffer;
         const gain = ctx.createGain();
-        gain.gain.value = videoVolume;
+        if (duckOriginal) {
+          const curve = buildNarrationDuckCurve(activeTake, totalDuration);
+          const combined = new Float32Array(curve.length);
+          for (let i = 0; i < curve.length; i++) combined[i] = videoVolume * curve[i];
+          gain.gain.setValueCurveAtTime(combined, 0, totalDuration);
+        } else {
+          gain.gain.value = videoVolume;
+        }
         src.connect(gain);
         gain.connect(ctx.destination);
         src.start(0);
@@ -513,6 +630,14 @@ export default function VoiceOverWorkspace() {
                 <p style={{ margin: '0 0 12px', fontSize: '0.78rem', color: T.mutedDark }}>
                   Record as many takes as you like — nothing is overwritten. Pick the one you want and drag its edges to trim.
                 </p>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', color: T.mutedDark, marginBottom: 12 }}>
+                  Pause-removal sensitivity
+                  <select value={silenceAggr} onChange={(e) => setSilenceAggr(e.target.value)} style={{ padding: '4px 6px', borderRadius: 6, border: `1px solid ${T.border}`, fontSize: '0.72rem' }}>
+                    <option value="light">Light</option>
+                    <option value="medium">Medium</option>
+                    <option value="aggressive">Aggressive</option>
+                  </select>
+                </label>
                 {takes.map((take) => (
                   <TakeCard
                     key={take.id}
@@ -523,6 +648,11 @@ export default function VoiceOverWorkspace() {
                     onDelete={handleDeleteTake}
                     onTrimChange={handleTrimChange}
                     onClean={handleCleanTake}
+                    onEnhance={handleEnhanceTake}
+                    onFindPauses={handleFindPausesTake}
+                    pendingSilence={pendingSilence}
+                    onApplyRemoveSilence={handleApplyRemoveSilenceTake}
+                    onCancelPendingSilence={() => setPendingSilence(null)}
                   />
                 ))}
                 {status && <p style={{ fontSize: '0.76rem', color: T.mutedDark }}>{status}</p>}
@@ -543,6 +673,10 @@ export default function VoiceOverWorkspace() {
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: T.mutedDark, marginBottom: 12 }}>
                   <input type="checkbox" checked={videoMuted} onChange={(e) => setVideoMuted(e.target.checked)} />
                   Mute original video audio
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: T.mutedDark, marginBottom: 12 }} title="Automatically lowers the original video's volume while your narration is actually speaking, and restores it during pauses">
+                  <input type="checkbox" checked={duckOriginal} onChange={(e) => setDuckOriginal(e.target.checked)} disabled={videoMuted} />
+                  Auto-duck original audio while narrating
                 </label>
                 <button onClick={handleTogglePreview} style={smallBtn}>{previewPlaying ? '⏸ Stop Preview' : '▶ Preview Mix'}</button>
               </div>

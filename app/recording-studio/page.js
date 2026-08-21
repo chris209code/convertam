@@ -26,6 +26,7 @@ const FAQ = [
   { q: 'What effects are available?', a: 'Per track: bass and treble EQ, a compressor, reverb, and echo/delay — each as a simple amount slider, not raw DSP parameters. Per clip: volume, fade in/out, and a speed control (which also shifts pitch, like a tape-speed change, since true pitch-only shifting isn\'t reliably possible for free in a browser).' },
   { q: 'Can I export as MP3?', a: 'Yes — WAV or MP3, both encoded locally in your browser using an open-source encoder. Nothing is ever sent to a paid transcoding service.' },
   { q: 'Does the preview speed control change my export?', a: 'No — the 0.25×–2× speed control on the transport is for editing only, so you can slow playback down to find an exact spot. It never affects the exported mix unless you deliberately apply the per-clip Speed effect.' },
+  { q: 'How does audio ducking work?', a: 'Open a track\'s FX panel and set "Duck under" to another track — say, background music ducking under a vocal track. Whenever that other track has actual signal, this track\'s volume automatically drops (and rises back once it\'s quiet again), with a short hold so normal speech pauses don\'t pump the volume up and down. It updates live while you preview, and the exported mix always matches exactly what you heard.' },
   { q: 'Does this upload my recordings anywhere?', a: 'No — recording, editing, mixing, effects, noise reduction, and export all happen locally in your browser. Nothing is ever uploaded to a server.' },
   { q: 'Is this tool free?', a: 'Yes, completely free with no login required.' },
 ];
@@ -68,6 +69,10 @@ export default function RecordingStudioPage() {
                 <li><strong>Mixing</strong> — per-track volume, pan, mute, and solo, plus a master volume with a safety limiter and a live level meter.</li>
                 <li><strong>Effects</strong> — per-track bass/treble EQ, compressor, reverb, and echo; per-clip gain, fade in/out, and a speed effect.</li>
                 <li><strong>Noise reduction</strong> — clean up a noisy clip after the fact, or reduce noise live while you&apos;re actually recording.</li>
+                <li><strong>Enhance Voice</strong> — a one-click preset combining noise reduction, a voice-presence EQ boost, and loudness normalization for the common &quot;just make my voice sound good&quot; case.</li>
+                <li><strong>Automatic pause removal</strong> — find long silences in a clip at your choice of sensitivity, review how much they add up to, then remove them in one click.</li>
+                <li><strong>Crossfades</strong> — overlap a clip with the next one on its track and fade smoothly between them, with an adjustable crossfade length.</li>
+                <li><strong>Audio ducking</strong> — set a track to automatically lower in volume whenever another track (like a vocal) has signal, then rise back up in the gaps — ideal for background music under narration.</li>
                 <li><strong>Editing playback speed</strong> — slow playback down to 0.25× to find an exact spot, without touching your export.</li>
                 <li><strong>Export</strong> — download your finished mix as WAV or MP3.</li>
               </ul>

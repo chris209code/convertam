@@ -17,9 +17,10 @@ import {
 } from '@/lib/media/audioTimeline';
 import {
   createAudioContext, buildTrackChain, applyTrackChainParams, buildMasterChain, applyMasterChainParams,
-  getPeakLevel, scheduleTimelinePlayback, stopAllScheduled, startMicCapture, stopMicCapture,
+  scheduleTimelinePlayback, stopAllScheduled, startMicCapture, stopMicCapture, describeMicError,
 } from '@/lib/media/audioEngine';
 import { renderTimelineToWav, renderTimelineToMp3 } from '@/lib/media/audioTimelineRender';
+import LevelMeter from '../shared/LevelMeter';
 
 const PREVIEW_SPEEDS = [0.25, 0.5, 1, 1.5, 2];
 const ZOOM_LEVELS = [15, 25, 40, 65, 100, 150, 220];
@@ -28,54 +29,6 @@ const RULER_HEIGHT = 28;
 const HEADER_WIDTH = 190;
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-
-function micErrorMessage(err) {
-  if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
-    return "Microphone access was denied. Allow microphone access for this site in your browser's address-bar permissions, then try recording again.";
-  }
-  if (err?.name === 'NotFoundError' || err?.name === 'DevicesNotFoundError') {
-    return 'No microphone was found. Connect a microphone and try again.';
-  }
-  if (err?.name === 'NotReadableError' || err?.name === 'TrackStartError') {
-    return 'Your microphone is already in use by another application. Close it and try again.';
-  }
-  return err?.message || 'Could not access the microphone. Please try again.';
-}
-
-// Reads level continuously off an AnalyserNode via its own rAF loop, so
-// meters never force the whole workspace to re-render every frame.
-function LevelMeter({ analyserRef, vertical = false, width = 10, height = 46 }) {
-  const barRef = useRef(null);
-  useEffect(() => {
-    let raf;
-    function tick() {
-      const level = getPeakLevel(analyserRef.current);
-      if (barRef.current) {
-        if (vertical) barRef.current.style.height = `${Math.round(level * 100)}%`;
-        else barRef.current.style.width = `${Math.round(level * 100)}%`;
-      }
-      raf = requestAnimationFrame(tick);
-    }
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [analyserRef, vertical]);
-
-  return (
-    <div style={{
-      width: vertical ? width : '100%', height: vertical ? height : width,
-      background: '#1E293B', borderRadius: 4, overflow: 'hidden', position: 'relative',
-      display: 'flex', alignItems: vertical ? 'flex-end' : 'stretch',
-    }}
-    >
-      <div ref={barRef} style={{
-        background: 'linear-gradient(90deg, #22D3EE, #F59E0B, #DC2626)',
-        width: vertical ? '100%' : '0%', height: vertical ? '0%' : '100%',
-        transition: 'width 60ms linear, height 60ms linear',
-      }}
-      />
-    </div>
-  );
-}
 
 function ClipBlock({ clip, source, pxPerSec, selected, preview, onSelect, onMoveStart, onTrimLeft, onTrimRight }) {
   const canvasRef = useRef(null);
@@ -412,7 +365,7 @@ export default function RecordingStudioWorkspace() {
         setPlaying(true);
       }
     } catch (err) {
-      setMicError(micErrorMessage(err));
+      setMicError(describeMicError(err));
     }
   }
 

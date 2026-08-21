@@ -115,7 +115,7 @@ export default function RecordingStudioPage() {
                 <li><strong>Noise reduction, not noise removal:</strong> plain signal processing reduces hum, rumble, and hiss — it can&apos;t surgically isolate a voice from arbitrary background noise the way a paid AI model could.</li>
                 <li><strong>Speed changes pitch:</strong> the per-clip Speed effect shifts pitch along with tempo, like a tape-speed change, since true pitch-independent time-stretching isn&apos;t reliably available for free client-side.</li>
                 <li><strong>Browser memory:</strong> every track's audio is held in your browser tab's memory while you work, so extremely long sessions with many tracks can use significant RAM.</li>
-                <li><strong>Microphone quality depends on your hardware and browser permissions</strong> — Recording Studio can&apos;t improve a mic\'s fundamental audio quality, only clean up what it captures.</li>
+                <li><strong>Microphone quality depends on your hardware and browser permissions</strong> — Recording Studio can&apos;t improve a mic&apos;s fundamental audio quality, only clean up what it captures.</li>
               </ul>
             </section>
 

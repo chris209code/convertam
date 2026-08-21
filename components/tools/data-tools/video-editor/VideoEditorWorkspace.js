@@ -12,7 +12,7 @@ import Link from 'next/link';
 import UploadBox from '@/components/UploadBox';
 import { T } from '../smart-parser/theme';
 import { downloadBlob } from '@/lib/dataTools/shared';
-import { receiveBlobHandoff } from '@/lib/media/blobHandoff';
+import { receiveBlobHandoff, sendBlobToTool } from '@/lib/media/blobHandoff';
 import { extractVideoMetadata, extractImageMetadata, extractAudioMetadata, formatDuration } from '@/lib/media/metadata';
 import { validateUploadSize, MAX_UPLOAD_VIDEO_BYTES, MAX_UPLOAD_IMAGE_BYTES, MAX_UPLOAD_AUDIO_BYTES } from '@/lib/media/limits';
 import {
@@ -1986,6 +1986,21 @@ export default function VideoEditorWorkspace() {
     if (exportCancelRef.current) exportCancelRef.current.cancelled = true;
   }
 
+  // Voice Over stays a fully separate, purpose-built tool (see its own
+  // workspace file header) rather than a mode of this one — this just hands
+  // off the main track's source file the same way Compress Video hands a
+  // result to this tool. Only offered for the common single-clip case: with
+  // more than one main-track clip there's no single "the current video" to
+  // send without first exporting the composed timeline, which this button
+  // deliberately doesn't do (kept simple, matching the requirement that
+  // Voice Over never grows into a second full editor).
+  async function handleAddVoiceOver() {
+    if (mainClips.length !== 1 || !activeMainSource || activeMainSource.kind !== 'video') return;
+    const sent = await sendBlobToTool('voice-over', activeMainSource.file, activeMainSource.file.name);
+    if (!sent) return;
+    window.location.href = '/voice-over';
+  }
+
   // ---- Auto Captions — the one operation in this tool that leaves the
   // browser, and only for the transcription step: renderTimelineAudio()
   // renders the CURRENT edited timeline's actual audio mix locally first
@@ -2308,12 +2323,23 @@ export default function VideoEditorWorkspace() {
             </span>
           )}
         </div>
-        <button
-          onClick={() => setExportPanelOpen((v) => !v)}
-          style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: exportPanelOpen ? 'white' : T.accentGradient, color: exportPanelOpen ? T.accentDark : 'white', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', fontFamily: T.font, flexShrink: 0 }}
-        >
-          ⬇ Export
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          {mainClips.length === 1 && activeMainSource?.kind === 'video' && (
+            <button
+              onClick={handleAddVoiceOver}
+              title="Send this video to the standalone Voice Over tool to record narration over it"
+              style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #334155', background: 'transparent', color: '#E2E8F0', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', fontFamily: T.font }}
+            >
+              🎤 Add Voice Over
+            </button>
+          )}
+          <button
+            onClick={() => setExportPanelOpen((v) => !v)}
+            style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: exportPanelOpen ? 'white' : T.accentGradient, color: exportPanelOpen ? T.accentDark : 'white', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer', fontFamily: T.font }}
+          >
+            ⬇ Export
+          </button>
+        </div>
       </div>
 
       <div className="ve-body">

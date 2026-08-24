@@ -48,6 +48,7 @@ export default function VideoStudioWorkspace() {
 
   const [extractStatus, setExtractStatus] = useState('idle'); // idle | extracting | error
   const [extractError, setExtractError] = useState('');
+  const [extractResult, setExtractResult] = useState(null); // { blob, filename, url } | null
 
   const [burnStatus, setBurnStatus] = useState('idle'); // idle | loading | burning | error
   const [burnProgress, setBurnProgress] = useState(0);
@@ -86,47 +87,43 @@ export default function VideoStudioWorkspace() {
     setTranscribeStatus('idle');
     setTranscribeError('');
     setTranscribeProgress(null);
+    if (extractResult?.url) URL.revokeObjectURL(extractResult.url);
     setExtractStatus('idle');
     setExtractError('');
+    setExtractResult(null);
     setBurnStatus('idle');
     setBurnError('');
     setBurnProgress(0);
   }
 
+  // Extracts once, then presents the result with Download AND Continue
+  // Editing together — a user who only wanted the audio file shouldn't be
+  // forced into another tool to get it, and a user who wants to do more
+  // shouldn't have to re-extract just to pick a different next step.
   async function handleExtractAudio() {
     if (!file) return;
     setExtractStatus('extracting');
     setExtractError('');
+    setExtractResult(null);
     try {
       const { blob } = await fileToQualityWav(file);
-      downloadBlob(blob, 'audio/wav', `${baseName(file.name)}.wav`);
+      const filename = `${baseName(file.name)}.wav`;
+      setExtractResult({ blob, filename, url: URL.createObjectURL(blob) });
       setExtractStatus('idle');
     } catch (err) {
       setExtractStatus('error');
       setExtractError(err.message || 'Could not extract audio from this video.');
     }
   }
-
-  async function handleExtractToAudioStudio() {
-    if (!file) return;
-    setExtractStatus('extracting');
-    setExtractError('');
-    try {
-      const { blob } = await fileToQualityWav(file);
-      const filename = `${baseName(file.name)}.wav`;
-      const sent = await sendBlobToTool('audio-studio', blob, filename);
-      if (!sent) {
-        // Handoff mechanism unavailable in this browser — fall back to a
-        // real download rather than silently doing nothing.
-        downloadBlob(blob, 'audio/wav', filename);
-        setExtractStatus('idle');
-        return;
-      }
-      window.location.href = '/audio-studio';
-    } catch (err) {
-      setExtractStatus('error');
-      setExtractError(err.message || 'Could not extract audio from this video.');
-    }
+  function handleDownloadExtracted() {
+    if (!extractResult) return;
+    downloadBlob(extractResult.blob, 'audio/wav', extractResult.filename);
+  }
+  async function handleContinueToAudioStudio() {
+    if (!extractResult) return;
+    const sent = await sendBlobToTool('audio-studio', extractResult.blob, extractResult.filename);
+    if (!sent) { handleDownloadExtracted(); return; } // handoff mechanism unavailable in this browser — fall back to a real download rather than silently doing nothing
+    window.location.href = '/audio-studio';
   }
 
   async function handleTranscribe(quick) {
@@ -332,15 +329,26 @@ export default function VideoStudioWorkspace() {
                 ) : (
                   <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 16 }}>
                     <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.3 }}>Extract audio</div>
-                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                      <button onClick={handleExtractAudio} disabled={extractStatus === 'extracting'} style={smallBtn}>
-                        {extractStatus === 'extracting' ? 'Extracting…' : '🎧 Extract Audio (WAV)'}
-                      </button>
-                      <button onClick={handleExtractToAudioStudio} disabled={extractStatus === 'extracting'} style={smallBtn}>
-                        🎙️ Extract &amp; Open in Audio Studio →
-                      </button>
-                    </div>
-                    {extractError && <div style={{ ...statusBox, marginTop: 12 }}>⚠️ {extractError}</div>}
+                    {!extractResult ? (
+                      <>
+                        <button onClick={handleExtractAudio} disabled={extractStatus === 'extracting'} style={primaryBtn(extractStatus === 'extracting')}>
+                          {extractStatus === 'extracting' ? 'Extracting…' : '🎧 Extract Audio'}
+                        </button>
+                        {extractError && <div style={{ ...statusBox, marginTop: 12 }}>⚠️ {extractError}</div>}
+                      </>
+                    ) : (
+                      <>
+                        <p style={{ margin: '0 0 12px', fontSize: '0.86rem', fontWeight: 700, color: '#15803D' }}>✓ Audio extracted successfully</p>
+                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                          <button onClick={handleDownloadExtracted} style={primaryBtn(false)}>⬇ Download Audio</button>
+                          <button onClick={handleContinueToAudioStudio} style={smallBtn}>🎙️ Continue Editing →</button>
+                        </div>
+                        <p style={{ fontSize: '0.72rem', color: T.muted, marginTop: 10, marginBottom: 0 }}>
+                          Continue Editing opens this audio straight in Audio Studio — no re-download or re-upload needed — where you can transcribe it, clean it up, or pair it with a video/images in Video Editor.
+                        </p>
+                        <button onClick={() => { if (extractResult?.url) URL.revokeObjectURL(extractResult.url); setExtractResult(null); }} style={{ ...ghostBtn, marginTop: 10 }}>Extract again</button>
+                      </>
+                    )}
                   </div>
                 )
               )}

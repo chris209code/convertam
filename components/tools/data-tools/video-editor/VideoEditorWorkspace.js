@@ -31,6 +31,7 @@ import {
   getClipTimelineBounds, getAllClipBoundaryTimes,
   getMasterGain, setMasterVolume, setMasterMuted, setMasterFade,
   addMarker, updateMarker, deleteMarker,
+  setProjectAudioSource, clearProjectAudioSource, setProjectAudioGain, setProjectAudioMuted, getProjectAudioSource,
 } from '@/lib/media/timeline';
 import { drawCompositionFrame, drawTextOverlays, drawImageOverlays, drawShapeOverlays, computeLayoutRects, pipPositionFromPoint, getComposeSize, getFadeOpacity, getTextOverlayBounds, buildCutoutCanvas } from '@/lib/media/compositionLayouts';
 import { ensureSegmenterLoaded, getPersonMaskCanvas } from '@/lib/media/segmentation';
@@ -482,6 +483,13 @@ export default function VideoEditorWorkspace() {
   const mainReplaceAudioElRef = useRef(null); // hidden <audio> for a clip's 'replace'/'mix' audioSourceId
   const mainReplaceSrcNodeRef = useRef(null);
   const mainReplaceLastClipRef = useRef(null);
+  // Project audio (timeline.projectAudio) — a single, clip-independent
+  // audio bed. Unlike mainReplaceAudioElRef above, there's no per-clip
+  // lifecycle to track: this element just stays seeked to `playhead`
+  // directly, for as long as a project audio source is set at all.
+  const projectAudioElRef = useRef(null);
+  const projectAudioGainRef = useRef(null);
+  const projectAudioSrcNodeRef = useRef(null);
   // Wall-clock anchor set when Play starts: { atWall, atPlayhead }. The
   // playhead advances from real elapsed time rather than a fixed per-frame
   // step, so it never drifts away from the audio actually playing.
@@ -573,6 +581,10 @@ export default function VideoEditorWorkspace() {
       mainGainRef.current = mainGain;
       mainReplaceGainRef.current = mainReplaceGain;
       mainReplaceAudioElRef.current = new Audio();
+      const projectAudioGain = ctx.createGain();
+      projectAudioGain.connect(masterGain);
+      projectAudioGainRef.current = projectAudioGain;
+      projectAudioElRef.current = new Audio();
     } else if (audioCtxRef.current.state === 'suspended') {
       audioCtxRef.current.resume().catch(() => {});
     }
@@ -641,13 +653,15 @@ export default function VideoEditorWorkspace() {
   // `=== undefined` check so this only ever fires once per source id.
   useEffect(() => {
     timeline.sources.forEach((s) => {
-      if (s.kind !== 'video') return;
-      if (thumbnailsBySource[s.id] === undefined) {
+      if (s.kind === 'video' && thumbnailsBySource[s.id] === undefined) {
         setThumbnailsBySource((prev) => ({ ...prev, [s.id]: 'loading' }));
         extractThumbnails(s.file, 10, 100)
           .then((result) => setThumbnailsBySource((prev) => ({ ...prev, [s.id]: result })))
           .catch(() => setThumbnailsBySource((prev) => ({ ...prev, [s.id]: 'error' })));
       }
+      // Waveforms apply to any source that actually has audio — video
+      // clips (as before) and now also a plain 'audio'-kind source, e.g.
+      // Replace Video/Sync Audio's or a slideshow's project audio track.
       if (waveformBySource[s.id] === undefined && s.hasAudio) {
         setWaveformBySource((prev) => ({ ...prev, [s.id]: 'loading' }));
         extractWaveformPeaks(s.file, 100)
@@ -693,6 +707,68 @@ export default function VideoEditorWorkspace() {
     }
   }
 
+  const DEFAULT_IMAGE_CLIP_DURATION = 3;
+
+  // Adds one or more images to the END of the main track, each becoming its
+  // own image clip placed back-to-back — a lightweight slideshow. Reuses the
+  // exact addSource → addClip → trimClip sequence handleFreezeFrame already
+  // relies on (a fresh image clip starts at sourceEnd 0 and needs an explicit
+  // trimClip to get a real, non-zero duration). Accumulates every file into a
+  // single `next` timeline and commits once, so a multi-file selection is one
+  // undo step instead of N.
+  async function handleMainImageFiles(files) {
+    const list = Array.from(files || []);
+    if (!list.length) return;
+    setUploadError('');
+    let next = timeline;
+    let firstNewClipId = null;
+    for (const f of list) {
+      const sizeError = validateUploadSize(f, 'image');
+      if (sizeError) { setUploadError(sizeError); break; }
+      try {
+        const meta = await extractImageMetadata(f);
+        const { timeline: withSource, source } = addSource(next, f, meta, 'image');
+        const withClip = addClip(withSource, source.id, MAIN_TRACK);
+        const newClips = getTrackClips(withClip, MAIN_TRACK);
+        const newClip = newClips[newClips.length - 1];
+        next = trimClip(withClip, newClip.id, { sourceStart: 0, sourceEnd: DEFAULT_IMAGE_CLIP_DURATION });
+        if (!firstNewClipId) firstNewClipId = newClip.id;
+      } catch (err) {
+        setUploadError(err.message || 'Could not read one of these image files.');
+        break;
+      }
+    }
+    if (next !== timeline) {
+      commit(next);
+      if (firstNewClipId) { setSelectedClipId(firstNewClipId); setExtraSelectedClipIds([]); }
+    }
+  }
+
+  // Retrims every image clip on the main track to the same duration in one
+  // commit — the "set all image durations" bulk control shown once 2+ image
+  // clips exist. Non-image clips are left untouched.
+  function handleSetAllImageDurations(seconds) {
+    const dur = Math.max(0.1, Number(seconds) || DEFAULT_IMAGE_CLIP_DURATION);
+    commit((prev) => {
+      const imageClips = getTrackClips(prev, MAIN_TRACK)
+        .filter((c) => prev.sources.find((s) => s.id === c.sourceId)?.kind === 'image')
+        .sort((a, b) => a.start - b.start);
+      if (!imageClips.length) return prev;
+      // Retrimming alone only changes a clip's own in/out points, not its
+      // position — without repositioning what follows, shrinking durations
+      // opens gaps and growing them creates overlaps. Processing in start
+      // order and moving each clip to right after the previous one keeps
+      // the slideshow back-to-back exactly like a fresh multi-image upload.
+      let cursor = imageClips[0].start;
+      return imageClips.reduce((tl, c) => {
+        const trimmed = trimClip(tl, c.id, { sourceStart: 0, sourceEnd: dur });
+        const moved = moveClip(trimmed, c.id, cursor);
+        cursor += dur;
+        return moved;
+      }, prev);
+    });
+  }
+
   // Picks up a recording handed off from the standalone Screen Recorder
   // tool's "Open in Video Editor" button (lib/media/blobHandoff.js) — same
   // client-side, same-tab, one-shot mechanism Video Studio's "Extract Audio
@@ -707,9 +783,45 @@ export default function VideoEditorWorkspace() {
         const file = new File([handoff.blob], handoff.filename || 'screen-recording.webm', { type: handoff.mimeType || 'video/webm' });
         await handleMainFiles([file]);
       }
+      // A second, independent handoff slot (see blobHandoff.js's `role`) —
+      // Replace Video/Sync Audio sends the replacement video above (the
+      // normal, default-role handoff every other 'video-editor' sender
+      // already uses) alongside the audio it should be synced with, in the
+      // SAME navigation. Received after the video so it lands on the
+      // now-populated timeline rather than racing it.
+      const audioHandoff = await receiveBlobHandoff('video-editor', 'project-audio');
+      if (audioHandoff) {
+        const audioFile = new File([audioHandoff.blob], audioHandoff.filename || 'audio.wav', { type: audioHandoff.mimeType || 'audio/wav' });
+        await handleAddProjectAudioFile(audioFile);
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Adds/replaces the project's independent audio bed (timeline.projectAudio)
+  // — used by the handoff above and by the Audio Track panel's own
+  // Add/Replace Music upload. Uses the functional commit() form throughout
+  // (operating on `prev`, not the outer closure's `timeline`) since this can
+  // run immediately after handleMainFiles's own commit in the same tick,
+  // before this component has re-rendered with the updated timeline.
+  async function handleAddProjectAudioFile(file) {
+    if (!file) return;
+    const sizeError = validateUploadSize(file, 'audio');
+    if (sizeError) { setUploadError(sizeError); return; }
+    setUploadError('');
+    try {
+      const meta = await extractAudioMetadata(file);
+      commit((prev) => {
+        const { timeline: withSource, source } = addSource(prev, file, meta, 'audio');
+        return setProjectAudioSource(withSource, source.id);
+      });
+    } catch (err) {
+      setUploadError(err.message || 'Could not read this audio file — it may be an unsupported or corrupted format.');
+    }
+  }
+  function handleRemoveProjectAudio() {
+    commit((prev) => clearProjectAudioSource(prev));
+  }
 
   // Each video overlay upload creates a NEW overlay track (rather than
   // replacing a fixed single slot) — this is what lets 2, 3, or more
@@ -1630,6 +1742,36 @@ export default function VideoEditorWorkspace() {
       return clip.audioMode === 'mix';
     }
 
+    // Project audio has no clip lifecycle to key off (see the ref's own
+    // comment) — it's just kept seeked to `playhead` directly and played
+    // whenever the transport is, for as long as the timeline has a project
+    // audio source at all.
+    function syncProjectAudioLive() {
+      const gain = projectAudioGainRef.current;
+      const el = projectAudioElRef.current;
+      if (!gain || !el) return;
+      const source = timeline.projectAudio?.sourceId ? timeline.sources.find((s) => s.id === timeline.projectAudio.sourceId) : null;
+      if (!source) {
+        gain.gain.value = 0;
+        if (!el.paused) el.pause();
+        return;
+      }
+      if (el.dataset.sourceId !== source.id) {
+        el.src = URL.createObjectURL(source.file);
+        el.dataset.sourceId = source.id;
+      }
+      if (!projectAudioSrcNodeRef.current) {
+        projectAudioSrcNodeRef.current = audioCtxRef.current.createMediaElementSource(el);
+        projectAudioSrcNodeRef.current.connect(gain);
+        el.muted = false;
+      }
+      gain.gain.value = timeline.projectAudio.muted ? 0 : (timeline.projectAudio.gain ?? 1);
+      if (Math.abs(el.currentTime - playhead) > 0.15) {
+        el.currentTime = Math.max(0, Math.min(playhead, el.duration || playhead));
+      }
+      if (playing) { if (el.paused) el.play().catch(() => {}); } else if (!el.paused) el.pause();
+    }
+
     async function tick() {
       if (cancelled) return;
       if (playing && !playStartRef.current) playStartRef.current = { atWall: performance.now(), atPlayhead: playhead };
@@ -1672,6 +1814,7 @@ export default function VideoEditorWorkspace() {
       // clip doesn't cut abruptly to silence at full volume.
       if (audioCtxRef.current) {
         if (masterGainRef.current) masterGainRef.current.gain.value = getMasterGain(timeline, playhead);
+        syncProjectAudioLive();
         if (analyserRef.current && meterDataRef.current && meterBarRef.current) {
           analyserRef.current.getByteTimeDomainData(meterDataRef.current);
           let peak = 0;
@@ -2261,6 +2404,19 @@ export default function VideoEditorWorkspace() {
                   oversizedHint={<>Use <Link href="/compress-video" style={{ color: T.accentDark, fontWeight: 700 }}>Compress &amp; Split Video</Link> to shrink or cut it down first.</>}
                 />
                 {uploadError && <div style={{ ...statusBox, marginTop: 12 }}>⚠️ {uploadError}</div>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '12px 0' }}>
+                  <div style={{ flex: 1, height: 1, background: T.border }} />
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: T.muted }}>OR</span>
+                  <div style={{ flex: 1, height: 1, background: T.border }} />
+                </div>
+                <UploadBox
+                  accept="image/png,image/jpeg,image/webp"
+                  multiple
+                  onFiles={handleMainImageFiles}
+                  maxSizeMB={MAX_UPLOAD_IMAGE_BYTES / (1024 * 1024)}
+                  compact
+                  compactLabel="🖼️ Add Images / Create Slideshow"
+                />
                 <p style={{ fontSize: '0.76rem', color: T.muted, marginTop: 10, textAlign: 'center' }}>
                   Trim, cut, and reorder clips — or add a second video or image overlay for split-screen or picture-in-picture composition.{' '}
                   Need to record your screen first? Use{' '}
@@ -2970,6 +3126,28 @@ export default function VideoEditorWorkspace() {
                 <UploadBox accept="video/*" onFiles={handleMainFiles} maxSizeMB={MAX_UPLOAD_VIDEO_BYTES / (1024 * 1024)} compact compactLabel="+ Add another video" oversizedHint={<>Use <Link href="/compress-video" style={{ color: T.accentDark, fontWeight: 700 }}>Compress &amp; Split Video</Link> to shrink or cut it down first.</>} />
               </div>
               <div>
+                <div style={{ fontSize: '0.7rem', color: T.mutedDark, marginBottom: 2 }}>Images (slideshow, added to end of main track)</div>
+                <UploadBox accept="image/png,image/jpeg,image/webp" multiple onFiles={handleMainImageFiles} maxSizeMB={MAX_UPLOAD_IMAGE_BYTES / (1024 * 1024)} compact compactLabel="+ Add images" />
+                {(() => {
+                  const mainImageClips = mainClips.filter((c) => timeline.sources.find((s) => s.id === c.sourceId)?.kind === 'image');
+                  if (mainImageClips.length < 2) return null;
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                      <span style={{ fontSize: '0.64rem', color: T.muted }}>Set all image durations:</span>
+                      <input
+                        type="number"
+                        min="0.5"
+                        step="0.5"
+                        defaultValue={DEFAULT_IMAGE_CLIP_DURATION}
+                        onBlur={(e) => handleSetAllImageDurations(e.target.value)}
+                        style={{ width: 56, fontSize: '0.7rem', padding: '3px 5px', borderRadius: 6, border: `1px solid ${T.border}` }}
+                      />
+                      <span style={{ fontSize: '0.64rem', color: T.muted }}>sec</span>
+                    </div>
+                  );
+                })()}
+              </div>
+              <div>
                 <div style={{ fontSize: '0.7rem', color: T.mutedDark, marginBottom: 2 }}>Video overlay (split-screen / video call)</div>
                 <UploadBox accept="video/*" onFiles={handleOverlayFiles} maxSizeMB={MAX_UPLOAD_VIDEO_BYTES / (1024 * 1024)} compact compactLabel="+ Add video overlay" />
               </div>
@@ -3553,6 +3731,71 @@ export default function VideoEditorWorkspace() {
             </div>
           </div>
 
+          {/* Audio Track — an independent audio bed, distinct from any
+              clip's own audio: Replace Video/Sync Audio's paired video +
+              audio (with different durations) lands here, and it doubles
+              as a plain "add music" track for any timeline (e.g. a
+              slideshow). Plays from t=0 for its own length regardless of
+              how the main track is trimmed/split/reordered. */}
+          <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Audio track</div>
+            {(() => {
+              const projectAudioSource = getProjectAudioSource(timeline);
+              if (!projectAudioSource) {
+                return (
+                  <>
+                    <p style={{ fontSize: '0.74rem', color: T.mutedDark, margin: '0 0 8px' }}>
+                      No independent audio track set. Add one to pair separately-sourced audio (e.g. from Audio Studio) with this video — it plays from the very start, independently of the main track&apos;s own clips.
+                    </p>
+                    <label style={{ ...smallBtn, display: 'inline-block', cursor: 'pointer' }}>
+                      🎵 Add Music / Audio Track
+                      <input type="file" accept="audio/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) handleAddProjectAudioFile(f); }} />
+                    </label>
+                  </>
+                );
+              }
+              const videoDuration = totalDuration;
+              const audioDuration = projectAudioSource.duration || 0;
+              const diff = videoDuration - audioDuration;
+              const diffLabel = Math.abs(diff) < 0.3
+                ? 'Video and audio are the same length.'
+                : diff > 0
+                  ? `Video is ${formatDuration(diff)} longer than the audio.`
+                  : `Audio is ${formatDuration(-diff)} longer than the video.`;
+              return (
+                <>
+                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 8, fontSize: '0.76rem', color: T.ink }}>
+                    <span><strong>Video:</strong> {formatDuration(videoDuration)}</span>
+                    <span><strong>Audio:</strong> {formatDuration(audioDuration)}</span>
+                  </div>
+                  <div style={{ padding: '6px 10px', borderRadius: 6, background: Math.abs(diff) < 0.3 ? '#F0FDF4' : '#FFFBEB', color: Math.abs(diff) < 0.3 ? '#15803D' : '#92400E', fontSize: '0.72rem', fontWeight: 600, marginBottom: 10 }}>
+                    {diffLabel} {Math.abs(diff) >= 0.3 && 'Trim, split, or add clips on the main track (or trim this audio) to match them up.'}
+                  </div>
+                  <ProjectAudioWaveform source={projectAudioSource} waveformBySource={waveformBySource} />
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', margin: '10px 0 8px' }}>
+                    <label style={fieldLabel}>Volume {Math.round((timeline.projectAudio.gain ?? 1) * 100)}%
+                      <input type="range" min={0} max={2} step={0.05} value={timeline.projectAudio.gain ?? 1}
+                        onChange={(e) => commit((tl) => setProjectAudioGain(tl, parseFloat(e.target.value)))} style={{ width: 100 }} />
+                    </label>
+                    <button
+                      onClick={() => commit((tl) => setProjectAudioMuted(tl, !tl.projectAudio.muted))}
+                      style={{ ...smallBtn, background: timeline.projectAudio.muted ? '#DC2626' : 'white', color: timeline.projectAudio.muted ? 'white' : T.inkSecondary, borderColor: timeline.projectAudio.muted ? '#DC2626' : T.border }}
+                    >
+                      {timeline.projectAudio.muted ? '🔇 Muted' : '🔊 Mute'}
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <label style={{ ...smallBtn, display: 'inline-block', cursor: 'pointer' }}>
+                      ⇄ Replace audio
+                      <input type="file" accept="audio/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) handleAddProjectAudioFile(f); }} />
+                    </label>
+                    <button onClick={handleRemoveProjectAudio} style={{ ...smallBtn, color: T.danger }}>🗑 Remove</button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+
           </>)}
 
           {exportPanelOpen && (<>
@@ -3830,4 +4073,24 @@ function ClipWaveform({ source, sourceStart, sourceEnd, waveformBySource }) {
       style={{ position: 'absolute', left: 2, right: 2, bottom: 2, width: 'calc(100% - 4px)', height: 14, opacity: 0.9, zIndex: 1, pointerEvents: 'none' }}
     />
   );
+}
+
+// Full-width waveform for the standalone Audio Track panel — same peaks
+// cache as ClipWaveform, just laid out for a panel instead of overlaid on a
+// timeline clip block.
+function ProjectAudioWaveform({ source, waveformBySource }) {
+  const peaks = waveformBySource[source?.id];
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    if (!canvasRef.current || !Array.isArray(peaks)) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawWaveform(ctx, peaks, { x: 0, y: 0, width: canvas.width, height: canvas.height, color: '#0EA5E9' });
+  }, [peaks]);
+  if (peaks === 'loading' || peaks === undefined) {
+    return <div style={{ width: '100%', height: 40, borderRadius: 6, background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', color: '#94A3B8' }}>Loading waveform…</div>;
+  }
+  if (!Array.isArray(peaks)) return null;
+  return <canvas ref={canvasRef} width={600} height={40} style={{ width: '100%', height: 40, borderRadius: 6, background: '#F1F5F9', display: 'block' }} />;
 }

@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import UploadBox from '@/components/UploadBox';
 import { T } from '../smart-parser/theme';
 import { downloadBlob, sendToTool } from '@/lib/dataTools/shared';
-import { receiveBlobHandoff } from '@/lib/media/blobHandoff';
-import { extractAudioMetadata, formatDuration } from '@/lib/media/metadata';
+import { receiveBlobHandoff, sendBlobToTool } from '@/lib/media/blobHandoff';
+import { extractAudioMetadata, extractVideoMetadata, formatDuration } from '@/lib/media/metadata';
 import { extractWaveformPeaks } from '@/lib/media/waveform';
 import { validateUploadSize, MAX_UPLOAD_AUDIO_BYTES } from '@/lib/media/limits';
 import { transcribeMedia, TranscriptionError } from '@/lib/media/providers/geminiTranscription';
@@ -70,6 +70,9 @@ export default function AudioStudioWorkspace() {
   const [cleanupStatus, setCleanupStatus] = useState('idle'); // idle | processing | error
   const [cleanupError, setCleanupError] = useState('');
   const [cleanedResult, setCleanedResult] = useState(null); // { blob, url } | null
+  const [replaceVideoStatus, setReplaceVideoStatus] = useState('idle'); // idle | sending
+  const [replaceVideoError, setReplaceVideoError] = useState('');
+  const [replaceAudioChoice, setReplaceAudioChoice] = useState('cleaned'); // 'cleaned' | 'original' — only matters once cleanedResult exists
 
   useEffect(() => {
     (async () => {
@@ -248,6 +251,42 @@ export default function AudioStudioWorkspace() {
     terminateFFmpeg(); // the only way to interrupt an in-flight ffmpeg.wasm exec() — see ffmpegClient.js
   }
 
+  // Replace Video/Sync Audio's entry point — hands this audio (never
+  // re-transcribed, re-generated, or otherwise modified; whatever the user
+  // is currently looking at, cleaned or original) off to Video Editor as
+  // its independent project audio track, optionally alongside a freshly
+  // chosen replacement video as the main track. videoFile is omitted for
+  // "Add Images"/"Create Slideshow", which land on Video Editor's normal
+  // empty timeline with just the audio already attached — the user picks
+  // images once there. Two real blobs, one navigation, no download/
+  // re-upload round trip (see blobHandoff.js's `role` param).
+  async function handleSendAudioToVideoEditor({ videoFile } = {}) {
+    if (!file) return;
+    setReplaceVideoError('');
+    setReplaceVideoStatus('sending');
+    try {
+      if (videoFile) {
+        const sizeError = validateUploadSize(videoFile, 'video');
+        if (sizeError) { setReplaceVideoStatus('idle'); setReplaceVideoError(sizeError); return; }
+        await extractVideoMetadata(videoFile); // best-effort decode check — surfaces a corrupt/unsupported file now rather than after navigating away
+      }
+      const useCleaned = replaceAudioChoice === 'cleaned' && cleanedResult;
+      const audioBlob = useCleaned ? cleanedResult.blob : file;
+      const audioFilename = useCleaned ? `${baseName(file.name)}-cleaned.wav` : file.name;
+      const sentAudio = await sendBlobToTool('video-editor', audioBlob, audioFilename, 'project-audio');
+      const sentVideo = videoFile ? await sendBlobToTool('video-editor', videoFile, videoFile.name) : true;
+      if (!sentAudio || !sentVideo) {
+        setReplaceVideoStatus('idle');
+        setReplaceVideoError('Could not hand off to Video Editor. Please try again.');
+        return;
+      }
+      window.location.href = '/video-editor';
+    } catch (err) {
+      setReplaceVideoStatus('idle');
+      setReplaceVideoError(err?.message || (videoFile ? 'Could not read this video file — it may be an unsupported or corrupted format.' : 'Could not hand off this audio. Please try again.'));
+    }
+  }
+
   const isBusy = transcribeStatus === 'preparing' || transcribeStatus === 'transcribing' || transcribeStatus === 'merging';
   const isRendering = renderStatus === 'preparing' || renderStatus === 'rendering' || renderStatus === 'finalizing';
 
@@ -415,8 +454,36 @@ export default function AudioStudioWorkspace() {
               {activeCategory === 'video' && (
                 !file ? (
                   <EmptyPanel icon="🎬" label="Video">Upload an audio file on the left, transcribe it, then turn it into a downloadable captioned video here.</EmptyPanel>
-                ) : !transcript ? (
-                  <EmptyPanel icon="🎬" label="Video">Transcribe this audio first (in the Transcribe tab) to unlock creating a captioned video.</EmptyPanel>
+                ) : (<>
+                <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>🎥 Continue with a video</div>
+                  <p style={{ margin: '0 0 10px', fontSize: '0.78rem', color: T.mutedDark }}>
+                    Choose what becomes the visual side of your video — this audio goes straight into Video Editor with it, no download or re-upload. If your audio and the visual source are different lengths, Video Editor shows both durations clearly so you can trim, split, or extend to match them up.
+                  </p>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <label style={{ ...smallBtn, display: 'inline-block', cursor: 'pointer' }}>
+                      🎥 Add Video
+                      <input type="file" accept="video/*" style={{ display: 'none' }}
+                        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) handleSendAudioToVideoEditor({ videoFile: f }); }} />
+                    </label>
+                    <button onClick={() => handleSendAudioToVideoEditor()} style={smallBtn}>🖼️ Add Images</button>
+                    <button onClick={() => handleSendAudioToVideoEditor()} style={smallBtn}>🎞️ Create Slideshow</button>
+                  </div>
+                  {cleanedResult && (
+                    <div style={{ display: 'flex', gap: 14, marginTop: 10, fontSize: '0.76rem', color: T.mutedDark }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                        <input type="radio" checked={replaceAudioChoice === 'cleaned'} onChange={() => setReplaceAudioChoice('cleaned')} /> Use cleaned audio
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+                        <input type="radio" checked={replaceAudioChoice === 'original'} onChange={() => setReplaceAudioChoice('original')} /> Use original audio
+                      </label>
+                    </div>
+                  )}
+                  {replaceVideoStatus === 'sending' && <p style={{ margin: '10px 0 0', fontSize: '0.76rem', color: T.mutedDark }}>Sending to Video Editor…</p>}
+                  {replaceVideoError && <div style={{ ...statusBox, marginTop: 10 }}>⚠️ {replaceVideoError}</div>}
+                </div>
+                {!transcript ? (
+                  <EmptyPanel icon="🎬" label="Captioned Video">Transcribe this audio first (in the Transcribe tab) to unlock creating a captioned video.</EmptyPanel>
                 ) : isCaptionedVideoSupported() ? (
                   <div style={{ padding: '16px', borderRadius: 12, background: T.accentTint, textAlign: 'center' }}>
                     <p style={{ margin: '0 0 10px', fontSize: '0.82rem', color: T.inkSecondary }}>
@@ -442,7 +509,8 @@ export default function AudioStudioWorkspace() {
                   <p style={{ fontSize: '0.76rem', color: T.muted, textAlign: 'center' }}>
                     Creating a captioned video isn&apos;t supported in this browser. Try a recent version of Chrome, Edge, or Firefox.
                   </p>
-                )
+                )}
+                </>)
               )}
             </div>
           </div>

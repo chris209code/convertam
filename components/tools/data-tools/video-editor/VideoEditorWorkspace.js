@@ -438,6 +438,8 @@ export default function VideoEditorWorkspace() {
   const [renderStatus, setRenderStatus] = useState('idle');
   const [renderProgress, setRenderProgress] = useState(0);
   const [renderError, setRenderError] = useState('');
+  const [exportFilename, setExportFilename] = useState('edited-video');
+  const exportFilenameTouchedRef = useRef(false);
   const [selectedTextOverlayId, setSelectedTextOverlayId] = useState(null);
   const [selectedShapeOverlayId, setSelectedShapeOverlayId] = useState(null);
   const [thumbnailsBySource, setThumbnailsBySource] = useState({}); // sourceId -> { thumbs, duration } | 'loading' | 'error'
@@ -640,6 +642,16 @@ export default function VideoEditorWorkspace() {
   const videoKbps = ESTIMATED_VIDEO_KBPS[timeline.exportResolution]?.[timeline.exportQuality] ?? ESTIMATED_VIDEO_KBPS['720p'].balanced;
   const estimatedExportMB = Math.max(0.1, Math.round(((videoKbps + 128) * totalDuration) / 8 / 1024 * 10) / 10);
   const mainClips = getTrackClips(timeline, MAIN_TRACK);
+  // Suggests a filename from the first clip actually on the timeline rather
+  // than leaving a generic "edited-video" — but only until the user types
+  // their own, so it doesn't clobber a name they already chose once more
+  // clips get added.
+  useEffect(() => {
+    if (exportFilenameTouchedRef.current || !mainClips.length) return;
+    const firstSource = timeline.sources.find((s) => s.id === mainClips[0].sourceId);
+    if (firstSource?.file?.name) setExportFilename(firstSource.file.name.replace(/\.[^.]+$/, ''));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mainClips[0]?.sourceId]);
   // Which main clip the playhead is currently inside, and where that lands
   // in ITS OWN source file — surfaced next to the project-time readout so a
   // user splitting a merged multi-video timeline can see exactly which
@@ -651,6 +663,12 @@ export default function VideoEditorWorkspace() {
   const overlayTracks = timeline.overlayTracks;
   const audioTrack = timeline.mainAudioTrackId != null ? timeline.soundTracks.find((t) => t.id === timeline.mainAudioTrackId) : null;
   const audioTrackClips = audioTrack ? getTrackClips(timeline, audioTrack.id) : [];
+  // Every other sound track (background music, sound effects, extra
+  // narration) — anything added via "+ Add sound" in the Audio tab. Shown
+  // as its own draggable timeline row right here, same as Audio track
+  // above, instead of being visible only as numeric Start/Length fields
+  // buried in the Audio tab with no picture of where they actually sit.
+  const extraSoundTracks = timeline.soundTracks.filter((t) => t.id !== timeline.mainAudioTrackId);
   const allOverlayClips = overlayTracks.flatMap((t) => getTrackClips(timeline, t.id));
   const isComposed = overlayTracks.length > 0;
   // Canvas pixel size for the chosen output frame shape — the single
@@ -2070,6 +2088,12 @@ export default function VideoEditorWorkspace() {
           s.srcNode.connect(s.gain);
           s.audioEl.muted = false;
         }
+        // Without this, a sound clip's own speed (e.g. the linked audio
+        // clip when "Apply speed to Audio/Both" is used) was silently
+        // ignored in live preview — it always played back at native 1x and
+        // only got nudged via the currentTime correction below, which
+        // masked the mismatch as jitter instead of an actual speed change.
+        s.audioEl.playbackRate = hit.clip.speed || 1;
         if (Math.abs(s.audioEl.currentTime - hit.sourceTime) > 0.15) {
           s.audioEl.currentTime = Math.max(0, Math.min(hit.sourceTime, s.audioEl.duration || hit.sourceTime));
         }
@@ -2528,7 +2552,7 @@ export default function VideoEditorWorkspace() {
         cancelToken,
         captionEvents,
       });
-      downloadBlob(blob, 'video/mp4', 'edited-video.mp4');
+      downloadBlob(blob, 'video/mp4', `${exportBaseName()}.mp4`);
       setRenderStatus('idle');
     } catch (err) {
       if (err instanceof TimelineRenderCancelledError || cancelToken.cancelled) {
@@ -2615,9 +2639,10 @@ export default function VideoEditorWorkspace() {
     setPlaying(false);
     setPlayhead(time);
   }
-  function handleDownloadSrt() { downloadBlob(transcriptToSrt(transcript), 'text/plain', 'edited-video.srt'); }
-  function handleDownloadVtt() { downloadBlob(transcriptToVtt(transcript), 'text/vtt', 'edited-video.vtt'); }
-  function handleDownloadTxt() { downloadBlob(transcriptToPlainText(transcript), 'text/plain', 'edited-video-transcript.txt'); }
+  function exportBaseName() { return exportFilename.trim().replace(/[\\/:*?"<>|]/g, '-') || 'edited-video'; }
+  function handleDownloadSrt() { downloadBlob(transcriptToSrt(transcript), 'text/plain', `${exportBaseName()}.srt`); }
+  function handleDownloadVtt() { downloadBlob(transcriptToVtt(transcript), 'text/vtt', `${exportBaseName()}.vtt`); }
+  function handleDownloadTxt() { downloadBlob(transcriptToPlainText(transcript), 'text/plain', `${exportBaseName()}-transcript.txt`); }
 
   // Burn Subtitles: no transcription, no AI — the user already has an
   // .srt/.vtt file. Parsing it is all this does now; becoming visible in
@@ -3100,6 +3125,85 @@ export default function VideoEditorWorkspace() {
                   </div>
                 </div>
               )}
+
+              {extraSoundTracks.map((track, ti) => {
+                const trackClips = getTrackClips(timeline, track.id);
+                if (!trackClips.length) return null;
+                const source = timeline.sources.find((s) => s.id === trackClips[0].sourceId);
+                return (
+                  <div key={track.id} style={{ marginTop: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                      <h3 style={{ margin: 0, fontSize: '0.78rem', color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="An independent sound clip (background music, sound effects, or extra narration) — drag to move it, drag its side handles to trim, or manage volume/mute/remove from the Audio tab.">
+                        🎵 {source?.file.name || `Sound clip ${ti + 1}`}
+                      </h3>
+                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                        <button
+                          onClick={() => commit((tl) => setSoundTrackFlags(tl, track.id, { muted: !track.muted }))}
+                          title={track.muted ? 'Unmute this sound clip' : 'Mute this sound clip'}
+                          style={{ ...trackFlagBtn, background: track.muted ? '#DC2626' : 'white', color: track.muted ? 'white' : T.inkSecondary, borderColor: track.muted ? '#DC2626' : T.border }}
+                        >
+                          {track.muted ? '🔇' : '🔊'}
+                        </button>
+                        <button onClick={() => handleRemoveSoundTrack(track.id)} style={{ ...trackFlagBtn, color: '#DC2626', borderColor: '#FCA5A5' }} title="Remove this sound clip">🗑</button>
+                      </div>
+                    </div>
+                    <div onClick={clearSelectionIfEmptyClick} style={{ position: 'relative', height: 40, opacity: track.muted ? 0.5 : 1 }}>
+                      {trackClips.map((clip) => {
+                        const clipSource = timeline.sources.find((s) => s.id === clip.sourceId);
+                        const isPrimary = clip.id === selectedClipId;
+                        const isSelected = selectionIdSet.has(clip.id);
+                        const isDragging = clipDragVisual?.clipId === clip.id;
+                        const leftPct = totalDuration ? (clip.start / totalDuration) * 100 : 0;
+                        const widthPct = totalDuration ? (clipDuration(clip) / totalDuration) * 100 : 100;
+                        return (
+                          <div
+                            key={clip.id}
+                            onPointerDown={(e) => handleClipBodyPointerDown(e, clip)}
+                            onClick={(e) => handleClipClick(e, clip)}
+                            style={{
+                              position: 'absolute', top: 0, left: `calc(${leftPct}% + 1px)`, width: `calc(max(24px, ${widthPct}%) - 2px)`,
+                              height: 40, borderRadius: 7, cursor: 'grab',
+                              background: isSelected ? '#0891B2' : '#CFFAFE',
+                              border: isPrimary ? '2px solid #0E7490' : isSelected ? '2px solid #0E749090' : `1px solid ${T.border}`,
+                              boxShadow: isDragging ? '0 6px 16px rgba(0,0,0,0.35)' : isSelected && !isPrimary ? 'inset 0 0 0 1px white' : 'none',
+                              overflow: 'hidden',
+                              transform: isDragging ? `translateX(${clipDragVisual.offsetPx}px)` : 'none',
+                              zIndex: isDragging ? 20 : 1,
+                            }}
+                            title={`${formatDuration(clipDuration(clip))} of audio — source ${formatDuration(clip.sourceStart)}–${formatDuration(clip.sourceEnd)} of ${clipSource?.file.name || 'this file'}. Click to select and drop the edit cursor, drag to reposition, drag the side handles (when selected) to trim.`}
+                          >
+                            <ClipWaveform source={clipSource} sourceStart={clip.sourceStart} sourceEnd={clip.sourceEnd} waveformBySource={waveformBySource} />
+                            <div style={{
+                              position: 'absolute', left: 0, right: 0, top: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: '0.6rem', fontWeight: 700, color: 'white', textShadow: '0 1px 2px rgba(0,0,0,0.7)',
+                              padding: '2px 4px', pointerEvents: 'none', zIndex: 2, whiteSpace: 'nowrap', overflow: 'hidden',
+                            }}>
+                              {formatDuration(clipDuration(clip))}
+                            </div>
+                            {isSelected && !isPrimary && (
+                              <div style={{ position: 'absolute', top: 3, right: 3, width: 12, height: 12, borderRadius: '50%', background: 'white', color: '#0E7490', fontSize: '0.55rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3, pointerEvents: 'none' }}>✓</div>
+                            )}
+                            {isPrimary && (
+                              <>
+                                <div
+                                  onPointerDown={(e) => handleTrimHandleDown(e, clip, 'start')}
+                                  title="Drag to trim the start (snaps to the playhead, other clip edges, and markers — hold Alt to bypass)"
+                                  style={trimHandleStyle('left', snappedHandle?.clipId === clip.id && snappedHandle?.edge === 'start')}
+                                />
+                                <div
+                                  onPointerDown={(e) => handleTrimHandleDown(e, clip, 'end')}
+                                  title="Drag to trim the end (snaps to the playhead, other clip edges, and markers — hold Alt to bypass)"
+                                  style={trimHandleStyle('right', snappedHandle?.clipId === clip.id && snappedHandle?.edge === 'end')}
+                                />
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
 
               {overlayTracks.map((track, ti) => {
                 const trackClips = getTrackClips(timeline, track.id);
@@ -4339,6 +4443,18 @@ export default function VideoEditorWorkspace() {
           {/* Export */}
           <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Export settings</div>
+            <label style={{ ...fieldLabel, display: 'block', marginBottom: 10 }}>File name
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                <input
+                  type="text"
+                  value={exportFilename}
+                  onChange={(e) => { exportFilenameTouchedRef.current = true; setExportFilename(e.target.value); }}
+                  placeholder="edited-video"
+                  style={{ ...numInput, flex: 1, minWidth: 0 }}
+                />
+                <span style={{ fontSize: '0.72rem', color: T.muted, flexShrink: 0 }}>.mp4</span>
+              </div>
+            </label>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <div>
                 <div style={{ ...fieldLabel, marginBottom: 4 }}>Resolution</div>

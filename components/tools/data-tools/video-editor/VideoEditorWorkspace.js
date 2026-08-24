@@ -13,7 +13,7 @@ import UploadBox from '@/components/UploadBox';
 import { T } from '../smart-parser/theme';
 import { downloadBlob } from '@/lib/dataTools/shared';
 import { receiveBlobHandoff } from '@/lib/media/blobHandoff';
-import { extractVideoMetadata, extractImageMetadata, extractAudioMetadata, formatDuration } from '@/lib/media/metadata';
+import { extractVideoMetadata, extractImageMetadata, extractAudioMetadata, formatDuration, formatDurationPrecise } from '@/lib/media/metadata';
 import { validateUploadSize, MAX_UPLOAD_VIDEO_BYTES, MAX_UPLOAD_IMAGE_BYTES, MAX_UPLOAD_AUDIO_BYTES } from '@/lib/media/limits';
 import {
   createTimeline, addSource, addClip, trimClip, splitClip, deleteClip, deleteClips, joinClips, moveClip, moveClipToIndex, duplicateClip, duplicateClips,
@@ -2877,14 +2877,14 @@ export default function VideoEditorWorkspace() {
             <button onClick={() => commit((tl) => addMarker(tl, playhead))} style={{ ...smallBtn, padding: '6px 9px', flexShrink: 0 }} title="Add marker at playhead (M)">
               🚩
             </button>
-            <span style={{ fontSize: '0.72rem', color: T.mutedDark, minWidth: 76, textAlign: 'right' }}>
-              {formatDuration(playhead)} / {formatDuration(totalDuration)}
+            <span style={{ fontSize: '0.72rem', color: T.mutedDark, minWidth: 92, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+              {formatDurationPrecise(playhead)} / {formatDuration(totalDuration)}
             </span>
           </div>
 
           {playheadMainHit && (
-            <p style={{ margin: '-4px 0 10px', fontSize: '0.72rem', color: T.mutedDark, fontFamily: 'monospace' }} title="Where the playhead sits in the combined timeline, and the exact matching point inside this clip's own original source file — use this to see precisely where to split when several videos are joined on the main track.">
-              Project: <strong style={{ color: T.ink }}>{formatDuration(playhead)}</strong> | Source: <strong style={{ color: T.ink }}>{formatDuration(playheadMainHit.sourceTime)}</strong>
+            <p style={{ margin: '-4px 0 10px', fontSize: '0.72rem', color: T.mutedDark, fontFamily: 'monospace' }} title="Where the playhead sits in the combined timeline, and the exact matching point inside this clip's own original source file — shown to a tenth of a second so you can see precisely where to split when several videos are joined on the main track.">
+              Project: <strong style={{ color: T.ink }}>{formatDurationPrecise(playhead)}</strong> | Source: <strong style={{ color: T.ink }}>{formatDurationPrecise(playheadMainHit.sourceTime)}</strong>
             </p>
           )}
 

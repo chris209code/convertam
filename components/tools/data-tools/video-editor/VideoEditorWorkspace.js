@@ -32,6 +32,7 @@ import {
   getMasterGain, setMasterVolume, setMasterMuted, setMasterFade,
   addMarker, updateMarker, deleteMarker,
   setProjectAudioSource, clearProjectAudioSource, setProjectAudioGain, setProjectAudioMuted, getProjectAudioSource,
+  addSoundTrack, removeSoundTrack, setSoundTrackFlags, isSoundTrackAudible,
 } from '@/lib/media/timeline';
 import { drawCompositionFrame, drawTextOverlays, drawImageOverlays, drawShapeOverlays, computeLayoutRects, pipPositionFromPoint, getComposeSize, getFadeOpacity, getTextOverlayBounds, buildCutoutCanvas } from '@/lib/media/compositionLayouts';
 import { ensureSegmenterLoaded, getPersonMaskCanvas } from '@/lib/media/segmentation';
@@ -241,15 +242,21 @@ const FILTER_PRESETS = {
 // no jump/repeat when its own official slot begins right after.
 const TRANSITION_OPTIONS = [
   { id: 'cut', label: 'Cut' },
-  { id: 'fade', label: 'Fade' },
-  { id: 'dip-black', label: 'Dip to black' },
-  { id: 'dip-white', label: 'Dip to white' },
-  { id: 'crossfade', label: 'Crossfade' },
-  { id: 'slide', label: 'Slide' },
+  { id: 'crossfade', label: 'Crossfade / Dissolve' },
+  { id: 'dip-black', label: 'Fade to Black' },
+  { id: 'dip-white', label: 'Fade to White' },
   { id: 'wipe', label: 'Wipe' },
+  { id: 'slide', label: 'Slide' },
+  { id: 'push', label: 'Push' },
   { id: 'zoom', label: 'Zoom' },
-  { id: 'blur', label: 'Blur' },
+  { id: 'blur', label: 'Blur Dissolve' },
+  { id: 'iris', label: 'Circle/Iris Reveal' },
 ];
+
+// Discrete duration presets (seconds) for the transition duration picker —
+// a fixed set reads as a professional, deliberate choice rather than an
+// open-ended number field encouraging odd values like 1.37s.
+const TRANSITION_DURATION_PRESETS = [0.25, 0.5, 1, 1.5, 2];
 
 // The between-clip TRANSITION_OPTIONS above (slide/wipe/zoom/crossfade/etc.)
 // all need a NEXT clip to blend into — meaningless at the very start or end
@@ -467,6 +474,19 @@ export default function VideoEditorWorkspace() {
       });
     }
     return overlayLayersRef.current.get(trackId);
+  }
+
+  // One audio element/gain-node pair per sound track — same lazy-map idea
+  // as getOverlayLayerState above, just without any visual element or
+  // per-clip lifecycle beyond the one clip a sound track normally holds.
+  // The gain node is created lazily too, inside tick(), since it needs
+  // audioCtxRef.current to exist (only true after the first Play press).
+  const soundLayersRef = useRef(new Map());
+  function getSoundLayerState(trackId) {
+    if (!soundLayersRef.current.has(trackId)) {
+      soundLayersRef.current.set(trackId, { audioEl: new Audio(), gain: null, srcNode: null });
+    }
+    return soundLayersRef.current.get(trackId);
   }
 
   // Live-preview audio graph — separate from (but modeled on) the Web Audio
@@ -833,6 +853,44 @@ export default function VideoEditorWorkspace() {
   }
   function handleRemoveProjectAudio() {
     commit((prev) => clearProjectAudioSource(prev));
+  }
+
+  // Any number of independent sound clips (music, sound effects, extra
+  // narration) — each upload gets its OWN sound track (mirroring
+  // handleOverlayFiles' one-track-per-upload pattern below), so multiple
+  // sounds can freely overlap in time without needing same-track collision
+  // handling. A multi-file selection adds them all in one commit, placed
+  // back-to-back starting at the playhead rather than all stacked at 0, so
+  // dropping in several sound effects at once doesn't require manually
+  // repositioning every one of them afterward.
+  async function handleSoundFiles(files) {
+    const list = Array.from(files || []);
+    if (!list.length) return;
+    setUploadError('');
+    let next = timeline;
+    let cursor = playhead;
+    let firstTrackId = null;
+    for (const f of list) {
+      const sizeError = validateUploadSize(f, 'audio');
+      if (sizeError) { setUploadError(sizeError); break; }
+      try {
+        const meta = await extractAudioMetadata(f);
+        const { timeline: withSource, source } = addSource(next, f, meta, 'audio');
+        const { timeline: withTrack, trackId } = addSoundTrack(withSource);
+        const withClip = addClip(withTrack, source.id, trackId);
+        const newClip = getTrackClips(withClip, trackId)[0];
+        next = moveClip(withClip, newClip.id, cursor);
+        cursor += clipDuration(newClip);
+        if (!firstTrackId) firstTrackId = trackId;
+      } catch (err) {
+        setUploadError(err.message || 'Could not read one of these audio files.');
+        break;
+      }
+    }
+    if (next !== timeline) commit(next);
+  }
+  function handleRemoveSoundTrack(trackId) {
+    commit((tl) => removeSoundTrack(tl, trackId));
   }
 
   // Each video overlay upload creates a NEW overlay track (rather than
@@ -1843,6 +1901,43 @@ export default function VideoEditorWorkspace() {
       if (playing) { if (el.paused) el.play().catch(() => {}); } else if (!el.paused) el.pause();
     }
 
+    // Any number of independent sound clips (timeline.js's soundTracks) —
+    // unlike project audio, each one has its own clip lifecycle (trim
+    // points, an actual start position on the timeline), so this is keyed
+    // off findActiveClipAt per track rather than just following `playhead`
+    // directly the way project audio does.
+    function syncSoundTracksLive() {
+      for (const track of timeline.soundTracks) {
+        const s = getSoundLayerState(track.id);
+        if (!s.gain) {
+          s.gain = audioCtxRef.current.createGain();
+          s.gain.connect(masterGainRef.current);
+        }
+        const hit = findActiveClipAt(timeline, track.id, playhead);
+        if (!hit || !isSoundTrackAudible(timeline, track.id)) {
+          s.gain.gain.value = 0;
+          if (!s.audioEl.paused) s.audioEl.pause();
+          continue;
+        }
+        const source = timeline.sources.find((so) => so.id === hit.clip.sourceId);
+        if (source && s.audioEl.dataset.sourceId !== source.id) {
+          s.audioEl.src = URL.createObjectURL(source.file);
+          s.audioEl.dataset.sourceId = source.id;
+        }
+        if (!s.srcNode) {
+          s.srcNode = audioCtxRef.current.createMediaElementSource(s.audioEl);
+          s.srcNode.connect(s.gain);
+          s.audioEl.muted = false;
+        }
+        if (Math.abs(s.audioEl.currentTime - hit.sourceTime) > 0.15) {
+          s.audioEl.currentTime = Math.max(0, Math.min(hit.sourceTime, s.audioEl.duration || hit.sourceTime));
+        }
+        const opacity = getFadeOpacity(hit.clip, hit.sourceTime - hit.clip.sourceStart);
+        s.gain.gain.value = opacity * (hit.clip.gain ?? 1) * (track.volume ?? 1);
+        if (playing) { if (s.audioEl.paused) s.audioEl.play().catch(() => {}); } else if (!s.audioEl.paused) s.audioEl.pause();
+      }
+    }
+
     async function tick() {
       if (cancelled) return;
       // Belt-and-suspenders alongside loadClip/applyReplacementAudioLive's
@@ -1902,6 +1997,7 @@ export default function VideoEditorWorkspace() {
       if (audioCtxRef.current) {
         if (masterGainRef.current) masterGainRef.current.gain.value = getMasterGain(timeline, playhead);
         syncProjectAudioLive();
+        syncSoundTracksLive();
         if (analyserRef.current && meterDataRef.current && meterBarRef.current) {
           analyserRef.current.getByteTimeDomainData(meterDataRef.current);
           let peak = 0;
@@ -3129,12 +3225,18 @@ export default function VideoEditorWorkspace() {
                         {t.label}
                       </button>
                     ))}
-                    {selectedClip.transitionOut.type !== 'cut' && (
-                      <input type="number" step={0.1} min={0.1} max={2} value={selectedClip.transitionOut.duration.toFixed(1)}
-                        onChange={(e) => handleTransitionDuration(selectedClip, parseFloat(e.target.value) || 0.5)}
-                        style={{ ...numInput, width: 56 }} title="Transition duration (seconds)" />
-                    )}
                   </div>
+                  {selectedClip.transitionOut.type !== 'cut' && (
+                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', marginTop: 6 }}>
+                      <span style={{ fontSize: '0.64rem', color: T.muted }}>Duration</span>
+                      {TRANSITION_DURATION_PRESETS.map((d) => (
+                        <button key={d} onClick={() => handleTransitionDuration(selectedClip, d)}
+                          style={{ ...smallBtn, padding: '4px 9px', fontSize: '0.66rem', background: Math.abs(selectedClip.transitionOut.duration - d) < 0.01 ? T.accentGradient : 'white', color: Math.abs(selectedClip.transitionOut.duration - d) < 0.01 ? 'white' : T.inkSecondary, border: Math.abs(selectedClip.transitionOut.duration - d) < 0.01 ? 'none' : `1px solid ${T.border}` }}>
+                          {d}s
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   {selectedClip.transitionOut.type !== 'cut' && !BLEND_TRANSITION_TYPES.includes(selectedClip.transitionOut.type) && (
                     <p style={{ fontSize: '0.64rem', color: T.muted, margin: '4px 0 0' }}>Sets this clip's fade-out and the next clip's fade-in to match{selectedClip.transitionOut.type !== 'fade' ? ', and the composition background color' : ''}.</p>
                   )}
@@ -3917,6 +4019,63 @@ export default function VideoEditorWorkspace() {
                 </>
               );
             })()}
+          </div>
+
+          {/* Sound clips — any number of independent audio clips (music,
+              sound effects, extra narration), each its own track so they can
+              freely overlap. Distinct from the single Audio Track bed above
+              (one continuous track from t=0) and from a clip's own
+              replace/mix audio (scoped to that one clip's span). */}
+          <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Sound clips</div>
+            <p style={{ fontSize: '0.74rem', color: T.mutedDark, margin: '0 0 8px' }}>
+              Add as many sound clips as you like — background music, sound effects, extra narration. Each one plays independently and can overlap with the others; position and trim them with the fields below.
+            </p>
+            <label style={{ ...smallBtn, display: 'inline-block', cursor: 'pointer', marginBottom: 10 }}>
+              + Add sound{timeline.soundTracks.length ? ' clip' : ''}
+              <input type="file" accept="audio/*" multiple style={{ display: 'none' }} onChange={(e) => { const files = e.target.files; e.target.value = ''; if (files?.length) handleSoundFiles(files); }} />
+            </label>
+            {timeline.soundTracks.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {timeline.soundTracks.map((track, ti) => {
+                  const clip = getTrackClips(timeline, track.id)[0];
+                  if (!clip) return null;
+                  const source = timeline.sources.find((s) => s.id === clip.sourceId);
+                  const dur = clipDuration(clip);
+                  return (
+                    <div key={track.id} style={{ padding: '8px 10px', borderRadius: 8, background: '#F8FAFC', border: `1px solid ${T.border}` }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {ti + 1}. {source?.file.name || 'Sound'}
+                        </span>
+                        <button onClick={() => handleRemoveSoundTrack(track.id)} style={{ ...smallBtn, padding: '4px 8px', color: '#DC2626', borderColor: '#FCA5A5', flexShrink: 0 }}>🗑 Remove</button>
+                      </div>
+                      <ProjectAudioWaveform source={source} waveformBySource={waveformBySource} />
+                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 8 }}>
+                        <label style={fieldLabel}>Start (s)
+                          <input type="number" step={0.1} min={0} value={clip.start.toFixed(1)}
+                            onChange={(e) => commit((tl) => moveClip(tl, clip.id, Math.max(0, parseFloat(e.target.value) || 0)))} style={numInput} />
+                        </label>
+                        <label style={fieldLabel}>Length (s)
+                          <input type="number" step={0.1} min={0.1} max={source?.duration || 999} value={dur.toFixed(1)}
+                            onChange={(e) => commit((tl) => trimClip(tl, clip.id, { sourceStart: clip.sourceStart, sourceEnd: clip.sourceStart + (parseFloat(e.target.value) || 0.1) }))} style={numInput} />
+                        </label>
+                        <label style={fieldLabel}>Volume {Math.round((track.volume ?? 1) * 100)}%
+                          <input type="range" min={0} max={2} step={0.05} value={track.volume ?? 1}
+                            onChange={(e) => commit((tl) => setSoundTrackFlags(tl, track.id, { volume: parseFloat(e.target.value) }))} style={{ width: 90 }} />
+                        </label>
+                        <button
+                          onClick={() => commit((tl) => setSoundTrackFlags(tl, track.id, { muted: !track.muted }))}
+                          style={{ ...smallBtn, background: track.muted ? '#DC2626' : 'white', color: track.muted ? 'white' : T.inkSecondary, borderColor: track.muted ? '#DC2626' : T.border }}
+                        >
+                          {track.muted ? '🔇 Muted' : '🔊 Mute'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           </>)}

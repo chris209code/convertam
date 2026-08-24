@@ -4033,7 +4033,17 @@ export default function VideoEditorWorkspace() {
             </p>
             <label style={{ ...smallBtn, display: 'inline-block', cursor: 'pointer', marginBottom: 10 }}>
               + Add sound{timeline.soundTracks.length ? ' clip' : ''}
-              <input type="file" accept="audio/*" multiple style={{ display: 'none' }} onChange={(e) => { const files = e.target.files; e.target.value = ''; if (files?.length) handleSoundFiles(files); }} />
+              <input type="file" accept="audio/*" multiple style={{ display: 'none' }} onChange={(e) => {
+                // Array.from(...) copies the file references out BEFORE
+                // clearing value — e.target.files is a live FileList tied to
+                // the input, so resetting value first (as every other
+                // single-file input in this file safely does with
+                // e.target.files?.[0], a plain File reference) would empty
+                // this multi-file FileList out from under handleSoundFiles.
+                const files = Array.from(e.target.files || []);
+                e.target.value = '';
+                if (files.length) handleSoundFiles(files);
+              }} />
             </label>
             {timeline.soundTracks.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

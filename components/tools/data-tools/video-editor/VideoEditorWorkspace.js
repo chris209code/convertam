@@ -2882,11 +2882,6 @@ export default function VideoEditorWorkspace() {
             </span>
           </div>
 
-          {playheadMainHit && (
-            <p style={{ margin: '-4px 0 10px', fontSize: '0.72rem', color: T.mutedDark, fontFamily: 'monospace' }} title="Where the playhead sits in the combined timeline, and the exact matching point inside this clip's own original source file — shown to a tenth of a second so you can see precisely where to split when several videos are joined on the main track.">
-              Project: <strong style={{ color: T.ink }}>{formatDurationPrecise(playhead)}</strong> | Source: <strong style={{ color: T.ink }}>{formatDurationPrecise(playheadMainHit.sourceTime)}</strong>
-            </p>
-          )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.68rem', fontWeight: 700, color: T.mutedDark }}>Preview speed</span>
@@ -3172,6 +3167,34 @@ export default function VideoEditorWorkspace() {
                   </div>
                 );
               })}
+              {/* The always-on playhead — tracks `playhead` directly (the same
+                  value driving preview/export) so it moves continuously during
+                  playback and dragging instead of only showing up once a clip
+                  is selected, like the per-clip edit-cursor above does. The
+                  time badge riding on it is what replaces the old "Project: X
+                  | Source: Y" text that used to sit up by the play button,
+                  disconnected from the actual timeline you split on. */}
+              {totalDuration > 0 && (
+                <div
+                  style={{
+                    position: 'absolute', top: 0, bottom: 0,
+                    left: `${Math.min(100, Math.max(0, (playhead / totalDuration) * 100))}%`,
+                    zIndex: 15, pointerEvents: 'none',
+                  }}
+                >
+                  <div style={{ position: 'absolute', top: 0, bottom: 0, left: -1, width: 2, background: '#DC2626' }} />
+                  <div
+                    style={{
+                      position: 'absolute', top: '100%', left: 0, transform: 'translateX(-50%)',
+                      marginTop: 3, fontSize: '0.68rem', fontWeight: 700, color: T.ink, fontFamily: 'monospace',
+                      background: 'white', border: `1px solid ${T.border}`, borderRadius: 5,
+                      padding: '1px 6px', whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {formatDurationPrecise(playhead)}{playheadMainHit ? ` · src ${formatDurationPrecise(playheadMainHit.sourceTime)}` : ''}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           {selectedClip && !isLockedSelected && selectionIds.length <= 1 && selectedSource?.kind !== 'image' && (

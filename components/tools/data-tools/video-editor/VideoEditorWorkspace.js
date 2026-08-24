@@ -33,6 +33,8 @@ import {
   addMarker, updateMarker, deleteMarker,
   setProjectAudioSource, clearProjectAudioSource, setProjectAudioGain, setProjectAudioMuted, getProjectAudioSource,
   addSoundTrack, removeSoundTrack, setSoundTrackFlags, isSoundTrackAudible,
+  linkVideoClipAudio, getLinkedAudioClip, unlinkAudioClip, removeClipInPlace,
+  trimLinkedClip, splitLinkedClip, moveLinkedClip, moveLinkedClipToIndex, deleteLinkedClip, deleteLinkedClips, duplicateLinkedClip, duplicateLinkedClips,
 } from '@/lib/media/timeline';
 import { drawCompositionFrame, drawTextOverlays, drawImageOverlays, drawShapeOverlays, computeLayoutRects, pipPositionFromPoint, getComposeSize, getFadeOpacity, getTextOverlayBounds, buildCutoutCanvas } from '@/lib/media/compositionLayouts';
 import { ensureSegmenterLoaded, getPersonMaskCanvas } from '@/lib/media/segmentation';
@@ -332,6 +334,72 @@ const ESTIMATED_VIDEO_KBPS = {
   '1080p': { small: 3000, balanced: 5000, high: 8000 },
 };
 
+// Every direct clip-edit handler below routes trim/split/move/duplicate
+// through one of these instead of calling timeline.js's plain primitive
+// straight on `clip.id` — pure functions, so they live at module scope
+// rather than inside the component. A MAIN_TRACK video clip always goes
+// through the matching Linked* wrapper (see lib/media/timeline.js's own
+// "Linked main-audio track" section), which mirrors the edit onto its
+// linked audio clip if one exists and is a no-op passthrough if not. Editing
+// a still-linked audio clip directly (selecting it on the audio track itself
+// rather than editing it via its paired video clip) instead unlinks it
+// first — from that point on it's an ordinary independent sound clip and
+// stops receiving the video clip's own mirrored edits, per the "video/audio
+// stay synced by default, but are always independently editable" brief.
+// Deleting doesn't need this: a clip that's about to be removed has no
+// "going forward" for the link to matter to.
+function trimClipRespectingLink(tl, clip, trim) {
+  if (clip.track === MAIN_TRACK) return trimLinkedClip(tl, clip.id, trim);
+  return trimClip(clip.linkedVideoClipId ? unlinkAudioClip(tl, clip.id) : tl, clip.id, trim);
+}
+function splitClipRespectingLink(tl, clip, atSourceTime) {
+  if (clip.track === MAIN_TRACK) return splitLinkedClip(tl, clip.id, atSourceTime);
+  return splitClip(clip.linkedVideoClipId ? unlinkAudioClip(tl, clip.id) : tl, clip.id, atSourceTime);
+}
+function moveClipRespectingLink(tl, clip, newStart) {
+  if (clip.track === MAIN_TRACK) return moveLinkedClip(tl, clip.id, newStart);
+  return moveClip(clip.linkedVideoClipId ? unlinkAudioClip(tl, clip.id) : tl, clip.id, newStart);
+}
+function moveClipToIndexRespectingLink(tl, track, clipId, newIndex) {
+  if (track === MAIN_TRACK) return moveLinkedClipToIndex(tl, track, clipId, newIndex);
+  const clip = tl.clips.find((c) => c.id === clipId);
+  return moveClipToIndex(clip?.linkedVideoClipId ? unlinkAudioClip(tl, clipId) : tl, track, clipId, newIndex);
+}
+// Fallback used when there's no "apply to video/audio/both" choice to make:
+// a MAIN_TRACK clip with no linked audio clip (mirrors the change nowhere,
+// same as plain setClipSpeed), or a clip being edited directly on the Audio
+// track itself (see trimClipRespectingLink's own comment on why a direct
+// edit there unlinks first). The Effects panel's own Speed control picks
+// between this and its explicit video/audio/both target buttons — see its
+// JSX for the linked, MAIN_TRACK case this intentionally doesn't handle.
+function setClipSpeedRespectingLink(tl, clip, speed) {
+  const linked = clip.track === MAIN_TRACK ? getLinkedAudioClip(tl, clip.id) : null;
+  let next = setClipSpeed(tl, clip.id, speed);
+  if (linked) next = setClipSpeed(next, linked.id, speed);
+  return next;
+}
+// Manually setting a MAIN_TRACK clip's own audioMode (the Keep/Mute/Replace/
+// Mix dropdown, or the separate Replace/Clean-audio actions that call this
+// with mode='replace') is a deliberate takeover of that clip's audio — if
+// it still has a linked clip on the main audio track, that clip is now
+// redundant (both would otherwise try to be "the" audio for this span at
+// once) and is removed outright, in place, rather than merely unlinked.
+function setClipAudioModeRespectingLink(tl, clip, audioMode, audioSourceId) {
+  const linked = clip.track === MAIN_TRACK ? getLinkedAudioClip(tl, clip.id) : null;
+  const base = linked ? removeClipInPlace(tl, linked.id) : tl;
+  return setClipAudioMode(base, clip.id, audioMode, audioSourceId);
+}
+function duplicateClipRespectingLink(tl, clip) {
+  if (clip.track === MAIN_TRACK) return duplicateLinkedClip(tl, clip.id);
+  const next = duplicateClip(tl, clip.id);
+  if (next === tl || !clip.linkedVideoClipId) return next;
+  // The ORIGINAL keeps mirroring its video clip if edited from there — only
+  // the brand-new copy (a deliberate "duplicate just the audio" action) is
+  // born already independent.
+  const newClip = next.clips[next.clips.length - 1];
+  return { ...next, clips: next.clips.map((c) => (c.id === newClip.id ? { ...c, linkedVideoClipId: null } : c)) };
+}
+
 export default function VideoEditorWorkspace() {
   const [timeline, setTimeline] = useState(createTimeline());
   const [past, setPast] = useState([]);
@@ -361,6 +429,11 @@ export default function VideoEditorWorkspace() {
   const [thumbnailsBySource, setThumbnailsBySource] = useState({}); // sourceId -> { thumbs, duration } | 'loading' | 'error'
   const [waveformBySource, setWaveformBySource] = useState({}); // sourceId -> peaks[] | 'loading' | 'error'
   const [silenceRanges, setSilenceRanges] = useState(null); // null = not run yet; [] = ran, found none; [{ start, end, selected }] = ran, found some — never applied until the user confirms
+  // Which clip(s) a speed change from a MAIN_TRACK clip's own Speed control
+  // applies to when it has a linked audio clip — 'both' (the historical,
+  // still-synced default) | 'video' | 'audio'. A plain UI choice, not part
+  // of the timeline itself — irrelevant once a clip has no linked partner.
+  const [speedApplyTarget, setSpeedApplyTarget] = useState('both');
   const [silenceScanning, setSilenceScanning] = useState(false);
   const [isFullscreenPreview, setIsFullscreenPreview] = useState(false);
   const [normalizing, setNormalizing] = useState(false);
@@ -555,6 +628,8 @@ export default function VideoEditorWorkspace() {
   // transport display needs it too.
   const playheadMainHit = findActiveClipAt(timeline, MAIN_TRACK, playhead);
   const overlayTracks = timeline.overlayTracks;
+  const audioTrack = timeline.mainAudioTrackId != null ? timeline.soundTracks.find((t) => t.id === timeline.mainAudioTrackId) : null;
+  const audioTrackClips = audioTrack ? getTrackClips(timeline, audioTrack.id) : [];
   const allOverlayClips = overlayTracks.flatMap((t) => getTrackClips(timeline, t.id));
   const isComposed = overlayTracks.length > 0;
   // Canvas pixel size for the chosen output frame shape — the single
@@ -741,7 +816,10 @@ export default function VideoEditorWorkspace() {
         const { timeline: withSource, source } = addSource(next, f, meta, 'video');
         const withClip = addClip(withSource, source.id, MAIN_TRACK);
         const newClipId = getTrackClips(withClip, MAIN_TRACK).at(-1)?.id || null;
-        next = withClip;
+        // Give this clip's own audio (if it has any) an independent, linked
+        // track/clip of its own right away — see linkVideoClipAudio's own
+        // comment for why this is a no-op for a silent/image source.
+        next = newClipId ? linkVideoClipAudio(withClip, newClipId) : withClip;
         if (!firstNewClipId) firstNewClipId = newClipId;
       } catch (err) {
         setUploadError(err.message || 'Could not read one of these video files.');
@@ -974,7 +1052,7 @@ export default function VideoEditorWorkspace() {
       const meta = await extractAudioMetadata(f);
       commit((tl) => {
         const { timeline: withSource, source } = addSource(tl, f, meta, 'audio');
-        return setClipAudioMode(withSource, selectedClip.id, mode, source.id);
+        return setClipAudioModeRespectingLink(withSource, selectedClip, mode, source.id);
       });
     } catch (err) {
       setUploadError(err.message || 'Could not read this audio file.');
@@ -1075,10 +1153,11 @@ export default function VideoEditorWorkspace() {
     if (!selectedClip) return;
     const num = parseFloat(value);
     if (Number.isNaN(num)) return;
-    commit((tl) => trimClip(tl, selectedClip.id, {
+    const trim = {
       sourceStart: field === 'start' ? num : selectedClip.sourceStart,
       sourceEnd: field === 'end' ? num : selectedClip.sourceEnd,
-    }));
+    };
+    commit((tl) => trimClipRespectingLink(tl, selectedClip, trim));
   }
 
   // Splits whatever clip currently sits at the playhead on the selected
@@ -1094,7 +1173,7 @@ export default function VideoEditorWorkspace() {
     // point in the SOURCE file's own timeline, so undo the same
     // start-offset + speed math findActiveClipAt uses elsewhere.
     const sourceTime = selectedClip.sourceStart + (playhead - selectedClip.start) * (selectedClip.speed || 1);
-    commit((tl) => splitClip(tl, selectedClip.id, sourceTime));
+    commit((tl) => splitClipRespectingLink(tl, selectedClip, sourceTime));
     // The cursor stays visible — splitClip keeps the FIRST piece's id, so
     // it's still pointing at a valid clip, now sitting right at that
     // piece's own end (the exact spot the cut just happened).
@@ -1110,7 +1189,9 @@ export default function VideoEditorWorkspace() {
     const track = selectedClip?.track ?? timeline.clips.find((c) => c.id === selectionIds[0])?.track;
     if (track === undefined) return;
     commit((tl) => {
-      const next = selectionIds.length > 1 ? deleteClips(tl, selectionIds) : deleteClip(tl, selectionIds[0]);
+      const next = track === MAIN_TRACK
+        ? (selectionIds.length > 1 ? deleteLinkedClips(tl, selectionIds) : deleteLinkedClip(tl, selectionIds[0]))
+        : (selectionIds.length > 1 ? deleteClips(tl, selectionIds) : deleteClip(tl, selectionIds[0]));
       // An overlay track left with zero clips is dead weight in the track
       // list/UI — same "clean up after yourself" removeSource already does
       // for a deleted source's now-empty tracks.
@@ -1132,7 +1213,7 @@ export default function VideoEditorWorkspace() {
 
   function handleDuplicateSelected() {
     if (!selectedClip) return;
-    commit((tl) => duplicateClip(tl, selectedClip.id));
+    commit((tl) => duplicateClipRespectingLink(tl, selectedClip));
   }
   // Bulk duplicate for 2+ selected clips — a separate function (rather than
   // folding into handleDuplicateSelected) so the existing single-clip
@@ -1142,7 +1223,8 @@ export default function VideoEditorWorkspace() {
   // duplicateClips' own comment) in a single commit — one undo/redo entry.
   function handleDuplicateMultiSelected() {
     if (selectionIds.length < 2) return;
-    commit((tl) => duplicateClips(tl, selectionIds));
+    const track = selectedClip?.track ?? timeline.clips.find((c) => c.id === selectionIds[0])?.track;
+    commit((tl) => (track === MAIN_TRACK ? duplicateLinkedClips(tl, selectionIds) : duplicateClips(tl, selectionIds)));
     setExtraSelectedClipIds([]);
   }
 
@@ -1286,18 +1368,28 @@ export default function VideoEditorWorkspace() {
   function handleApplySilenceRemoval() {
     if (!silenceRanges?.length || !selectedClip) return;
     const originalSourceId = selectedClip.sourceId;
+    // A linked audio clip shares this same sourceId and (while still linked)
+    // the exact same sourceStart/sourceEnd — without also matching on track,
+    // every lookup below could just as easily land on that audio clip
+    // instead of the video clip actually being edited.
+    const originalTrack = selectedClip.track;
     const selected = silenceRanges.filter((r) => r.selected);
     if (!selected.length) return;
     commit((tl) => {
-      let next = tl;
+      // This reshapes the video with a series of splits+deletes that are
+      // impractical to mirror onto a linked audio clip step for step —
+      // unlink it first so it keeps playing exactly as before rather than
+      // silently drifting out of sync while still claiming to be in sync.
+      const linked = getLinkedAudioClip(tl, selectedClip.id);
+      let next = linked ? unlinkAudioClip(tl, linked.id) : tl;
       for (const range of selected) {
-        const target = next.clips.find((c) => c.sourceId === originalSourceId && c.sourceStart <= range.start + 0.02 && c.sourceEnd >= range.end - 0.02);
+        const target = next.clips.find((c) => c.track === originalTrack && c.sourceId === originalSourceId && c.sourceStart <= range.start + 0.02 && c.sourceEnd >= range.end - 0.02);
         if (!target) continue;
         const afterFirstSplit = splitClip(next, target.id, range.start);
-        const midCandidate = afterFirstSplit.clips.find((c) => c.sourceId === originalSourceId && Math.abs(c.sourceStart - range.start) < 0.06 && c.sourceEnd > range.start);
+        const midCandidate = afterFirstSplit.clips.find((c) => c.track === originalTrack && c.sourceId === originalSourceId && Math.abs(c.sourceStart - range.start) < 0.06 && c.sourceEnd > range.start);
         if (!midCandidate) { next = afterFirstSplit; continue; }
         const afterSecondSplit = splitClip(afterFirstSplit, midCandidate.id, range.end);
-        const toDelete = afterSecondSplit.clips.find((c) => c.sourceId === originalSourceId && Math.abs(c.sourceStart - range.start) < 0.06 && Math.abs(c.sourceEnd - range.end) < 0.06);
+        const toDelete = afterSecondSplit.clips.find((c) => c.track === originalTrack && c.sourceId === originalSourceId && Math.abs(c.sourceStart - range.start) < 0.06 && Math.abs(c.sourceEnd - range.end) < 0.06);
         next = toDelete ? deleteClip(afterSecondSplit, toDelete.id) : afterSecondSplit;
       }
       return next;
@@ -1324,7 +1416,7 @@ export default function VideoEditorWorkspace() {
     const trackClips = getTrackClips(timeline, selectedClip.track);
     const idx = trackClips.findIndex((c) => c.id === selectedClip.id);
     const prevEnd = idx > 0 ? trackClips[idx - 1].start + clipDuration(trackClips[idx - 1]) : 0;
-    commit((tl) => moveClip(tl, selectedClip.id, prevEnd));
+    commit((tl) => moveClipRespectingLink(tl, selectedClip, prevEnd));
   }
 
   // Explicit reordering — click-based, not a drag gesture, so moving a
@@ -1337,19 +1429,19 @@ export default function VideoEditorWorkspace() {
   }
   function handleMoveClipToStart() {
     if (!selectedClip) return;
-    commit((tl) => moveClipToIndex(tl, selectedClip.track, selectedClip.id, 0));
+    commit((tl) => moveClipToIndexRespectingLink(tl, selectedClip.track, selectedClip.id, 0));
   }
   function handleMoveClipEarlier() {
     if (!selectedClip) return;
-    commit((tl) => moveClipToIndex(tl, selectedClip.track, selectedClip.id, selectedClipTrackIndex() - 1));
+    commit((tl) => moveClipToIndexRespectingLink(tl, selectedClip.track, selectedClip.id, selectedClipTrackIndex() - 1));
   }
   function handleMoveClipLater() {
     if (!selectedClip) return;
-    commit((tl) => moveClipToIndex(tl, selectedClip.track, selectedClip.id, selectedClipTrackIndex() + 1));
+    commit((tl) => moveClipToIndexRespectingLink(tl, selectedClip.track, selectedClip.id, selectedClipTrackIndex() + 1));
   }
   function handleMoveClipToEnd() {
     if (!selectedClip) return;
-    commit((tl) => moveClipToIndex(tl, selectedClip.track, selectedClip.id, getTrackClips(timeline, selectedClip.track).length - 1));
+    commit((tl) => moveClipToIndexRespectingLink(tl, selectedClip.track, selectedClip.id, getTrackClips(timeline, selectedClip.track).length - 1));
   }
 
   function toggleFullscreenPreview() {
@@ -1396,7 +1488,16 @@ export default function VideoEditorWorkspace() {
     const file = new File([blob], 'freeze-frame.jpg', { type: 'image/jpeg' });
     const freezeDuration = 2;
     commit((tl) => {
-      const split = splitClip(tl, hit.clip.id, hit.sourceTime);
+      // A freeze frame only affects the video timeline — a still image has
+      // no audio of its own to insert into the gap. If this clip's audio is
+      // still linked, unlink it first rather than leaving it claiming to
+      // mirror a video clip whose timing is about to change out from under
+      // it: the audio keeps playing through the freeze exactly as before,
+      // and the user can re-trim/reposition it independently afterward if
+      // they want the pause reflected there too.
+      const linked = getLinkedAudioClip(tl, hit.clip.id);
+      const base = linked ? unlinkAudioClip(tl, linked.id) : tl;
+      const split = splitClip(base, hit.clip.id, hit.sourceTime);
       // If the playhead landed too close to an edge, splitClip is a no-op
       // (see its own 0.05s guard) — the freeze frame still gets inserted,
       // just without an actual split on that side.
@@ -1550,9 +1651,10 @@ export default function VideoEditorWorkspace() {
     setTimeline((prev) => {
       const clip = prev.clips.find((c) => c.id === drag.clipId);
       if (!clip) return prev;
-      return drag.edge === 'start'
-        ? trimClip(prev, drag.clipId, { sourceStart: newValue, sourceEnd: clip.sourceEnd })
-        : trimClip(prev, drag.clipId, { sourceStart: clip.sourceStart, sourceEnd: newValue });
+      const trim = drag.edge === 'start'
+        ? { sourceStart: newValue, sourceEnd: clip.sourceEnd }
+        : { sourceStart: clip.sourceStart, sourceEnd: newValue };
+      return trimClipRespectingLink(prev, clip, trim);
     });
     setSnappedHandle((prev) => {
       const next = didSnap ? { clipId: drag.clipId, edge: drag.edge } : null;
@@ -1675,7 +1777,7 @@ export default function VideoEditorWorkspace() {
     const newCenter = drag.startStart + deltaSeconds + clipDuration(clip) / 2;
     const others = getTrackClips(timeline, clip.track).filter((c) => c.id !== clip.id);
     const targetIndex = others.filter((o) => o.start + clipDuration(o) / 2 < newCenter).length;
-    commit((tl) => moveClipToIndex(tl, clip.track, clip.id, targetIndex));
+    commit((tl) => moveClipToIndexRespectingLink(tl, clip.track, clip.id, targetIndex));
   }
 
   // ---- Text overlays ----
@@ -2956,6 +3058,91 @@ export default function VideoEditorWorkspace() {
               })}
               </div>
 
+              {audioTrackClips.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                    <h3 style={{ margin: 0, fontSize: '0.78rem', color: T.ink }} title="Every main-track video clip's own audio, broken out onto its own track. Split, trim, move, and delete it independently of the video — editing it directly here (rather than through its video clip) makes it independent going forward.">🔊 Audio track</h3>
+                    <button
+                      onClick={() => commit((tl) => setSoundTrackFlags(tl, audioTrack.id, { muted: !audioTrack.muted }))}
+                      title={audioTrack.muted ? 'Unmute this audio track' : 'Mute this audio track'}
+                      style={{ ...trackFlagBtn, background: audioTrack.muted ? '#DC2626' : 'white', color: audioTrack.muted ? 'white' : T.inkSecondary, borderColor: audioTrack.muted ? '#DC2626' : T.border }}
+                    >
+                      {audioTrack.muted ? '🔇' : '🔊'}
+                    </button>
+                  </div>
+                  <div onClick={clearSelectionIfEmptyClick} style={{ position: 'relative', height: 40, opacity: audioTrack.muted ? 0.5 : 1 }}>
+                    {audioTrackClips.map((clip) => {
+                      const source = timeline.sources.find((s) => s.id === clip.sourceId);
+                      const isPrimary = clip.id === selectedClipId;
+                      const isSelected = selectionIdSet.has(clip.id);
+                      const isDragging = clipDragVisual?.clipId === clip.id;
+                      const leftPct = totalDuration ? (clip.start / totalDuration) * 100 : 0;
+                      const widthPct = totalDuration ? (clipDuration(clip) / totalDuration) * 100 : 100;
+                      return (
+                        <div
+                          key={clip.id}
+                          onPointerDown={(e) => handleClipBodyPointerDown(e, clip)}
+                          onClick={(e) => handleClipClick(e, clip)}
+                          style={{
+                            position: 'absolute', top: 0, left: `calc(${leftPct}% + 1px)`, width: `calc(max(24px, ${widthPct}%) - 2px)`,
+                            height: 40, borderRadius: 7, cursor: 'grab',
+                            background: isSelected ? '#7C3AED' : '#EDE9FE',
+                            border: isPrimary ? '2px solid #6D28D9' : isSelected ? '2px solid #6D28D990' : `1px solid ${T.border}`,
+                            boxShadow: isDragging ? '0 6px 16px rgba(0,0,0,0.35)' : isSelected && !isPrimary ? 'inset 0 0 0 1px white' : 'none',
+                            overflow: 'hidden',
+                            transform: isDragging ? `translateX(${clipDragVisual.offsetPx}px)` : 'none',
+                            zIndex: isDragging ? 20 : 1,
+                          }}
+                          title={`${formatDuration(clipDuration(clip))} of audio — source ${formatDuration(clip.sourceStart)}–${formatDuration(clip.sourceEnd)} of ${source?.file.name || 'this file'}. ${clip.linkedVideoClipId ? 'Linked to its video clip — trimming/splitting/moving/deleting the video does this too; edit it directly here to make it independent.' : 'Independent — no longer follows its original video clip.'} Click to select and drop the edit cursor, drag to reorder, drag the side handles (when selected) to trim.`}
+                        >
+                          <ClipWaveform source={source} sourceStart={clip.sourceStart} sourceEnd={clip.sourceEnd} waveformBySource={waveformBySource} />
+                          <div style={{
+                            position: 'absolute', left: 0, right: 0, top: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '0.6rem', fontWeight: 700, color: 'white', textShadow: '0 1px 2px rgba(0,0,0,0.7)',
+                            padding: '2px 4px', pointerEvents: 'none', zIndex: 2, whiteSpace: 'nowrap', overflow: 'hidden',
+                          }}>
+                            {formatDuration(clipDuration(clip))}{clip.linkedVideoClipId ? ' 🔗' : ''}
+                          </div>
+                          {isSelected && !isPrimary && (
+                            <div style={{ position: 'absolute', top: 3, right: 3, width: 12, height: 12, borderRadius: '50%', background: 'white', color: '#6D28D9', fontSize: '0.55rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3, pointerEvents: 'none' }}>✓</div>
+                          )}
+                          {isPrimary && (
+                            <>
+                              <div
+                                onPointerDown={(e) => handleTrimHandleDown(e, clip, 'start')}
+                                title="Drag to trim the start (snaps to the playhead, other clip edges, and markers — hold Alt to bypass)"
+                                style={trimHandleStyle('left', snappedHandle?.clipId === clip.id && snappedHandle?.edge === 'start')}
+                              />
+                              <div
+                                onPointerDown={(e) => handleTrimHandleDown(e, clip, 'end')}
+                                title="Drag to trim the end (snaps to the playhead, other clip edges, and markers — hold Alt to bypass)"
+                                style={trimHandleStyle('right', snappedHandle?.clipId === clip.id && snappedHandle?.edge === 'end')}
+                              />
+                              {editCursorClipId === clip.id && (
+                                <div
+                                  onPointerDown={(e) => handleEditCursorPointerDown(e, clip)}
+                                  title="Drag to choose exactly where Split cuts this clip"
+                                  style={{
+                                    position: 'absolute', top: -6, bottom: -6,
+                                    left: `calc(${Math.min(100, Math.max(0, ((playhead - clip.start) / (clipDuration(clip) || 1)) * 100))}% - 7px)`,
+                                    width: 14, zIndex: 6, cursor: 'ew-resize',
+                                    display: 'flex', flexDirection: 'column', alignItems: 'center', touchAction: 'none',
+                                  }}
+                                >
+                                  <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '6px solid #DC2626', flexShrink: 0 }} />
+                                  <div style={{ width: 2, flex: 1, background: '#DC2626' }} />
+                                  <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderBottom: '6px solid #DC2626', flexShrink: 0 }} />
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {overlayTracks.map((track, ti) => {
                 const trackClips = getTrackClips(timeline, track.id);
                 if (!trackClips.length) return null;
@@ -3069,7 +3256,7 @@ export default function VideoEditorWorkspace() {
             ) : selectedClip && selectedSource ? (
               <>
                 <div style={{ fontSize: '0.74rem', fontWeight: 700, color: T.ink, marginBottom: selectedSource.kind === 'image' ? 0 : 4, wordBreak: 'break-word' }}>
-                  {selectedSource.file.name} <span style={{ fontWeight: 500, color: T.mutedDark }}>({selectedClip.track === MAIN_TRACK ? 'main' : 'overlay'}{selectedSource.kind === 'image' ? ' · image' : ''})</span>
+                  {selectedSource.file.name} <span style={{ fontWeight: 500, color: T.mutedDark }}>({selectedClip.track === MAIN_TRACK ? 'main' : selectedClip.track === audioTrack?.id ? 'audio track' : 'overlay'}{selectedSource.kind === 'image' ? ' · image' : ''})</span>
                 </div>
                 {selectedSource.kind === 'image' ? (
                   <p style={{ fontSize: '0.72rem', color: T.mutedDark, margin: '4px 0 0' }}>
@@ -3162,7 +3349,7 @@ export default function VideoEditorWorkspace() {
               <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Clip audio</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
                 <label style={fieldLabel}>Audio
-                  <select value={selectedClip.audioMode} onChange={(e) => commit((tl) => setClipAudioMode(tl, selectedClip.id, e.target.value))} style={numInput}>
+                  <select value={selectedClip.audioMode} onChange={(e) => commit((tl) => setClipAudioModeRespectingLink(tl, selectedClip, e.target.value))} style={numInput}>
                     <option value="keep">Keep</option>
                     <option value="mute">Mute</option>
                     <option value="replace">Replace…</option>
@@ -3211,13 +3398,57 @@ export default function VideoEditorWorkspace() {
           {activeCategory === 'effects' && (selectedClip && selectedSource && !isLockedSelected && selectionIds.length <= 1 ? (
             <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
               <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Effects</div>
-              {selectedSource.kind !== 'image' && (
-                <label style={{ ...fieldLabel, display: 'inline-flex', marginBottom: 10 }}>Speed
-                  <select value={selectedClip.speed} onChange={(e) => commit((tl) => setClipSpeed(tl, selectedClip.id, parseFloat(e.target.value)))} style={numInput}>
-                    {SPEED_OPTIONS.map((s) => <option key={s} value={s}>{s}×</option>)}
-                  </select>
-                </label>
-              )}
+              {selectedSource.kind !== 'image' && (() => {
+                const linkedAudioForSpeed = selectedClip.track === MAIN_TRACK ? getLinkedAudioClip(timeline, selectedClip.id) : null;
+                return (
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={{ ...fieldLabel, display: 'inline-flex' }}>Speed
+                      <select
+                        value={selectedClip.speed}
+                        onChange={(e) => {
+                          const speed = parseFloat(e.target.value);
+                          if (!linkedAudioForSpeed) { commit((tl) => setClipSpeedRespectingLink(tl, selectedClip, speed)); return; }
+                          commit((tl) => {
+                            if (speedApplyTarget === 'audio') return setClipSpeed(tl, linkedAudioForSpeed.id, speed);
+                            let next = setClipSpeed(tl, selectedClip.id, speed);
+                            if (speedApplyTarget === 'both') next = setClipSpeed(next, linkedAudioForSpeed.id, speed);
+                            return next;
+                          });
+                        }}
+                        style={numInput}
+                      >
+                        {SPEED_OPTIONS.map((s) => <option key={s} value={s}>{s}×</option>)}
+                      </select>
+                    </label>
+                    {linkedAudioForSpeed && (
+                      <div style={{ marginTop: 6 }}>
+                        <div style={{ fontSize: '0.66rem', fontWeight: 700, color: T.mutedDark, marginBottom: 4 }}>Apply speed change to</div>
+                        <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
+                          {[['video', 'Video only'], ['audio', 'Audio only'], ['both', 'Both']].map(([id, label]) => (
+                            <button
+                              key={id}
+                              onClick={() => setSpeedApplyTarget(id)}
+                              style={{
+                                ...smallBtn, padding: '4px 9px', fontSize: '0.68rem',
+                                background: speedApplyTarget === id ? T.accentGradient : 'white',
+                                color: speedApplyTarget === id ? 'white' : T.inkSecondary,
+                                border: speedApplyTarget === id ? 'none' : `1px solid ${T.border}`,
+                              }}
+                              title={id === 'both' ? "Change this clip's speed and its linked audio clip's speed together, keeping them synced" : id === 'video' ? "Change only this clip's own (now-muted) video speed — its linked audio clip keeps its current speed" : "Change only the linked audio clip's speed on the Audio track — this clip's own video speed is untouched"}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                        <p style={{ fontSize: '0.66rem', color: T.mutedDark, margin: 0 }}>
+                          🔗 This clip's audio lives on its own linked clip on the Audio track — Video: <strong>{selectedClip.speed}×</strong> · Audio: <strong>{linkedAudioForSpeed.speed}×</strong>
+                          {selectedClip.speed !== linkedAudioForSpeed.speed ? ' (currently different, on purpose or otherwise — that\'s allowed).' : '.'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               <div style={{ marginBottom: 10 }}>
                 <div style={{ ...fieldLabel, marginBottom: 4 }}>Filters</div>
                 <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 6 }}>

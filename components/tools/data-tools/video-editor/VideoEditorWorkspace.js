@@ -256,7 +256,7 @@ const TRANSITION_OPTIONS = [
 // Discrete duration presets (seconds) for the transition duration picker —
 // a fixed set reads as a professional, deliberate choice rather than an
 // open-ended number field encouraging odd values like 1.37s.
-const TRANSITION_DURATION_PRESETS = [0.25, 0.5, 1, 1.5, 2];
+const TRANSITION_DURATION_PRESETS = [0.25, 0.5, 1, 2, 3, 5, 7, 10];
 
 // The between-clip TRANSITION_OPTIONS above (slide/wipe/zoom/crossfade/etc.)
 // all need a NEXT clip to blend into — meaningless at the very start or end
@@ -546,6 +546,14 @@ export default function VideoEditorWorkspace() {
   const videoKbps = ESTIMATED_VIDEO_KBPS[timeline.exportResolution]?.[timeline.exportQuality] ?? ESTIMATED_VIDEO_KBPS['720p'].balanced;
   const estimatedExportMB = Math.max(0.1, Math.round(((videoKbps + 128) * totalDuration) / 8 / 1024 * 10) / 10);
   const mainClips = getTrackClips(timeline, MAIN_TRACK);
+  // Which main clip the playhead is currently inside, and where that lands
+  // in ITS OWN source file — surfaced next to the project-time readout so a
+  // user splitting a merged multi-video timeline can see exactly which
+  // frame of the original file they're looking at, not just how far into
+  // the combined timeline they are. Recomputed on every render (cheap pure
+  // lookup) rather than only inside tick()'s own closure, since the
+  // transport display needs it too.
+  const playheadMainHit = findActiveClipAt(timeline, MAIN_TRACK, playhead);
   const overlayTracks = timeline.overlayTracks;
   const allOverlayClips = overlayTracks.flatMap((t) => getTrackClips(timeline, t.id));
   const isComposed = overlayTracks.length > 0;
@@ -714,28 +722,38 @@ export default function VideoEditorWorkspace() {
     return img;
   }
 
+  // Accepts one or many files in a single selection — each is appended to
+  // the end of the main track in the order given (addClip's own start
+  // computation always lands a new clip right after the current last one),
+  // so a multi-file pick becomes one clean sequence and one undo step
+  // instead of requiring N separate "+ Add another video" uploads.
   async function handleMainFiles(files) {
-    const f = files[0];
-    if (!f) return;
-    const sizeError = validateUploadSize(f, 'video');
-    if (sizeError) { setUploadError(sizeError); return; }
+    const list = Array.from(files || []);
+    if (!list.length) return;
     setUploadError('');
-    try {
-      const meta = await extractVideoMetadata(f);
-      // Computed synchronously from the current `timeline` (not via a
-      // commit() functional updater) so newClipId is known immediately —
-      // React doesn't invoke a setState updater function synchronously,
-      // so a `let` mutated inside one can't be read right after commit().
-      const { timeline: withSource, source } = addSource(timeline, f, meta, 'video');
-      const next = addClip(withSource, source.id, MAIN_TRACK);
-      const newClipId = getTrackClips(next, MAIN_TRACK).at(-1)?.id || null;
+    let next = timeline;
+    let firstNewClipId = null;
+    for (const f of list) {
+      const sizeError = validateUploadSize(f, 'video');
+      if (sizeError) { setUploadError(sizeError); break; }
+      try {
+        const meta = await extractVideoMetadata(f);
+        const { timeline: withSource, source } = addSource(next, f, meta, 'video');
+        const withClip = addClip(withSource, source.id, MAIN_TRACK);
+        const newClipId = getTrackClips(withClip, MAIN_TRACK).at(-1)?.id || null;
+        next = withClip;
+        if (!firstNewClipId) firstNewClipId = newClipId;
+      } catch (err) {
+        setUploadError(err.message || 'Could not read one of these video files.');
+        break;
+      }
+    }
+    if (next !== timeline) {
       commit(next);
-      // Selecting the clip immediately — not just adding it — is what
-      // makes the trim/audio/split panel actually show up without the
+      // Selecting the first newly added clip — not just adding it — is
+      // what makes the trim/audio/split panel actually show up without the
       // user needing to know to click the timeline strip first.
-      if (newClipId) { setSelectedClipId(newClipId); setExtraSelectedClipIds([]); }
-    } catch (err) {
-      setUploadError(err.message || 'Could not read this video file.');
+      if (firstNewClipId) { setSelectedClipId(firstNewClipId); setExtraSelectedClipIds([]); }
     }
   }
 
@@ -2580,9 +2598,10 @@ export default function VideoEditorWorkspace() {
               <div style={{ flex: '1 1 360px', minWidth: 300, maxWidth: 440 }}>
                 <UploadBox
                   accept="video/*"
+                  multiple
                   onFiles={handleMainFiles}
                   maxSizeMB={MAX_UPLOAD_VIDEO_BYTES / (1024 * 1024)}
-                  label="Click to choose a video to start editing, or drag it here"
+                  label="Click to choose one or more videos to start editing, or drag them here"
                   oversizedHint={<>Use <Link href="/compress-video" style={{ color: T.accentDark, fontWeight: 700 }}>Compress &amp; Split Video</Link> to shrink or cut it down first.</>}
                 />
                 {uploadError && <div style={{ ...statusBox, marginTop: 12 }}>⚠️ {uploadError}</div>}
@@ -2798,6 +2817,12 @@ export default function VideoEditorWorkspace() {
             </span>
           </div>
 
+          {playheadMainHit && (
+            <p style={{ margin: '-4px 0 10px', fontSize: '0.72rem', color: T.mutedDark, fontFamily: 'monospace' }} title="Where the playhead sits in the combined timeline, and the exact matching point inside this clip's own original source file — use this to see precisely where to split when several videos are joined on the main track.">
+              Project: <strong style={{ color: T.ink }}>{formatDuration(playhead)}</strong> | Source: <strong style={{ color: T.ink }}>{formatDuration(playheadMainHit.sourceTime)}</strong>
+            </p>
+          )}
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.68rem', fontWeight: 700, color: T.mutedDark }}>Preview speed</span>
             {PREVIEW_SPEED_OPTIONS.map((r) => (
@@ -2875,16 +2900,19 @@ export default function VideoEditorWorkspace() {
                       transform: isDragging ? `translateX(${clipDragVisual.offsetPx}px)` : 'none',
                       zIndex: isDragging ? 20 : 1,
                     }}
-                    title={`${formatDuration(clipDuration(clip))} — click to select and drop the edit cursor there, drag the clip's body to reorder it on the timeline (Ctrl/Cmd-click to multi-select, Shift-click for a range), drag the side handles to trim`}
+                    title={`${formatDuration(clipDuration(clip))} on the timeline — source ${formatDuration(clip.sourceStart)}–${formatDuration(clip.sourceEnd)} of ${source?.file.name || 'this file'}. Click to select and drop the edit cursor there, drag the clip's body to reorder it on the timeline (Ctrl/Cmd-click to multi-select, Shift-click for a range), drag the side handles to trim`}
                   >
                     <ClipThumbFilmstrip source={source} sourceStart={clip.sourceStart} sourceEnd={clip.sourceEnd} thumbnailsBySource={thumbnailsBySource} />
                     <ClipWaveform source={source} sourceStart={clip.sourceStart} sourceEnd={clip.sourceEnd} waveformBySource={waveformBySource} />
                     <div style={{
                       position: 'absolute', left: 0, right: 0, top: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: '0.62rem', fontWeight: 700, color: 'white', textShadow: '0 1px 2px rgba(0,0,0,0.7)',
-                      padding: '2px 4px', pointerEvents: 'none', zIndex: 2,
+                      padding: '2px 4px', pointerEvents: 'none', zIndex: 2, whiteSpace: 'nowrap', overflow: 'hidden',
                     }}>
                       {formatDuration(clipDuration(clip))}{clip.speed !== 1 ? ` · ${clip.speed}×` : ''}
+                      {source?.kind !== 'image' && (
+                        <span style={{ fontWeight: 500, opacity: 0.85 }}> · src {formatDuration(clip.sourceStart)}–{formatDuration(clip.sourceEnd)}</span>
+                      )}
                     </div>
                     {isSelected && !isPrimary && (
                       <div style={{ position: 'absolute', top: 3, right: 3, width: 14, height: 14, borderRadius: '50%', background: 'white', color: T.accentDark, fontSize: '0.6rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3, pointerEvents: 'none' }}>✓</div>
@@ -3311,7 +3339,7 @@ export default function VideoEditorWorkspace() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div>
                 <div style={{ fontSize: '0.7rem', color: T.mutedDark, marginBottom: 2 }}>Main video</div>
-                <UploadBox accept="video/*" onFiles={handleMainFiles} maxSizeMB={MAX_UPLOAD_VIDEO_BYTES / (1024 * 1024)} compact compactLabel="+ Add another video" oversizedHint={<>Use <Link href="/compress-video" style={{ color: T.accentDark, fontWeight: 700 }}>Compress &amp; Split Video</Link> to shrink or cut it down first.</>} />
+                <UploadBox accept="video/*" multiple onFiles={handleMainFiles} maxSizeMB={MAX_UPLOAD_VIDEO_BYTES / (1024 * 1024)} compact compactLabel="+ Add video(s)" oversizedHint={<>Use <Link href="/compress-video" style={{ color: T.accentDark, fontWeight: 700 }}>Compress &amp; Split Video</Link> to shrink or cut it down first.</>} />
               </div>
               <div>
                 <div style={{ fontSize: '0.7rem', color: T.mutedDark, marginBottom: 2 }}>Images (slideshow, added to end of main track)</div>

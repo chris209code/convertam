@@ -251,6 +251,18 @@ const TRANSITION_OPTIONS = [
   { id: 'blur', label: 'Blur' },
 ];
 
+// The between-clip TRANSITION_OPTIONS above (slide/wipe/zoom/crossfade/etc.)
+// all need a NEXT clip to blend into — meaningless at the very start or end
+// of the whole timeline, where there's no adjacent clip to blend with. Only
+// a plain fade (to/from a solid color) makes sense there, so opening/closing
+// transitions get their own, smaller option set — see
+// handleSetOpeningTransition/handleSetClosingTransition.
+const EDGE_TRANSITION_OPTIONS = [
+  { id: 'none', label: 'None' },
+  { id: 'fade-black', label: 'Fade to/from black' },
+  { id: 'fade-white', label: 'Fade to/from white' },
+];
+
 const MARKER_LABEL_OPTIONS = ['Marker', 'Intro', 'Important moment', 'Cut here', 'Caption', 'Music change', 'Outro'];
 
 const TEXT_ANIMATION_OPTIONS = [
@@ -1095,6 +1107,42 @@ export default function VideoEditorWorkspace() {
       return next;
     });
   }
+
+  const EDGE_TRANSITION_DURATION = 0.75;
+
+  // Opening/closing transitions reuse the exact same fadeIn/fadeOut +
+  // backgroundFill mechanism as the dip-black/dip-white between-clip
+  // transitions above — they're the same visual effect, just applied to the
+  // main track's very first/last clip (whose fadeIn/fadeOut are otherwise
+  // unused for a between-clip handoff: transitionOut is meaningless on the
+  // last clip, and a first clip's own fadeIn is never touched by any
+  // between-clip transition). Sharing timeline.backgroundFill means an
+  // opening fade and a between-clip dip elsewhere can't both keep their own
+  // color at once — the same known limitation the dip transitions already
+  // have with each other.
+  function handleSetOpeningTransition(type) {
+    const first = mainClips[0];
+    if (!first) return;
+    commit((tl) => {
+      let next = setClipFade(tl, first.id, { fadeIn: type === 'none' ? 0 : EDGE_TRANSITION_DURATION });
+      if (type === 'fade-white') next = setBackgroundFill(next, '#FFFFFF');
+      else if (type === 'fade-black') next = setBackgroundFill(next, '#000000');
+      return next;
+    });
+  }
+  function handleSetClosingTransition(type) {
+    const last = mainClips[mainClips.length - 1];
+    if (!last) return;
+    commit((tl) => {
+      let next = setClipFade(tl, last.id, { fadeOut: type === 'none' ? 0 : EDGE_TRANSITION_DURATION });
+      if (type === 'fade-white') next = setBackgroundFill(next, '#FFFFFF');
+      else if (type === 'fade-black') next = setBackgroundFill(next, '#000000');
+      return next;
+    });
+  }
+  const openingTransitionType = mainClips[0]?.fadeIn > 0 ? (timeline.backgroundFill === '#FFFFFF' ? 'fade-white' : 'fade-black') : 'none';
+  const closingTransitionType = mainClips[mainClips.length - 1]?.fadeOut > 0 ? (timeline.backgroundFill === '#FFFFFF' ? 'fade-white' : 'fade-black') : 'none';
+
   // ---- Audio normalization: plain RMS-level analysis (see
   // normalizeAudio.js), no AI — computes a gain multiplier once and stores
   // it on the clip via setClipGain, same as any other manual clip setting.
@@ -1671,7 +1719,22 @@ export default function VideoEditorWorkspace() {
       if (ref.current !== clip.sourceId) {
         videoEl.src = URL.createObjectURL(source.file);
         ref.current = clip.sourceId;
-        await new Promise((resolve) => { videoEl.onloadedmetadata = resolve; });
+        // A bounded wait, not just `onloadedmetadata` — some browsers
+        // (mobile Safari in particular) can fail to ever fire that event
+        // for a reused <video> element's reassigned blob src. Without a
+        // fallback, this whole await — and therefore this entire tick()
+        // call, since the rAF loop only reschedules itself after tick()
+        // returns — would hang forever: the visual freezes on whatever
+        // frame was last drawn while anything already natively playing
+        // (e.g. an independent project audio track) keeps going on its
+        // own clock, unaware the preview loop has stalled.
+        await new Promise((resolve) => {
+          let done = false;
+          const finish = () => { if (!done) { done = true; resolve(); } };
+          videoEl.onloadedmetadata = finish;
+          videoEl.onerror = finish;
+          setTimeout(finish, 4000);
+        });
         // Loaded metadata (readyState 4) does not guarantee a decoded,
         // paintable frame exists yet — a paused video whose currentTime
         // never changes from its default 0 can sit with nothing for
@@ -1723,7 +1786,15 @@ export default function VideoEditorWorkspace() {
           if (audioEl.dataset.sourceId !== audioSource.id) {
             audioEl.src = URL.createObjectURL(audioSource.file);
             audioEl.dataset.sourceId = audioSource.id;
-            await new Promise((resolve) => { audioEl.onloadedmetadata = resolve; });
+            // Same bounded-wait reasoning as loadClip() above — a metadata
+            // event that never fires must not hang tick() forever.
+            await new Promise((resolve) => {
+              let done = false;
+              const finish = () => { if (!done) { done = true; resolve(); } };
+              audioEl.onloadedmetadata = finish;
+              audioEl.onerror = finish;
+              setTimeout(finish, 4000);
+            });
           }
           if (!srcNodeRef.current) {
             srcNodeRef.current = audioCtxRef.current.createMediaElementSource(audioEl);
@@ -1774,6 +1845,22 @@ export default function VideoEditorWorkspace() {
 
     async function tick() {
       if (cancelled) return;
+      // Belt-and-suspenders alongside loadClip/applyReplacementAudioLive's
+      // own timeouts above: whatever throws inside this large per-frame
+      // body, the rAF loop must still get rescheduled — an uncaught
+      // exception here would otherwise silently and permanently stop the
+      // whole preview (visual, audio sync, playhead advance) with no error
+      // shown to the user.
+      try {
+        await tickBody();
+      } catch {
+        // swallow — one bad frame shouldn't end playback for good.
+      } finally {
+        if (!cancelled) rafRef.current = requestAnimationFrame(tick);
+      }
+    }
+
+    async function tickBody() {
       if (playing && !playStartRef.current) playStartRef.current = { atWall: performance.now(), atPlayhead: playhead };
 
       const mainHit = findActiveClipAt(timeline, MAIN_TRACK, playhead);
@@ -2012,7 +2099,6 @@ export default function VideoEditorWorkspace() {
           setPlayhead(next);
         }
       }
-      rafRef.current = requestAnimationFrame(tick);
     }
     rafRef.current = requestAnimationFrame(tick);
     return () => { cancelled = true; if (rafRef.current) cancelAnimationFrame(rafRef.current); };
@@ -3550,6 +3636,43 @@ export default function VideoEditorWorkspace() {
           </>)}
 
           {activeCategory === 'composition' && (<>
+          {/* Opening/closing transitions — the start and end of the WHOLE
+              timeline, not any one clip's handoff to the next (that's the
+              per-clip "Transition to next clip" picker in the Edit panel).
+              Always visible, no clip selection required. */}
+          <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Opening &amp; closing transitions</div>
+            {mainClips.length ? (<>
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ ...fieldLabel, marginBottom: 4 }}>Opening (start of video)</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {EDGE_TRANSITION_OPTIONS.map((t) => (
+                    <button key={t.id} onClick={() => handleSetOpeningTransition(t.id)}
+                      style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.68rem', background: openingTransitionType === t.id ? T.accentGradient : 'white', color: openingTransitionType === t.id ? 'white' : T.inkSecondary, border: openingTransitionType === t.id ? 'none' : `1px solid ${T.border}` }}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div style={{ ...fieldLabel, marginBottom: 4 }}>Closing (end of video)</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {EDGE_TRANSITION_OPTIONS.map((t) => (
+                    <button key={t.id} onClick={() => handleSetClosingTransition(t.id)}
+                      style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.68rem', background: closingTransitionType === t.id ? T.accentGradient : 'white', color: closingTransitionType === t.id ? 'white' : T.inkSecondary, border: closingTransitionType === t.id ? 'none' : `1px solid ${T.border}` }}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {(openingTransitionType !== 'none' || closingTransitionType !== 'none') && (
+                <p style={{ fontSize: '0.64rem', color: T.muted, margin: '8px 0 0' }}>Fade-to-black and fade-to-white share the same background color as dip transitions between clips — picking one here can change the color an existing between-clip dip fades through too.</p>
+              )}
+            </>) : (
+              <p style={{ fontSize: '0.72rem', color: T.muted, margin: 0 }}>Add a video to the main track to set an opening or closing fade.</p>
+            )}
+          </div>
+
           {/* Composition — overlay LAYOUT: split-screen/PIP/video-call/
               person cutout. Always visible, not just after an overlay
               exists (see the empty-state uploader below). */}

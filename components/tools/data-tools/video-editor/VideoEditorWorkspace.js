@@ -7,7 +7,7 @@
 // any parallel infrastructure. lib/media/timeline.js, compositionLayouts.js
 // and timelineRender.js are the only new engine modules.
 
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import UploadBox from '@/components/UploadBox';
 import { T } from '../smart-parser/theme';
@@ -35,8 +35,9 @@ import {
   addSoundTrack, removeSoundTrack, setSoundTrackFlags, isSoundTrackAudible,
   linkVideoClipAudio, getLinkedAudioClip, unlinkAudioClip, removeClipInPlace,
   trimLinkedClip, splitLinkedClip, moveLinkedClip, moveLinkedClipToIndex, deleteLinkedClip, deleteLinkedClips, duplicateLinkedClip, duplicateLinkedClips,
+  CAPTION_PRESETS, setCaptionsEnabled, setCaptionStyle, setCaptionPreset, setCaptionPosition, setCaptionBoxWidth,
 } from '@/lib/media/timeline';
-import { drawCompositionFrame, drawTextOverlays, drawImageOverlays, drawShapeOverlays, computeLayoutRects, pipPositionFromPoint, getComposeSize, getFadeOpacity, getTextOverlayBounds, buildCutoutCanvas } from '@/lib/media/compositionLayouts';
+import { drawCompositionFrame, drawTextOverlays, drawImageOverlays, drawShapeOverlays, drawCaptions, computeLayoutRects, pipPositionFromPoint, getComposeSize, getFadeOpacity, getTextOverlayBounds, getCaptionBounds, buildCutoutCanvas } from '@/lib/media/compositionLayouts';
 import { ensureSegmenterLoaded, getPersonMaskCanvas } from '@/lib/media/segmentation';
 import { renderTimeline, renderTimelineAudio, isTimelineExportSupported, TimelineRenderCancelledError, TimelineRenderError } from '@/lib/media/timelineRender';
 import { extractThumbnails, thumbnailsForRange } from '@/lib/media/thumbnails';
@@ -58,10 +59,9 @@ import { duckGainAtTime } from '@/lib/media/ducking';
 // renders the actual final video (once) and burns the captions into that
 // same pass, rather than reusing a separate, possibly-stale earlier export.
 import { transcribeMedia, TranscriptionError } from '@/lib/media/providers/geminiTranscription';
-import { transcriptToSrt, transcriptToVtt, transcriptToAss, transcriptToCaptionCues, DEFAULT_CAPTION_STYLE } from '@/lib/media/captions';
+import { transcriptToSrt, transcriptToVtt, getCaptionEvents, findActiveCaptionEvent } from '@/lib/media/captions';
 import { parseSubtitleFile } from '@/lib/media/subtitleParse';
 import { transcriptToPlainText } from '@/lib/media/transcript';
-import { burnAssSubtitles, FfmpegLoadError, FfmpegRenderError, FfmpegCancelledError } from '@/lib/media/ffmpegClient';
 import TranscriptEditor from '../shared/TranscriptEditor';
 
 const TRANSCRIBE_STATUS_LABEL = {
@@ -71,22 +71,36 @@ const TRANSCRIBE_STATUS_LABEL = {
   transcribing: 'Transcribing speech…',
   merging: 'Combining transcript…',
 };
-const BURN_STATUS_LABEL = {
-  'rendering-video': 'Rendering final video…',
-  loading: 'Loading video engine…',
-  burning: 'Burning captions into video…',
-};
 
-const BURN_SUBTITLE_STATUS_LABEL = {
-  'rendering-video': 'Rendering final video…',
-  loading: 'Loading video engine…',
-  burning: 'Burning subtitles into video…',
-};
+// Seven quick-start caption looks, shown as swatch buttons — see
+// CAPTION_PRESETS in timeline.js for what each one actually sets.
+const CAPTION_PRESET_OPTIONS = [
+  { id: 'classic', label: 'Classic' },
+  { id: 'bold', label: 'Bold' },
+  { id: 'minimal', label: 'Minimal' },
+  { id: 'social', label: 'Social' },
+  { id: 'highlight', label: 'Highlight' },
+  { id: 'karaoke', label: 'Karaoke' },
+  { id: 'pop', label: 'Pop' },
+];
 
-const SUBTITLE_POSITION_OPTIONS = [
-  { id: 'bottom', label: 'Bottom' },
-  { id: 'middle', label: 'Middle' },
-  { id: 'top', label: 'Top' },
+const CAPTION_ALIGN_OPTIONS = [
+  { id: 'left', label: 'Align Left' },
+  { id: 'center', label: 'Center' },
+  { id: 'right', label: 'Align Right' },
+];
+
+const CAPTION_HIGHLIGHT_OPTIONS = [
+  { id: 'none', label: 'None' },
+  { id: 'word', label: 'Word-by-word' },
+  { id: 'karaoke', label: 'Karaoke' },
+];
+
+const CAPTION_ANIMATION_OPTIONS = [
+  { id: 'none', label: 'None' },
+  { id: 'fade', label: 'Fade' },
+  { id: 'pop', label: 'Pop' },
+  { id: 'rise', label: 'Rise' },
 ];
 
 const RENDER_STATUS_LABEL = {
@@ -476,31 +490,29 @@ export default function VideoEditorWorkspace() {
   const [transcribeStatus, setTranscribeStatus] = useState('idle'); // idle | preparing-audio | rendering-audio | preparing | transcribing | merging | error
   const [transcribeError, setTranscribeError] = useState('');
   const [transcribeProgress, setTranscribeProgress] = useState(null); // { chunkIndex, totalChunks } | { audioRenderProgress } | null
-  const [burnStatus, setBurnStatus] = useState('idle'); // idle | rendering-video | loading | burning | error
-  const [burnProgress, setBurnProgress] = useState(0);
-  const [burnError, setBurnError] = useState('');
-  const [burnEta, setBurnEta] = useState('');
-  const burnCancelRef = useRef(null);
   const audioRenderCancelRef = useRef(null);
   const exportCancelRef = useRef(null);
-  const burnStartRef = useRef(0);
 
   // ---- Burn Subtitles: user supplies an existing .srt/.vtt file instead
-  // of generating one with Auto Captions — no transcription, no AI, kept
-  // as a fully separate state machine from transcript/burnStatus above so
-  // the two features can't collide, even though the actual burn-in at the
-  // end reuses the exact same transcriptToAss + burnAssSubtitles pipeline
-  // Auto Captions already uses (see handleBurnSubtitles). ----
+  // of generating one with Auto Captions — no transcription, no AI. Once
+  // parsed, it becomes just another caption SOURCE for the exact same
+  // canvas renderer/style/toggle Auto Captions uses (see captionEvents and
+  // timeline.captionsEnabled below) — there is no separate "burn" pipeline
+  // or style for it anymore; whichever source exists (this, or a
+  // transcript) is drawn live and included in the regular Export MP4
+  // export the moment captionsEnabled is turned on. ----
   const [uploadedSubtitle, setUploadedSubtitle] = useState(null); // { segments: [{start,end,text}] } | null
   const [subtitleFileName, setSubtitleFileName] = useState('');
   const [subtitleParseError, setSubtitleParseError] = useState('');
-  const [subtitleStyle, setSubtitleStyle] = useState(DEFAULT_CAPTION_STYLE);
-  const [burnSubtitleStatus, setBurnSubtitleStatus] = useState('idle'); // idle | rendering-video | loading | burning | error
-  const [burnSubtitleProgress, setBurnSubtitleProgress] = useState(0);
-  const [burnSubtitleError, setBurnSubtitleError] = useState('');
-  const [burnSubtitleEta, setBurnSubtitleEta] = useState('');
-  const burnSubtitleCancelRef = useRef(null);
-  const burnSubtitleStartRef = useRef(0);
+  // Whichever caption source exists becomes the active one for the unified
+  // renderer/style/toggle below — an uploaded subtitle file is a deliberate,
+  // one-off action, so it takes priority over a transcript if somehow both
+  // are present at once. Memoized (not just a plain const) because the live
+  // preview's render-loop effect depends on it — see its own dependency
+  // array — and getCaptionEvents builds a fresh array every call, which
+  // would otherwise look "changed" on every render and restart that loop
+  // needlessly.
+  const captionEvents = useMemo(() => getCaptionEvents(uploadedSubtitle || transcript), [uploadedSubtitle, transcript]);
 
   const canvasRef = useRef(null);
   const previewWrapRef = useRef(null);
@@ -612,6 +624,15 @@ export default function VideoEditorWorkspace() {
   // completely separate avoids any risk to the already-verified PiP drag.
   const dragTextStateRef = useRef(null); // { id, grabDx, grabDy } grab offset (in canvas px) from the overlay's own anchor point, while dragging
   const liveTextPositionRef = useRef(null); // { id, x, y } during an active drag, else null
+  // Same pattern again for the caption box — there's only ever one caption
+  // showing at a time (unlike N text overlays), so no id is needed, just
+  // whether a drag/resize is in progress. dragCaptionStateRef distinguishes
+  // a plain move (grabDx/grabDy, same as text) from a resize (which edge,
+  // 'left' or 'right', plus the box's own committed width/anchor at grab
+  // time so the OTHER edge stays fixed while dragging one side).
+  const dragCaptionStateRef = useRef(null); // { mode: 'move', grabDx, grabDy } | { mode: 'resize', edge, startBoxWidth, startX, anchorX } | null
+  const liveCaptionStateRef = useRef(null); // { x, y } | { x, boxWidth } during an active drag/resize, else null
+  const [isDraggingCaption, setIsDraggingCaption] = useState(false);
   const [isDraggingOverlay, setIsDraggingOverlay] = useState(false);
   const [selectedOverlayTrackId, setSelectedOverlayTrackId] = useState(null); // which overlay track's Composition controls are shown
 
@@ -2259,6 +2280,9 @@ export default function VideoEditorWorkspace() {
           textOverlays: drawTimeline.textOverlays.map((o) => (o.id === liveTextPositionRef.current.id ? { ...o, x: liveTextPositionRef.current.x, y: liveTextPositionRef.current.y } : o)),
         };
       }
+      if (liveCaptionStateRef.current) {
+        drawTimeline = { ...drawTimeline, captionStyle: { ...drawTimeline.captionStyle, ...liveCaptionStateRef.current } };
+      }
 
       drawCompositionFrame(ctx, {
         timeline: drawTimeline,
@@ -2282,6 +2306,34 @@ export default function VideoEditorWorkspace() {
       drawImageOverlays(ctx, { timeline: drawTimeline, timelineSeconds: playhead, imageElements: imageOverlayElsRef.current });
       drawShapeOverlays(ctx, { timeline: drawTimeline, timelineSeconds: playhead });
       drawTextOverlays(ctx, { timeline: drawTimeline, timelineSeconds: playhead });
+      if (drawTimeline.captionsEnabled && captionEvents.length) {
+        const activeCaptionEvent = findActiveCaptionEvent(captionEvents, playhead);
+        if (activeCaptionEvent) {
+          drawCaptions(ctx, { style: drawTimeline.captionStyle, event: activeCaptionEvent, timelineSeconds: playhead, timeline: drawTimeline });
+          // The box outline + side resize handles are editing chrome, shown
+          // only while the Captions panel is open (same idea as the safe-
+          // zone guides below) — never part of the actual export, drawn
+          // straight onto this preview-only canvas pass after drawCaptions
+          // rather than through drawCompositionFrame/timelineRender.js.
+          if (activeCategory === 'captions') {
+            const b = getCaptionBounds(ctx, drawTimeline.captionStyle, activeCaptionEvent, composeW, composeH);
+            if (b) {
+              ctx.save();
+              ctx.strokeStyle = 'rgba(124,58,237,0.9)';
+              ctx.lineWidth = 2;
+              ctx.setLineDash([6, 4]);
+              ctx.strokeRect(b.x, b.y, b.w, b.h);
+              ctx.setLineDash([]);
+              ctx.fillStyle = 'rgba(124,58,237,0.9)';
+              const handleW = 10, handleH = Math.min(40, b.h * 0.6);
+              const handleY = b.y + b.h / 2 - handleH / 2;
+              ctx.fillRect(b.x - handleW / 2, handleY, handleW, handleH);
+              ctx.fillRect(b.x + b.w - handleW / 2, handleY, handleW, handleH);
+              ctx.restore();
+            }
+          }
+        }
+      }
 
       // Safe-zone guides — preview only, drawn after everything else so
       // they're always visible on top, and never passed through
@@ -2319,7 +2371,7 @@ export default function VideoEditorWorkspace() {
     rafRef.current = requestAnimationFrame(tick);
     return () => { cancelled = true; if (rafRef.current) cancelAnimationFrame(rafRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeline, playhead, playing, previewRate]);
+  }, [timeline, playhead, playing, previewRate, captionEvents, activeCategory]);
 
   // ---- Free-drag PiP repositioning (mouse + touch via Pointer Events) ----
   function canvasPointFromEvent(e) {
@@ -2330,13 +2382,42 @@ export default function VideoEditorWorkspace() {
     return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
   }
 
-  // Hit-tests text overlays first (they draw last = visually topmost),
-  // then overlay tracks top-most first (last in overlayTracks = drawn last
-  // = visually on top) — so a drag anywhere grabs whichever element is
-  // actually visible at that point.
+  // Hit-tests the caption box first (it draws last of all = visually
+  // topmost — see the render loop's drawCaptions call), then text overlays
+  // (drawn just before it), then overlay tracks top-most first (last in
+  // overlayTracks = drawn last among those = visually on top) — so a drag
+  // anywhere grabs whichever element is actually visible at that point.
   function handleOverlayPointerDown(e) {
     const point = canvasPointFromEvent(e);
     const ctx = canvasRef.current?.getContext('2d');
+    if (ctx && timeline.captionsEnabled && captionEvents.length) {
+      const activeCaptionEvent = findActiveCaptionEvent(captionEvents, playhead);
+      const b = activeCaptionEvent ? getCaptionBounds(ctx, timeline.captionStyle, activeCaptionEvent, composeW, composeH) : null;
+      if (b) {
+        // A grab band around each side edge (rather than requiring a pixel-
+        // perfect hit on the 1px edge itself) so resizing is actually
+        // reachable on a touch screen, not just with a mouse.
+        const grabPx = Math.max(14, composeW * 0.015);
+        const withinY = point.y >= b.y - 12 && point.y <= b.y + b.h + 12;
+        const nearLeft = withinY && Math.abs(point.x - b.x) <= grabPx;
+        const nearRight = withinY && Math.abs(point.x - (b.x + b.w)) <= grabPx;
+        const insideBox = point.x >= b.x && point.x <= b.x + b.w && point.y >= b.y && point.y <= b.y + b.h;
+        if (nearLeft || nearRight) {
+          e.target.setPointerCapture(e.pointerId);
+          dragCaptionStateRef.current = { mode: 'resize', edge: nearLeft ? 'left' : 'right', anchorX: nearLeft ? b.x + b.w : b.x };
+          liveCaptionStateRef.current = { x: timeline.captionStyle.x, boxWidth: timeline.captionStyle.boxWidth };
+          setIsDraggingCaption(true);
+          return;
+        }
+        if (insideBox) {
+          e.target.setPointerCapture(e.pointerId);
+          dragCaptionStateRef.current = { mode: 'move', grabDx: point.x - (timeline.captionStyle.x ?? 0.5) * composeW, grabDy: point.y - (timeline.captionStyle.y ?? 0.85) * composeH };
+          liveCaptionStateRef.current = { x: timeline.captionStyle.x, y: timeline.captionStyle.y };
+          setIsDraggingCaption(true);
+          return;
+        }
+      }
+    }
     if (ctx) {
       const activeTextOverlays = timeline.textOverlays.filter((o) => playhead >= o.start && (o.end == null || playhead < o.end));
       for (let i = activeTextOverlays.length - 1; i >= 0; i--) {
@@ -2367,6 +2448,23 @@ export default function VideoEditorWorkspace() {
   }
 
   function handleOverlayPointerMove(e) {
+    if (dragCaptionStateRef.current) {
+      const point = canvasPointFromEvent(e);
+      if (dragCaptionStateRef.current.mode === 'resize') {
+        const anchorX = dragCaptionStateRef.current.anchorX;
+        const newWidthPx = Math.max(60, Math.abs(point.x - anchorX));
+        const newCenterX = (anchorX + point.x) / 2;
+        liveCaptionStateRef.current = {
+          x: Math.max(0, Math.min(1, newCenterX / composeW)),
+          boxWidth: Math.max(0.2, Math.min(1, newWidthPx / composeW)),
+        };
+      } else {
+        const x = Math.max(0, Math.min(1, (point.x - dragCaptionStateRef.current.grabDx) / composeW));
+        const y = Math.max(0, Math.min(1, (point.y - dragCaptionStateRef.current.grabDy) / composeH));
+        liveCaptionStateRef.current = { x, y };
+      }
+      return;
+    }
     if (dragTextStateRef.current) {
       const point = canvasPointFromEvent(e);
       const x = Math.max(0, Math.min(1, (point.x - dragTextStateRef.current.grabDx) / composeW));
@@ -2383,6 +2481,21 @@ export default function VideoEditorWorkspace() {
   }
 
   function handleOverlayPointerUp() {
+    if (dragCaptionStateRef.current) {
+      const mode = dragCaptionStateRef.current.mode;
+      const finalState = liveCaptionStateRef.current;
+      dragCaptionStateRef.current = null;
+      setIsDraggingCaption(false);
+      if (finalState) {
+        commit((tl) => {
+          let next = mode === 'resize' ? setCaptionBoxWidth(tl, finalState.boxWidth) : tl;
+          next = setCaptionPosition(next, mode === 'resize' ? { x: finalState.x, y: next.captionStyle.y } : { x: finalState.x, y: finalState.y });
+          return next;
+        });
+      }
+      liveCaptionStateRef.current = null;
+      return;
+    }
     if (dragTextStateRef.current) {
       const { id } = dragTextStateRef.current;
       const finalPosition = liveTextPositionRef.current;
@@ -2413,6 +2526,7 @@ export default function VideoEditorWorkspace() {
         onStatus: (s) => setRenderStatus(s === 'done' ? 'idle' : s),
         onProgress: setRenderProgress,
         cancelToken,
+        captionEvents,
       });
       downloadBlob(blob, 'video/mp4', 'edited-video.mp4');
       setRenderStatus('idle');
@@ -2505,65 +2619,10 @@ export default function VideoEditorWorkspace() {
   function handleDownloadVtt() { downloadBlob(transcriptToVtt(transcript), 'text/vtt', 'edited-video.vtt'); }
   function handleDownloadTxt() { downloadBlob(transcriptToPlainText(transcript), 'text/plain', 'edited-video-transcript.txt'); }
 
-  // Renders the actual final video (once, fresh — never reusing a
-  // possibly-stale earlier export) and burns the captions into that same
-  // pass, producing exactly one downloaded file — the "Final MP4" the
-  // Auto Captions workflow ends at, rather than exporting once for
-  // transcription and again for captions the way this used to work.
-  async function handleBurnCaptions() {
-    if (!transcript || !mainClips.length) return;
-    setBurnError('');
-    setBurnStatus('rendering-video');
-    setBurnProgress(0);
-    setBurnEta('');
-    const cancelToken = { cancelled: false };
-    burnCancelRef.current = cancelToken;
-    burnStartRef.current = Date.now();
-    try {
-      const videoBlob = await renderTimeline(timeline, {
-        onStatus: () => {},
-        onProgress: setBurnProgress,
-        cancelToken,
-      });
-      if (cancelToken.cancelled) throw new TimelineRenderCancelledError();
-      setBurnProgress(0);
-      setBurnStatus('loading');
-      const videoFile = new File([videoBlob], 'edited-video.mp4', { type: 'video/mp4' });
-      const assText = transcriptToAss(transcript, DEFAULT_CAPTION_STYLE);
-      setBurnStatus('burning');
-      burnStartRef.current = Date.now();
-      const mp4Blob = await burnAssSubtitles({
-        videoFile,
-        assText,
-        onProgress: (p) => {
-          setBurnProgress(p);
-          const elapsedSec = (Date.now() - burnStartRef.current) / 1000;
-          setBurnEta(p > 0.03 ? `~${formatDuration(Math.max(0, elapsedSec / p - elapsedSec))} remaining` : '');
-        },
-        cancelToken,
-      });
-      downloadBlob(mp4Blob, 'video/mp4', 'edited-video-captioned.mp4');
-      setBurnStatus('idle');
-      setBurnEta('');
-    } catch (err) {
-      if (err instanceof FfmpegCancelledError || err instanceof TimelineRenderCancelledError || cancelToken.cancelled) {
-        setBurnStatus('idle');
-        setBurnProgress(0);
-        setBurnEta('');
-      } else {
-        setBurnStatus('error');
-        setBurnError(err instanceof FfmpegLoadError || err instanceof FfmpegRenderError || err instanceof TimelineRenderError ? err.message : 'Could not burn captions into this video. Please try again.');
-      }
-    } finally {
-      burnCancelRef.current = null;
-    }
-  }
-  function handleCancelBurnCaptions() {
-    if (burnCancelRef.current) burnCancelRef.current.cancelled = true;
-  }
-
   // Burn Subtitles: no transcription, no AI — the user already has an
-  // .srt/.vtt file and just wants it hardcoded into the video's pixels.
+  // .srt/.vtt file. Parsing it is all this does now; becoming visible in
+  // the preview/export is the same captionsEnabled toggle Auto Captions
+  // uses (see the Captions panel JSX), not a separate burn action.
   async function handleSubtitleFile(files) {
     const f = files[0];
     if (!f) return;
@@ -2587,73 +2646,8 @@ export default function VideoEditorWorkspace() {
     setSubtitleParseError('');
   }
 
-  // Same render-then-burn pipeline as Auto Captions' handleBurnCaptions
-  // (render the current edited timeline fresh, then burn styled subtitles
-  // into that render) — only the source of the cues differs: an uploaded
-  // file's segments here, transcript.segments there. transcriptToAss
-  // doesn't care which produced them, since both are the same
-  // { segments: [{start,end,text}] } shape.
-  async function handleBurnSubtitles() {
-    if (!uploadedSubtitle || !mainClips.length) return;
-    setBurnSubtitleError('');
-    setBurnSubtitleStatus('rendering-video');
-    setBurnSubtitleProgress(0);
-    setBurnSubtitleEta('');
-    const cancelToken = { cancelled: false };
-    burnSubtitleCancelRef.current = cancelToken;
-    burnSubtitleStartRef.current = Date.now();
-    try {
-      const videoBlob = await renderTimeline(timeline, {
-        onStatus: () => {},
-        onProgress: setBurnSubtitleProgress,
-        cancelToken,
-      });
-      if (cancelToken.cancelled) throw new TimelineRenderCancelledError();
-      setBurnSubtitleProgress(0);
-      setBurnSubtitleStatus('loading');
-      const videoFile = new File([videoBlob], 'edited-video.mp4', { type: 'video/mp4' });
-      const assText = transcriptToAss(uploadedSubtitle, subtitleStyle);
-      setBurnSubtitleStatus('burning');
-      burnSubtitleStartRef.current = Date.now();
-      const mp4Blob = await burnAssSubtitles({
-        videoFile,
-        assText,
-        onProgress: (p) => {
-          setBurnSubtitleProgress(p);
-          const elapsedSec = (Date.now() - burnSubtitleStartRef.current) / 1000;
-          setBurnSubtitleEta(p > 0.03 ? `~${formatDuration(Math.max(0, elapsedSec / p - elapsedSec))} remaining` : '');
-        },
-        cancelToken,
-      });
-      downloadBlob(mp4Blob, 'video/mp4', 'edited-video-subtitled.mp4');
-      setBurnSubtitleStatus('idle');
-      setBurnSubtitleEta('');
-    } catch (err) {
-      if (err instanceof FfmpegCancelledError || err instanceof TimelineRenderCancelledError || cancelToken.cancelled) {
-        setBurnSubtitleStatus('idle');
-        setBurnSubtitleProgress(0);
-        setBurnSubtitleEta('');
-      } else {
-        setBurnSubtitleStatus('error');
-        setBurnSubtitleError(err instanceof FfmpegLoadError || err instanceof FfmpegRenderError || err instanceof TimelineRenderError ? err.message : 'Could not burn subtitles into this video. Please try again.');
-      }
-    } finally {
-      burnSubtitleCancelRef.current = null;
-    }
-  }
-  function handleCancelBurnSubtitles() {
-    if (burnSubtitleCancelRef.current) burnSubtitleCancelRef.current.cancelled = true;
-  }
-
   const isExporting = renderStatus === 'preparing' || renderStatus === 'rendering' || renderStatus === 'finalizing';
   const isTranscribing = transcribeStatus === 'preparing-audio' || transcribeStatus === 'rendering-audio' || transcribeStatus === 'preparing' || transcribeStatus === 'transcribing' || transcribeStatus === 'merging';
-  const isBurning = burnStatus === 'rendering-video' || burnStatus === 'loading' || burnStatus === 'burning';
-  // ffmpeg.wasm is a single lazy-loaded singleton (see ffmpegClient.js) —
-  // it can't run two exec() calls at once, so Auto Captions' burn and
-  // Burn Subtitles' burn must never overlap even though they're otherwise
-  // fully independent state machines.
-  const isBurningSubtitles = burnSubtitleStatus === 'rendering-video' || burnSubtitleStatus === 'loading' || burnSubtitleStatus === 'burning';
-  const isBurningAnything = isBurning || isBurningSubtitles;
   const supported = isTimelineExportSupported();
 
   // Empty state shows the SAME editor chrome (header + tool rail) as the
@@ -2840,41 +2834,10 @@ export default function VideoEditorWorkspace() {
               onPointerCancel={handleOverlayPointerUp}
               style={{
                 maxWidth: '100%', maxHeight: isFullscreenPreview ? '100vh' : 'clamp(220px, 46vh, 460px)', width: 'auto', height: 'auto', display: 'block',
-                touchAction: (overlayTracks.some((t) => t.mode === 'pip') || timeline.textOverlays.length > 0) ? 'none' : 'auto',
-                cursor: (overlayTracks.some((t) => t.mode === 'pip') || timeline.textOverlays.length > 0) ? (isDraggingOverlay ? 'grabbing' : 'grab') : 'default',
+                touchAction: (overlayTracks.some((t) => t.mode === 'pip') || timeline.textOverlays.length > 0 || (timeline.captionsEnabled && captionEvents.length > 0)) ? 'none' : 'auto',
+                cursor: (overlayTracks.some((t) => t.mode === 'pip') || timeline.textOverlays.length > 0 || (timeline.captionsEnabled && captionEvents.length > 0)) ? (isDraggingOverlay ? 'grabbing' : 'grab') : 'default',
               }}
             />
-            {uploadedSubtitle && (() => {
-              const cue = transcriptToCaptionCues(uploadedSubtitle).find((c) => playhead >= c.start && playhead < c.end);
-              if (!cue) return null;
-              const scale = subtitleStyle.fontSize / DEFAULT_CAPTION_STYLE.fontSize;
-              const hasBackground = (subtitleStyle.backgroundOpacity ?? 0) > 0;
-              return (
-                <div
-                  style={{
-                    position: 'absolute', left: '6%', right: '6%', textAlign: 'center', pointerEvents: 'none', zIndex: 4,
-                    top: subtitleStyle.position === 'top' ? '5%' : subtitleStyle.position === 'middle' ? '50%' : 'auto',
-                    bottom: subtitleStyle.position === 'bottom' ? '6%' : 'auto',
-                    transform: subtitleStyle.position === 'middle' ? 'translateY(-50%)' : 'none',
-                  }}
-                >
-                  {cue.lines.map((line, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        display: 'inline-block', color: subtitleStyle.color, fontWeight: 700, lineHeight: 1.3,
-                        fontSize: `${1.05 * scale}rem`,
-                        ...(hasBackground
-                          ? { background: `rgba(0,0,0,${subtitleStyle.backgroundOpacity})`, padding: '2px 8px', borderRadius: 4 }
-                          : { textShadow: `1px 1px 0 ${subtitleStyle.outlineColor}, -1px -1px 0 ${subtitleStyle.outlineColor}, 1px -1px 0 ${subtitleStyle.outlineColor}, -1px 1px 0 ${subtitleStyle.outlineColor}` }),
-                      }}
-                    >
-                      {line}
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
             <video ref={mainVideoRef} muted playsInline style={{ display: 'none' }} />
             <video ref={mainCrossfadeVideoRef} muted playsInline style={{ display: 'none' }} />
             {overlayTracks.map((track) => (
@@ -2885,9 +2848,9 @@ export default function VideoEditorWorkspace() {
               </Fragment>
             ))}
           </div>
-          {(overlayTracks.some((t) => t.mode === 'pip') || timeline.textOverlays.length > 0) && (
+          {(overlayTracks.some((t) => t.mode === 'pip') || timeline.textOverlays.length > 0 || (timeline.captionsEnabled && captionEvents.length > 0)) && (
             <p style={{ fontSize: '0.68rem', color: T.muted, margin: '0 0 8px', textAlign: 'center' }}>
-              Drag an overlay or text layer directly on the preview to reposition it.
+              Drag an overlay, text layer, or caption directly on the preview to reposition it — drag a caption&apos;s side handles to resize its text box.
             </p>
           )}
 
@@ -4447,97 +4410,173 @@ export default function VideoEditorWorkspace() {
                   <button onClick={handleDownloadTxt} style={smallBtn}>⬇ TXT</button>
                   <button onClick={() => { setTranscript(null); setTranscribeStatus('idle'); }} style={smallBtn}>Re-transcribe</button>
                 </div>
-                <button onClick={handleBurnCaptions} disabled={isBurningAnything} style={{ ...primaryBtn(isBurningAnything), width: '100%', marginTop: 8, padding: '10px 20px', fontSize: '0.85rem' }}>
-                  {isBurning ? `${BURN_STATUS_LABEL[burnStatus] || 'Working…'} ${Math.round(burnProgress * 100)}%${burnEta ? ` — ${burnEta}` : ''}` : '🔥 Burn captions & export final video'}
-                </button>
-                {isBurning && (
-                  <>
-                    <p style={{ margin: '6px 0 0', fontSize: '0.68rem', color: T.muted }}>Keep this tab open while the final video renders.</p>
-                    <button onClick={handleCancelBurnCaptions} style={{ ...smallBtn, marginTop: 6 }}>Cancel</button>
-                  </>
-                )}
-                {burnStatus === 'error' && <div style={{ ...statusBox, marginTop: 8 }}>⚠️ {burnError}</div>}
               </>
             )}
           </div>
 
           {/* Burn Subtitles — separate from Auto Captions above: no
               transcription, no AI, the user already has an .srt/.vtt file.
-              Reuses the exact same styled ffmpeg burn-in engine (see
-              handleBurnSubtitles), just with an uploaded file's cues
-              instead of a generated transcript's. */}
+              Once parsed it becomes just another caption source for the
+              SAME style/position/toggle below (see captionEvents), not a
+              separate styled burn pipeline of its own. */}
           <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginTop: 10 }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Burn Subtitles</div>
             {!mainClips.length ? (
-              <p style={{ fontSize: '0.72rem', color: T.muted, margin: 0 }}>Add a clip to the timeline, then burn a subtitle file into it here.</p>
+              <p style={{ fontSize: '0.72rem', color: T.muted, margin: 0 }}>Add a clip to the timeline, then upload a subtitle file for it here.</p>
             ) : !uploadedSubtitle ? (
               <>
-                <p style={{ fontSize: '0.7rem', color: T.muted, margin: '0 0 8px' }}>Already have captions? Upload an .srt or .vtt file to burn them directly into your video — no transcription needed.</p>
+                <p style={{ fontSize: '0.7rem', color: T.muted, margin: '0 0 8px' }}>Already have captions? Upload an .srt or .vtt file — no transcription needed. Style, position, and export use the same controls as Auto Captions, below.</p>
                 <UploadBox accept=".srt,.vtt,text/vtt,application/x-subrip" onFiles={handleSubtitleFile} maxSizeMB={5} compact compactLabel="+ Upload .srt or .vtt file" />
                 {subtitleParseError && <div style={{ ...statusBox, marginTop: 8 }}>⚠️ {subtitleParseError}</div>}
               </>
             ) : (
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
-                  <span style={{ fontSize: '0.72rem', color: T.inkSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    📄 {subtitleFileName} · {uploadedSubtitle.segments.length} cue{uploadedSubtitle.segments.length === 1 ? '' : 's'}
-                  </span>
-                  <button onClick={handleRemoveSubtitle} style={{ ...smallBtn, padding: '5px 10px', flexShrink: 0 }}>Remove</button>
-                </div>
-
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
-                  <label style={fieldLabel}>Font size {subtitleStyle.fontSize}px
-                    <input type="range" min={16} max={56} step={2} value={subtitleStyle.fontSize}
-                      onChange={(e) => setSubtitleStyle((s) => ({ ...s, fontSize: parseInt(e.target.value, 10) }))} style={{ width: 110 }} />
-                  </label>
-                  <div>
-                    <div style={{ ...fieldLabel, marginBottom: 4 }}>Position</div>
-                    <div style={{ display: 'flex', gap: 5 }}>
-                      {SUBTITLE_POSITION_OPTIONS.map((p) => (
-                        <button key={p.id} onClick={() => setSubtitleStyle((s) => ({ ...s, position: p.id }))}
-                          style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.68rem', background: subtitleStyle.position === p.id ? T.accentGradient : 'white', color: subtitleStyle.position === p.id ? 'white' : T.inkSecondary, border: subtitleStyle.position === p.id ? 'none' : `1px solid ${T.border}` }}>
-                          {p.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
-                  <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6 }}>Text color
-                    <input type="color" value={subtitleStyle.color} onChange={(e) => setSubtitleStyle((s) => ({ ...s, color: e.target.value }))} style={{ width: 32, height: 28, padding: 0, border: `1px solid ${T.border}`, borderRadius: 6, cursor: 'pointer' }} />
-                  </label>
-                  <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6 }}>Outline color
-                    <input type="color" value={subtitleStyle.outlineColor} onChange={(e) => setSubtitleStyle((s) => ({ ...s, outlineColor: e.target.value }))} style={{ width: 32, height: 28, padding: 0, border: `1px solid ${T.border}`, borderRadius: 6, cursor: 'pointer' }} />
-                  </label>
-                  <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={(subtitleStyle.backgroundOpacity ?? 0) > 0} onChange={(e) => setSubtitleStyle((s) => ({ ...s, backgroundOpacity: e.target.checked ? 0.6 : 0 }))} />
-                    Background box
-                  </label>
-                  {(subtitleStyle.backgroundOpacity ?? 0) > 0 && (
-                    <label style={fieldLabel}>Opacity {Math.round(subtitleStyle.backgroundOpacity * 100)}%
-                      <input type="range" min={0.2} max={1} step={0.05} value={subtitleStyle.backgroundOpacity}
-                        onChange={(e) => setSubtitleStyle((s) => ({ ...s, backgroundOpacity: parseFloat(e.target.value) }))} style={{ width: 90 }} />
-                    </label>
-                  )}
-                </div>
-
-                <button onClick={handleBurnSubtitles} disabled={isBurningAnything} style={{ ...primaryBtn(isBurningAnything), width: '100%', padding: '10px 20px', fontSize: '0.85rem' }}>
-                  {isBurningSubtitles ? `${BURN_SUBTITLE_STATUS_LABEL[burnSubtitleStatus] || 'Working…'} ${Math.round(burnSubtitleProgress * 100)}%${burnSubtitleEta ? ` — ${burnSubtitleEta}` : ''}` : '🔥 Burn subtitles & export final video'}
-                </button>
-                {isBurningSubtitles && (
-                  <>
-                    <p style={{ margin: '6px 0 0', fontSize: '0.68rem', color: T.muted }}>Keep this tab open while the final video renders.</p>
-                    <button onClick={handleCancelBurnSubtitles} style={{ ...smallBtn, marginTop: 6 }}>Cancel</button>
-                  </>
-                )}
-                {burnSubtitleStatus === 'error' && <div style={{ ...statusBox, marginTop: 8 }}>⚠️ {burnSubtitleError}</div>}
-                <p style={{ fontSize: '0.64rem', color: T.muted, margin: '8px 0 0' }}>
-                  Burned into the video&apos;s actual pixels — permanent, and not something a viewer can turn off. Cue timestamps are relative to this timeline as it is right now; if you trim, retime, or otherwise change the timeline afterward, re-burn so they stay in sync.
-                </p>
-              </>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ fontSize: '0.72rem', color: T.inkSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  📄 {subtitleFileName} · {uploadedSubtitle.segments.length} cue{uploadedSubtitle.segments.length === 1 ? '' : 's'}
+                </span>
+                <button onClick={handleRemoveSubtitle} style={{ ...smallBtn, padding: '5px 10px', flexShrink: 0 }}>Remove</button>
+              </div>
             )}
           </div>
+
+          {/* Unified style/position/export — whichever source above is
+              active (an uploaded file takes priority over a transcript, see
+              captionEvents), this is the ONE place to style and place it,
+              live on the preview canvas and identically in the export the
+              moment "Show captions" is on. Dragging the caption directly on
+              the preview (position) and its side handles (text-box width)
+              works while this panel is open — see the render loop's own
+              box/handle drawing, gated on activeCategory === 'captions'. */}
+          {captionEvents.length > 0 && (
+            <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginTop: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, textTransform: 'uppercase', letterSpacing: 0.3 }}>Caption style &amp; position</div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', fontWeight: 700, color: T.inkSecondary, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!timeline.captionsEnabled} onChange={(e) => commit((tl) => setCaptionsEnabled(tl, e.target.checked))} />
+                  Show in preview &amp; export
+                </label>
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ ...fieldLabel, marginBottom: 4 }}>Presets</div>
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                  {CAPTION_PRESET_OPTIONS.map((p) => (
+                    <button key={p.id} onClick={() => commit((tl) => setCaptionPreset(tl, p.id))}
+                      style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.68rem', background: timeline.captionStyle.preset === p.id ? T.accentGradient : 'white', color: timeline.captionStyle.preset === p.id ? 'white' : T.inkSecondary, border: timeline.captionStyle.preset === p.id ? 'none' : `1px solid ${T.border}` }}>
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 10 }}>
+                <label style={fieldLabel}>Font size {timeline.captionStyle.fontSize}px
+                  <input type="range" min={16} max={72} step={2} value={timeline.captionStyle.fontSize}
+                    onChange={(e) => commit((tl) => setCaptionStyle(tl, { fontSize: parseInt(e.target.value, 10) }))} style={{ width: 110 }} />
+                </label>
+                <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!timeline.captionStyle.bold} onChange={(e) => commit((tl) => setCaptionStyle(tl, { bold: e.target.checked }))} />
+                  Bold
+                </label>
+                <div>
+                  <div style={{ ...fieldLabel, marginBottom: 4 }}>Text box width {Math.round(timeline.captionStyle.boxWidth * 100)}%</div>
+                  <input type="range" min={20} max={100} step={2} value={Math.round(timeline.captionStyle.boxWidth * 100)}
+                    onChange={(e) => commit((tl) => setCaptionBoxWidth(tl, parseInt(e.target.value, 10) / 100))} style={{ width: 130 }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+                <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6 }}>Text color
+                  <input type="color" value={timeline.captionStyle.color} onChange={(e) => commit((tl) => setCaptionStyle(tl, { color: e.target.value }))} style={{ width: 32, height: 28, padding: 0, border: `1px solid ${T.border}`, borderRadius: 6, cursor: 'pointer' }} />
+                </label>
+                <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6 }}>Highlight color
+                  <input type="color" value={timeline.captionStyle.highlightColor} onChange={(e) => commit((tl) => setCaptionStyle(tl, { highlightColor: e.target.value }))} style={{ width: 32, height: 28, padding: 0, border: `1px solid ${T.border}`, borderRadius: 6, cursor: 'pointer' }} />
+                </label>
+                <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={timeline.captionStyle.outline} onChange={(e) => commit((tl) => setCaptionStyle(tl, { outline: e.target.checked }))} />
+                  Outline
+                </label>
+                {timeline.captionStyle.outline && (
+                  <input type="color" value={timeline.captionStyle.outlineColor} onChange={(e) => commit((tl) => setCaptionStyle(tl, { outlineColor: e.target.value }))} style={{ width: 32, height: 28, padding: 0, border: `1px solid ${T.border}`, borderRadius: 6, cursor: 'pointer' }} />
+                )}
+                <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={timeline.captionStyle.shadow} onChange={(e) => commit((tl) => setCaptionStyle(tl, { shadow: e.target.checked }))} />
+                  Shadow
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+                <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={timeline.captionStyle.background === 'box'} onChange={(e) => commit((tl) => setCaptionStyle(tl, { background: e.target.checked ? 'box' : 'none' }))} />
+                  Background box
+                </label>
+                {timeline.captionStyle.background === 'box' && (
+                  <>
+                    <input type="color" value={timeline.captionStyle.backgroundColor} onChange={(e) => commit((tl) => setCaptionStyle(tl, { backgroundColor: e.target.value }))} style={{ width: 32, height: 28, padding: 0, border: `1px solid ${T.border}`, borderRadius: 6, cursor: 'pointer' }} />
+                    <label style={fieldLabel}>Opacity {Math.round(timeline.captionStyle.backgroundOpacity * 100)}%
+                      <input type="range" min={0.2} max={1} step={0.05} value={timeline.captionStyle.backgroundOpacity}
+                        onChange={(e) => commit((tl) => setCaptionStyle(tl, { backgroundOpacity: parseFloat(e.target.value) }))} style={{ width: 90 }} />
+                    </label>
+                  </>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+                <label style={fieldLabel}>Opacity {Math.round(timeline.captionStyle.opacity * 100)}%
+                  <input type="range" min={0.2} max={1} step={0.05} value={timeline.captionStyle.opacity}
+                    onChange={(e) => commit((tl) => setCaptionStyle(tl, { opacity: parseFloat(e.target.value) }))} style={{ width: 100 }} />
+                </label>
+                <label style={fieldLabel}>Line spacing {timeline.captionStyle.lineHeight.toFixed(2)}×
+                  <input type="range" min={1} max={2} step={0.05} value={timeline.captionStyle.lineHeight}
+                    onChange={(e) => commit((tl) => setCaptionStyle(tl, { lineHeight: parseFloat(e.target.value) }))} style={{ width: 100 }} />
+                </label>
+                <label style={fieldLabel}>Letter spacing {timeline.captionStyle.letterSpacing}px
+                  <input type="range" min={-2} max={10} step={0.5} value={timeline.captionStyle.letterSpacing}
+                    onChange={(e) => commit((tl) => setCaptionStyle(tl, { letterSpacing: parseFloat(e.target.value) }))} style={{ width: 100 }} />
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 10 }}>
+                <div>
+                  <div style={{ ...fieldLabel, marginBottom: 4 }}>Alignment</div>
+                  <div style={{ display: 'flex', gap: 5 }}>
+                    {CAPTION_ALIGN_OPTIONS.map((a) => (
+                      <button key={a.id} onClick={() => commit((tl) => setCaptionStyle(tl, { align: a.id }))}
+                        style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.68rem', background: timeline.captionStyle.align === a.id ? T.accentGradient : 'white', color: timeline.captionStyle.align === a.id ? 'white' : T.inkSecondary, border: timeline.captionStyle.align === a.id ? 'none' : `1px solid ${T.border}` }}>
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ ...fieldLabel, marginBottom: 4 }}>Word highlight</div>
+                  <div style={{ display: 'flex', gap: 5 }}>
+                    {CAPTION_HIGHLIGHT_OPTIONS.map((h) => (
+                      <button key={h.id} onClick={() => commit((tl) => setCaptionStyle(tl, { highlightMode: h.id }))}
+                        style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.68rem', background: timeline.captionStyle.highlightMode === h.id ? T.accentGradient : 'white', color: timeline.captionStyle.highlightMode === h.id ? 'white' : T.inkSecondary, border: timeline.captionStyle.highlightMode === h.id ? 'none' : `1px solid ${T.border}` }}>
+                        {h.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ ...fieldLabel, marginBottom: 4 }}>Animation</div>
+                  <div style={{ display: 'flex', gap: 5 }}>
+                    {CAPTION_ANIMATION_OPTIONS.map((a) => (
+                      <button key={a.id} onClick={() => commit((tl) => setCaptionStyle(tl, { animation: a.id }))}
+                        style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.68rem', background: timeline.captionStyle.animation === a.id ? T.accentGradient : 'white', color: timeline.captionStyle.animation === a.id ? 'white' : T.inkSecondary, border: timeline.captionStyle.animation === a.id ? 'none' : `1px solid ${T.border}` }}>
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <p style={{ fontSize: '0.66rem', color: T.muted, margin: 0 }}>
+                Drag the caption directly on the preview above to reposition it, or its side handles to resize the text box — both update live and match the export exactly. Word highlight/karaoke timing is approximated evenly across each caption{uploadedSubtitle ? '' : ' (V1 has no real per-word transcription timestamps yet)'}, not tied to actual speech detection.
+              </p>
+            </div>
+          )}
           </>)}
 
           <p style={{ fontSize: '0.68rem', color: T.muted, marginTop: 10, textAlign: 'center' }}>

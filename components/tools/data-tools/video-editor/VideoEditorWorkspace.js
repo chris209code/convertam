@@ -37,7 +37,7 @@ import {
   trimLinkedClip, splitLinkedClip, moveLinkedClip, moveLinkedClipToIndex, deleteLinkedClip, deleteLinkedClips, duplicateLinkedClip, duplicateLinkedClips,
   CAPTION_PRESETS, setCaptionsEnabled, setCaptionStyle, setCaptionPreset, setCaptionPosition, setCaptionBoxWidth,
 } from '@/lib/media/timeline';
-import { drawCompositionFrame, drawTextOverlays, drawImageOverlays, drawShapeOverlays, drawCaptions, computeLayoutRects, pipPositionFromPoint, getComposeSize, getFadeOpacity, getTextOverlayBounds, getCaptionBounds, buildCutoutCanvas } from '@/lib/media/compositionLayouts';
+import { drawCompositionFrame, drawTextOverlays, drawImageOverlays, drawShapeOverlays, drawCaptions, drawMasterFade, computeLayoutRects, pipPositionFromPoint, getComposeSize, getFadeOpacity, getTextOverlayBounds, getImageOverlayBounds, getCaptionBounds, buildCutoutCanvas } from '@/lib/media/compositionLayouts';
 import { ensureSegmenterLoaded, getPersonMaskCanvas } from '@/lib/media/segmentation';
 import { renderTimeline, renderTimelineAudio, isTimelineExportSupported, TimelineRenderCancelledError, TimelineRenderError } from '@/lib/media/timelineRender';
 import { extractThumbnails, thumbnailsForRange } from '@/lib/media/thumbnails';
@@ -519,6 +519,11 @@ export default function VideoEditorWorkspace() {
   const canvasRef = useRef(null);
   const previewWrapRef = useRef(null);
   const mainVideoRef = useRef(null);
+  // A static image on the MAIN track (slideshow) has no video to decode —
+  // it needs its own <img> element, loaded/drawn instead of mainVideoRef
+  // whenever the active main clip's source is an image (see tickBody).
+  const mainImageRef = useRef(null);
+  const lastMainImageSourceIdRef = useRef(null);
   const rafRef = useRef(null);
   const lastMainClipRef = useRef(null);
   // A second, always-available main-track video element used only during a
@@ -619,6 +624,10 @@ export default function VideoEditorWorkspace() {
   // completely separate avoids any risk to the already-verified PiP drag.
   const dragTextStateRef = useRef(null); // { id, grabDx, grabDy } grab offset (in canvas px) from the overlay's own anchor point, while dragging
   const liveTextPositionRef = useRef(null); // { id, x, y } during an active drag, else null
+  // Same pattern again for a logo/watermark (timeline.imageOverlays) — a
+  // real drag on the preview replaces the old corner-preset-only UI.
+  const dragImageOverlayStateRef = useRef(null); // { id, grabDx, grabDy }
+  const liveImageOverlayPositionRef = useRef(null); // { id, x, y } during an active drag, else null
   // Same pattern again for the caption box — there's only ever one caption
   // showing at a time (unlike N text overlays), so no id is needed, just
   // whether a drag/resize is in progress. dragCaptionStateRef distinguishes
@@ -2115,8 +2124,17 @@ export default function VideoEditorWorkspace() {
       if (playing && !playStartRef.current) playStartRef.current = { atWall: performance.now(), atPlayhead: playhead };
 
       const mainHit = findActiveClipAt(timeline, MAIN_TRACK, playhead);
+      const mainSource = mainHit ? timeline.sources.find((s) => s.id === mainHit.clip.sourceId) : null;
+      const mainIsImage = mainSource?.kind === 'image';
 
-      if (mainHit) {
+      if (mainHit && mainIsImage) {
+        // A static image has no <video> to decode — loading it into
+        // mainVideoRef (as every other branch here does) silently fails,
+        // leaving the canvas with no frame to draw and the preview blank.
+        // Same isImage split the overlay-track loop below already uses.
+        if (mainImageRef.current) await loadImage(mainImageRef.current, mainHit.clip, lastMainImageSourceIdRef);
+        syncTrackPlayback(mainVideoRef.current, false);
+      } else if (mainHit) {
         await loadClip(mainVideoRef.current, mainHit.clip, lastMainClipRef);
         mainVideoRef.current.playbackRate = (mainHit.clip.speed || 1) * previewRate;
         if (mainHit.clip.reversed) {
@@ -2167,9 +2185,13 @@ export default function VideoEditorWorkspace() {
           meterBarRef.current.style.width = `${level * 100}%`;
           meterBarRef.current.style.background = level > 0.85 ? '#DC2626' : level > 0.6 ? '#F59E0B' : '#10B981';
         }
-        if (mainHit && mainHit.clip.reversed) {
+        if (mainHit && (mainHit.clip.reversed || mainIsImage)) {
+          // An image has no video audio track of its own, but can still
+          // carry replace/mix audio (e.g. narration under a title card) —
+          // same as the overlay-track isImage branch above.
+          if (mainIsImage) await applyReplacementAudioLive(mainHit.clip, 0, mainReplaceAudioElRef.current, mainReplaceGainRef.current, mainReplaceSrcNodeRef, mainReplaceLastClipRef, 1);
           mainGainRef.current.gain.value = 0;
-          mainReplaceGainRef.current.gain.value = 0;
+          if (!mainIsImage) mainReplaceGainRef.current.gain.value = 0;
         } else if (mainHit) {
           const elapsedInClip = mainHit.sourceTime - mainHit.clip.sourceStart;
           const mainDuckGain = mainHit.clip.duckBackground && mainHit.clip.audioMode === 'mix'
@@ -2294,13 +2316,19 @@ export default function VideoEditorWorkspace() {
           textOverlays: drawTimeline.textOverlays.map((o) => (o.id === liveTextPositionRef.current.id ? { ...o, x: liveTextPositionRef.current.x, y: liveTextPositionRef.current.y } : o)),
         };
       }
+      if (liveImageOverlayPositionRef.current) {
+        drawTimeline = {
+          ...drawTimeline,
+          imageOverlays: drawTimeline.imageOverlays.map((o) => (o.id === liveImageOverlayPositionRef.current.id ? { ...o, x: liveImageOverlayPositionRef.current.x, y: liveImageOverlayPositionRef.current.y } : o)),
+        };
+      }
       if (liveCaptionStateRef.current) {
         drawTimeline = { ...drawTimeline, captionStyle: { ...drawTimeline.captionStyle, ...liveCaptionStateRef.current } };
       }
 
       drawCompositionFrame(ctx, {
         timeline: drawTimeline,
-        mainEl: mainHit ? mainVideoRef.current : null,
+        mainEl: mainHit ? (mainIsImage ? mainImageRef.current : mainVideoRef.current) : null,
         mainClip: mainHit?.clip || null,
         mainOpacity,
         crossfadeEl: crossfadeLayer?.el || null,
@@ -2348,6 +2376,8 @@ export default function VideoEditorWorkspace() {
           }
         }
       }
+
+      drawMasterFade(ctx, { timeline: drawTimeline, timelineSeconds: playhead, totalDuration, canvasWidth: composeW, canvasHeight: composeH });
 
       // Safe-zone guides — preview only, drawn after everything else so
       // they're always visible on top, and never passed through
@@ -2446,6 +2476,23 @@ export default function VideoEditorWorkspace() {
         return;
       }
     }
+    // Image overlays (logos/watermarks) draw just under text/shapes (see
+    // the render loop's drawImageOverlays call, before drawTextOverlays) —
+    // hit-tested here, after text, before PIP overlay tracks, to match.
+    {
+      const activeImageOverlays = timeline.imageOverlays.filter((o) => playhead >= o.start && (o.end == null || playhead < o.end));
+      for (let i = activeImageOverlays.length - 1; i >= 0; i--) {
+        const o = activeImageOverlays[i];
+        const img = imageOverlayElsRef.current.get(o.sourceId);
+        const b = getImageOverlayBounds(o, img, composeW, composeH);
+        if (!b || point.x < b.x || point.x > b.x + b.w || point.y < b.y || point.y > b.y + b.h) continue;
+        e.target.setPointerCapture(e.pointerId);
+        dragImageOverlayStateRef.current = { id: o.id, grabDx: point.x - o.x * composeW, grabDy: point.y - o.y * composeH };
+        liveImageOverlayPositionRef.current = { id: o.id, x: o.x, y: o.y };
+        setIsDraggingOverlay(true);
+        return;
+      }
+    }
     const rects = computeLayoutRects(timeline, composeW, composeH);
     for (let i = timeline.overlayTracks.length - 1; i >= 0; i--) {
       const track = timeline.overlayTracks[i];
@@ -2486,6 +2533,13 @@ export default function VideoEditorWorkspace() {
       liveTextPositionRef.current = { id: dragTextStateRef.current.id, x, y };
       return;
     }
+    if (dragImageOverlayStateRef.current) {
+      const point = canvasPointFromEvent(e);
+      const x = Math.max(0, Math.min(1, (point.x - dragImageOverlayStateRef.current.grabDx) / composeW));
+      const y = Math.max(0, Math.min(1, (point.y - dragImageOverlayStateRef.current.grabDy) / composeH));
+      liveImageOverlayPositionRef.current = { id: dragImageOverlayStateRef.current.id, x, y };
+      return;
+    }
     if (!dragStateRef.current) return;
     const track = timeline.overlayTracks.find((t) => t.id === dragStateRef.current.trackId);
     if (!track) return;
@@ -2517,6 +2571,15 @@ export default function VideoEditorWorkspace() {
       setIsDraggingOverlay(false);
       if (finalPosition) commit((tl) => updateTextOverlay(tl, id, { x: finalPosition.x, y: finalPosition.y }));
       liveTextPositionRef.current = null;
+      return;
+    }
+    if (dragImageOverlayStateRef.current) {
+      const { id } = dragImageOverlayStateRef.current;
+      const finalPosition = liveImageOverlayPositionRef.current;
+      dragImageOverlayStateRef.current = null;
+      setIsDraggingOverlay(false);
+      if (finalPosition) commit((tl) => updateImageOverlay(tl, id, { x: finalPosition.x, y: finalPosition.y }));
+      liveImageOverlayPositionRef.current = null;
       return;
     }
     if (!dragStateRef.current) return;
@@ -2849,11 +2912,13 @@ export default function VideoEditorWorkspace() {
               onPointerCancel={handleOverlayPointerUp}
               style={{
                 maxWidth: '100%', maxHeight: isFullscreenPreview ? '100vh' : 'clamp(220px, 46vh, 460px)', width: 'auto', height: 'auto', display: 'block',
-                touchAction: (overlayTracks.some((t) => t.mode === 'pip') || timeline.textOverlays.length > 0 || (timeline.captionsEnabled && captionEvents.length > 0)) ? 'none' : 'auto',
-                cursor: (overlayTracks.some((t) => t.mode === 'pip') || timeline.textOverlays.length > 0 || (timeline.captionsEnabled && captionEvents.length > 0)) ? (isDraggingOverlay ? 'grabbing' : 'grab') : 'default',
+                touchAction: (overlayTracks.some((t) => t.mode === 'pip') || timeline.textOverlays.length > 0 || timeline.imageOverlays.length > 0 || (timeline.captionsEnabled && captionEvents.length > 0)) ? 'none' : 'auto',
+                cursor: (overlayTracks.some((t) => t.mode === 'pip') || timeline.textOverlays.length > 0 || timeline.imageOverlays.length > 0 || (timeline.captionsEnabled && captionEvents.length > 0)) ? (isDraggingOverlay ? 'grabbing' : 'grab') : 'default',
               }}
             />
             <video ref={mainVideoRef} muted playsInline style={{ display: 'none' }} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img ref={mainImageRef} alt="" style={{ display: 'none' }} />
             <video ref={mainCrossfadeVideoRef} muted playsInline style={{ display: 'none' }} />
             {overlayTracks.map((track) => (
               <Fragment key={track.id}>
@@ -2863,9 +2928,9 @@ export default function VideoEditorWorkspace() {
               </Fragment>
             ))}
           </div>
-          {(overlayTracks.some((t) => t.mode === 'pip') || timeline.textOverlays.length > 0 || (timeline.captionsEnabled && captionEvents.length > 0)) && (
+          {(overlayTracks.some((t) => t.mode === 'pip') || timeline.textOverlays.length > 0 || timeline.imageOverlays.length > 0 || (timeline.captionsEnabled && captionEvents.length > 0)) && (
             <p style={{ fontSize: '0.68rem', color: T.muted, margin: '0 0 8px', textAlign: 'center' }}>
-              Drag an overlay, text layer, or caption directly on the preview to reposition it — drag a caption&apos;s side handles to resize its text box.
+              Drag an overlay, logo, text layer, or caption directly on the preview to reposition it — drag a caption&apos;s side handles to resize its text box.
             </p>
           )}
 
@@ -3867,15 +3932,8 @@ export default function VideoEditorWorkspace() {
                       <label style={fieldLabel}>Opacity
                         <input type="range" min={0.1} max={1} step={0.02} value={o.opacity} onChange={(e) => handleUpdateImageOverlay(o.id, { opacity: parseFloat(e.target.value) })} style={{ width: 90 }} />
                       </label>
-                      <div>
-                        <div style={{ ...fieldLabel, marginBottom: 4 }}>Position</div>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          {PIP_CORNER_OPTIONS.map((c) => (
-                            <button key={c.id} onClick={() => handleUpdateImageOverlay(o.id, { x: c.id.includes('left') ? 0.12 : 0.88, y: c.id.includes('top') ? 0.12 : 0.88 })} style={{ ...smallBtn, padding: '5px 8px' }}>{c.icon}</button>
-                          ))}
-                        </div>
-                      </div>
                     </div>
+                    <p style={{ fontSize: '0.64rem', color: T.muted, margin: 0 }}>Drag it directly on the preview above to reposition it.</p>
                   </div>
                 );
               })}
@@ -4403,17 +4461,20 @@ export default function VideoEditorWorkspace() {
                 {timeline.masterMuted ? '🔇 Muted' : '🔊 Mute all'}
               </button>
             </div>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <label style={fieldLabel}>Fade in
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <label style={fieldLabel}>Fade in (from black)
                 <input type="number" step={0.5} min={0} max={totalDuration / 2} value={(timeline.masterFadeIn || 0).toFixed(1)}
                   onChange={(e) => commit((tl) => setMasterFade(tl, { masterFadeIn: parseFloat(e.target.value) || 0 }))} style={numInput} />
               </label>
-              <label style={fieldLabel}>Fade out
+              <label style={fieldLabel}>Fade out (to black)
                 <input type="number" step={0.5} min={0} max={totalDuration / 2} value={(timeline.masterFadeOut || 0).toFixed(1)}
                   onChange={(e) => commit((tl) => setMasterFade(tl, { masterFadeOut: parseFloat(e.target.value) || 0 }))} style={numInput} />
               </label>
+              {(timeline.masterFadeOut || 0) === 0 && (
+                <button onClick={() => commit((tl) => setMasterFade(tl, { masterFadeOut: 1.5 }))} style={smallBtn}>+ Fade to black at the end</button>
+              )}
             </div>
-            <p style={{ fontSize: '0.66rem', color: T.muted, margin: '6px 0 0' }}>Applies to the whole mix, on top of every clip&apos;s own volume and fades.</p>
+            <p style={{ fontSize: '0.66rem', color: T.muted, margin: '6px 0 0' }}>Fades both the picture (to/from black) and the whole mix&apos;s volume together, on top of every clip&apos;s own volume and fades.</p>
             <div style={{ marginTop: 8 }}>
               <div style={{ ...fieldLabel, marginBottom: 4 }}>Level meter <span style={{ fontWeight: 500, opacity: 0.8 }}>— live during playback</span></div>
               <div style={{ width: '100%', height: 8, borderRadius: 4, background: '#E2E8F0', overflow: 'hidden' }}>

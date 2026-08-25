@@ -661,6 +661,13 @@ export default function VideoEditorWorkspace() {
   // transport display needs it too.
   const playheadMainHit = findActiveClipAt(timeline, MAIN_TRACK, playhead);
   const overlayTracks = timeline.overlayTracks;
+  // The independent "Audio Track" bed (timeline.projectAudio) — e.g. audio
+  // used to replace a video's original sound via Replace Video/Sync Audio,
+  // or a plain background-music track. Always starts at project time 0 and
+  // runs for its own full length (it has no sourceStart/sourceEnd of its
+  // own to trim), so its timeline row below is a fixed bar, not a
+  // draggable clip like Audio track/Sound clips are.
+  const projectAudioSource = getProjectAudioSource(timeline);
   const audioTrack = timeline.mainAudioTrackId != null ? timeline.soundTracks.find((t) => t.id === timeline.mainAudioTrackId) : null;
   const audioTrackClips = audioTrack ? getTrackClips(timeline, audioTrack.id) : [];
   // Every other sound track (background music, sound effects, extra
@@ -3122,6 +3129,41 @@ export default function VideoEditorWorkspace() {
                         </div>
                       );
                     })}
+                  </div>
+                </div>
+              )}
+
+              {projectAudioSource && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                    <h3 style={{ margin: 0, fontSize: '0.78rem', color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="The independent Audio Track bed — e.g. audio used to replace this video's original sound, or a plain background-music track. Always starts at the very beginning and runs for its own full length; manage it from the Audio tab.">
+                      🎼 Audio Track — {projectAudioSource.file.name}
+                    </h3>
+                    <button
+                      onClick={() => commit((tl) => setProjectAudioMuted(tl, !tl.projectAudio.muted))}
+                      title={timeline.projectAudio.muted ? 'Unmute the Audio Track' : 'Mute the Audio Track'}
+                      style={{ ...trackFlagBtn, background: timeline.projectAudio.muted ? '#DC2626' : 'white', color: timeline.projectAudio.muted ? 'white' : T.inkSecondary, borderColor: timeline.projectAudio.muted ? '#DC2626' : T.border }}
+                    >
+                      {timeline.projectAudio.muted ? '🔇' : '🔊'}
+                    </button>
+                  </div>
+                  <div style={{ position: 'relative', height: 40, opacity: timeline.projectAudio.muted ? 0.5 : 1 }}>
+                    <div
+                      style={{
+                        position: 'absolute', top: 0, left: 1, width: `calc(max(24px, ${totalDuration ? Math.min(100, ((projectAudioSource.duration || 0) / totalDuration) * 100) : 100}%) - 2px)`,
+                        height: 40, borderRadius: 7, background: '#FEF3C7', border: `1px solid ${T.border}`, overflow: 'hidden',
+                      }}
+                      title={`Audio Track — plays from the very start of the project for ${formatDuration(projectAudioSource.duration || 0)}. Manage volume/mute/replace/remove from the Audio tab.`}
+                    >
+                      <ClipWaveform source={projectAudioSource} sourceStart={0} sourceEnd={projectAudioSource.duration || 0} waveformBySource={waveformBySource} />
+                      <div style={{
+                        position: 'absolute', left: 0, right: 0, top: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '0.6rem', fontWeight: 700, color: T.ink, textShadow: '0 1px 2px rgba(255,255,255,0.7)',
+                        padding: '2px 4px', pointerEvents: 'none', zIndex: 2, whiteSpace: 'nowrap', overflow: 'hidden',
+                      }}>
+                        {formatDuration(projectAudioSource.duration || 0)}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

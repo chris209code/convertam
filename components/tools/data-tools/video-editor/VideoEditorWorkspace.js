@@ -470,6 +470,18 @@ export default function VideoEditorWorkspace() {
   // most real editors.
   const [activeCategory, setActiveCategory] = useState('media');
   const [exportPanelOpen, setExportPanelOpen] = useState(false);
+  // The Audio Track (projectAudio) bar on the timeline isn't a real clip —
+  // it has no id in timeline.clips, no trim/split — so it can't go through
+  // selectedClipId like everything else without breaking every place that
+  // assumes a selected id resolves to an actual clip. This is a separate,
+  // purely-visual "is this the thing I just clicked" flag just for that bar.
+  const [projectAudioSelected, setProjectAudioSelected] = useState(false);
+  const projectAudioPanelRef = useRef(null);
+  useEffect(() => {
+    if (projectAudioSelected && activeCategory === 'audio') {
+      projectAudioPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [projectAudioSelected, activeCategory]);
   // Preview-only aspect-ratio-safe guides (action-safe/title-safe boxes) —
   // drawn directly on the canvas in the live preview loop, deliberately
   // OUTSIDE drawCompositionFrame (the function export also calls), so they
@@ -1126,6 +1138,7 @@ export default function VideoEditorWorkspace() {
   // "select an overlay clip also selects its track's Composition panel"
   // behavior working on a plain click.
   function handleClipClick(e, clip, overlayTrackId) {
+    setProjectAudioSelected(false);
     if (suppressClickRef.current) { suppressClickRef.current = false; return; }
     const clickedId = clip.id;
     if (e.ctrlKey || e.metaKey) {
@@ -1193,6 +1206,7 @@ export default function VideoEditorWorkspace() {
     if (e.target !== e.currentTarget) return;
     setSelectedClipId(null);
     setExtraSelectedClipIds([]);
+    setProjectAudioSelected(false);
   }
 
   function handleTrimChange(field, value) {
@@ -3174,11 +3188,20 @@ export default function VideoEditorWorkspace() {
                   </div>
                   <div style={{ position: 'relative', height: 40, opacity: timeline.projectAudio.muted ? 0.5 : 1 }}>
                     <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedClipId(null);
+                        setExtraSelectedClipIds([]);
+                        setProjectAudioSelected(true);
+                        setActiveCategory('audio');
+                      }}
                       style={{
                         position: 'absolute', top: 0, left: 1, width: `calc(max(24px, ${totalDuration ? Math.min(100, ((projectAudioSource.duration || 0) / totalDuration) * 100) : 100}%) - 2px)`,
-                        height: 40, borderRadius: 7, background: '#FEF3C7', border: `1px solid ${T.border}`, overflow: 'hidden',
+                        height: 40, borderRadius: 7, background: '#FEF3C7', cursor: 'pointer', overflow: 'hidden',
+                        border: projectAudioSelected ? `2px solid ${T.accentDark}` : `1px solid ${T.border}`,
+                        boxShadow: projectAudioSelected ? `0 0 0 1px ${T.accentDark}40` : 'none',
                       }}
-                      title={`Audio Track — plays from the very start of the project for ${formatDuration(projectAudioSource.duration || 0)}. Manage volume/mute/replace/remove from the Audio tab.`}
+                      title={`Audio Track — plays from the very start of the project for ${formatDuration(projectAudioSource.duration || 0)}. Click to select it and open its volume/mute/replace/remove controls in the Audio tab.`}
                     >
                       <ClipWaveform source={projectAudioSource} sourceStart={0} sourceEnd={projectAudioSource.duration || 0} waveformBySource={waveformBySource} />
                       <div style={{
@@ -4405,7 +4428,7 @@ export default function VideoEditorWorkspace() {
               as a plain "add music" track for any timeline (e.g. a
               slideshow). Plays from t=0 for its own length regardless of
               how the main track is trimmed/split/reordered. */}
-          <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+          <div ref={projectAudioPanelRef} style={{ background: 'white', border: projectAudioSelected ? `2px solid ${T.accentDark}` : `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Audio track</div>
             {(() => {
               const projectAudioSource = getProjectAudioSource(timeline);

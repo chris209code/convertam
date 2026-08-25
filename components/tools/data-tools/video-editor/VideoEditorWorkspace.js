@@ -21,7 +21,7 @@ import {
   addOverlayTrack, removeOverlayTrack, setOverlayTrackMode, setOverlayTrackDividerRatio,
   setOverlayTrackPipCorner, setOverlayTrackPipPosition, setOverlayTrackPipSizeRatio, setOverlayTrackFlags, setOverlayTrackCutout, isOverlayTrackAudible,
   setFitMode, setBackgroundFill, setBackgroundType, setBackgroundGradient, setBackgroundImageSource, setFrameAspect,
-  setClipSpeedRipple, setClipFade, setClipFilters, setClipCropFocus, setClipCropZoom, setClipTransitionOut, setClipGain, setClipReversed, setClipDucking,
+  setClipSpeedRipple, setImageClipDuration, setClipFade, setClipFilters, setClipCropFocus, setClipCropZoom, setClipTransitionOut, setClipGain, setClipReversed, setClipDucking,
   rotateClip90, setClipFlip,
   addTextOverlay, updateTextOverlay, deleteTextOverlay, duplicateTextOverlay,
   addImageOverlay, updateImageOverlay, deleteImageOverlay,
@@ -520,10 +520,17 @@ export default function VideoEditorWorkspace() {
   const previewWrapRef = useRef(null);
   const mainVideoRef = useRef(null);
   // A static image on the MAIN track (slideshow) has no video to decode —
-  // it needs its own <img> element, loaded/drawn instead of mainVideoRef
-  // whenever the active main clip's source is an image (see tickBody).
-  const mainImageRef = useRef(null);
-  const lastMainImageSourceIdRef = useRef(null);
+  // one plain Image() per source (see ensureMainImageElement below), drawn
+  // instead of mainVideoRef whenever the active main clip's source is an
+  // image. Not a single shared/reused element with an awaited onload the
+  // way mainVideoRef's loadClip works — with several images in a row during
+  // real playback, that pattern raced against this effect's own teardown
+  // (a still-pending await from a superseded tick() generation could finish
+  // after a newer one had already moved the shared element on to a later
+  // image, leaving the draw call painting nothing) and could stall the loop
+  // entirely if one image failed to decode. One persistent element per
+  // source, created once and never reassigned, has nothing to race on.
+  const mainImageElsRef = useRef(new Map());
   const rafRef = useRef(null);
   const lastMainClipRef = useRef(null);
   // A second, always-available main-track video element used only during a
@@ -841,6 +848,21 @@ export default function VideoEditorWorkspace() {
     return img;
   }
 
+  // Same lazy-map-of-plain-Image()-objects pattern as ensureImageOverlayElement
+  // above, for a main-track image clip (slideshow) instead of a logo — one
+  // persistent element per source, created once and never reassigned, so
+  // there's nothing for two overlapping tick() generations to race on and
+  // no per-frame await to stall the render loop on a slow-to-decode photo.
+  function ensureMainImageElement(sourceId) {
+    if (mainImageElsRef.current.has(sourceId)) return mainImageElsRef.current.get(sourceId);
+    const source = timeline.sources.find((s) => s.id === sourceId);
+    if (!source) return null;
+    const img = new Image();
+    img.src = URL.createObjectURL(source.file);
+    mainImageElsRef.current.set(sourceId, img);
+    return img;
+  }
+
   // Accepts one or many files in a single selection — each is appended to
   // the end of the main track in the order given (addClip's own start
   // computation always lands a new clip right after the current last one),
@@ -939,6 +961,14 @@ export default function VideoEditorWorkspace() {
         return moved;
       }, prev);
     });
+  }
+
+  // Per-clip duration for a single selected image — the individual-control
+  // counterpart to handleSetAllImageDurations' bulk "set them all the same"
+  // button, so one slide can run half a second and the next run for 7.
+  function handleSetImageClipDuration(seconds) {
+    const dur = Math.max(0.1, Number(seconds) || DEFAULT_IMAGE_CLIP_DURATION);
+    commit((tl) => setImageClipDuration(tl, selectedClip.id, dur));
   }
 
   // Picks up a recording handed off from the standalone Screen Recorder
@@ -1992,7 +2022,15 @@ export default function VideoEditorWorkspace() {
       if (ref.current !== clip.sourceId) {
         imgEl.src = URL.createObjectURL(source.file);
         ref.current = clip.sourceId;
-        await new Promise((resolve, reject) => { imgEl.onload = resolve; imgEl.onerror = reject; });
+        // Resolve rather than reject on error/timeout — a photo that fails
+        // to decode should just not draw that frame, not throw out of
+        // tickBody() (which would otherwise skip the rest of this frame's
+        // audio routing and drawing every single tick, not just this one).
+        await new Promise((resolve) => {
+          const timer = setTimeout(resolve, 8000);
+          imgEl.onload = () => { clearTimeout(timer); resolve(); };
+          imgEl.onerror = () => { clearTimeout(timer); resolve(); };
+        });
       }
     }
 
@@ -2131,8 +2169,9 @@ export default function VideoEditorWorkspace() {
         // A static image has no <video> to decode — loading it into
         // mainVideoRef (as every other branch here does) silently fails,
         // leaving the canvas with no frame to draw and the preview blank.
-        // Same isImage split the overlay-track loop below already uses.
-        if (mainImageRef.current) await loadImage(mainImageRef.current, mainHit.clip, lastMainImageSourceIdRef);
+        // ensureMainImageElement is synchronous (no per-frame await), so
+        // there's nothing here for a slow-to-decode photo to stall.
+        ensureMainImageElement(mainHit.clip.sourceId);
         syncTrackPlayback(mainVideoRef.current, false);
       } else if (mainHit) {
         await loadClip(mainVideoRef.current, mainHit.clip, lastMainClipRef);
@@ -2328,7 +2367,7 @@ export default function VideoEditorWorkspace() {
 
       drawCompositionFrame(ctx, {
         timeline: drawTimeline,
-        mainEl: mainHit ? (mainIsImage ? mainImageRef.current : mainVideoRef.current) : null,
+        mainEl: mainHit ? (mainIsImage ? ensureMainImageElement(mainHit.clip.sourceId) : mainVideoRef.current) : null,
         mainClip: mainHit?.clip || null,
         mainOpacity,
         crossfadeEl: crossfadeLayer?.el || null,
@@ -2917,8 +2956,6 @@ export default function VideoEditorWorkspace() {
               }}
             />
             <video ref={mainVideoRef} muted playsInline style={{ display: 'none' }} />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img ref={mainImageRef} alt="" style={{ display: 'none' }} />
             <video ref={mainCrossfadeVideoRef} muted playsInline style={{ display: 'none' }} />
             {overlayTracks.map((track) => (
               <Fragment key={track.id}>
@@ -3053,7 +3090,7 @@ export default function VideoEditorWorkspace() {
                       transform: isDragging ? `translateX(${clipDragVisual.offsetPx}px)` : 'none',
                       zIndex: isDragging ? 20 : 1,
                     }}
-                    title={`${formatDuration(clipDuration(clip))} on the timeline — source ${formatDuration(clip.sourceStart)}–${formatDuration(clip.sourceEnd)} of ${source?.file.name || 'this file'}. Click to select and drop the edit cursor there, drag the clip's body to reorder it on the timeline (Ctrl/Cmd-click to multi-select, Shift-click for a range), drag the side handles to trim`}
+                    title={`${source?.kind === 'image' ? formatDurationPrecise(clipDuration(clip)) : formatDuration(clipDuration(clip))} on the timeline — source ${formatDuration(clip.sourceStart)}–${formatDuration(clip.sourceEnd)} of ${source?.file.name || 'this file'}. Click to select and drop the edit cursor there, drag the clip's body to reorder it on the timeline (Ctrl/Cmd-click to multi-select, Shift-click for a range), drag the side handles to trim`}
                   >
                     <ClipThumbFilmstrip source={source} sourceStart={clip.sourceStart} sourceEnd={clip.sourceEnd} thumbnailsBySource={thumbnailsBySource} />
                     <ClipWaveform source={source} sourceStart={clip.sourceStart} sourceEnd={clip.sourceEnd} waveformBySource={waveformBySource} />
@@ -3062,7 +3099,7 @@ export default function VideoEditorWorkspace() {
                       fontSize: '0.62rem', fontWeight: 700, color: 'white', textShadow: '0 1px 2px rgba(0,0,0,0.7)',
                       padding: '2px 4px', pointerEvents: 'none', zIndex: 2, whiteSpace: 'nowrap', overflow: 'hidden',
                     }}>
-                      {formatDuration(clipDuration(clip))}{clip.speed !== 1 ? ` · ${clip.speed}×` : ''}
+                      {source?.kind === 'image' ? formatDurationPrecise(clipDuration(clip)) : formatDuration(clipDuration(clip))}{clip.speed !== 1 ? ` · ${clip.speed}×` : ''}
                       {source?.kind !== 'image' && (
                         <span style={{ fontWeight: 500, opacity: 0.85 }}> · src {formatDuration(clip.sourceStart)}–{formatDuration(clip.sourceEnd)}</span>
                       )}
@@ -3505,7 +3542,9 @@ export default function VideoEditorWorkspace() {
                 </div>
                 {selectedSource.kind === 'image' ? (
                   <p style={{ fontSize: '0.72rem', color: T.mutedDark, margin: '4px 0 0' }}>
-                    Static image — shown for the whole overlay duration. Drag it directly on the preview to reposition it.
+                    {selectedClip.track === MAIN_TRACK
+                      ? 'Static image — set exactly how long it shows for under Edit, below.'
+                      : 'Static image — shown for the whole overlay duration. Drag it directly on the preview to reposition it.'}
                   </p>
                 ) : (
                   <p style={{ fontSize: '0.66rem', color: T.muted, margin: 0 }}>Edit for trim/split/join, Audio for volume/replace, Effects for filters/crop/rotate.</p>
@@ -3525,7 +3564,7 @@ export default function VideoEditorWorkspace() {
                   <button onClick={handleCloseGapBeforeSelected} style={{ ...smallBtn, padding: '5px 10px', flexShrink: 0 }}>⇤ Close gap</button>
                 </div>
               )}
-              {selectedSource.kind !== 'image' && (
+              {selectedSource.kind !== 'image' ? (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
                   <label style={fieldLabel}>Trim start
                     <input type="number" step={0.1} min={0} max={selectedSource.duration}
@@ -3537,6 +3576,14 @@ export default function VideoEditorWorkspace() {
                       value={selectedClip.sourceEnd.toFixed(2)}
                       onChange={(e) => handleTrimChange('end', e.target.value)} style={numInput} />
                   </label>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+                  <label style={fieldLabel}>Duration
+                    <input type="number" step={0.1} min={0.1} value={clipDuration(selectedClip).toFixed(1)}
+                      onChange={(e) => handleSetImageClipDuration(e.target.value)} style={numInput} />
+                  </label>
+                  <span style={{ fontSize: '0.66rem', color: T.muted }}>sec — any length you want, e.g. 0.5, 2, 5, 7…</span>
                 </div>
               )}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -4945,6 +4992,22 @@ function trimHandleStyle(side, snapped) {
 // falling within this clip's own trim range, so a re-trimmed clip shows
 // the right slice without re-decoding anything.
 function ClipThumbFilmstrip({ source, sourceStart, sourceEnd, thumbnailsBySource }) {
+  // A static image has no filmstrip of its own to extract — thumbnailsBySource
+  // only ever populates video sources (see the workspace's thumbnail effect)
+  // — so every image clip rendered this way alike, indistinguishable from
+  // each other until clicked. The image file itself IS its own thumbnail.
+  const [imgSrc, setImgSrc] = useState(null);
+  useEffect(() => {
+    if (source?.kind !== 'image') { setImgSrc(null); return; }
+    const url = URL.createObjectURL(source.file);
+    setImgSrc(url);
+    return () => URL.revokeObjectURL(url);
+  }, [source?.id, source?.kind, source?.file]);
+  if (source?.kind === 'image') {
+    if (!imgSrc) return null;
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={imgSrc} alt="" draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.85, zIndex: 0 }} />;
+  }
   const entry = thumbnailsBySource[source?.id];
   if (!entry || entry === 'loading' || entry === 'error') return null;
   const thumbs = thumbnailsForRange(entry.thumbs, entry.duration, sourceStart, sourceEnd);

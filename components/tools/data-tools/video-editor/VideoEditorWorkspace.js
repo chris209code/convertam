@@ -2927,8 +2927,8 @@ export default function VideoEditorWorkspace() {
           </div>
 
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: T.mutedDark }}>Preview speed</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: T.mutedDark }} title="Speeds up or slows down scrubbing/playback here in the editor only — every clip and every audio track together, temporarily. It is NOT saved and does NOT change what gets exported.">Scrub preview speed (not exported)</span>
             {PREVIEW_SPEED_OPTIONS.map((r) => (
               <button
                 key={r}
@@ -2939,12 +2939,25 @@ export default function VideoEditorWorkspace() {
                   color: previewRate === r ? 'white' : T.inkSecondary,
                   border: previewRate === r ? 'none' : `1px solid ${T.border}`,
                 }}
-                title={`Play the editor's preview at ${r}× — for reviewing footage while you find a split point; doesn't change any clip's actual duration or export speed`}
+                title={`Play the editor's preview at ${r}× — for reviewing footage while you find a split point. Applies to every clip and audio track at once, temporarily, and doesn't change any clip's actual duration or export speed.`}
               >
                 {r}×
               </button>
             ))}
           </div>
+          {selectedClip && selectedClip.track === MAIN_TRACK && selectedSource?.kind !== 'image' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.66rem', color: T.mutedDark }}>
+                Want THIS clip to actually play faster or slower in the exported video (independent of the others)?
+              </span>
+              <button
+                onClick={() => setActiveCategory('effects')}
+                style={{ ...smallBtn, padding: '4px 9px', fontSize: '0.68rem', background: activeCategory === 'effects' ? T.accentGradient : 'white', color: activeCategory === 'effects' ? 'white' : T.inkSecondary, border: activeCategory === 'effects' ? 'none' : `1px solid ${T.border}` }}
+              >
+                ⚡ Set this clip's speed ({selectedClip.speed}×)
+              </button>
+            </div>
+          )}
 
           {timeline.markers.length > 0 && (
             <div style={{ marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>

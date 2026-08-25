@@ -2061,6 +2061,12 @@ export default function VideoEditorWorkspace() {
         el.muted = false;
       }
       gain.gain.value = timeline.projectAudio.muted ? 0 : (timeline.projectAudio.gain ?? 1);
+      // Without this, the "Preview speed" control only ever changed the
+      // main video's own playbackRate — this audio kept playing natively at
+      // 1x and just got yanked forward/back by the currentTime correction
+      // below to chase a playhead now moving at a different rate, which
+      // sounds like skipping rather than an actual speed change.
+      el.playbackRate = previewRate;
       if (Math.abs(el.currentTime - playhead) > 0.15) {
         el.currentTime = Math.max(0, Math.min(playhead, el.duration || playhead));
       }
@@ -2100,7 +2106,13 @@ export default function VideoEditorWorkspace() {
         // ignored in live preview — it always played back at native 1x and
         // only got nudged via the currentTime correction below, which
         // masked the mismatch as jitter instead of an actual speed change.
-        s.audioEl.playbackRate = hit.clip.speed || 1;
+        // previewRate is folded in too, same as the main/overlay video
+        // elements — otherwise "Preview speed" only ever sped up/slowed
+        // down what you could see, leaving every imported audio track
+        // playing at native speed and just getting yanked around by that
+        // same currentTime correction to chase a playhead now moving at a
+        // different rate, which sounds like skipping, not a speed change.
+        s.audioEl.playbackRate = (hit.clip.speed || 1) * previewRate;
         if (Math.abs(s.audioEl.currentTime - hit.sourceTime) > 0.15) {
           s.audioEl.currentTime = Math.max(0, Math.min(hit.sourceTime, s.audioEl.duration || hit.sourceTime));
         }

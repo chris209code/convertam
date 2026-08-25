@@ -274,6 +274,12 @@ const TRANSITION_OPTIONS = [
 // open-ended number field encouraging odd values like 1.37s.
 const TRANSITION_DURATION_PRESETS = [0.25, 0.5, 1, 2, 3, 5, 7, 10];
 
+// Quick-pick durations for an image clip's own on-screen length — a rapid
+// slideshow lives in this range (fractions of a second up to a couple),
+// same "fixed set reads as deliberate" reasoning as the transition presets
+// above. The numeric input next to these still takes any custom value.
+const IMAGE_DURATION_PRESETS = [0.25, 0.5, 0.75, 1, 1.5, 2];
+
 // The between-clip TRANSITION_OPTIONS above (slide/wipe/zoom/crossfade/etc.)
 // all need a NEXT clip to blend into — meaningless at the very start or end
 // of the whole timeline, where there's no adjacent clip to blend with. Only
@@ -971,6 +977,23 @@ export default function VideoEditorWorkspace() {
     commit((tl) => setImageClipDuration(tl, selectedClip.id, dur));
   }
 
+  // Group version for a multi-selection (e.g. "make these 5 rapid-fire
+  // slides all 0.5s") — applies setImageClipDuration to each selected image
+  // clip in start order within one commit/undo step. Each call already
+  // ripples every later main-track clip on its own (selected or not), so
+  // chaining them in order composes correctly without any separate
+  // reposition pass, unlike handleSetAllImageDurations' explicit cursor.
+  function handleSetSelectedImageDurations(seconds) {
+    const dur = Math.max(0.1, Number(seconds) || DEFAULT_IMAGE_CLIP_DURATION);
+    commit((tl) => {
+      const targets = selectionIds
+        .map((id) => tl.clips.find((c) => c.id === id))
+        .filter((c) => c && c.track === MAIN_TRACK && tl.sources.find((s) => s.id === c.sourceId)?.kind === 'image')
+        .sort((a, b) => a.start - b.start);
+      return targets.reduce((acc, c) => setImageClipDuration(acc, c.id, dur), tl);
+    });
+  }
+
   // Picks up a recording handed off from the standalone Screen Recorder
   // tool's "Open in Video Editor" button (lib/media/blobHandoff.js) — same
   // client-side, same-tab, one-shot mechanism Video Studio's "Extract Audio
@@ -1213,8 +1236,10 @@ export default function VideoEditorWorkspace() {
     setSelectedClipId(clickedId);
     setExtraSelectedClipIds([]);
     if (overlayTrackId !== undefined) setSelectedOverlayTrackId(overlayTrackId);
-    // Image clips have no time dimension to cut (clipDuration is 0) — the
-    // cursor is meaningless there, so it's simply never set.
+    // A main-track image clip has a real clipDuration (see
+    // setImageClipDuration) just like a video clip, so it gets a cursor
+    // too — only a genuinely zero-length clip (a not-yet-trimmed
+    // freshly-added one) has none to drop.
     if (clipDuration(clip) > 0) {
       const rect = e.currentTarget.getBoundingClientRect();
       const frac = rect.width > 0 ? Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)) : 0;
@@ -2331,12 +2356,19 @@ export default function VideoEditorWorkspace() {
           const idx = mainList.findIndex((c) => c.id === mainHit.clip.id);
           const nextClip = idx >= 0 ? mainList[idx + 1] : null;
           const nextSource = nextClip ? timeline.sources.find((s) => s.id === nextClip.sourceId) : null;
-          if (nextClip && nextSource && nextSource.kind !== 'image' && mainCrossfadeVideoRef.current) {
+          const progress = Math.max(0, Math.min(1, (elapsedInClip - (dur - mainHit.clip.fadeOut)) / mainHit.clip.fadeOut));
+          if (nextClip && nextSource?.kind === 'image') {
+            // A static image needs no seeking/freezing — it's already a
+            // single, permanent frame — so it can join the exact same blend
+            // draw path drawCompositionFrame already uses for video (see
+            // getMediaSize/drawCover, which handle either media type).
+            const img = ensureMainImageElement(nextClip.sourceId);
+            if (img) crossfadeLayer = { el: img, clip: nextClip, opacity: progress };
+          } else if (nextClip && nextSource && mainCrossfadeVideoRef.current) {
             await loadClip(mainCrossfadeVideoRef.current, nextClip, mainCrossfadeLoadedClipRef);
             if (Math.abs(mainCrossfadeVideoRef.current.currentTime - nextClip.sourceStart) > 0.05) {
               mainCrossfadeVideoRef.current.currentTime = nextClip.sourceStart;
             }
-            const progress = Math.max(0, Math.min(1, (elapsedInClip - (dur - mainHit.clip.fadeOut)) / mainHit.clip.fadeOut));
             crossfadeLayer = { el: mainCrossfadeVideoRef.current, clip: nextClip, opacity: progress };
           }
         }
@@ -2829,7 +2861,7 @@ export default function VideoEditorWorkspace() {
                   onFiles={handleMainImageFiles}
                   maxSizeMB={MAX_UPLOAD_IMAGE_BYTES / (1024 * 1024)}
                   compact
-                  compactLabel="🖼️ Add Images / Create Slideshow"
+                  compactLabel="🖼️ Rapid Slideshow — Add Images"
                 />
                 <p style={{ fontSize: '0.76rem', color: T.muted, marginTop: 10, textAlign: 'center' }}>
                   Trim, cut, and reorder clips — or add a second video or image overlay for split-screen or picture-in-picture composition.{' '}
@@ -3487,13 +3519,13 @@ export default function VideoEditorWorkspace() {
                       padding: '1px 6px', whiteSpace: 'nowrap',
                     }}
                   >
-                    {formatDurationPrecise(playhead)}{playheadMainHit ? ` · src ${formatDurationPrecise(playheadMainHit.sourceTime)}` : ''}
+                    {formatDurationPrecise(playhead)}{playheadMainHit && timeline.sources.find((s) => s.id === playheadMainHit.clip.sourceId)?.kind !== 'image' ? ` · src ${formatDurationPrecise(playheadMainHit.sourceTime)}` : ''}
                   </div>
                 </div>
               )}
             </div>
           </div>
-          {selectedClip && !isLockedSelected && selectionIds.length <= 1 && selectedSource?.kind !== 'image' && (
+          {selectedClip && !isLockedSelected && selectionIds.length <= 1 && (
             <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
               <button onClick={handleSplitAtCursor} disabled={editCursorClipId !== selectedClip.id} style={{ ...quickActionBtn, opacity: editCursorClipId !== selectedClip.id ? 0.5 : 1 }} title={editCursorClipId === selectedClip.id ? 'Cuts the selected clip in two at the edit cursor' : 'Click the clip to drop an edit cursor first'}>
                 <span style={{ fontSize: '1.1rem' }}>✂</span> Split
@@ -3526,6 +3558,19 @@ export default function VideoEditorWorkspace() {
                   <button onClick={handleDeleteSelected} style={{ ...smallBtn, color: '#DC2626', borderColor: '#FCA5A5' }}>✕ Delete selected</button>
                   <button onClick={() => setExtraSelectedClipIds([])} style={smallBtn}>Clear selection</button>
                 </div>
+                {selectionIds.some((id) => {
+                  const c = timeline.clips.find((cl) => cl.id === id);
+                  return c?.track === MAIN_TRACK && timeline.sources.find((s) => s.id === c.sourceId)?.kind === 'image';
+                }) && (
+                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${T.border}` }}>
+                    <div style={{ fontSize: '0.64rem', color: T.muted, marginBottom: 4 }}>Set duration for the selected images:</div>
+                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                      {IMAGE_DURATION_PRESETS.map((d) => (
+                        <button key={d} onClick={() => handleSetSelectedImageDurations(d)} style={{ ...smallBtn, padding: '4px 9px', fontSize: '0.66rem' }}>{d}s</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             ) : selectedClip && selectedSource && isLockedSelected ? (
               <>
@@ -3578,16 +3623,26 @@ export default function VideoEditorWorkspace() {
                   </label>
                 </div>
               ) : (
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
-                  <label style={fieldLabel}>Duration
-                    <input type="number" step={0.1} min={0.1} value={clipDuration(selectedClip).toFixed(1)}
-                      onChange={(e) => handleSetImageClipDuration(e.target.value)} style={numInput} />
-                  </label>
-                  <span style={{ fontSize: '0.66rem', color: T.muted }}>sec — any length you want, e.g. 0.5, 2, 5, 7…</span>
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <label style={fieldLabel}>Duration
+                      <input type="number" step={0.1} min={0.1} value={clipDuration(selectedClip).toFixed(2)}
+                        onChange={(e) => handleSetImageClipDuration(e.target.value)} style={numInput} />
+                    </label>
+                    <span style={{ fontSize: '0.66rem', color: T.muted }}>sec — any length you want</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 6 }}>
+                    {IMAGE_DURATION_PRESETS.map((d) => (
+                      <button key={d} onClick={() => handleSetImageClipDuration(d)}
+                        style={{ ...smallBtn, padding: '4px 9px', fontSize: '0.66rem', background: Math.abs(clipDuration(selectedClip) - d) < 0.005 ? T.accentGradient : 'white', color: Math.abs(clipDuration(selectedClip) - d) < 0.005 ? 'white' : T.inkSecondary, border: Math.abs(clipDuration(selectedClip) - d) < 0.005 ? 'none' : `1px solid ${T.border}` }}>
+                        {d}s
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {selectedSource.kind !== 'image' && <button onClick={handleSplitAtCursor} disabled={editCursorClipId !== selectedClip.id} style={{ ...smallBtn, opacity: editCursorClipId !== selectedClip.id ? 0.5 : 1 }} title={editCursorClipId === selectedClip.id ? 'Cut at the edit cursor' : 'Click the clip to drop an edit cursor first'}>✂ Split</button>}
+                <button onClick={handleSplitAtCursor} disabled={editCursorClipId !== selectedClip.id} style={{ ...smallBtn, opacity: editCursorClipId !== selectedClip.id ? 0.5 : 1 }} title={editCursorClipId === selectedClip.id ? 'Cut at the edit cursor' : 'Click the clip to drop an edit cursor first'}>✂ Split</button>
                 {selectedSource.kind !== 'image' && <button onClick={() => handleJoinWithNext(selectedClip.track)} style={smallBtn}>⤵ Join with next</button>}
                 {selectedClip.track === MAIN_TRACK && selectedSource.kind !== 'image' && <button onClick={handleFreezeFrame} style={smallBtn}>❄ Freeze frame</button>}
                 {selectedClip.track === MAIN_TRACK && selectedSource.kind !== 'image' && <button onClick={handleFindSilence} disabled={silenceScanning} style={smallBtn}>{silenceScanning ? 'Scanning…' : '🔇 Find silence'}</button>}
@@ -3603,11 +3658,9 @@ export default function VideoEditorWorkspace() {
                   <button onClick={handleMoveClipToEnd} disabled={selectedClipTrackIndex() < 0 || selectedClipTrackIndex() >= getTrackClips(timeline, selectedClip.track).length - 1} style={smallBtn} title="Move to the very end of this track">⏭ End</button>
                 </div>
               </div>
-              {selectedSource.kind !== 'image' && (
-                <p style={{ fontSize: '0.68rem', color: T.muted, margin: '8px 0 0' }}>
-                  Click a clip to select it — a red edit cursor drops exactly where you clicked, the preview jumps there immediately, and pressing Play afterward resumes from that exact point instead of the start. Drag the cursor left/right to fine-tune the exact frame (the preview follows it live), then click Split. To remove part of a clip: split at both edges of the part you don&apos;t want, select that middle piece, and Delete it — everything after closes the gap automatically. Drag a clip{"'"}s body left or right to reorder it, or use the Reorder buttons above for a precise move to either end. This all works the same way for overlay clips.
-                </p>
-              )}
+              <p style={{ fontSize: '0.68rem', color: T.muted, margin: '8px 0 0' }}>
+                Click a clip to select it — a red edit cursor drops exactly where you clicked, the preview jumps there immediately, and pressing Play afterward resumes from that exact point instead of the start. Drag the cursor left/right to fine-tune the exact frame (the preview follows it live), then click Split. To remove part of a clip: split at both edges of the part you don&apos;t want, select that middle piece, and Delete it — everything after closes the gap automatically. Drag a clip{"'"}s body left or right to reorder it, or use the Reorder buttons above for a precise move to either end. This all works the same way for overlay clips.
+              </p>
               {silenceRanges !== null && (
                 <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
                   {silenceRanges.length === 0 ? (
@@ -3892,23 +3945,30 @@ export default function VideoEditorWorkspace() {
                 <UploadBox accept="video/*" multiple onFiles={handleMainFiles} maxSizeMB={MAX_UPLOAD_VIDEO_BYTES / (1024 * 1024)} compact compactLabel="+ Add video(s)" oversizedHint={<>Use <Link href="/compress-video" style={{ color: T.accentDark, fontWeight: 700 }}>Compress &amp; Split Video</Link> to shrink or cut it down first.</>} />
               </div>
               <div>
-                <div style={{ fontSize: '0.7rem', color: T.mutedDark, marginBottom: 2 }}>Images (slideshow, added to end of main track)</div>
+                <div style={{ fontSize: '0.7rem', color: T.mutedDark, marginBottom: 2 }}>Rapid Slideshow (images added to end of main track)</div>
                 <UploadBox accept="image/png,image/jpeg,image/webp" multiple onFiles={handleMainImageFiles} maxSizeMB={MAX_UPLOAD_IMAGE_BYTES / (1024 * 1024)} compact compactLabel="+ Add images" />
                 {(() => {
                   const mainImageClips = mainClips.filter((c) => timeline.sources.find((s) => s.id === c.sourceId)?.kind === 'image');
                   if (mainImageClips.length < 2) return null;
                   return (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-                      <span style={{ fontSize: '0.64rem', color: T.muted }}>Set all image durations:</span>
-                      <input
-                        type="number"
-                        min="0.5"
-                        step="0.5"
-                        defaultValue={DEFAULT_IMAGE_CLIP_DURATION}
-                        onBlur={(e) => handleSetAllImageDurations(e.target.value)}
-                        style={{ width: 56, fontSize: '0.7rem', padding: '3px 5px', borderRadius: 6, border: `1px solid ${T.border}` }}
-                      />
-                      <span style={{ fontSize: '0.64rem', color: T.muted }}>sec</span>
+                    <div style={{ marginTop: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: '0.64rem', color: T.muted }}>Set all image durations:</span>
+                        <input
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          defaultValue={DEFAULT_IMAGE_CLIP_DURATION}
+                          onBlur={(e) => handleSetAllImageDurations(e.target.value)}
+                          style={{ width: 56, fontSize: '0.7rem', padding: '3px 5px', borderRadius: 6, border: `1px solid ${T.border}` }}
+                        />
+                        <span style={{ fontSize: '0.64rem', color: T.muted }}>sec</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 5 }}>
+                        {IMAGE_DURATION_PRESETS.map((d) => (
+                          <button key={d} onClick={() => handleSetAllImageDurations(d)} style={{ ...smallBtn, padding: '3px 7px', fontSize: '0.64rem' }}>{d}s</button>
+                        ))}
+                      </div>
                     </div>
                   );
                 })()}

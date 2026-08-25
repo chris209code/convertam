@@ -31,7 +31,7 @@ import {
   getClipTimelineBounds, getAllClipBoundaryTimes,
   getMasterGain, setMasterVolume, setMasterMuted, setMasterFade,
   addMarker, updateMarker, deleteMarker,
-  setProjectAudioSource, clearProjectAudioSource, setProjectAudioGain, setProjectAudioMuted, getProjectAudioSource,
+  ensureProjectAudioTrack,
   addSoundTrack, removeSoundTrack, setSoundTrackFlags, isSoundTrackAudible,
   linkVideoClipAudio, getLinkedAudioClip, unlinkAudioClip, removeClipInPlace,
   trimLinkedClip, splitLinkedClip, moveLinkedClip, moveLinkedClipToIndex, deleteLinkedClip, deleteLinkedClips, duplicateLinkedClip, duplicateLinkedClips,
@@ -470,18 +470,6 @@ export default function VideoEditorWorkspace() {
   // most real editors.
   const [activeCategory, setActiveCategory] = useState('media');
   const [exportPanelOpen, setExportPanelOpen] = useState(false);
-  // The Audio Track (projectAudio) bar on the timeline isn't a real clip —
-  // it has no id in timeline.clips, no trim/split — so it can't go through
-  // selectedClipId like everything else without breaking every place that
-  // assumes a selected id resolves to an actual clip. This is a separate,
-  // purely-visual "is this the thing I just clicked" flag just for that bar.
-  const [projectAudioSelected, setProjectAudioSelected] = useState(false);
-  const projectAudioPanelRef = useRef(null);
-  useEffect(() => {
-    if (projectAudioSelected && activeCategory === 'audio') {
-      projectAudioPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-  }, [projectAudioSelected, activeCategory]);
   // Preview-only aspect-ratio-safe guides (action-safe/title-safe boxes) —
   // drawn directly on the canvas in the live preview loop, deliberately
   // OUTSIDE drawCompositionFrame (the function export also calls), so they
@@ -614,13 +602,6 @@ export default function VideoEditorWorkspace() {
   const mainReplaceAudioElRef = useRef(null); // hidden <audio> for a clip's 'replace'/'mix' audioSourceId
   const mainReplaceSrcNodeRef = useRef(null);
   const mainReplaceLastClipRef = useRef(null);
-  // Project audio (timeline.projectAudio) — a single, clip-independent
-  // audio bed. Unlike mainReplaceAudioElRef above, there's no per-clip
-  // lifecycle to track: this element just stays seeked to `playhead`
-  // directly, for as long as a project audio source is set at all.
-  const projectAudioElRef = useRef(null);
-  const projectAudioGainRef = useRef(null);
-  const projectAudioSrcNodeRef = useRef(null);
   // Wall-clock anchor set when Play starts: { atWall, atPlayhead }. The
   // playhead advances from real elapsed time rather than a fixed per-frame
   // step, so it never drifts away from the audio actually playing.
@@ -673,13 +654,13 @@ export default function VideoEditorWorkspace() {
   // transport display needs it too.
   const playheadMainHit = findActiveClipAt(timeline, MAIN_TRACK, playhead);
   const overlayTracks = timeline.overlayTracks;
-  // The independent "Audio Track" bed (timeline.projectAudio) — e.g. audio
-  // used to replace a video's original sound via Replace Video/Sync Audio,
-  // or a plain background-music track. Always starts at project time 0 and
-  // runs for its own full length (it has no sourceStart/sourceEnd of its
-  // own to trim), so its timeline row below is a fixed bar, not a
-  // draggable clip like Audio track/Sound clips are.
-  const projectAudioSource = getProjectAudioSource(timeline);
+  // The independent "Audio Track" bed — e.g. audio used to replace a
+  // video's original sound via Replace Video/Sync Audio, or a plain
+  // background-music track. Just an ordinary sound track (full split/trim/
+  // move/delete support) flagged via projectAudioTrackId so the UI can
+  // find and label it specifically.
+  const projectAudioTrack = timeline.projectAudioTrackId != null ? timeline.soundTracks.find((t) => t.id === timeline.projectAudioTrackId) : null;
+  const projectAudioClips = projectAudioTrack ? getTrackClips(timeline, projectAudioTrack.id) : [];
   const audioTrack = timeline.mainAudioTrackId != null ? timeline.soundTracks.find((t) => t.id === timeline.mainAudioTrackId) : null;
   const audioTrackClips = audioTrack ? getTrackClips(timeline, audioTrack.id) : [];
   // Every other sound track (background music, sound effects, extra
@@ -687,7 +668,7 @@ export default function VideoEditorWorkspace() {
   // as its own draggable timeline row right here, same as Audio track
   // above, instead of being visible only as numeric Start/Length fields
   // buried in the Audio tab with no picture of where they actually sit.
-  const extraSoundTracks = timeline.soundTracks.filter((t) => t.id !== timeline.mainAudioTrackId);
+  const extraSoundTracks = timeline.soundTracks.filter((t) => t.id !== timeline.mainAudioTrackId && t.id !== timeline.projectAudioTrackId);
   const allOverlayClips = overlayTracks.flatMap((t) => getTrackClips(timeline, t.id));
   const isComposed = overlayTracks.length > 0;
   // Canvas pixel size for the chosen output frame shape — the single
@@ -754,10 +735,6 @@ export default function VideoEditorWorkspace() {
       mainGainRef.current = mainGain;
       mainReplaceGainRef.current = mainReplaceGain;
       mainReplaceAudioElRef.current = new Audio();
-      const projectAudioGain = ctx.createGain();
-      projectAudioGain.connect(masterGain);
-      projectAudioGainRef.current = projectAudioGain;
-      projectAudioElRef.current = new Audio();
     } else if (audioCtxRef.current.state === 'suspended') {
       audioCtxRef.current.resume().catch(() => {});
     }
@@ -984,12 +961,17 @@ export default function VideoEditorWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Adds/replaces the project's independent audio bed (timeline.projectAudio)
+  // Adds/replaces the project's independent Audio Track
   // — used by the handoff above and by the Audio Track panel's own
   // Add/Replace Music upload. Uses the functional commit() form throughout
   // (operating on `prev`, not the outer closure's `timeline`) since this can
   // run immediately after handleMainFiles's own commit in the same tick,
   // before this component has re-rendered with the updated timeline.
+  // Adding or replacing the Audio Track always starts it fresh with one
+  // clip spanning the new file's full length — matching what "Add Music /
+  // Audio Track" and "Replace audio" have always meant — but from there
+  // it's an ordinary sound track: split it, delete a piece, drag it,
+  // exactly like Sound clips or the linked Audio track already support.
   async function handleAddProjectAudioFile(file) {
     if (!file) return;
     const sizeError = validateUploadSize(file, 'audio');
@@ -999,14 +981,16 @@ export default function VideoEditorWorkspace() {
       const meta = await extractAudioMetadata(file);
       commit((prev) => {
         const { timeline: withSource, source } = addSource(prev, file, meta, 'audio');
-        return setProjectAudioSource(withSource, source.id);
+        const { timeline: withTrack, trackId } = ensureProjectAudioTrack(withSource);
+        const cleared = { ...withTrack, clips: withTrack.clips.filter((c) => c.track !== trackId) };
+        return addClip(cleared, source.id, trackId);
       });
     } catch (err) {
       setUploadError(err.message || 'Could not read this audio file — it may be an unsupported or corrupted format.');
     }
   }
   function handleRemoveProjectAudio() {
-    commit((prev) => clearProjectAudioSource(prev));
+    commit((prev) => (prev.projectAudioTrackId != null ? removeSoundTrack(prev, prev.projectAudioTrackId) : prev));
   }
 
   // Any number of independent sound clips (music, sound effects, extra
@@ -1138,7 +1122,6 @@ export default function VideoEditorWorkspace() {
   // "select an overlay clip also selects its track's Composition panel"
   // behavior working on a plain click.
   function handleClipClick(e, clip, overlayTrackId) {
-    setProjectAudioSelected(false);
     if (suppressClickRef.current) { suppressClickRef.current = false; return; }
     const clickedId = clip.id;
     if (e.ctrlKey || e.metaKey) {
@@ -1206,7 +1189,6 @@ export default function VideoEditorWorkspace() {
     if (e.target !== e.currentTarget) return;
     setSelectedClipId(null);
     setExtraSelectedClipIds([]);
-    setProjectAudioSelected(false);
   }
 
   function handleTrimChange(field, value) {
@@ -2051,47 +2033,11 @@ export default function VideoEditorWorkspace() {
       return clip.audioMode === 'mix';
     }
 
-    // Project audio has no clip lifecycle to key off (see the ref's own
-    // comment) — it's just kept seeked to `playhead` directly and played
-    // whenever the transport is, for as long as the timeline has a project
-    // audio source at all.
-    function syncProjectAudioLive() {
-      const gain = projectAudioGainRef.current;
-      const el = projectAudioElRef.current;
-      if (!gain || !el) return;
-      const source = timeline.projectAudio?.sourceId ? timeline.sources.find((s) => s.id === timeline.projectAudio.sourceId) : null;
-      if (!source) {
-        gain.gain.value = 0;
-        if (!el.paused) el.pause();
-        return;
-      }
-      if (el.dataset.sourceId !== source.id) {
-        el.src = URL.createObjectURL(source.file);
-        el.dataset.sourceId = source.id;
-      }
-      if (!projectAudioSrcNodeRef.current) {
-        projectAudioSrcNodeRef.current = audioCtxRef.current.createMediaElementSource(el);
-        projectAudioSrcNodeRef.current.connect(gain);
-        el.muted = false;
-      }
-      gain.gain.value = timeline.projectAudio.muted ? 0 : (timeline.projectAudio.gain ?? 1);
-      // Without this, the "Preview speed" control only ever changed the
-      // main video's own playbackRate — this audio kept playing natively at
-      // 1x and just got yanked forward/back by the currentTime correction
-      // below to chase a playhead now moving at a different rate, which
-      // sounds like skipping rather than an actual speed change.
-      el.playbackRate = previewRate;
-      if (Math.abs(el.currentTime - playhead) > 0.15) {
-        el.currentTime = Math.max(0, Math.min(playhead, el.duration || playhead));
-      }
-      if (playing) { if (el.paused) el.play().catch(() => {}); } else if (!el.paused) el.pause();
-    }
-
-    // Any number of independent sound clips (timeline.js's soundTracks) —
-    // unlike project audio, each one has its own clip lifecycle (trim
-    // points, an actual start position on the timeline), so this is keyed
-    // off findActiveClipAt per track rather than just following `playhead`
-    // directly the way project audio does.
+    // Any number of independent sound clips (timeline.js's soundTracks,
+    // which also holds the linked main-audio track and the Audio Track
+    // bed) — each has its own clip lifecycle (trim points, an actual start
+    // position on the timeline), so this is keyed off findActiveClipAt per
+    // track rather than just following `playhead` directly.
     function syncSoundTracksLive() {
       for (const track of timeline.soundTracks) {
         const s = getSoundLayerState(track.id);
@@ -2194,7 +2140,6 @@ export default function VideoEditorWorkspace() {
       // clip doesn't cut abruptly to silence at full volume.
       if (audioCtxRef.current) {
         if (masterGainRef.current) masterGainRef.current.gain.value = getMasterGain(timeline, playhead);
-        syncProjectAudioLive();
         syncSoundTracksLive();
         if (analyserRef.current && meterDataRef.current && meterBarRef.current) {
           analyserRef.current.getByteTimeDomainData(meterDataRef.current);
@@ -3172,46 +3117,89 @@ export default function VideoEditorWorkspace() {
                 </div>
               )}
 
-              {projectAudioSource && (
+              {projectAudioTrack && projectAudioClips.length > 0 && (
                 <div style={{ marginTop: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                    <h3 style={{ margin: 0, fontSize: '0.78rem', color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="The independent Audio Track bed — e.g. audio used to replace this video's original sound, or a plain background-music track. Always starts at the very beginning and runs for its own full length; manage it from the Audio tab.">
-                      🎼 Audio Track — {projectAudioSource.file.name}
+                    <h3 style={{ margin: 0, fontSize: '0.78rem', color: T.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title="The independent Audio Track bed — e.g. audio used to replace this video's original sound, or a plain background-music track. Click a piece to select it, then Split/Delete/drag it exactly like any other clip.">
+                      🎼 Audio Track
                     </h3>
                     <button
-                      onClick={() => commit((tl) => setProjectAudioMuted(tl, !tl.projectAudio.muted))}
-                      title={timeline.projectAudio.muted ? 'Unmute the Audio Track' : 'Mute the Audio Track'}
-                      style={{ ...trackFlagBtn, background: timeline.projectAudio.muted ? '#DC2626' : 'white', color: timeline.projectAudio.muted ? 'white' : T.inkSecondary, borderColor: timeline.projectAudio.muted ? '#DC2626' : T.border }}
+                      onClick={() => commit((tl) => setSoundTrackFlags(tl, projectAudioTrack.id, { muted: !projectAudioTrack.muted }))}
+                      title={projectAudioTrack.muted ? 'Unmute the Audio Track' : 'Mute the Audio Track'}
+                      style={{ ...trackFlagBtn, background: projectAudioTrack.muted ? '#DC2626' : 'white', color: projectAudioTrack.muted ? 'white' : T.inkSecondary, borderColor: projectAudioTrack.muted ? '#DC2626' : T.border }}
                     >
-                      {timeline.projectAudio.muted ? '🔇' : '🔊'}
+                      {projectAudioTrack.muted ? '🔇' : '🔊'}
                     </button>
                   </div>
-                  <div style={{ position: 'relative', height: 40, opacity: timeline.projectAudio.muted ? 0.5 : 1 }}>
-                    <div
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedClipId(null);
-                        setExtraSelectedClipIds([]);
-                        setProjectAudioSelected(true);
-                        setActiveCategory('audio');
-                      }}
-                      style={{
-                        position: 'absolute', top: 0, left: 1, width: `calc(max(24px, ${totalDuration ? Math.min(100, ((projectAudioSource.duration || 0) / totalDuration) * 100) : 100}%) - 2px)`,
-                        height: 40, borderRadius: 7, background: '#FEF3C7', cursor: 'pointer', overflow: 'hidden',
-                        border: projectAudioSelected ? `2px solid ${T.accentDark}` : `1px solid ${T.border}`,
-                        boxShadow: projectAudioSelected ? `0 0 0 1px ${T.accentDark}40` : 'none',
-                      }}
-                      title={`Audio Track — plays from the very start of the project for ${formatDuration(projectAudioSource.duration || 0)}. Click to select it and open its volume/mute/replace/remove controls in the Audio tab.`}
-                    >
-                      <ClipWaveform source={projectAudioSource} sourceStart={0} sourceEnd={projectAudioSource.duration || 0} waveformBySource={waveformBySource} />
-                      <div style={{
-                        position: 'absolute', left: 0, right: 0, top: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '0.6rem', fontWeight: 700, color: T.ink, textShadow: '0 1px 2px rgba(255,255,255,0.7)',
-                        padding: '2px 4px', pointerEvents: 'none', zIndex: 2, whiteSpace: 'nowrap', overflow: 'hidden',
-                      }}>
-                        {formatDuration(projectAudioSource.duration || 0)}
-                      </div>
-                    </div>
+                  <div onClick={clearSelectionIfEmptyClick} style={{ position: 'relative', height: 40, opacity: projectAudioTrack.muted ? 0.5 : 1 }}>
+                    {projectAudioClips.map((clip) => {
+                      const clipSource = timeline.sources.find((s) => s.id === clip.sourceId);
+                      const isPrimary = clip.id === selectedClipId;
+                      const isSelected = selectionIdSet.has(clip.id);
+                      const isDragging = clipDragVisual?.clipId === clip.id;
+                      const leftPct = totalDuration ? (clip.start / totalDuration) * 100 : 0;
+                      const widthPct = totalDuration ? (clipDuration(clip) / totalDuration) * 100 : 100;
+                      return (
+                        <div
+                          key={clip.id}
+                          onPointerDown={(e) => handleClipBodyPointerDown(e, clip)}
+                          onClick={(e) => handleClipClick(e, clip)}
+                          style={{
+                            position: 'absolute', top: 0, left: `calc(${leftPct}% + 1px)`, width: `calc(max(24px, ${widthPct}%) - 2px)`,
+                            height: 40, borderRadius: 7, cursor: 'grab',
+                            background: isSelected ? '#F59E0B' : '#FEF3C7',
+                            border: isPrimary ? '2px solid #B45309' : isSelected ? '2px solid #B4530990' : `1px solid ${T.border}`,
+                            boxShadow: isDragging ? '0 6px 16px rgba(0,0,0,0.35)' : isSelected && !isPrimary ? 'inset 0 0 0 1px white' : 'none',
+                            overflow: 'hidden',
+                            transform: isDragging ? `translateX(${clipDragVisual.offsetPx}px)` : 'none',
+                            zIndex: isDragging ? 20 : 1,
+                          }}
+                          title={`${formatDuration(clipDuration(clip))} of audio — source ${formatDuration(clip.sourceStart)}–${formatDuration(clip.sourceEnd)} of ${clipSource?.file.name || 'this file'}. Click to select and drop the edit cursor, drag to reposition, drag the side handles (when selected) to trim.`}
+                        >
+                          <ClipWaveform source={clipSource} sourceStart={clip.sourceStart} sourceEnd={clip.sourceEnd} waveformBySource={waveformBySource} />
+                          <div style={{
+                            position: 'absolute', left: 0, right: 0, top: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '0.6rem', fontWeight: 700, color: T.ink, textShadow: '0 1px 2px rgba(255,255,255,0.7)',
+                            padding: '2px 4px', pointerEvents: 'none', zIndex: 2, whiteSpace: 'nowrap', overflow: 'hidden',
+                          }}>
+                            {formatDuration(clipDuration(clip))}
+                          </div>
+                          {isSelected && !isPrimary && (
+                            <div style={{ position: 'absolute', top: 3, right: 3, width: 12, height: 12, borderRadius: '50%', background: 'white', color: '#B45309', fontSize: '0.55rem', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3, pointerEvents: 'none' }}>✓</div>
+                          )}
+                          {isPrimary && (
+                            <>
+                              <div
+                                onPointerDown={(e) => handleTrimHandleDown(e, clip, 'start')}
+                                title="Drag to trim the start (snaps to the playhead, other clip edges, and markers — hold Alt to bypass)"
+                                style={trimHandleStyle('left', snappedHandle?.clipId === clip.id && snappedHandle?.edge === 'start')}
+                              />
+                              <div
+                                onPointerDown={(e) => handleTrimHandleDown(e, clip, 'end')}
+                                title="Drag to trim the end (snaps to the playhead, other clip edges, and markers — hold Alt to bypass)"
+                                style={trimHandleStyle('right', snappedHandle?.clipId === clip.id && snappedHandle?.edge === 'end')}
+                              />
+                              {editCursorClipId === clip.id && (
+                                <div
+                                  onPointerDown={(e) => handleEditCursorPointerDown(e, clip)}
+                                  title="Drag to choose exactly where Split cuts this clip"
+                                  style={{
+                                    position: 'absolute', top: -6, bottom: -6,
+                                    left: `calc(${Math.min(100, Math.max(0, ((playhead - clip.start) / (clipDuration(clip) || 1)) * 100))}% - 7px)`,
+                                    width: 14, zIndex: 6, cursor: 'ew-resize',
+                                    display: 'flex', flexDirection: 'column', alignItems: 'center', touchAction: 'none',
+                                  }}
+                                >
+                                  <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '6px solid #DC2626', flexShrink: 0 }} />
+                                  <div style={{ width: 2, flex: 1, background: '#DC2626' }} />
+                                  <div style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderBottom: '6px solid #DC2626', flexShrink: 0 }} />
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -4428,11 +4416,10 @@ export default function VideoEditorWorkspace() {
               as a plain "add music" track for any timeline (e.g. a
               slideshow). Plays from t=0 for its own length regardless of
               how the main track is trimmed/split/reordered. */}
-          <div ref={projectAudioPanelRef} style={{ background: 'white', border: projectAudioSelected ? `2px solid ${T.accentDark}` : `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+          <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Audio track</div>
             {(() => {
-              const projectAudioSource = getProjectAudioSource(timeline);
-              if (!projectAudioSource) {
+              if (!projectAudioTrack || !projectAudioClips.length) {
                 return (
                   <>
                     <p style={{ fontSize: '0.74rem', color: T.mutedDark, margin: '0 0 8px' }}>
@@ -4446,8 +4433,8 @@ export default function VideoEditorWorkspace() {
                 );
               }
               const videoDuration = totalDuration;
-              const audioDuration = projectAudioSource.duration || 0;
-              const diff = videoDuration - audioDuration;
+              const audioEnd = projectAudioClips.reduce((max, c) => Math.max(max, c.start + clipDuration(c)), 0);
+              const diff = videoDuration - audioEnd;
               const diffLabel = Math.abs(diff) < 0.3
                 ? 'Video and audio are the same length.'
                 : diff > 0
@@ -4457,30 +4444,33 @@ export default function VideoEditorWorkspace() {
                 <>
                   <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 8, fontSize: '0.76rem', color: T.ink }}>
                     <span><strong>Video:</strong> {formatDuration(videoDuration)}</span>
-                    <span><strong>Audio:</strong> {formatDuration(audioDuration)}</span>
+                    <span><strong>Audio:</strong> {formatDuration(audioEnd)}</span>
+                    {projectAudioClips.length > 1 && <span>({projectAudioClips.length} pieces)</span>}
                   </div>
                   <div style={{ padding: '6px 10px', borderRadius: 6, background: Math.abs(diff) < 0.3 ? '#F0FDF4' : '#FFFBEB', color: Math.abs(diff) < 0.3 ? '#15803D' : '#92400E', fontSize: '0.72rem', fontWeight: 600, marginBottom: 10 }}>
                     {diffLabel} {Math.abs(diff) >= 0.3 && 'Trim, split, or add clips on the main track (or trim this audio) to match them up.'}
                   </div>
-                  <ProjectAudioWaveform source={projectAudioSource} waveformBySource={waveformBySource} />
+                  <p style={{ fontSize: '0.68rem', color: T.mutedDark, margin: '0 0 10px' }}>
+                    Click a piece right on the timeline above to select it, then use Split (to cut it in two) or Delete (to remove that piece) — the same way you edit any other clip.
+                  </p>
                   <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', margin: '10px 0 8px' }}>
-                    <label style={fieldLabel}>Volume {Math.round((timeline.projectAudio.gain ?? 1) * 100)}%
-                      <input type="range" min={0} max={2} step={0.05} value={timeline.projectAudio.gain ?? 1}
-                        onChange={(e) => commit((tl) => setProjectAudioGain(tl, parseFloat(e.target.value)))} style={{ width: 100 }} />
+                    <label style={fieldLabel}>Volume {Math.round((projectAudioTrack.volume ?? 1) * 100)}%
+                      <input type="range" min={0} max={2} step={0.05} value={projectAudioTrack.volume ?? 1}
+                        onChange={(e) => commit((tl) => setSoundTrackFlags(tl, projectAudioTrack.id, { volume: parseFloat(e.target.value) }))} style={{ width: 100 }} />
                     </label>
                     <button
-                      onClick={() => commit((tl) => setProjectAudioMuted(tl, !tl.projectAudio.muted))}
-                      style={{ ...smallBtn, background: timeline.projectAudio.muted ? '#DC2626' : 'white', color: timeline.projectAudio.muted ? 'white' : T.inkSecondary, borderColor: timeline.projectAudio.muted ? '#DC2626' : T.border }}
+                      onClick={() => commit((tl) => setSoundTrackFlags(tl, projectAudioTrack.id, { muted: !projectAudioTrack.muted }))}
+                      style={{ ...smallBtn, background: projectAudioTrack.muted ? '#DC2626' : 'white', color: projectAudioTrack.muted ? 'white' : T.inkSecondary, borderColor: projectAudioTrack.muted ? '#DC2626' : T.border }}
                     >
-                      {timeline.projectAudio.muted ? '🔇 Muted' : '🔊 Mute'}
+                      {projectAudioTrack.muted ? '🔇 Muted' : '🔊 Mute'}
                     </button>
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <label style={{ ...smallBtn, display: 'inline-block', cursor: 'pointer' }}>
+                    <label style={{ ...smallBtn, display: 'inline-block', cursor: 'pointer' }} title="Starts the Audio Track over with this new file as one fresh piece — any splits you've made are discarded. To remove just one piece instead, select it on the timeline and click Delete.">
                       ⇄ Replace audio
                       <input type="file" accept="audio/*" style={{ display: 'none' }} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) handleAddProjectAudioFile(f); }} />
                     </label>
-                    <button onClick={handleRemoveProjectAudio} style={{ ...smallBtn, color: T.danger }}>🗑 Remove</button>
+                    <button onClick={handleRemoveProjectAudio} style={{ ...smallBtn, color: T.danger }} title="Removes the whole Audio Track and every piece on it">🗑 Remove</button>
                   </div>
                 </>
               );
@@ -4498,7 +4488,7 @@ export default function VideoEditorWorkspace() {
               Add as many sound clips as you like — background music, sound effects, extra narration. Each one plays independently and can overlap with the others; position and trim them with the fields below.
             </p>
             <label style={{ ...smallBtn, display: 'inline-block', cursor: 'pointer', marginBottom: 10 }}>
-              + Add sound{timeline.soundTracks.length ? ' clip' : ''}
+              + Add sound{extraSoundTracks.length ? ' clip' : ''}
               <input type="file" accept="audio/*" multiple style={{ display: 'none' }} onChange={(e) => {
                 // Array.from(...) copies the file references out BEFORE
                 // clearing value — e.target.files is a live FileList tied to
@@ -4511,9 +4501,9 @@ export default function VideoEditorWorkspace() {
                 if (files.length) handleSoundFiles(files);
               }} />
             </label>
-            {timeline.soundTracks.length > 0 && (
+            {extraSoundTracks.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {timeline.soundTracks.map((track, ti) => {
+                {extraSoundTracks.map((track, ti) => {
                   const clip = getTrackClips(timeline, track.id)[0];
                   if (!clip) return null;
                   const source = timeline.sources.find((s) => s.id === clip.sourceId);

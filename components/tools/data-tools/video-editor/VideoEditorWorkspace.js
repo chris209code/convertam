@@ -21,7 +21,7 @@ import {
   addOverlayTrack, removeOverlayTrack, setOverlayTrackMode, setOverlayTrackDividerRatio,
   setOverlayTrackPipCorner, setOverlayTrackPipPosition, setOverlayTrackPipSizeRatio, setOverlayTrackFlags, setOverlayTrackCutout, isOverlayTrackAudible,
   setFitMode, setBackgroundFill, setBackgroundType, setBackgroundGradient, setBackgroundImageSource, setFrameAspect,
-  setClipSpeed, setClipFade, setClipFilters, setClipCropFocus, setClipCropZoom, setClipTransitionOut, setClipGain, setClipReversed, setClipDucking,
+  setClipSpeedRipple, setClipFade, setClipFilters, setClipCropFocus, setClipCropZoom, setClipTransitionOut, setClipGain, setClipReversed, setClipDucking,
   rotateClip90, setClipFlip,
   addTextOverlay, updateTextOverlay, deleteTextOverlay, duplicateTextOverlay,
   addImageOverlay, updateImageOverlay, deleteImageOverlay,
@@ -388,8 +388,8 @@ function moveClipToIndexRespectingLink(tl, track, clipId, newIndex) {
 // JSX for the linked, MAIN_TRACK case this intentionally doesn't handle.
 function setClipSpeedRespectingLink(tl, clip, speed) {
   const linked = clip.track === MAIN_TRACK ? getLinkedAudioClip(tl, clip.id) : null;
-  let next = setClipSpeed(tl, clip.id, speed);
-  if (linked) next = setClipSpeed(next, linked.id, speed);
+  let next = setClipSpeedRipple(tl, clip.id, speed);
+  if (linked) next = setClipSpeedRipple(next, linked.id, speed);
   return next;
 }
 // Manually setting a MAIN_TRACK clip's own audioMode (the Keep/Mute/Replace/
@@ -3557,26 +3557,53 @@ export default function VideoEditorWorkspace() {
               <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 }}>Effects</div>
               {selectedSource.kind !== 'image' && (() => {
                 const linkedAudioForSpeed = selectedClip.track === MAIN_TRACK ? getLinkedAudioClip(timeline, selectedClip.id) : null;
+                const applySpeed = (speed) => {
+                  if (!linkedAudioForSpeed) { commit((tl) => setClipSpeedRespectingLink(tl, selectedClip, speed)); return; }
+                  commit((tl) => {
+                    if (speedApplyTarget === 'audio') return setClipSpeedRipple(tl, linkedAudioForSpeed.id, speed);
+                    let next = setClipSpeedRipple(tl, selectedClip.id, speed);
+                    if (speedApplyTarget === 'both') next = setClipSpeedRipple(next, linkedAudioForSpeed.id, speed);
+                    return next;
+                  });
+                };
                 return (
                   <div style={{ marginBottom: 10 }}>
-                    <label style={{ ...fieldLabel, display: 'inline-flex' }}>Speed
-                      <select
-                        value={selectedClip.speed}
-                        onChange={(e) => {
-                          const speed = parseFloat(e.target.value);
-                          if (!linkedAudioForSpeed) { commit((tl) => setClipSpeedRespectingLink(tl, selectedClip, speed)); return; }
-                          commit((tl) => {
-                            if (speedApplyTarget === 'audio') return setClipSpeed(tl, linkedAudioForSpeed.id, speed);
-                            let next = setClipSpeed(tl, selectedClip.id, speed);
-                            if (speedApplyTarget === 'both') next = setClipSpeed(next, linkedAudioForSpeed.id, speed);
-                            return next;
-                          });
-                        }}
-                        style={numInput}
-                      >
-                        {SPEED_OPTIONS.map((s) => <option key={s} value={s}>{s}×</option>)}
-                      </select>
-                    </label>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 6 }}>Selected clip</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: '0.72rem', color: T.inkSecondary, marginBottom: 8 }}>
+                      <span><strong style={{ color: T.ink }}>Duration:</strong> {formatDuration(clipDuration(selectedClip))}</span>
+                      <span><strong style={{ color: T.ink }}>Audio:</strong> {linkedAudioForSpeed ? 'Linked to Audio track' : selectedClip.track === MAIN_TRACK ? 'Embedded in this clip' : '—'}</span>
+                    </div>
+                    <div style={{ ...fieldLabel, marginBottom: 4 }} title="Independent of Scrub preview speed above — this changes the clip's actual duration and is included in the export.">
+                      Speed <span style={{ fontWeight: 500, color: T.muted }}>(this clip only — affects the export)</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
+                      {SPEED_OPTIONS.map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => applySpeed(s)}
+                          style={{
+                            ...smallBtn, padding: '5px 10px', fontSize: '0.7rem',
+                            background: selectedClip.speed === s ? T.accentGradient : 'white',
+                            color: selectedClip.speed === s ? 'white' : T.inkSecondary,
+                            border: selectedClip.speed === s ? 'none' : `1px solid ${T.border}`,
+                          }}
+                        >
+                          {Math.round(s * 100)}%
+                        </button>
+                      ))}
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.7rem', color: T.inkSecondary }}>
+                        <input
+                          type="number" min={25} max={400} step={5}
+                          value={Math.round(selectedClip.speed * 100)}
+                          onChange={(e) => {
+                            const pct = parseFloat(e.target.value);
+                            if (Number.isFinite(pct) && pct > 0) applySpeed(pct / 100);
+                          }}
+                          style={{ ...numInput, width: 60 }}
+                        />
+                        %
+                      </label>
+                    </div>
                     {linkedAudioForSpeed && (
                       <div style={{ marginTop: 6 }}>
                         <div style={{ fontSize: '0.66rem', fontWeight: 700, color: T.mutedDark, marginBottom: 4 }}>Apply speed change to</div>
@@ -3598,7 +3625,7 @@ export default function VideoEditorWorkspace() {
                           ))}
                         </div>
                         <p style={{ fontSize: '0.66rem', color: T.mutedDark, margin: 0 }}>
-                          🔗 This clip's audio lives on its own linked clip on the Audio track — Video: <strong>{selectedClip.speed}×</strong> · Audio: <strong>{linkedAudioForSpeed.speed}×</strong>
+                          🔗 This clip's audio lives on its own linked clip on the Audio track — Video: <strong>{Math.round(selectedClip.speed * 100)}%</strong> · Audio: <strong>{Math.round(linkedAudioForSpeed.speed * 100)}%</strong>
                           {selectedClip.speed !== linkedAudioForSpeed.speed ? ' (currently different, on purpose or otherwise — that\'s allowed).' : '.'}
                         </p>
                       </div>

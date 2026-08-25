@@ -46,6 +46,7 @@ import { detectSilence } from '@/lib/media/silenceDetect';
 import { computeNormalizationGain } from '@/lib/media/normalizeAudio';
 import { cleanAudioFile } from '@/lib/media/audioCleanup';
 import { duckGainAtTime } from '@/lib/media/ducking';
+import { saveProject, loadProject, clearProject, isWorthSaving } from '@/lib/media/projectPersistence';
 // Auto Captions reuses the exact same transcription/caption engine as
 // Audio Studio and Video Studio — no separate implementation. It runs on
 // a LOCAL, audio-only render of the edited timeline's actual mix
@@ -486,6 +487,14 @@ export default function VideoEditorWorkspace() {
   // on that one handle. Set sparingly (only on actual on/off transitions,
   // see handleTrimHandleMove) so a drag doesn't re-render on every pixel.
   const [snappedHandle, setSnappedHandle] = useState(null);
+  // Project auto-save/restore (IndexedDB) — see lib/media/projectPersistence.js.
+  // restorePrompt holds a previously-saved { timeline, savedAt } offered to
+  // the user right after mount; null once dismissed either way (or if there
+  // was nothing to restore). restoreCheckDone gates the autosave effect
+  // below so it can never fire — and overwrite a real save with the initial
+  // empty timeline — before the one-time mount check has actually run.
+  const [restorePrompt, setRestorePrompt] = useState(null);
+  const restoreCheckDoneRef = useRef(false);
 
   // ---- Auto Captions state — operates on a local audio-only render of
   // the current timeline (see the import comment above for why). ----
@@ -715,6 +724,59 @@ export default function VideoEditorWorkspace() {
     setFuture([]);
     setTimeline((prev) => (typeof updater === 'function' ? updater(prev) : updater));
   }
+  // One-time mount check: is there an auto-saved project from a previous
+  // session/reload waiting in IndexedDB? Surfaced as a dismissable prompt
+  // rather than silently restored, since silently overwriting whatever the
+  // user is about to do (even a blank timeline) would be its own surprise.
+  useEffect(() => {
+    let cancelled = false;
+    loadProject().then((record) => {
+      if (cancelled) return;
+      if (record && isWorthSaving(record.timeline)) setRestorePrompt(record);
+      restoreCheckDoneRef.current = true;
+    }).catch(() => {
+      restoreCheckDoneRef.current = true;
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Debounced auto-save: any time the timeline actually changes, persist it
+  // a beat later (so a burst of edits — e.g. dragging a trim handle — only
+  // triggers one write, not one per intermediate frame). Gated on the mount
+  // check above having finished so this can never race ahead of it and save
+  // the empty starting timeline over a real, not-yet-loaded save; further
+  // gated on isWorthSaving so an intentionally-cleared project doesn't
+  // instantly get re-saved as an empty shell. Runs unconditionally once
+  // eligible — there's no explicit "save" action in this editor, so this is
+  // the only thing standing between a reload and losing the whole project.
+  useEffect(() => {
+    if (!restoreCheckDoneRef.current || restorePrompt) return;
+    if (!isWorthSaving(timeline)) {
+      // The user deleted every clip/source down to nothing — that's a
+      // deliberate "start over," so drop the stale save rather than let a
+      // later reload offer to restore a project that no longer exists here.
+      clearProject().catch(() => {});
+      return;
+    }
+    const handle = setTimeout(() => {
+      saveProject(timeline).catch(() => {});
+    }, 1200);
+    return () => clearTimeout(handle);
+  }, [timeline, restorePrompt]);
+
+  function handleRestoreProject() {
+    if (!restorePrompt) return;
+    setTimeline(restorePrompt.timeline);
+    setPast([]);
+    setFuture([]);
+    setRestorePrompt(null);
+  }
+  function handleDiscardRestoredProject() {
+    setRestorePrompt(null);
+    clearProject().catch(() => {});
+  }
+
   function undo() {
     if (!past.length) return;
     const prev = past[past.length - 1];
@@ -2816,6 +2878,18 @@ export default function VideoEditorWorkspace() {
             <span style={{ fontWeight: 800, color: 'white', fontSize: '0.88rem', flexShrink: 0 }}>🎬 Video Editor</span>
           </div>
         </div>
+
+        {restorePrompt && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '10px 16px', background: '#1E293B', borderBottom: '1px solid #334155' }}>
+            <div style={{ color: '#E2E8F0', fontSize: '0.78rem' }}>
+              <strong>We found a previous project</strong> that wasn't finished — auto-saved {formatRelativeSavedAt(restorePrompt.savedAt)}. Restore it?
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              <button onClick={handleRestoreProject} style={{ ...smallBtn, background: T.accentGradient, color: 'white', border: 'none' }}>Restore project</button>
+              <button onClick={handleDiscardRestoredProject} style={{ ...smallBtn, background: 'transparent', color: '#94A3B8', border: '1px solid #475569' }}>Discard</button>
+            </div>
+          </div>
+        )}
 
         <div className="ve-body">
           <div className="ve-rail" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 2, padding: '10px 6px', background: '#0F172A', borderRight: '1px solid #1E293B', flexShrink: 0, overflowX: 'auto' }}>
@@ -5021,6 +5095,18 @@ export default function VideoEditorWorkspace() {
       `}</style>
     </div>
   );
+}
+
+// "3 minutes ago" style, for the restore-project banner's savedAt.
+function formatRelativeSavedAt(savedAt) {
+  const seconds = Math.max(0, Math.round((Date.now() - savedAt) / 1000));
+  if (seconds < 60) return 'just now';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
 const playBtn = { width: 40, height: 40, borderRadius: '50%', border: 'none', background: T.accentGradient, color: 'white', fontSize: '1rem', cursor: 'pointer', flexShrink: 0 };

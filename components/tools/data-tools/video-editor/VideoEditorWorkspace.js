@@ -1816,10 +1816,22 @@ export default function VideoEditorWorkspace() {
     const clip = timeline.clips.find((c) => c.id === drag.clipId);
     if (!clip) return;
     const deltaSeconds = drag.lastDxPx / drag.pxPerSecond;
-    const newCenter = drag.startStart + deltaSeconds + clipDuration(clip) / 2;
-    const others = getTrackClips(timeline, clip.track).filter((c) => c.id !== clip.id);
-    const targetIndex = others.filter((o) => o.start + clipDuration(o) / 2 < newCenter).length;
-    commit((tl) => moveClipToIndexRespectingLink(tl, clip.track, clip.id, targetIndex));
+    if (clip.track === MAIN_TRACK) {
+      const newCenter = drag.startStart + deltaSeconds + clipDuration(clip) / 2;
+      const others = getTrackClips(timeline, clip.track).filter((c) => c.id !== clip.id);
+      const targetIndex = others.filter((o) => o.start + clipDuration(o) / 2 < newCenter).length;
+      commit((tl) => moveClipToIndexRespectingLink(tl, clip.track, clip.id, targetIndex));
+      return;
+    }
+    // Every other track (overlay, Sound clips, the linked Audio track, the
+    // Audio Track) is free-form and manually positioned — drop the clip at
+    // exactly the position it was dragged to. moveClipToIndex above snaps a
+    // clip into a re-sorted back-to-back sequence instead, which is a no-op
+    // whenever there's only one clip on the track (nowhere else to be
+    // "reordered" to) — exactly why dragging a lone Sound clip or Audio
+    // Track piece did nothing no matter where you dropped it.
+    const newStart = Math.max(0, drag.startStart + deltaSeconds);
+    commit((tl) => moveClipRespectingLink(tl, clip, newStart));
   }
 
   // ---- Text overlays ----

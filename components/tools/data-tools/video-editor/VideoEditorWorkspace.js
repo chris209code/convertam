@@ -47,6 +47,7 @@ import { computeNormalizationGain } from '@/lib/media/normalizeAudio';
 import { cleanAudioFile } from '@/lib/media/audioCleanup';
 import { duckGainAtTime } from '@/lib/media/ducking';
 import { saveProject, loadProject, clearProject, isWorthSaving } from '@/lib/media/projectPersistence';
+import { TARGET_VIDEO_KBPS } from '@/lib/media/exportQuality';
 // Auto Captions reuses the exact same transcription/caption engine as
 // Audio Studio and Video Studio — no separate implementation. It runs on
 // a LOCAL, audio-only render of the edited timeline's actual mix
@@ -345,15 +346,12 @@ const FPS_OPTIONS = [
   { id: 60, label: '60', sub: 'Smooth' },
 ];
 
-// Rough kbps-per-quality-tier lookup used only for the "estimated size"
-// readout — not a promise of exact output size, ffmpeg's actual bitrate
-// depends on content complexity too. Video kbps only; a flat allowance for
-// audio (~128kbps) is added on top in estimatedExportMB below.
-const ESTIMATED_VIDEO_KBPS = {
-  '480p': { small: 800, balanced: 1200, high: 2000 },
-  '720p': { small: 1500, balanced: 2500, high: 4000 },
-  '1080p': { small: 3000, balanced: 5000, high: 8000 },
-};
+// Same table timelineRender.js uses as the encoder's actual -maxrate
+// ceiling (see exportQuality.js) — kept as ONE source of truth so this
+// "estimated size" readout can never promise a number the encoder isn't
+// also held to. Video kbps only; a flat allowance for audio (~128kbps) is
+// added on top in estimatedExportMB below.
+const ESTIMATED_VIDEO_KBPS = TARGET_VIDEO_KBPS;
 
 // Every direct clip-edit handler below routes trim/split/move/duplicate
 // through one of these instead of calling timeline.js's plain primitive
@@ -4851,7 +4849,7 @@ export default function VideoEditorWorkspace() {
                 </div>
               </div>
             </div>
-            <p style={{ fontSize: '0.68rem', color: T.muted, margin: '8px 0 0' }}>Estimated size: ~{estimatedExportMB} MB</p>
+            <p style={{ fontSize: '0.68rem', color: T.muted, margin: '8px 0 0' }}>Estimated size: ~{estimatedExportMB} MB (typical; the encoder is capped so it won't run far past this even for a busy composition)</p>
           </div>
           {supported ? (
             <div style={{ textAlign: 'center', padding: '4px 0' }}>

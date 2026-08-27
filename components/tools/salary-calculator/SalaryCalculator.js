@@ -12,6 +12,7 @@ import { formatCurrency, formatCurrencyCompact, formatPercent } from './format';
 import { FREQUENCIES, computeSalary, buildConversionTable, buildInsights, categorizeDeductions, perPeriod } from './calculations';
 import { buildSalaryReportData } from './reportData';
 import { generateFinancialReportPdf } from '../financial-shared/FinancialReport';
+import PayslipUpload from './payslip/PayslipUpload';
 
 const TEMPLATES = [
   {
@@ -67,6 +68,8 @@ function StatCard({ label, value, tone }) {
 }
 
 export default function SalaryCalculator() {
+  const [mode, setMode] = useState('manual'); // 'manual' | 'upload'
+  const [netPayCheck, setNetPayCheck] = useState(null); // { stated, computed } | null — a payslip's own stated net pay, shown once after applying, purely informational
   const [gross, setGross] = useState('');
   const [frequency, setFrequency] = useState('monthly');
   const [currencyCode, setCurrencyCode] = useState('NGN');
@@ -96,6 +99,22 @@ export default function SalaryCalculator() {
     setDeductions(template.deductions.map((d, i) => ({ ...d, id: i + 1 })));
     setNextId(template.deductions.length + 10);
     setShowTemplates(false);
+  }
+  // Hands off a reviewed/edited payslip-upload result into the SAME state
+  // the manual entry form uses — there is no separate payslip calculation
+  // path, this just pre-fills the normal fields and switches back to the
+  // familiar manual view so every existing control (templates, optional
+  // earnings, export, etc.) keeps working exactly as it always has.
+  function applyPayslipPayload(payload) {
+    setGross(payload.gross);
+    if (payload.frequency) setFrequency(payload.frequency);
+    if (payload.currencyCode) setCurrencyCode(payload.currencyCode);
+    setDeductions(payload.deductions);
+    setNextId(payload.deductions.length + payload.bonuses.length + 10);
+    setBonuses(payload.bonuses);
+    setOptionalOpen(payload.bonuses.length > 0);
+    setNetPayCheck(payload.netPayStated != null ? { stated: payload.netPayStated } : null);
+    setMode('manual');
   }
   function addBonus(name = '') {
     setBonuses((prev) => [...prev, { id: nextId, name, amount: '' }]);
@@ -135,12 +154,19 @@ export default function SalaryCalculator() {
     <div className="sal2-root">
       <style>{SAL2_STYLES}</style>
 
-      <div className="sal2-topbar no-print">
-        <span className="sal2-privacy" title="Every calculation happens in your browser — nothing is sent to a server or stored.">
-          🔒 100% Private <span className="sal2-privacy-sub">No salary information is stored</span>
+      <div className="sal2-topbar no-print" style={{ justifyContent: 'space-between' }}>
+        <div className="sal2-mode-toggle">
+          <button className={`sal2-mode-btn ${mode === 'manual' ? 'active' : ''}`} onClick={() => setMode('manual')}>✍️ Enter manually</button>
+          <button className={`sal2-mode-btn ${mode === 'upload' ? 'active' : ''}`} onClick={() => setMode('upload')}>📄 Upload payslip</button>
+        </div>
+        <span className="sal2-privacy" title="Manual entry and local extraction never leave your browser. AI extraction is optional and only runs when you explicitly choose it.">
+          🔒 {mode === 'manual' ? '100% Private' : 'Local-first'} <span className="sal2-privacy-sub">{mode === 'manual' ? 'No salary information is stored' : 'AI is only used if you explicitly ask'}</span>
         </span>
       </div>
 
+      {mode === 'upload' ? (
+        <PayslipUpload onApply={applyPayslipPayload} onBack={() => setMode('manual')} />
+      ) : (
       <div className="sal2-grid">
         {/* ---------------- LEFT: inputs ---------------- */}
         <div className="sal2-col no-print">
@@ -260,6 +286,12 @@ export default function SalaryCalculator() {
               </div>
             ) : (
               <>
+                {netPayCheck && Math.abs(netPayCheck.stated - perPeriod(result.annualNet, frequency)) > netPayCheck.stated * 0.01 && (
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, fontSize: '0.76rem', color: '#7C2D12', background: '#FFF7ED', border: '1px solid #FED7AA', borderRadius: 10, padding: '10px 12px', marginBottom: 12 }}>
+                    <span>Your payslip stated a net pay of {formatCurrency(netPayCheck.stated, currency)}, but based on the values here we calculate {formatCurrency(perPeriod(result.annualNet, frequency), currency)}. Double-check the figures above if this seems off.</span>
+                    <button onClick={() => setNetPayCheck(null)} aria-label="Dismiss" style={{ background: 'none', border: 'none', color: '#92400E', cursor: 'pointer', fontSize: '0.9rem', lineHeight: 1 }}>×</button>
+                  </div>
+                )}
                 <SectionCard icon="📊" title="Your Salary Overview" action={<span className="sal2-live-badge">● Live</span>}>
                   <p className="sal2-card-sub">Live calculation based on your inputs</p>
 
@@ -332,6 +364,7 @@ export default function SalaryCalculator() {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }
@@ -340,7 +373,10 @@ const INSIGHT_ICONS = { percent: '📊', tax: '🏛️', trending: '📈', shiel
 
 const SAL2_STYLES = `
   .sal2-root { --sal2-blue: #2563EB; --sal2-purple: #7C3AED; color: #0F172A; }
-  .sal2-topbar { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+  .sal2-topbar { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .sal2-mode-toggle { display: flex; gap: 6px; background: #F1F5F9; border-radius: 12px; padding: 4px; }
+  .sal2-mode-btn { font-size: 0.78rem; font-weight: 700; padding: 8px 14px; border-radius: 9px; border: none; background: transparent; color: #64748B; cursor: pointer; font-family: inherit; }
+  .sal2-mode-btn.active { background: #fff; color: #2563EB; box-shadow: 0 1px 2px rgba(15,23,42,.08); }
   .sal2-privacy { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 0.78rem; font-weight: 700; color: #059669; background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 12px; padding: 8px 14px; }
   .sal2-privacy-sub { font-size: 0.65rem; font-weight: 500; color: #64748B; }
 

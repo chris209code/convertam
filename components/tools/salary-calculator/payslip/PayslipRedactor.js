@@ -175,7 +175,12 @@ export default function PayslipRedactor({ pages, onCancel, onApply }) {
                 key={b.id}
                 style={{
                   position: 'absolute', left: nb.x * zoom, top: nb.y * zoom, width: nb.w * zoom, height: nb.h * zoom,
-                  background: 'rgba(15,23,42,0.85)', border: isSelected ? '2px solid #2563EB' : '1px solid rgba(255,255,255,0.6)',
+                  // Fully opaque — matches flattenPages()'s own solid fill
+                  // exactly, so what's shown here while editing is exactly
+                  // what ends up in the processed copy, never a translucent
+                  // preview that could read as "not really" covering
+                  // something sensitive.
+                  background: '#000000', border: isSelected ? '2px solid #2563EB' : '1px solid rgba(255,255,255,0.6)',
                   boxSizing: 'border-box',
                 }}
               >

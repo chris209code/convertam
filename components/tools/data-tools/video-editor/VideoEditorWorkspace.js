@@ -29,7 +29,7 @@ import {
   setExportResolution, setExportQuality, setExportFps,
   getTrackClips, getTotalDuration, findActiveClipAt, clipDuration, MAIN_TRACK, BLEND_TRANSITION_TYPES,
   getClipTimelineBounds, getAllClipBoundaryTimes,
-  getMasterGain, setMasterVolume, setMasterMuted, setMasterFade,
+  getMasterGain, setMasterVolume, setMasterMuted, setMasterFade, setMasterAudioFade,
   addMarker, updateMarker, deleteMarker,
   ensureProjectAudioTrack,
   addSoundTrack, removeSoundTrack, setSoundTrackFlags, isSoundTrackAudible,
@@ -4654,6 +4654,22 @@ export default function VideoEditorWorkspace() {
               )}
             </div>
             <p style={{ fontSize: '0.66rem', color: T.muted, margin: '6px 0 0' }}>Fades both the picture (to/from black) and the whole mix&apos;s volume together, on top of every clip&apos;s own volume and fades.</p>
+
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.border}` }}>
+              <label style={fieldLabel}>Audio-only fade in
+                <input type="number" step={0.5} min={0} max={totalDuration / 2} value={(timeline.masterAudioFadeIn || 0).toFixed(1)}
+                  onChange={(e) => commit((tl) => setMasterAudioFade(tl, { masterAudioFadeIn: parseFloat(e.target.value) || 0 }))} style={numInput} />
+              </label>
+              <label style={fieldLabel}>Audio-only fade out
+                <input type="number" step={0.5} min={0} max={totalDuration / 2} value={(timeline.masterAudioFadeOut || 0).toFixed(1)}
+                  onChange={(e) => commit((tl) => setMasterAudioFade(tl, { masterAudioFadeOut: parseFloat(e.target.value) || 0 }))} style={numInput} />
+              </label>
+              {(timeline.masterAudioFadeOut || 0) === 0 && (
+                <button onClick={() => commit((tl) => setMasterAudioFade(tl, { masterAudioFadeOut: 1.5 }))} style={smallBtn}>+ Fade out audio at the end</button>
+              )}
+            </div>
+            <p style={{ fontSize: '0.66rem', color: T.muted, margin: '6px 0 0' }}>Eases the volume up/down without touching the picture — use this if you want the audio to fade smoothly instead of cutting off abruptly, but don&apos;t want the video itself to dip to black.</p>
+
             <div style={{ marginTop: 8 }}>
               <div style={{ ...fieldLabel, marginBottom: 4 }}>Level meter <span style={{ fontWeight: 500, opacity: 0.8 }}>— live during playback</span></div>
               <div style={{ width: '100%', height: 8, borderRadius: 4, background: '#E2E8F0', overflow: 'hidden' }}>

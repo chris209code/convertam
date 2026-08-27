@@ -159,8 +159,8 @@ export default function SalaryCalculator() {
           <button className={`sal2-mode-btn ${mode === 'manual' ? 'active' : ''}`} onClick={() => setMode('manual')}>✍️ Enter manually</button>
           <button className={`sal2-mode-btn ${mode === 'upload' ? 'active' : ''}`} onClick={() => setMode('upload')}>📄 Upload payslip</button>
         </div>
-        <span className="sal2-privacy" title="Manual entry and local extraction never leave your browser. AI extraction is optional and only runs when you explicitly choose it.">
-          🔒 {mode === 'manual' ? '100% Private' : 'Local-first'} <span className="sal2-privacy-sub">{mode === 'manual' ? 'No salary information is stored' : 'AI is only used if you explicitly ask'}</span>
+        <span className="sal2-privacy" title={mode === 'manual' ? 'Every calculation happens in your browser — nothing is sent to a server or stored.' : 'Payslip images are sent to our AI service to be read. You can redact sensitive areas first, and nothing is applied to the calculator without your review.'}>
+          {mode === 'manual' ? '🔒 100% Private' : '🤖 AI-assisted'} <span className="sal2-privacy-sub">{mode === 'manual' ? 'No salary information is stored' : 'Your payslip is analyzed by AI — review before it\'s applied'}</span>
         </span>
       </div>
 

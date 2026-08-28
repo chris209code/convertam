@@ -22,7 +22,7 @@ import {
   setOverlayTrackPipCorner, setOverlayTrackPipPosition, setOverlayTrackPipSizeRatio, setOverlayTrackFlags, setOverlayTrackCutout, isOverlayTrackAudible,
   setFitMode, setBackgroundFill, setBackgroundType, setBackgroundGradient, setBackgroundImageSource, setFrameAspect,
   setClipSpeedRipple, setImageClipDuration, setClipFade, setClipFilters, setClipCropFocus, setClipCropZoom, setClipTransitionOut, setClipGain, setClipReversed, setClipDucking,
-  rotateClip90, setClipFlip,
+  rotateClip90, setClipFlip, setClipKenBurns, getKenBurnsTransform,
   addTextOverlay, updateTextOverlay, deleteTextOverlay, duplicateTextOverlay,
   addImageOverlay, updateImageOverlay, deleteImageOverlay,
   addShapeOverlay, updateShapeOverlay, deleteShapeOverlay,
@@ -91,6 +91,16 @@ const CAPTION_ALIGN_OPTIONS = [
   { id: 'left', label: 'Align Left' },
   { id: 'center', label: 'Center' },
   { id: 'right', label: 'Align Right' },
+];
+
+const KEN_BURNS_OPTIONS = [
+  { id: 'none', label: 'None' },
+  { id: 'zoom-in', label: '🔍 Zoom in' },
+  { id: 'zoom-out', label: '🔎 Zoom out' },
+  { id: 'pan-left', label: '⬅ Pan left' },
+  { id: 'pan-right', label: '➡ Pan right' },
+  { id: 'pan-up', label: '⬆ Pan up' },
+  { id: 'pan-down', label: '⬇ Pan down' },
 ];
 
 const CAPTION_HIGHLIGHT_OPTIONS = [
@@ -2511,7 +2521,9 @@ export default function VideoEditorWorkspace() {
       drawCompositionFrame(ctx, {
         timeline: drawTimeline,
         mainEl: mainHit ? (mainIsImage ? ensureMainImageElement(mainHit.clip.sourceId) : mainVideoRef.current) : null,
-        mainClip: mainHit?.clip || null,
+        mainClip: mainHit ? (mainIsImage && mainHit.clip.kenBurns && mainHit.clip.kenBurns !== 'none'
+          ? { ...mainHit.clip, ...getKenBurnsTransform(mainHit.clip, mainHit.sourceTime) }
+          : mainHit.clip) : null,
         mainOpacity,
         crossfadeEl: crossfadeLayer?.el || null,
         crossfadeClip: crossfadeLayer?.clip || null,
@@ -4039,6 +4051,23 @@ export default function VideoEditorWorkspace() {
                   )}
                   {BLEND_TRANSITION_TYPES.includes(selectedClip.transitionOut.type) && (
                     <p style={{ fontSize: '0.64rem', color: T.muted, margin: '4px 0 0' }}>Blends this clip's video directly into the next one — no fade through a color.</p>
+                  )}
+                </div>
+              )}
+
+              {selectedSource.kind === 'image' && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ ...fieldLabel, marginBottom: 4 }}>Ken Burns <span style={{ fontWeight: 500, opacity: 0.8 }}>— animated zoom/pan instead of a still frame</span></div>
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                    {KEN_BURNS_OPTIONS.map((opt) => (
+                      <button key={opt.id} onClick={() => commit((tl) => setClipKenBurns(tl, selectedClip.id, opt.id))}
+                        style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.68rem', background: (selectedClip.kenBurns || 'none') === opt.id ? T.accentGradient : 'white', color: (selectedClip.kenBurns || 'none') === opt.id ? 'white' : T.inkSecondary, border: (selectedClip.kenBurns || 'none') === opt.id ? 'none' : `1px solid ${T.border}` }}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedClip.kenBurns && selectedClip.kenBurns !== 'none' && (
+                    <p style={{ fontSize: '0.64rem', color: T.muted, margin: '4px 0 0' }}>Overrides the manual crop/pan below for this clip while it's playing.</p>
                   )}
                 </div>
               )}

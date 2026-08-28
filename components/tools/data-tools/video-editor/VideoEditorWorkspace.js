@@ -5080,7 +5080,13 @@ export default function VideoEditorWorkspace() {
                   <input type="color" value={timeline.captionStyle.color} onChange={(e) => commit((tl) => setCaptionStyle(tl, { color: e.target.value }))} style={{ width: 32, height: 28, padding: 0, border: `1px solid ${T.border}`, borderRadius: 6, cursor: 'pointer' }} />
                 </label>
                 <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6 }}>Highlight color
-                  <input type="color" value={timeline.captionStyle.highlightColor} onChange={(e) => commit((tl) => setCaptionStyle(tl, { highlightColor: e.target.value }))} style={{ width: 32, height: 28, padding: 0, border: `1px solid ${T.border}`, borderRadius: 6, cursor: 'pointer' }} />
+                  {timeline.captionStyle.highlightColorMode !== 'random' && (
+                    <input type="color" value={timeline.captionStyle.highlightColor} onChange={(e) => commit((tl) => setCaptionStyle(tl, { highlightColor: e.target.value }))} style={{ width: 32, height: 28, padding: 0, border: `1px solid ${T.border}`, borderRadius: 6, cursor: 'pointer' }} />
+                  )}
+                </label>
+                <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={timeline.captionStyle.highlightColorMode === 'random'} onChange={(e) => commit((tl) => setCaptionStyle(tl, { highlightColorMode: e.target.checked ? 'random' : 'fixed' }))} />
+                  🎨 Random multicolor
                 </label>
                 <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                   <input type="checkbox" checked={timeline.captionStyle.outline} onChange={(e) => commit((tl) => setCaptionStyle(tl, { outline: e.target.checked }))} />

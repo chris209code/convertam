@@ -1157,12 +1157,12 @@ export default function VideoEditorWorkspace() {
   // back-to-back starting at the playhead rather than all stacked at 0, so
   // dropping in several sound effects at once doesn't require manually
   // repositioning every one of them afterward.
-  async function handleSoundFiles(files) {
+  async function handleSoundFiles(files, atSeconds = playhead) {
     const list = Array.from(files || []);
     if (!list.length) return;
     setUploadError('');
     let next = timeline;
-    let cursor = playhead;
+    let cursor = atSeconds;
     let firstTrackId = null;
     for (const f of list) {
       const sizeError = validateUploadSize(f, 'audio');
@@ -1185,6 +1185,72 @@ export default function VideoEditorWorkspace() {
   }
   function handleRemoveSoundTrack(trackId) {
     commit((tl) => removeSoundTrack(tl, trackId));
+  }
+
+  // ---- Record Voiceover: mic narration recorded directly onto its own
+  // sound track while the timeline plays back, so the user can talk over
+  // their edit without leaving the editor. A standalone mic-recording tool
+  // (Voice Over) existed in this app once and was deliberately retired —
+  // the recorded audio quality via a browser's own getUserMedia/
+  // MediaRecorder processing (uncontrolled noise-suppression/AGC) wasn't
+  // acceptable. This capture explicitly turns that processing OFF
+  // (echoCancellation/noiseSuppression/autoGainControl: false) to get the
+  // rawest signal the browser will give up, then runs it through the real
+  // Audio Cleaner DSP (lib/media/audioCleanup.js) before it ever lands on
+  // the timeline — the fix that didn't exist when this was pulled before.
+  const [isRecordingVoiceover, setIsRecordingVoiceover] = useState(false);
+  const [voiceoverProcessing, setVoiceoverProcessing] = useState(false);
+  const [voiceoverError, setVoiceoverError] = useState('');
+  const voiceoverRecorderRef = useRef(null);
+  const voiceoverStreamRef = useRef(null);
+  const voiceoverChunksRef = useRef([]);
+  const voiceoverStartAtRef = useRef(0);
+
+  async function handleStartVoiceoverRecording() {
+    setVoiceoverError('');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      });
+      voiceoverStreamRef.current = stream;
+      voiceoverChunksRef.current = [];
+      const recorder = new MediaRecorder(stream);
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) voiceoverChunksRef.current.push(e.data); };
+      recorder.start();
+      voiceoverRecorderRef.current = recorder;
+      voiceoverStartAtRef.current = playhead; // narration lands where recording STARTED, not wherever playback ends up
+      setIsRecordingVoiceover(true);
+      setPlaying(true);
+    } catch {
+      setVoiceoverError("Could not access your microphone. Check your browser's microphone permission for this site.");
+    }
+  }
+
+  async function handleStopVoiceoverRecording() {
+    const recorder = voiceoverRecorderRef.current;
+    if (!recorder) return;
+    setPlaying(false);
+    setIsRecordingVoiceover(false);
+    const stopped = new Promise((resolve) => { recorder.onstop = resolve; });
+    recorder.stop();
+    voiceoverStreamRef.current?.getTracks().forEach((t) => t.stop());
+    await stopped;
+    voiceoverRecorderRef.current = null;
+    const rawBlob = new Blob(voiceoverChunksRef.current, { type: 'audio/webm' });
+    voiceoverChunksRef.current = [];
+    if (rawBlob.size === 0) return;
+    setVoiceoverProcessing(true);
+    setVoiceoverError('');
+    try {
+      const rawFile = new File([rawBlob], 'voiceover-raw.webm', { type: 'audio/webm' });
+      const { blob } = await cleanAudioFile(rawFile, { intensity: 'medium', reduceHum: true, voiceEnhance: true, normalize: true });
+      const file = new File([blob], `voiceover-${Date.now()}.wav`, { type: 'audio/wav' });
+      await handleSoundFiles([file], voiceoverStartAtRef.current);
+    } catch {
+      setVoiceoverError('Could not process this recording. Please try again.');
+    } finally {
+      setVoiceoverProcessing(false);
+    }
   }
 
   // Each video overlay upload creates a NEW overlay track (rather than
@@ -4912,20 +4978,32 @@ export default function VideoEditorWorkspace() {
             <p style={{ fontSize: '0.74rem', color: T.mutedDark, margin: '0 0 8px' }}>
               Add as many sound clips as you like — background music, sound effects, extra narration. Each one plays independently and can overlap with the others; position and trim them with the fields below.
             </p>
-            <label style={{ ...smallBtn, display: 'inline-block', cursor: 'pointer', marginBottom: 10 }}>
-              + Add sound{extraSoundTracks.length ? ' clip' : ''}
-              <input type="file" accept="audio/*" multiple style={{ display: 'none' }} onChange={(e) => {
-                // Array.from(...) copies the file references out BEFORE
-                // clearing value — e.target.files is a live FileList tied to
-                // the input, so resetting value first (as every other
-                // single-file input in this file safely does with
-                // e.target.files?.[0], a plain File reference) would empty
-                // this multi-file FileList out from under handleSoundFiles.
-                const files = Array.from(e.target.files || []);
-                e.target.value = '';
-                if (files.length) handleSoundFiles(files);
-              }} />
-            </label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+              <label style={{ ...smallBtn, display: 'inline-block', cursor: 'pointer' }}>
+                + Add sound{extraSoundTracks.length ? ' clip' : ''}
+                <input type="file" accept="audio/*" multiple style={{ display: 'none' }} onChange={(e) => {
+                  // Array.from(...) copies the file references out BEFORE
+                  // clearing value — e.target.files is a live FileList tied to
+                  // the input, so resetting value first (as every other
+                  // single-file input in this file safely does with
+                  // e.target.files?.[0], a plain File reference) would empty
+                  // this multi-file FileList out from under handleSoundFiles.
+                  const files = Array.from(e.target.files || []);
+                  e.target.value = '';
+                  if (files.length) handleSoundFiles(files);
+                }} />
+              </label>
+              {!isRecordingVoiceover ? (
+                <button onClick={handleStartVoiceoverRecording} disabled={voiceoverProcessing} style={smallBtn} title="Records your microphone while the timeline plays, then drops the narration onto its own sound track">
+                  {voiceoverProcessing ? 'Cleaning up recording…' : '🎙️ Record Voiceover'}
+                </button>
+              ) : (
+                <button onClick={handleStopVoiceoverRecording} style={{ ...smallBtn, background: '#DC2626', color: 'white', border: 'none' }}>
+                  ⏹ Stop recording
+                </button>
+              )}
+            </div>
+            {voiceoverError && <div style={{ ...statusBox, marginBottom: 10 }}>⚠️ {voiceoverError}</div>}
             {extraSoundTracks.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {extraSoundTracks.map((track, ti) => {

@@ -29,7 +29,7 @@ import {
   setExportResolution, setExportQuality, setExportFps,
   getTrackClips, getTotalDuration, findActiveClipAt, clipDuration, MAIN_TRACK, BLEND_TRANSITION_TYPES,
   getClipTimelineBounds, getAllClipBoundaryTimes,
-  getMasterGain, setMasterVolume, setMasterMuted, setMasterFade, setMasterAudioFade,
+  getMasterGain, setMasterVolume, setMasterMuted, setMasterFade, setMasterAudioFade, setOutroSound,
   addMarker, updateMarker, deleteMarker,
   ensureProjectAudioTrack,
   addSoundTrack, removeSoundTrack, setSoundTrackFlags, isSoundTrackAudible,
@@ -46,6 +46,7 @@ import { detectSilence } from '@/lib/media/silenceDetect';
 import { computeNormalizationGain } from '@/lib/media/normalizeAudio';
 import { cleanAudioFile } from '@/lib/media/audioCleanup';
 import { duckGainAtTime } from '@/lib/media/ducking';
+import { OUTRO_SOUND_EFFECTS, outroSoundById } from '@/lib/media/outroSounds';
 import { saveProject, loadProject, clearProject, isWorthSaving } from '@/lib/media/projectPersistence';
 import { TARGET_VIDEO_KBPS } from '@/lib/media/exportQuality';
 // Auto Captions reuses the exact same transcription/caption engine as
@@ -627,6 +628,16 @@ export default function VideoEditorWorkspace() {
   const mainReplaceAudioElRef = useRef(null); // hidden <audio> for a clip's 'replace'/'mix' audioSourceId
   const mainReplaceSrcNodeRef = useRef(null);
   const mainReplaceLastClipRef = useRef(null);
+  // Signature outro sound (lib/media/outroSounds.js) — its own gain node
+  // feeding the SAME point masterGain does (parallel with it, not through
+  // it), so it's unaffected by masterFadeOut/masterAudioFadeOut but still
+  // shows on the level meter and still respects masterVolume/masterMuted.
+  const outroAudioElRef = useRef(null);
+  const outroGainRef = useRef(null);
+  const outroSrcNodeRef = useRef(null);
+  const outroLoadedIdRef = useRef(null); // which effectId is currently loaded into outroAudioElRef
+  const outroDurationRef = useRef(0);
+  const outroStartedRef = useRef(false);
   // Wall-clock anchor set when Play starts: { atWall, atPlayhead }. The
   // playhead advances from real elapsed time rather than a fixed per-frame
   // step, so it never drifts away from the audio actually playing.
@@ -817,6 +828,13 @@ export default function VideoEditorWorkspace() {
       mainGainRef.current = mainGain;
       mainReplaceGainRef.current = mainReplaceGain;
       mainReplaceAudioElRef.current = new Audio();
+      const outroGain = ctx.createGain();
+      outroGain.gain.value = 0;
+      outroGain.connect(analyser);
+      outroGainRef.current = outroGain;
+      outroAudioElRef.current = new Audio();
+      outroSrcNodeRef.current = ctx.createMediaElementSource(outroAudioElRef.current);
+      outroSrcNodeRef.current.connect(outroGain);
     } else if (audioCtxRef.current.state === 'suspended') {
       audioCtxRef.current.resume().catch(() => {});
     }
@@ -2295,6 +2313,30 @@ export default function VideoEditorWorkspace() {
       if (audioCtxRef.current) {
         if (masterGainRef.current) masterGainRef.current.gain.value = getMasterGain(timeline, playhead);
         syncSoundTracksLive();
+
+        // Outro sound — (re)triggered off playhead position rather than a
+        // one-shot export-style flag, since scrubbing in the live preview
+        // means the same point in the timeline can be crossed many times.
+        const outroConfig = timeline.outroSound?.effectId ? outroSoundById(timeline.outroSound.effectId) : null;
+        if (outroConfig && outroAudioElRef.current) {
+          if (outroLoadedIdRef.current !== outroConfig.id) {
+            outroAudioElRef.current.src = outroConfig.url;
+            outroLoadedIdRef.current = outroConfig.id;
+            outroDurationRef.current = 0;
+            outroAudioElRef.current.onloadedmetadata = () => { outroDurationRef.current = outroAudioElRef.current.duration || 0; };
+          }
+          const outroStart = Math.max(0, totalDuration - (outroDurationRef.current || 1));
+          if (playing && !outroStartedRef.current && playhead >= outroStart) {
+            outroStartedRef.current = true;
+            outroGainRef.current.gain.value = timeline.masterMuted ? 0 : (timeline.masterVolume ?? 1) * (timeline.outroSound.volume ?? 0.8);
+            outroAudioElRef.current.currentTime = 0;
+            outroAudioElRef.current.play().catch(() => {});
+          } else if (playhead < outroStart - 0.05) {
+            outroStartedRef.current = false; // scrubbed back before the outro point — allow it to fire again
+          }
+        } else if (outroGainRef.current) {
+          outroGainRef.current.gain.value = 0;
+        }
         if (analyserRef.current && meterDataRef.current && meterBarRef.current) {
           analyserRef.current.getByteTimeDomainData(meterDataRef.current);
           let peak = 0;
@@ -4669,6 +4711,40 @@ export default function VideoEditorWorkspace() {
               )}
             </div>
             <p style={{ fontSize: '0.66rem', color: T.muted, margin: '6px 0 0' }}>Eases the volume up/down without touching the picture — use this if you want the audio to fade smoothly instead of cutting off abruptly, but don&apos;t want the video itself to dip to black.</p>
+
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.border}` }}>
+              <div style={{ ...fieldLabel, marginBottom: 6 }}>Outro sound <span style={{ fontWeight: 500, opacity: 0.8 }}>— a signature sound at the very end</span></div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => commit((tl) => setOutroSound(tl, { effectId: null }))}
+                  style={{ ...smallBtn, background: !timeline.outroSound?.effectId ? T.accentGradient : 'white', color: !timeline.outroSound?.effectId ? 'white' : T.inkSecondary, border: !timeline.outroSound?.effectId ? 'none' : `1px solid ${T.border}` }}
+                >None</button>
+                {OUTRO_SOUND_EFFECTS.map((fx) => {
+                  const active = timeline.outroSound?.effectId === fx.id;
+                  return (
+                    <div key={fx.id} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <button
+                        onClick={() => commit((tl) => setOutroSound(tl, { effectId: fx.id }))}
+                        style={{ ...smallBtn, background: active ? T.accentGradient : 'white', color: active ? 'white' : T.inkSecondary, border: active ? 'none' : `1px solid ${T.border}` }}
+                      >{fx.label}</button>
+                      <button
+                        onClick={() => new Audio(fx.url).play().catch(() => {})}
+                        title={`Preview ${fx.label}`}
+                        aria-label={`Preview ${fx.label}`}
+                        style={{ ...smallBtn, padding: '6px 8px' }}
+                      >▶</button>
+                    </div>
+                  );
+                })}
+              </div>
+              {timeline.outroSound?.effectId && (
+                <label style={{ ...fieldLabel, marginTop: 8, display: 'block' }}>Outro volume {Math.round((timeline.outroSound.volume ?? 0.8) * 100)}%
+                  <input type="range" min={0} max={1} step={0.05} value={timeline.outroSound.volume ?? 0.8}
+                    onChange={(e) => commit((tl) => setOutroSound(tl, { volume: parseFloat(e.target.value) }))} style={{ width: 140, display: 'block', marginTop: 2 }} />
+                </label>
+              )}
+              <p style={{ fontSize: '0.66rem', color: T.muted, margin: '6px 0 0' }}>Plays right at the end of the export, timed to finish exactly as the video does — always at its own volume, unaffected by the fades above.</p>
+            </div>
 
             <div style={{ marginTop: 8 }}>
               <div style={{ ...fieldLabel, marginBottom: 4 }}>Level meter <span style={{ fontWeight: 500, opacity: 0.8 }}>— live during playback</span></div>

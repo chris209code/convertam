@@ -44,7 +44,7 @@ import { extractThumbnails, thumbnailsForRange } from '@/lib/media/thumbnails';
 import { extractWaveformPeaks, drawWaveform } from '@/lib/media/waveform';
 import { detectSilence } from '@/lib/media/silenceDetect';
 import { computeNormalizationGain } from '@/lib/media/normalizeAudio';
-import { cleanAudioFile } from '@/lib/media/audioCleanup';
+import { cleanAudioFile, CLEANUP_INTENSITIES } from '@/lib/media/audioCleanup';
 import { duckGainAtTime } from '@/lib/media/ducking';
 import { OUTRO_SOUND_EFFECTS, outroSoundById } from '@/lib/media/outroSounds';
 import { saveProject, loadProject, clearProject, isWorthSaving } from '@/lib/media/projectPersistence';
@@ -461,6 +461,12 @@ export default function VideoEditorWorkspace() {
   const [normalizing, setNormalizing] = useState(false);
   const [cleaningClipAudio, setCleaningClipAudio] = useState(false);
   const [clipCleanupError, setClipCleanupError] = useState('');
+  const [cleanupIntensity, setCleanupIntensity] = useState('medium');
+  const [cleanupVoiceEnhance, setCleanupVoiceEnhance] = useState(false);
+  const [cleanupNormalize, setCleanupNormalize] = useState(false);
+  const [cleanupCompress, setCleanupCompress] = useState(false);
+  const [cleanupEq, setCleanupEq] = useState({ bass: 0, mid: 0, treble: 0 });
+  const [showCleanupOptions, setShowCleanupOptions] = useState(false);
   // Timeline zoom — a multiplier on the track strips' own width (they're
   // flex-proportional to clip duration already, see mainTrackRef's comment
   // below) rather than a fixed px-per-second, so 1x still exactly fits the
@@ -1516,7 +1522,10 @@ export default function VideoEditorWorkspace() {
       const usingReplacement = (selectedClip.audioMode === 'replace' || selectedClip.audioMode === 'mix') && selectedClipAudioSource;
       const sourceFile = usingReplacement ? selectedClipAudioSource.file : selectedSource.file;
       const range = usingReplacement ? {} : { startSeconds: selectedClip.sourceStart, endSeconds: selectedClip.sourceEnd };
-      const { blob } = await cleanAudioFile(sourceFile, { intensity: 'medium', reduceHum: true, voiceEnhance: false, normalize: false, ...range });
+      const { blob } = await cleanAudioFile(sourceFile, {
+        intensity: cleanupIntensity, reduceHum: true, voiceEnhance: cleanupVoiceEnhance,
+        normalize: cleanupNormalize, compress: cleanupCompress, eq: cleanupEq, ...range,
+      });
       const file = new File([blob], 'cleaned-audio.wav', { type: 'audio/wav' });
       await handleReplaceAudioFile([file], 'replace');
     } catch (err) {
@@ -3849,7 +3858,50 @@ export default function VideoEditorWorkspace() {
                 <button onClick={handleCleanClipAudio} disabled={cleaningClipAudio} style={smallBtn} title="Reduces hum, rumble, and background hiss in this clip's audio — plain signal processing, not AI">
                   {cleaningClipAudio ? 'Cleaning…' : '🧹 Clean audio'}
                 </button>
+                <button onClick={() => setShowCleanupOptions((v) => !v)} style={smallBtn} title="Clean audio options">
+                  {showCleanupOptions ? 'Hide options ▲' : 'Options ▼'}
+                </button>
               </div>
+              {showCleanupOptions && (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div>
+                    <div style={{ ...fieldLabel, marginBottom: 4 }}>Cleanup intensity</div>
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      {CLEANUP_INTENSITIES.map((level) => (
+                        <button key={level} onClick={() => setCleanupIntensity(level)}
+                          style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.68rem', textTransform: 'capitalize', background: cleanupIntensity === level ? T.accentGradient : 'white', color: cleanupIntensity === level ? 'white' : T.inkSecondary, border: cleanupIntensity === level ? 'none' : `1px solid ${T.border}` }}>
+                          {level}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                    <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={cleanupVoiceEnhance} onChange={(e) => setCleanupVoiceEnhance(e.target.checked)} />
+                      Voice enhance
+                    </label>
+                    <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={cleanupNormalize} onChange={(e) => setCleanupNormalize(e.target.checked)} />
+                      Normalize volume
+                    </label>
+                    <label style={{ ...fieldLabel, flexDirection: 'row', alignItems: 'center', gap: 6, cursor: 'pointer' }} title="Evens out loud/quiet moments as they happen, rather than one flat volume change">
+                      <input type="checkbox" checked={cleanupCompress} onChange={(e) => setCleanupCompress(e.target.checked)} />
+                      Compression
+                    </label>
+                  </div>
+                  <div>
+                    <div style={{ ...fieldLabel, marginBottom: 4 }}>EQ</div>
+                    <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                      {[['bass', 'Bass'], ['mid', 'Mid'], ['treble', 'Treble']].map(([key, label]) => (
+                        <label key={key} style={fieldLabel}>{label} {cleanupEq[key] > 0 ? '+' : ''}{cleanupEq[key]}dB
+                          <input type="range" min={-12} max={12} step={1} value={cleanupEq[key]}
+                            onChange={(e) => setCleanupEq((eq) => ({ ...eq, [key]: parseInt(e.target.value, 10) }))} style={{ width: 90 }} />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
               {clipCleanupError && <div style={{ ...statusBox, marginTop: 8 }}>⚠️ {clipCleanupError}</div>}
             </div>
           ))}

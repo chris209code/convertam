@@ -67,6 +67,8 @@ export default function AudioStudioWorkspace() {
   const [cleanupReduceHum, setCleanupReduceHum] = useState(true);
   const [cleanupVoiceEnhance, setCleanupVoiceEnhance] = useState(false);
   const [cleanupNormalize, setCleanupNormalize] = useState(true);
+  const [cleanupCompress, setCleanupCompress] = useState(false);
+  const [cleanupEq, setCleanupEq] = useState({ bass: 0, mid: 0, treble: 0 });
   const [cleanupStatus, setCleanupStatus] = useState('idle'); // idle | processing | error
   const [cleanupError, setCleanupError] = useState('');
   const [cleanedResult, setCleanedResult] = useState(null); // { blob, url } | null
@@ -138,6 +140,8 @@ export default function AudioStudioWorkspace() {
         reduceHum: cleanupReduceHum,
         voiceEnhance: cleanupVoiceEnhance,
         normalize: cleanupNormalize,
+        compress: cleanupCompress,
+        eq: cleanupEq,
       });
       if (cleanedResult?.url) URL.revokeObjectURL(cleanedResult.url);
       setCleanedResult({ blob, url: URL.createObjectURL(blob) });
@@ -427,6 +431,20 @@ export default function AudioStudioWorkspace() {
                         <input type="checkbox" checked={cleanupNormalize} onChange={(e) => setCleanupNormalize(e.target.checked)} />
                         Normalize volume
                       </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.76rem', color: T.inkSecondary, cursor: 'pointer' }} title="Evens out loud/quiet moments as they happen, rather than one flat volume change">
+                        <input type="checkbox" checked={cleanupCompress} onChange={(e) => setCleanupCompress(e.target.checked)} />
+                        Compression
+                      </label>
+                    </div>
+                    <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 700, color: T.mutedDark }}>EQ</div>
+                      {[['bass', 'Bass'], ['mid', 'Mid'], ['treble', 'Treble']].map(([key, label]) => (
+                        <label key={key} style={{ display: 'flex', flexDirection: 'column', fontSize: '0.7rem', color: T.inkSecondary }}>
+                          {label} {cleanupEq[key] > 0 ? '+' : ''}{cleanupEq[key]}dB
+                          <input type="range" min={-12} max={12} step={1} value={cleanupEq[key]}
+                            onChange={(e) => setCleanupEq((eq) => ({ ...eq, [key]: parseInt(e.target.value, 10) }))} style={{ width: 90 }} />
+                        </label>
+                      ))}
                     </div>
                     <button onClick={handleCleanAudio} disabled={cleanupStatus === 'processing'} style={{ ...smallBtn, background: cleanupStatus === 'processing' ? '#94A3B8' : T.accentGradient, color: 'white', border: 'none', fontWeight: 700 }}>
                       {cleanupStatus === 'processing' ? 'Cleaning…' : '🧹 Clean Audio'}

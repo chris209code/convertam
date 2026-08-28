@@ -64,7 +64,6 @@ export default function sitemap() {
     'video-editor',
     'screen-recorder',
     'audio-studio',
-    'recording-studio',
     'video-studio',
     'compress-video',
   ].map((slug) => ({

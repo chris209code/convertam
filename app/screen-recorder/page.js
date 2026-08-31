@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import ScreenRecorderWorkspace from '../../components/tools/data-tools/screen-recorder/ScreenRecorderWorkspace';
+import { LeaderboardAd, ResponsiveAd } from '@/components/ads/AdSlot';
 
 export const metadata = {
   title: 'Screen Recorder — Mic & Webcam PIP, Free & Local | Convertam',
@@ -51,8 +52,16 @@ export default function ScreenRecorderPage() {
             </p>
           </div>
 
-          <div style={{ background: 'white', borderRadius: 20, padding: '28px 20px', boxShadow: '0 1px 3px rgba(15,23,42,0.06)', marginBottom: 56, maxWidth: 640, margin: '0 auto 56px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
+            <LeaderboardAd />
+          </div>
+
+          <div style={{ background: 'white', borderRadius: 20, padding: '28px 20px', boxShadow: '0 1px 3px rgba(15,23,42,0.06)', marginBottom: 32, maxWidth: 640, margin: '0 auto 32px' }}>
             <ScreenRecorderWorkspace />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 56 }}>
+            <ResponsiveAd />
           </div>
 
           <article style={{ maxWidth: 760, margin: '0 auto', color: '#334155', lineHeight: 1.75, fontSize: '0.95rem' }}>

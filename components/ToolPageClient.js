@@ -75,6 +75,7 @@ import ToolExtrasSection from '@/components/tool-guide/ToolExtrasSection';
 import WorkspaceLayoutShell from '@/components/workspace/WorkspaceLayoutShell';
 import { useDocumentSession } from '@/components/document-session/DocumentSessionProvider';
 import SmartWorkflowStepBanner from '@/components/smart-workflows/SmartWorkflowStepBanner';
+import { LeaderboardAd, ResponsiveAd } from '@/components/ads/AdSlot';
 
 const isFree = (mode) =>
   ['pdf-lib', 'pdf-to-image', 'smart', 'receipt', 'sign', 'reorder', 'watermark', 'invoice',
@@ -173,6 +174,16 @@ export default function ToolPageClient({ tool }) {
           </div>
         )}
 
+        {/* Landing-page-only ad, same "cold visitor" gate (!inSession) as
+            the badges/steps/tips chrome above — never shown once someone's
+            actively mid-workflow, and always above the tool itself, never
+            inside it. LeaderboardAd renders nothing below ~900px wide. */}
+        {!inSession && (
+          <div className="mb-6 flex justify-center">
+            <LeaderboardAd />
+          </div>
+        )}
+
         {tool.mode === 'office' && <OfficeConvertWorkspace accept={tool.accept} toFormat={tool.toFormat} toLabel={tool.toLabel} />}
         {tool.mode === 'pdf-lib' && <PdfLibWorkspace mode={tool.pdfLibMode} accept={tool.accept} />}
         {tool.mode === 'pdf-to-image' && <PdfToImageWorkspace format={tool.imageFormat} />}
@@ -254,6 +265,14 @@ export default function ToolPageClient({ tool }) {
             <span>Guide: <strong>{learnArticle.title}</strong></span>
             <span className="ml-auto text-stamp-blue">→</span>
           </Link>
+        )}
+
+        {/* Below-the-tool ad — same landing-page-only gate as the
+            leaderboard above the workspace. */}
+        {!inSession && (
+          <div className="mt-8 flex justify-center">
+            <ResponsiveAd />
+          </div>
         )}
 
         {/* Plain related-tools chip row — superseded by the richer

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Base64Workspace from '../../../components/tools/data-tools/base64/Base64Workspace';
+import { LeaderboardAd, ResponsiveAd } from '@/components/ads/AdSlot';
 
 export const metadata = {
   title: 'Base64 Encode / Decode — Text & File Converter | Convertam',
@@ -42,8 +43,16 @@ export default function Base64Page() {
             </p>
           </div>
 
-          <div style={{ background: 'white', borderRadius: 20, padding: '28px 20px', boxShadow: '0 1px 3px rgba(15,23,42,0.06)', marginBottom: 56 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
+            <LeaderboardAd />
+          </div>
+
+          <div style={{ background: 'white', borderRadius: 20, padding: '28px 20px', boxShadow: '0 1px 3px rgba(15,23,42,0.06)', marginBottom: 32 }}>
             <Base64Workspace />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 56 }}>
+            <ResponsiveAd />
           </div>
 
           <article style={{ maxWidth: 760, margin: '0 auto', color: '#334155', lineHeight: 1.75, fontSize: '0.95rem' }}>

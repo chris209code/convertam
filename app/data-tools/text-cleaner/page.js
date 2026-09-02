@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import TextCleanerStudio from '../../../components/tools/data-tools/TextCleanerStudio';
+import { LeaderboardAd, ResponsiveAd } from '@/components/ads/AdSlot';
 
 export const metadata = {
   title: 'Text Cleaner Studio — Free Online Text Editor | Convertam',
@@ -25,7 +26,16 @@ export default function TextCleanerPage() {
       <main style={{ width: '100%', minHeight: '100vh', background: 'linear-gradient(180deg, #ECFEFF 0%, #F8FEFF 100%)' }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 4% 64px' }}>
           <Link href="/data-tools" style={{ fontSize: '0.8rem', color: '#0E7490', textDecoration: 'none', marginBottom: 12, display: 'inline-block' }}>← Back to Data Tools</Link>
+
+          <div style={{ display: 'flex', justifyContent: 'center', margin: '16px 0' }}>
+            <LeaderboardAd />
+          </div>
+
           <TextCleanerStudio />
+
+          <div style={{ display: 'flex', justifyContent: 'center', margin: '24px 0' }}>
+            <ResponsiveAd />
+          </div>
 
           <div style={{ marginTop: 40, paddingTop: 24, borderTop: '1px solid #E2E8F0' }}>
             <p style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Related Tools</p>

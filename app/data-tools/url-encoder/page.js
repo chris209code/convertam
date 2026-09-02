@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import UrlEncoderWorkspace from '../../../components/tools/data-tools/url-encoder/UrlEncoderWorkspace';
+import { LeaderboardAd, ResponsiveAd } from '@/components/ads/AdSlot';
 
 export const metadata = {
   title: 'URL Encode / Decode — Percent-Encoding Tool | Convertam',
@@ -41,8 +42,16 @@ export default function UrlEncoderPage() {
             </p>
           </div>
 
-          <div style={{ background: 'white', borderRadius: 20, padding: '28px 20px', boxShadow: '0 1px 3px rgba(15,23,42,0.06)', marginBottom: 56 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
+            <LeaderboardAd />
+          </div>
+
+          <div style={{ background: 'white', borderRadius: 20, padding: '28px 20px', boxShadow: '0 1px 3px rgba(15,23,42,0.06)', marginBottom: 32 }}>
             <UrlEncoderWorkspace />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 56 }}>
+            <ResponsiveAd />
           </div>
 
           <article style={{ maxWidth: 760, margin: '0 auto', color: '#334155', lineHeight: 1.75, fontSize: '0.95rem' }}>

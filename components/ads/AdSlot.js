@@ -1,42 +1,49 @@
 'use client';
 
-// Reusable Adsterra banner ad unit. Every ad placement across Convertam
-// renders through this one component (or the ResponsiveAd/LeaderboardAd
-// wrappers below) rather than pasting Adsterra's script tags into pages
-// directly — see lib/ads/adsterraConfig.js for the actual keys/sizes and
-// the sitewide on/off switch.
+// Reusable ad-network-agnostic banner slot. Every ad placement across
+// Convertam renders through this one component (or the ResponsiveAd/
+// LeaderboardAd wrappers below) rather than pasting a network's script
+// tags into pages directly — see lib/ads/adSlots.js for which network
+// currently fills each slot and the sitewide on/off switch, and
+// lib/ads/adNetworks.js for how each network's markup gets built. Adding a
+// second network later only touches those two files, never a page.
 //
-// Adsterra's invoke.js uses `document.write` to insert its ad markup at
-// the script tag's own position in the DOM — that's incompatible with
-// React (which owns the DOM and re-renders around it) if loaded directly
-// on the page, and two ad units on the same page would also clobber each
-// other's global `atOptions` variable. Rendering each unit inside its own
-// <iframe srcDoc=...> sidesteps both problems: it's a fresh, isolated
-// document where document.write works exactly as the ad network expects,
-// and each iframe has its own global scope.
+// Ad networks like Adsterra's invoke.js use `document.write` to insert
+// their markup at the script tag's own position in the DOM — that's
+// incompatible with React (which owns the DOM and re-renders around it) if
+// loaded directly on the page, and two ad units on the same page could
+// also clobber each other's global state (e.g. Adsterra's `atOptions`).
+// Rendering each unit inside its own <iframe srcDoc=...> sidesteps both
+// problems: it's a fresh, isolated document where document.write works
+// exactly as the ad network expects, and each iframe has its own global
+// scope — true regardless of which network fills the slot.
 
 import { useEffect, useState } from 'react';
-import { ADS_ENABLED, AD_UNITS } from '@/lib/ads/adsterraConfig';
+import { ADS_ENABLED, AD_SLOTS } from '@/lib/ads/adSlots';
+import { AD_NETWORKS } from '@/lib/ads/adNetworks';
 
-function buildAdSrcDoc(unit) {
-  const atOptions = { key: unit.key, format: 'iframe', height: unit.height, width: unit.width, params: {} };
+function buildAdSrcDoc(slot) {
+  const network = AD_NETWORKS[slot.network];
+  if (!network) return null;
   return `<!doctype html><html><head><meta charset="utf-8" /><style>html,body{margin:0;padding:0;overflow:hidden;background:transparent;}</style></head><body>
-<script>atOptions=${JSON.stringify(atOptions)};</script>
-<script src="https://www.highrevenueformat.com/${unit.key}/invoke.js"></script>
+${network.buildMarkup(slot.unit)}
 </body></html>`;
 }
 
-// size: '300x250' | '320x50' | '728x90' — one of AD_UNITS' keys.
+// size: '300x250' | '320x50' | '728x90' — one of AD_SLOTS' keys.
 // Renders a fixed-size reserved space immediately (even before the ad
 // itself loads) so the page never jumps once the ad appears.
 export function AdSlot({ size, style, className }) {
-  const unit = AD_UNITS[size];
+  const slot = AD_SLOTS[size];
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  if (!ADS_ENABLED || !unit) return null;
+  if (!ADS_ENABLED || !slot) return null;
+  const { width, height } = slot.unit;
+  const srcDoc = buildAdSrcDoc(slot);
+  if (!srcDoc) return null; // slot points at a network with no markup builder registered yet
 
-  const containerStyle = { width: unit.width, height: unit.height, maxWidth: '100%', overflow: 'hidden', ...style };
+  const containerStyle = { width, height, maxWidth: '100%', overflow: 'hidden', ...style };
 
   // Deferring the actual iframe (with its remote script) to after mount
   // keeps the ad off the very first paint/SSR output — the reserved-space
@@ -47,11 +54,11 @@ export function AdSlot({ size, style, className }) {
     <div className={className} style={containerStyle}>
       <iframe
         title="Advertisement"
-        srcDoc={buildAdSrcDoc(unit)}
-        width={unit.width}
-        height={unit.height}
+        srcDoc={srcDoc}
+        width={width}
+        height={height}
         scrolling="no"
-        style={{ border: 'none', display: 'block', width: unit.width, height: unit.height, maxWidth: '100%' }}
+        style={{ border: 'none', display: 'block', width, height, maxWidth: '100%' }}
       />
     </div>
   );

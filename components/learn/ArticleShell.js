@@ -13,6 +13,7 @@ import ArticleContent from './ArticleContent';
 import CommonMistakes from './CommonMistakes';
 import PrimaryCta from './PrimaryCta';
 import RelatedArticlesCard from './RelatedArticlesCard';
+import { LeaderboardAd, ResponsiveAd } from '@/components/ads/AdSlot';
 
 const CATEGORY_ICONS = { pdf: PdfIcon, business: BusinessIcon, ai: AiIcon, image: ImageIcon, calculator: CalculatorIcon, utilities: UtilitiesIcon, workflow: WorkflowIcon };
 
@@ -40,9 +41,16 @@ export default function ArticleShell({ article }) {
         readingTime={readingTime}
       />
 
+      <div className="lrn-inner" style={{ display: 'flex', justifyContent: 'center', padding: '20px 0 0' }}>
+        <LeaderboardAd />
+      </div>
+
       <div className="lrn-inner lrn-article-layout">
         <div>
           <ArticleContent body={article.body} />
+          <div style={{ display: 'flex', justifyContent: 'center', margin: '24px 0' }}>
+            <ResponsiveAd />
+          </div>
           <CommonMistakes items={article.commonMistakes} />
           {article.primaryTool && <PrimaryCta primaryTool={article.primaryTool} accent={accent} />}
           <FullFaqSection items={article.faqs} />

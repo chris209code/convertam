@@ -8,6 +8,7 @@ import { LEARN_CSS } from './learnStyles';
 import ArticleCard from './ArticleCard';
 import LearnSearch from './LearnSearch';
 import { LEARN_HERO_ART, CATEGORY_ART } from './illustrations/learnArt';
+import { ResponsiveAd } from '@/components/ads/AdSlot';
 
 export default function LearnHomepageClient() {
   const featured = getFeaturedArticles();
@@ -63,6 +64,10 @@ export default function LearnHomepageClient() {
             </div>
           </div>
         )}
+
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '0 0 40px' }}>
+          <ResponsiveAd />
+        </div>
 
         <div>
           <p className="lrn-section-label">Browse by Category</p>

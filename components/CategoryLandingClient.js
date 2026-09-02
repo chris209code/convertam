@@ -8,6 +8,7 @@ import SmartWorkflowStepBanner from './smart-workflows/SmartWorkflowStepBanner';
 import StarIcon from './icons/StarIcon';
 import { useFavoriteTools } from '../lib/favoriteTools';
 import { TOOL_CARD_ARTWORK } from './toolCardArtwork';
+import { ResponsiveAd } from './ads/AdSlot';
 
 // Reusable Category Landing Page framework — one layout, driven entirely by
 // props, meant to power every category hub (PDF Tools, Business Documents,
@@ -327,6 +328,10 @@ export default function CategoryLandingClient({ accent, icon, title, subtitle, e
             </div>
           </div>
         ))}
+
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '28px 0' }}>
+          <ResponsiveAd />
+        </div>
 
         {faqs && faqs.length > 0 && (
           <div style={{ marginBottom: 36, marginTop: 40 }}>

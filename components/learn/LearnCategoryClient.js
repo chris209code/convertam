@@ -7,6 +7,7 @@ import { getArticlesByCategory } from '@/lib/learn';
 import { LEARN_CSS } from './learnStyles';
 import ArticleCard from './ArticleCard';
 import { CATEGORY_ART } from './illustrations/learnArt';
+import { ResponsiveAd } from '@/components/ads/AdSlot';
 
 export default function LearnCategoryClient({ category }) {
   const accent = CATEGORY_ACCENTS[category.accentKey];
@@ -33,6 +34,9 @@ export default function LearnCategoryClient({ category }) {
       </div>
 
       <div className="lrn-inner" style={{ padding: '28px 4% 56px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
+          <ResponsiveAd />
+        </div>
         <div className="lrn-grid">
           {articles.map((a) => <ArticleCard key={a.slug} article={a} />)}
         </div>

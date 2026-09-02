@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { TOOL_CARD_ARTWORK } from './toolCardArtwork';
+import { ResponsiveAd } from './ads/AdSlot';
 
 // Generic premium "category hub" template — same pattern as the Calculator
 // Hub (quick-nav pills, sectioned grid of cards with icon/title/desc/badge).
@@ -155,6 +156,9 @@ export default function ToolHubClient({ accent, icon, title, subtitle, sections 
       </div>
 
       <div className="page-inner" style={{ paddingTop: 18, paddingBottom: 56 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
+          <ResponsiveAd />
+        </div>
         {sections.map((s) => (
           <div key={s.id} style={{ marginBottom: 28 }}>
             <h2 id={s.id} className="th-section-title">{s.icon} {s.label}</h2>

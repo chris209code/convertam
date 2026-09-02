@@ -1,4 +1,5 @@
 import { buildOgMeta } from '@/lib/pageMetadata';
+import { ResponsiveAd } from '@/components/ads/AdSlot';
 
 const TITLE = 'About Convertam — Free File Conversion, No Login';
 const DESCRIPTION = 'Learn about Convertam, our story, privacy policy, and answers to common questions about file conversion, security, and how our tools work.';
@@ -149,6 +150,10 @@ export default function AboutPage() {
           <p className="text-ink-soft text-sm text-center mt-2 font-semibold">— Christopher Okeke, Founder, Convertam</p>
         </div>
       </section>
+
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 40 }}>
+        <ResponsiveAd />
+      </div>
 
       {/* Privacy Policy */}
       <section className="mb-12" id="privacy">

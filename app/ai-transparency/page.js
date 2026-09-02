@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { buildOgMeta } from '@/lib/pageMetadata';
+import { ResponsiveAd } from '@/components/ads/AdSlot';
 
 const TITLE = 'AI Transparency — How Convertam Uses AI';
 const DESCRIPTION = 'Which Convertam tools use AI, which model powers them, what data is sent, whether it trains on your files, and the real limitations of AI-generated output.';
@@ -118,6 +119,10 @@ export default function AiTransparencyPage() {
           <Link href="/about#privacy" className="underline text-stamp-blue">Privacy Policy</Link>.
         </p>
       </section>
+
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 32 }}>
+        <ResponsiveAd />
+      </div>
 
     </main>
   );

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { buildOgMeta } from '@/lib/pageMetadata';
+import { ResponsiveAd } from '@/components/ads/AdSlot';
 
 const TITLE = 'Security — How Convertam Protects Your Files';
 const DESCRIPTION = 'How Convertam secures your files and data: encryption in transit, browser-based processing, infrastructure providers, payment security, and how to report a vulnerability.';
@@ -120,6 +121,10 @@ export default function SecurityPage() {
           <Link href="/about#privacy" className="underline text-stamp-blue">Privacy Policy</Link>.
         </p>
       </section>
+
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 32 }}>
+        <ResponsiveAd />
+      </div>
 
     </main>
   );

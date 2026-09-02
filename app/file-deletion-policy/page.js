@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { buildOgMeta } from '@/lib/pageMetadata';
+import { ResponsiveAd } from '@/components/ads/AdSlot';
 
 const TITLE = 'File Deletion Policy — What Happens to Your File on Convertam';
 const DESCRIPTION = 'Exactly what happens to your file when you use Convertam: which tools never leave your device, how server-side files are deleted, and what we never keep.';
@@ -98,6 +99,10 @@ export default function FileDeletionPolicyPage() {
           <Link href="/contact" className="underline text-stamp-blue">Contact us</Link>.
         </p>
       </section>
+
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 32 }}>
+        <ResponsiveAd />
+      </div>
 
     </main>
   );

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { buildOgMeta } from '@/lib/pageMetadata';
+import { ResponsiveAd } from '@/components/ads/AdSlot';
 
 const TITLE = 'Why Convertam — What Makes It Different';
 const DESCRIPTION = 'Why choose Convertam over other file-conversion sites: no login, no watermarks, transparent per-use pricing, browser-based privacy, and a real accountable maintainer.';
@@ -103,6 +104,10 @@ export default function WhyConvertamPage() {
           </p>
         </section>
 
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 32 }}>
+        <ResponsiveAd />
       </div>
 
     </main>

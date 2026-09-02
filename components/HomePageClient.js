@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { ResponsiveAd } from './ads/AdSlot';
 
 // Google's SearchAction schema needs a real URL target that actually
 // performs a search — "/?q={search_term_string}" plus this effect (which
@@ -624,6 +625,10 @@ export default function HomePageClient() {
               </div>
             </div>
           ))}
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '28px 0' }}>
+          <ResponsiveAd />
         </div>
 
         <div className="cvt-trust-wrap">

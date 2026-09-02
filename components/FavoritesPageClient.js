@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { ResponsiveAd } from './ads/AdSlot';
 import { ToolCard } from './CategoryLandingClient';
 import { useFavoriteTools } from '../lib/favoriteTools';
 import { getToolCards } from '../lib/allToolCards';
@@ -105,6 +106,10 @@ export default function FavoritesPageClient() {
             <Link href="/" className="fav-browse-btn">Browse all tools</Link>
           </div>
         ) : (
+          <>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
+            <ResponsiveAd />
+          </div>
           <div className="fav-grid">
             {tools.map((tool) => (
               <ToolCard
@@ -116,6 +121,7 @@ export default function FavoritesPageClient() {
               />
             ))}
           </div>
+          </>
         )}
       </div>
     </main>

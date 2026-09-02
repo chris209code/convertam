@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { buildOgMeta } from '@/lib/pageMetadata';
+import { ResponsiveAd } from '@/components/ads/AdSlot';
 
 const TITLE = 'Contact Convertam';
 const DESCRIPTION = 'How to reach Convertam — general support, security reports, and payment issues, with realistic response-time expectations from an independently run project.';
@@ -81,6 +82,10 @@ export default function ContactPage() {
           </a>
         </section>
 
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 32 }}>
+        <ResponsiveAd />
       </div>
 
     </main>

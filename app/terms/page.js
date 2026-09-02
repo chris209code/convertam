@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { buildOgMeta } from '@/lib/pageMetadata';
+import { ResponsiveAd } from '@/components/ads/AdSlot';
 
 const TITLE = 'Terms of Service — Convertam';
 const DESCRIPTION = 'The terms governing your use of Convertam — free and paid file conversion tools, acceptable use, payments, and liability.';
@@ -170,6 +171,10 @@ export default function TermsPage() {
           and <Link href="/about" className="underline text-stamp-blue">Our Story</Link>.
         </p>
       </section>
+
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 32 }}>
+        <ResponsiveAd />
+      </div>
 
     </main>
   );

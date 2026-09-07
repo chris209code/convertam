@@ -24,6 +24,15 @@ const EMPTY_EXP = {
   whatYouDid: '', toolsUsed: '', problemsSolved: '', whoYouWorkedWith: '', improvements: '', numbers: '', supervised: '',
   bullets: [], description: '', generating: false,
 };
+function genExpId() {
+  return `exp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+// Entries need a stable id (not their array index) so an in-flight AI
+// request started for one entry can't land on a different entry after the
+// user adds/removes/reorders entries while the request was pending.
+function makeExp() {
+  return { ...EMPTY_EXP, _id: genExpId() };
+}
 const EMPTY_EDU = { degree: '', course: '', institution: '', location: '', startYear: '', endYear: '', current: false, grade: '', notes: '' };
 const EMPTY_CERT = { name: '', issuer: '', dateIssued: '', expiryDate: '', doesNotExpire: false, credentialId: '', credentialUrl: '' };
 
@@ -135,7 +144,7 @@ export default function ResumeBuilderWorkspace() {
       setDocxDownloadStage(null);
     }
   }
-  const [experience, setExperience] = useState([{ ...EMPTY_EXP }]);
+  const [experience, setExperience] = useState([makeExp()]);
   const [education, setEducation] = useState([{ ...EMPTY_EDU }]);
   const [certifications, setCertifications] = useState([]);
   const [skills, setSkills] = useState('');
@@ -151,7 +160,7 @@ export default function ResumeBuilderWorkspace() {
     try {
       const imported = JSON.parse(raw);
       if (imported.form) setForm((f) => ({ ...f, ...imported.form }));
-      if (imported.experience?.length) setExperience(imported.experience.map((e) => ({ ...EMPTY_EXP, ...e })));
+      if (imported.experience?.length) setExperience(imported.experience.map((e) => ({ ...EMPTY_EXP, ...e, _id: genExpId() })));
       if (imported.education?.length) setEducation(imported.education.map((e) => ({ ...EMPTY_EDU, ...e })));
       if (imported.certifications?.length) setCertifications(imported.certifications.map((c) => ({ ...EMPTY_CERT, ...c })));
       if (imported.skills) setSkills(imported.skills);
@@ -176,7 +185,7 @@ export default function ResumeBuilderWorkspace() {
   const role = targetRole === 'General CV / Not sure yet' ? '' : (targetRole || customRole);
 
   const updateForm = (key, val) => setForm(f => ({ ...f, [key]: val }));
-  const updateExp = (i, key, val) => setExperience(prev => prev.map((e, idx) => idx === i ? { ...e, [key]: val } : e));
+  const updateExp = (id, key, val) => setExperience(prev => prev.map((e) => e._id === id ? { ...e, [key]: val } : e));
   const updateEdu = (i, key, val) => setEducation(prev => prev.map((e, idx) => idx === i ? { ...e, [key]: val } : e));
   const updateCert = (i, key, val) => setCertifications(prev => prev.map((c, idx) => idx === i ? { ...c, [key]: val } : c));
   function moveCert(i, dir) {
@@ -202,28 +211,29 @@ export default function ResumeBuilderWorkspace() {
     return certifications.filter(c => c.name).map(c => `${c.name}${c.issuer ? ` — ${c.issuer}` : ''}${c.dateIssued ? ` (${c.dateIssued})` : ''}`).join('\n');
   }
 
-  async function handleGenerateBullets(i) {
-    const exp = experience[i];
+  async function handleGenerateBullets(id) {
+    const exp = experience.find((e) => e._id === id);
+    if (!exp) return;
     setError('');
-    updateExp(i, 'generating', true);
+    updateExp(id, 'generating', true);
     try {
       const { bullets } = await callAI('bullets', {
         careerLevel, targetRole: role, jobTitle: exp.role, employer: exp.company,
         whatYouDid: exp.whatYouDid, toolsUsed: exp.toolsUsed, problemsSolved: exp.problemsSolved,
         whoYouWorkedWith: exp.whoYouWorkedWith, improvements: exp.improvements, numbers: exp.numbers, supervised: exp.supervised,
       });
-      updateExp(i, 'bullets', bullets);
-    } catch (err) { setError(err.message); } finally { updateExp(i, 'generating', false); }
+      updateExp(id, 'bullets', bullets);
+    } catch (err) { setError(err.message); } finally { updateExp(id, 'generating', false); }
   }
 
-  async function handleRefineBullets(i, action) {
-    const exp = experience[i];
-    if (!exp.bullets.length) return;
-    updateExp(i, 'generating', true);
+  async function handleRefineBullets(id, action) {
+    const exp = experience.find((e) => e._id === id);
+    if (!exp || !exp.bullets.length) return;
+    updateExp(id, 'generating', true);
     try {
       const { text } = await callAI('refine', { text: exp.bullets.join('\n'), modifier: action, context: `${exp.type} — ${exp.role} — targeting ${role || 'general role'}` });
-      updateExp(i, 'bullets', text.split('\n').map(s => s.replace(/^[-•]\s*/, '').trim()).filter(Boolean));
-    } catch (err) { setError(err.message); } finally { updateExp(i, 'generating', false); }
+      updateExp(id, 'bullets', text.split('\n').map(s => s.replace(/^[-•]\s*/, '').trim()).filter(Boolean));
+    } catch (err) { setError(err.message); } finally { updateExp(id, 'generating', false); }
   }
 
   async function handleGenerateSummary() {
@@ -355,42 +365,42 @@ export default function ResumeBuilderWorkspace() {
         <div>
           <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A', marginBottom: 4 }}>Experience</p>
           <p style={{ fontSize: '0.78rem', color: '#64748B', marginBottom: 16 }}>Include work experience, NYSC, internships, volunteer work, or teaching. Answer a few simple questions and let AI turn them into strong CV bullet points.</p>
-          {experience.map((exp, i) => (
-            <div key={i} style={{ background: '#F8FAFC', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid #E2E8F0' }}>
+          {experience.map((exp) => (
+            <div key={exp._id} style={{ background: '#F8FAFC', borderRadius: 12, padding: 16, marginBottom: 16, border: '1px solid #E2E8F0' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
-                <div><label style={labelStyle}>Type</label><select style={inputStyle} value={exp.type} onChange={e => updateExp(i, 'type', e.target.value)}>{EXP_TYPES.map(t => <option key={t}>{t}</option>)}</select></div>
-                <div><label style={labelStyle}>Role / Position</label><input style={inputStyle} value={exp.role} onChange={e => updateExp(i, 'role', e.target.value)} /></div>
-                <div><label style={labelStyle}>Organization</label><input style={inputStyle} value={exp.company} onChange={e => updateExp(i, 'company', e.target.value)} /></div>
+                <div><label style={labelStyle}>Type</label><select style={inputStyle} value={exp.type} onChange={e => updateExp(exp._id, 'type', e.target.value)}>{EXP_TYPES.map(t => <option key={t}>{t}</option>)}</select></div>
+                <div><label style={labelStyle}>Role / Position</label><input style={inputStyle} value={exp.role} onChange={e => updateExp(exp._id, 'role', e.target.value)} /></div>
+                <div><label style={labelStyle}>Organization</label><input style={inputStyle} value={exp.company} onChange={e => updateExp(exp._id, 'company', e.target.value)} /></div>
               </div>
-              <div style={{ marginBottom: 10 }}><label style={labelStyle}>Period (e.g. 2022 - 2024)</label><input style={inputStyle} value={exp.period} onChange={e => updateExp(i, 'period', e.target.value)} /></div>
+              <div style={{ marginBottom: 10 }}><label style={labelStyle}>Period (e.g. 2022 - 2024)</label><input style={inputStyle} value={exp.period} onChange={e => updateExp(exp._id, 'period', e.target.value)} /></div>
               <details style={{ marginBottom: 10 }} open={exp.bullets.length === 0}>
                 <summary style={{ fontSize: '0.8rem', fontWeight: 600, color: '#7C3AED', cursor: 'pointer', marginBottom: 8 }}>Answer a few questions so AI can write this for you</summary>
                 <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
-                  <div><label style={labelStyle}>Job Description</label><textarea style={{ ...inputStyle, minHeight: 50 }} value={exp.whatYouDid} onChange={e => updateExp(i, 'whatYouDid', e.target.value)} placeholder="What did you do in this role? This will appear on your CV as-is unless you use AI to turn it into polished bullet points below." /></div>
-                  <div><label style={labelStyle}>Equipment, software, or tools you used</label><input style={inputStyle} value={exp.toolsUsed} onChange={e => updateExp(i, 'toolsUsed', e.target.value)} /></div>
-                  <div><label style={labelStyle}>Any problems you solved?</label><input style={inputStyle} value={exp.problemsSolved} onChange={e => updateExp(i, 'problemsSolved', e.target.value)} /></div>
-                  <div><label style={labelStyle}>Who/what did you work with?</label><input style={inputStyle} value={exp.whoYouWorkedWith} onChange={e => updateExp(i, 'whoYouWorkedWith', e.target.value)} /></div>
-                  <div><label style={labelStyle}>Did you improve anything?</label><input style={inputStyle} value={exp.improvements} onChange={e => updateExp(i, 'improvements', e.target.value)} /></div>
-                  <div><label style={labelStyle}>Any numbers, targets, percentages, or quantities?</label><input style={inputStyle} value={exp.numbers} onChange={e => updateExp(i, 'numbers', e.target.value)} /></div>
-                  <div><label style={labelStyle}>Did you supervise or train anyone?</label><input style={inputStyle} value={exp.supervised} onChange={e => updateExp(i, 'supervised', e.target.value)} /></div>
+                  <div><label style={labelStyle}>Job Description</label><textarea style={{ ...inputStyle, minHeight: 50 }} value={exp.whatYouDid} onChange={e => updateExp(exp._id, 'whatYouDid', e.target.value)} placeholder="What did you do in this role? This will appear on your CV as-is unless you use AI to turn it into polished bullet points below." /></div>
+                  <div><label style={labelStyle}>Equipment, software, or tools you used</label><input style={inputStyle} value={exp.toolsUsed} onChange={e => updateExp(exp._id, 'toolsUsed', e.target.value)} /></div>
+                  <div><label style={labelStyle}>Any problems you solved?</label><input style={inputStyle} value={exp.problemsSolved} onChange={e => updateExp(exp._id, 'problemsSolved', e.target.value)} /></div>
+                  <div><label style={labelStyle}>Who/what did you work with?</label><input style={inputStyle} value={exp.whoYouWorkedWith} onChange={e => updateExp(exp._id, 'whoYouWorkedWith', e.target.value)} /></div>
+                  <div><label style={labelStyle}>Did you improve anything?</label><input style={inputStyle} value={exp.improvements} onChange={e => updateExp(exp._id, 'improvements', e.target.value)} /></div>
+                  <div><label style={labelStyle}>Any numbers, targets, percentages, or quantities?</label><input style={inputStyle} value={exp.numbers} onChange={e => updateExp(exp._id, 'numbers', e.target.value)} /></div>
+                  <div><label style={labelStyle}>Did you supervise or train anyone?</label><input style={inputStyle} value={exp.supervised} onChange={e => updateExp(exp._id, 'supervised', e.target.value)} /></div>
                 </div>
               </details>
-              <button style={aiBtnStyle} disabled={exp.generating} onClick={() => handleGenerateBullets(i)}>{exp.generating ? 'Writing…' : '✨ Help me write this'}</button>
+              <button style={aiBtnStyle} disabled={exp.generating} onClick={() => handleGenerateBullets(exp._id)}>{exp.generating ? 'Writing…' : '✨ Help me write this'}</button>
               {exp.bullets.length > 0 && (
                 <div style={{ marginTop: 12 }}>
                   <label style={labelStyle}>Result — edit freely if you want</label>
-                  <textarea style={{ ...inputStyle, minHeight: 90, resize: 'vertical' }} value={exp.bullets.join('\n')} onChange={e => updateExp(i, 'bullets', e.target.value.split('\n'))} />
-                  <RefineBar disabled={exp.generating} onAction={(action) => handleRefineBullets(i, action)} />
+                  <textarea style={{ ...inputStyle, minHeight: 90, resize: 'vertical' }} value={exp.bullets.join('\n')} onChange={e => updateExp(exp._id, 'bullets', e.target.value.split('\n'))} />
+                  <RefineBar disabled={exp.generating} onAction={(action) => handleRefineBullets(exp._id, action)} />
                 </div>
               )}
               <details style={{ marginTop: 10 }}>
                 <summary style={{ fontSize: '0.75rem', color: '#94A3B8', cursor: 'pointer' }}>Or just write it yourself instead</summary>
-                <textarea style={{ ...inputStyle, minHeight: 60, marginTop: 8 }} value={exp.description} onChange={e => updateExp(i, 'description', e.target.value)} />
+                <textarea style={{ ...inputStyle, minHeight: 60, marginTop: 8 }} value={exp.description} onChange={e => updateExp(exp._id, 'description', e.target.value)} />
               </details>
-              {experience.length > 1 && <button onClick={() => setExperience(prev => prev.filter((_, idx) => idx !== i))} style={{ marginTop: 10, fontSize: '0.75rem', color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Remove this entry</button>}
+              {experience.length > 1 && <button onClick={() => setExperience(prev => prev.filter((e) => e._id !== exp._id))} style={{ marginTop: 10, fontSize: '0.75rem', color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Remove this entry</button>}
             </div>
           ))}
-          <button onClick={() => setExperience(prev => [...prev, { ...EMPTY_EXP }])} style={{ fontSize: '0.8rem', color: '#2563EB', background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 20 }}>+ Add Another Entry</button>
+          <button onClick={() => setExperience(prev => [...prev, makeExp()])} style={{ fontSize: '0.8rem', color: '#2563EB', background: '#EFF6FF', border: '1px solid #BFDBFE', padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 20 }}>+ Add Another Entry</button>
           <div style={{ display: 'flex', gap: 12 }}>
             <button className="btn btn-ghost" onClick={() => setStep(1)}>← Back</button>
             <button className="btn btn-primary" onClick={() => setStep(3)}>Next: Education →</button>

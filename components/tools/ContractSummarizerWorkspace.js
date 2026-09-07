@@ -90,13 +90,18 @@ export default function ContractSummarizerWorkspace() {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
 
-  const isPdfSelected = files.length > 0 && files[0].type === 'application/pdf';
+  // Some browsers/OSes report an empty or non-standard MIME type for a PDF
+  // (e.g. dragged from a source that doesn't set Content-Type), so fall back
+  // to the file extension rather than silently dropping the file — same
+  // fallback lib/payslip/renderPages.js's isPdfFile already uses.
+  const isPdfFile = (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name || '');
+  const isPdfSelected = files.length > 0 && isPdfFile(files[0]);
 
   function handleFiles(e) {
     const selected = Array.from(e.target.files || []);
     e.target.value = '';
     if (selected.length === 0) return;
-    const pdf = selected.find((f) => f.type === 'application/pdf');
+    const pdf = selected.find(isPdfFile);
     setFiles(pdf ? [pdf] : selected.filter((f) => f.type.startsWith('image/')));
     setResult(null);
     setError('');

@@ -3,6 +3,16 @@ export const maxDuration = 60;
 
 import { GEMINI_MODEL_URL as GEMINI_URL } from '@/lib/geminiModel';
 
+// This route calls Gemini via a raw fetch rather than the shared
+// lib/geminiClient.js helper (which has no size guard of its own either),
+// so nothing rejects an oversized upload before it's buffered into memory
+// and base64-encoded — cap it here rather than relying on Gemini itself to
+// eventually error on an inline payload that's too large. The page-count
+// cap below already bounds request size roughly, but a handful of huge
+// scans can still add up to an enormous request, so each page also gets
+// its own cap.
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024; // 20MB per page
+
 const PROMPT = `You are a document digitization engine. Look at the attached image(s) of a document, scanned page, or photo and do the following:
 1. Read every piece of text in natural reading order, exactly as written. Correct obvious scanning artifacts where you are confident, but never invent content that isn't there.
 2. Separately identify any tables. For each table, extract its rows as arrays of cell strings, including header rows as the first row.
@@ -54,6 +64,12 @@ export async function POST(request) {
     if (images.length > 15) {
       return Response.json(
         { error: 'Too many pages — please try 15 pages or fewer at a time.' },
+        { status: 400 }
+      );
+    }
+    if (images.some((img) => img.size > MAX_IMAGE_BYTES)) {
+      return Response.json(
+        { error: 'One of those pages is too large (max 20MB per page). Try a smaller scan.' },
         { status: 400 }
       );
     }

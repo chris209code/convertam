@@ -157,7 +157,13 @@ export default function PdfLibWorkspace({ mode, accept: acceptProp }) {
   function removeFile(i) {
     setFiles(files.filter((_, idx) => idx !== i));
     setResultBytes(null);
-    if (i === 0) setPreviewUrl(null);
+    if (i === 0) {
+      setPreviewUrl(null);
+      // The "(from session)" label is only ever meaningful for whatever file
+      // sits at index 0 — removing that file (session-sourced or not) means
+      // there's no longer a session file in the list to tag.
+      setUsingSessionDoc(false);
+    }
   }
 
   function clearAll() {

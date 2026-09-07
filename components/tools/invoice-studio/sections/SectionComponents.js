@@ -1,6 +1,7 @@
 'use client';
 
-import { formatMoney } from '@/lib/invoice-studio/moneyFormat';
+import { formatMoney, fromCents } from '@/lib/invoice-studio/moneyFormat';
+import { computeItemLine } from '@/lib/invoice-studio/calculations';
 import { fontCss } from '@/lib/invoice-studio/styleTokens';
 import { docTypeConfig, LOGISTICS_FIELD_LABELS, ITEM_COLUMN_DEFS } from '@/lib/invoice-studio/docTypes';
 
@@ -136,7 +137,11 @@ function itemCellValue(colId, row, currency) {
     case 'qty': return qty;
     case 'rate': return formatMoney(rate, currency);
     case 'vat': return `${vat}%`;
-    case 'amount': return formatMoney(qty * rate * (1 + vat / 100), currency);
+    // Cents-rounded via the same computeItemLine() the Subtotal/VAT/Total
+    // use — a raw float (qty * rate * (1 + vat/100)) can round differently
+    // than the totals it's supposed to add up to, making this displayed
+    // row visibly disagree with the invoice's own bottom-line numbers.
+    case 'amount': return formatMoney(fromCents(computeItemLine(row).lineTotalCents), currency);
     case 'unit': return row.unit || '';
     case 'weight': return row.weight || '';
     case 'remarks': return row.remarks || '';

@@ -3,6 +3,13 @@ export const maxDuration = 60;
 
 import { GEMINI_MODEL_URL as GEMINI_URL } from '@/lib/geminiModel';
 
+// This route calls Gemini via a raw fetch rather than the shared
+// lib/geminiClient.js helper (which has no size guard of its own either),
+// so nothing rejects an oversized upload before it's buffered into memory
+// and base64-encoded — cap it here rather than relying on Gemini itself to
+// eventually error on an inline payload that's too large.
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024; // 20MB — a photographed receipt is never legitimately larger than this
+
 const PROMPT = `You are a receipt and invoice data extraction engine. Carefully examine the attached image of a receipt, invoice, or bill and extract all financial and business information.
 
 Extract the following fields (leave blank if not found):
@@ -50,6 +57,9 @@ export async function POST(request) {
 
     if (!image) {
       return Response.json({ error: 'No image received.' }, { status: 400 });
+    }
+    if (image.size > MAX_IMAGE_BYTES) {
+      return Response.json({ error: 'That image is too large (max 20MB). Try a smaller photo or scan.' }, { status: 400 });
     }
 
     const buf = Buffer.from(await image.arrayBuffer());

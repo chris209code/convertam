@@ -25,7 +25,7 @@ function fileToDataUrl(file) {
 }
 
 function drawWatermark(ctx, canvasW, canvasH, opts) {
-  const { type, text, textColor, fontSize, logoImg, opacity, rotation, scale, position, tiled } = opts;
+  const { type, text, textColor, fontSize, logoImg, opacity, rotation, scale, position, tiled, previewScale: displayScale = 1 } = opts;
   ctx.save();
   ctx.globalAlpha = opacity;
 
@@ -40,7 +40,13 @@ function drawWatermark(ctx, canvasW, canvasH, opts) {
       ctx.textBaseline = 'middle';
       ctx.fillText(text, 0, 0);
     } else if (logoImg) {
-      const w = logoImg.width * scale, h = logoImg.height * scale;
+      // The preview canvas is drawn at displayScale (shrunk to fit maxDim)
+      // while the real export canvas is the image's full resolution — the
+      // text watermark path already accounts for this via fontSize *
+      // displayScale, so the logo needs the same correction or it renders
+      // at native pixel size on the small preview (looking huge) but at the
+      // correct size on the full-res export.
+      const w = logoImg.width * scale * displayScale, h = logoImg.height * scale * displayScale;
       ctx.drawImage(logoImg, -w / 2, -h / 2, w, h);
     }
     ctx.restore();
@@ -138,6 +144,7 @@ export default function WatermarkImageWorkspace() {
     drawWatermark(ctx, canvas.width, canvas.height, {
       ...opts,
       fontSize: fontSize * displayScale,
+      previewScale: displayScale,
     });
   }, [items, activeIdx, opts, fontSize]);
 

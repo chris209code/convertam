@@ -224,6 +224,13 @@ export default function WatermarkPdfWorkspace() {
         });
       }
 
+      if (targetIndices.length === 0) {
+        setError(pages === 'range' ? 'No valid pages matched that range.' : 'Please enter which pages to watermark.');
+        setStatus('');
+        setBusy(false);
+        return;
+      }
+
       const finalColor = hexToRgb(useCustomColor ? customColor : color);
 
       for (const idx of targetIndices) {

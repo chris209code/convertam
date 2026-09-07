@@ -10,6 +10,7 @@ import { validateImageFile, readFileAsDataURL } from '@/lib/invoice-studio/fileU
 import { generateQrDataUrl } from '@/lib/invoice-studio/qrGenerate';
 import { docTypeConfig, DOC_TYPES, FLOW_SEQUENCE } from '@/lib/invoice-studio/docTypes';
 import { convertDocument } from '@/lib/invoice-studio/convertDocType';
+import { ZOOM_MIN, ZOOM_MAX, ZOOM_STEP, ZOOM_DEFAULT } from '@/lib/invoice-studio/constants';
 import EntryScreen from './EntryScreen';
 import Gallery from './Gallery';
 import Toolbar from './Toolbar';
@@ -33,7 +34,6 @@ function downloadBlob(blob, filename) {
 
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
-const ZOOM_MIN = 0.3, ZOOM_MAX = 1.5, ZOOM_STEP = 0.1, ZOOM_DEFAULT = 0.75;
 const HISTORY_LIMIT = 60;
 
 // initialDocType is set only by the compatibility routes (old

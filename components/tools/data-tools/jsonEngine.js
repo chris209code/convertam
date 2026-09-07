@@ -294,6 +294,16 @@ function valueToXml(tag, value, depth) {
   return `${pad}<${safeTag}>${value === null || value === undefined ? '' : xmlEscape(value)}</${safeTag}>`;
 }
 export function jsonToXml(data, rootName = 'root') {
+  // valueToXml's array branch emits one sibling element per array item with
+  // no wrapper of its own — fine at any nested depth (the parent object tag
+  // is the wrapper), but for an array-rooted document (very common JSON
+  // shape) that leaves multiple sibling top-level elements, which isn't
+  // well-formed XML (exactly one root element is required). Give a
+  // top-level array an explicit wrapping root instead.
+  if (Array.isArray(data)) {
+    const inner = data.map((v) => valueToXml('item', v, 1)).join('\n');
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<${safeTagName(rootName)}>\n${inner}\n</${safeTagName(rootName)}>`;
+  }
   return `<?xml version="1.0" encoding="UTF-8"?>\n${valueToXml(rootName, data, 0)}`;
 }
 

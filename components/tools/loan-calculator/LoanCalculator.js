@@ -436,7 +436,7 @@ export default function LoanCalculator() {
                     </div>
                     <div className="ln2-stat-grid">
                       <StatCard label="Debt-to-Income Ratio" value={formatPercent(affordability.dtiPct)} tone={affordability.tone === 'red' ? 'red' : affordability.tone === 'amber' ? 'amber' : 'green'} />
-                      <StatCard label="Monthly Cash Remaining" value={formatCurrency(affordability.cashRemaining, currency)} tone={affordability.cashRemaining < 0 ? 'red' : 'blue'} />
+                      <StatCard label="Monthly Cash Remaining" value={`${formatCurrency(affordability.cashRemaining, currency)}${affordability.cashRemaining < 0 ? ' short' : ''}`} tone={affordability.cashRemaining < 0 ? 'red' : 'blue'} />
                     </div>
                   </SectionCard>
                 )}

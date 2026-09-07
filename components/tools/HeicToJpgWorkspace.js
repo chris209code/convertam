@@ -21,7 +21,13 @@ export default function HeicToJpgWorkspace() {
   function handleFiles(e) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
+    items.forEach((it) => it.previewUrl && URL.revokeObjectURL(it.previewUrl));
     setItems(files.map((file) => ({ file, name: file.name, previewUrl: null, status: 'pending', outBlob: null, error: null })));
+  }
+
+  function startOver() {
+    items.forEach((it) => it.previewUrl && URL.revokeObjectURL(it.previewUrl));
+    setItems([]);
   }
 
   async function handleConvertAll() {
@@ -88,7 +94,7 @@ export default function HeicToJpgWorkspace() {
             <button onClick={handleConvertAll} disabled={busy} style={{ padding: '10px 20px', borderRadius: 10, border: 'none', background: busy ? '#94A3B8' : '#2563EB', color: 'white', fontWeight: 700, fontSize: '0.88rem', cursor: busy ? 'default' : 'pointer' }}>
               {busy ? 'Converting…' : `Convert ${items.length} Photo${items.length > 1 ? 's' : ''}`}
             </button>
-            <button onClick={() => setItems([])} style={{ padding: '10px 16px', borderRadius: 10, border: '1px solid #E2E8F0', background: 'white', color: '#475569', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Start Over</button>
+            <button onClick={startOver} style={{ padding: '10px 16px', borderRadius: 10, border: '1px solid #E2E8F0', background: 'white', color: '#475569', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>Start Over</button>
           </div>
 
           {allSettled && doneItems.length > 1 && (

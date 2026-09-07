@@ -50,7 +50,13 @@ export default function ImageCompressorWorkspace() {
   function handleFiles(e) {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
+    items.forEach((it) => URL.revokeObjectURL(it.previewUrl));
     setItems(files.map(emptyItem));
+  }
+
+  function startOver() {
+    items.forEach((it) => URL.revokeObjectURL(it.previewUrl));
+    setItems([]);
   }
 
   function targetFormat(originalType) {
@@ -144,7 +150,7 @@ export default function ImageCompressorWorkspace() {
               {busy ? 'Compressing…' : `Compress ${items.length} Image${items.length > 1 ? 's' : ''}`}
             </button>
             <button
-              onClick={() => setItems([])}
+              onClick={startOver}
               style={{ padding: '10px 16px', borderRadius: 10, border: '1px solid #E2E8F0', background: 'white', color: '#475569', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}
             >
               Start Over

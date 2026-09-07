@@ -3,6 +3,13 @@ export const maxDuration = 60;
 
 import { GEMINI_MODEL_URL as GEMINI_URL } from '@/lib/geminiModel';
 
+// This route calls Gemini via a raw fetch rather than the shared
+// lib/geminiClient.js helper (which has no size guard of its own either),
+// so nothing rejects an oversized upload before it's buffered into memory
+// and base64-encoded — cap it here rather than relying on Gemini itself to
+// eventually error on an inline payload that's too large.
+const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20MB
+
 export async function POST(request) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -17,6 +24,9 @@ export async function POST(request) {
     const file = formData.get('file');
     if (!file) {
       return Response.json({ error: 'No file received.' }, { status: 400 });
+    }
+    if (file.size > MAX_FILE_BYTES) {
+      return Response.json({ error: 'That file is too large (max 20MB). Try a smaller file.' }, { status: 400 });
     }
 
     const buf = Buffer.from(await file.arrayBuffer());

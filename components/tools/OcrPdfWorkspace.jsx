@@ -58,10 +58,12 @@ export default function OcrPdfWorkspace() {
 
   function downloadText() {
     const blob = new Blob([result], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
+    a.href = url;
     a.download = (fileInfo?.name?.replace(/\.(pdf|png|jpg|jpeg)$/i, '') || 'document') + '-ocr.txt';
     a.click();
+    URL.revokeObjectURL(url);
   }
 
   function reset() { setFile(null); setFileInfo(null); setResult(''); setStatus(''); }

@@ -173,7 +173,10 @@ export default function ImageResizerCropperWorkspace() {
     canvas.width = targetW;
     canvas.height = targetH;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = mode === 'fit' ? '#FFFFFF' : '#FFFFFF';
+    // The preview's '#F1F5F9' fit-mode fill is just a letterbox affordance
+    // so the canvas bounds are visible against the page — the real
+    // downloaded file always gets a plain white background.
+    ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, targetW, targetH);
     if (mode === 'fill') {
       ctx.drawImage(workingImg, pan.x, pan.y, drawnW, drawnH);
@@ -240,7 +243,11 @@ export default function ImageResizerCropperWorkspace() {
               </div>
               <div>
                 <label style={labelStyle}>Height (px)</label>
-                <input type="number" style={inputStyle} value={customH} onChange={(e) => setCustomH(Number(e.target.value))} />
+                <input type="number" style={inputStyle} value={customH} onChange={(e) => {
+                  const h = Number(e.target.value);
+                  setCustomH(h);
+                  if (lockAspect) setCustomW(Math.round(h * (customW / customH || 1)));
+                }} />
               </div>
               <label style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
                 <input type="checkbox" checked={lockAspect} onChange={(e) => setLockAspect(e.target.checked)} /> Lock ratio

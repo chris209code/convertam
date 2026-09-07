@@ -2527,7 +2527,17 @@ export default function VideoEditorWorkspace() {
           cutoutCanvas = s.lastCutoutCanvas;
         }
 
-        if (hit && !track.hidden) drawnOverlayLayers.push({ trackId: track.id, el: isImage ? s.imageEl : s.videoEl, clip: hit.clip, opacity, cutoutCanvas });
+        if (hit && !track.hidden) {
+          // Same Ken Burns override the main-track image path applies (see
+          // drawCompositionFrame's mainClip below) — an overlay-track image
+          // clip's sourceTime is already its elapsed-in-clip time (images
+          // always start at sourceStart 0), matching getKenBurnsTransform's
+          // own expectation.
+          const layerClip = isImage && hit.clip.kenBurns && hit.clip.kenBurns !== 'none'
+            ? { ...hit.clip, ...getKenBurnsTransform(hit.clip, hit.sourceTime) }
+            : hit.clip;
+          drawnOverlayLayers.push({ trackId: track.id, el: isImage ? s.imageEl : s.videoEl, clip: layerClip, opacity, cutoutCanvas });
+        }
       }
 
       // 'crossfade' transition tail: draw the NEXT main-track clip, frozen

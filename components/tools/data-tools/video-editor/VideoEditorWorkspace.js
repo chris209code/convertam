@@ -27,7 +27,7 @@ import {
   addImageOverlay, updateImageOverlay, deleteImageOverlay,
   addShapeOverlay, updateShapeOverlay, deleteShapeOverlay,
   setExportResolution, setExportQuality, setExportFps,
-  getTrackClips, getTotalDuration, findActiveClipAt, clipDuration, MAIN_TRACK, BLEND_TRANSITION_TYPES,
+  getTrackClips, getTotalDuration, findActiveClipAt, clipDuration, extractTimelineRange, MAIN_TRACK, BLEND_TRANSITION_TYPES,
   getClipTimelineBounds, getAllClipBoundaryTimes,
   getMasterGain, setMasterVolume, setMasterMuted, setMasterFade, setMasterAudioFade, setOutroSound,
   addMarker, updateMarker, deleteMarker,
@@ -524,6 +524,19 @@ export default function VideoEditorWorkspace() {
   const [transcribeProgress, setTranscribeProgress] = useState(null); // { chunkIndex, totalChunks } | { audioRenderProgress } | null
   const audioRenderCancelRef = useRef(null);
   const exportCancelRef = useRef(null);
+
+  // ---- AI Highlights — owner-only (see app/api/video-highlights/route.js;
+  // the route itself also enforces this, independent of this UI check).
+  // Reuses the exact same transcript Auto Captions produces above; never a
+  // second transcription of its own. ----
+  const [isOwner, setIsOwner] = useState(false);
+  const [highlights, setHighlights] = useState([]);
+  const [chapters, setChapters] = useState([]);
+  const [highlightsStatus, setHighlightsStatus] = useState('idle'); // idle | preparing-audio | rendering-audio | preparing | transcribing | merging | analyzing | error
+  const [highlightsError, setHighlightsError] = useState('');
+  useEffect(() => {
+    fetch('/api/owner-login').then((r) => r.json()).then((d) => setIsOwner(!!d.isOwner)).catch(() => setIsOwner(false));
+  }, []);
 
   // ---- Burn Subtitles: user supplies an existing .srt/.vtt file instead
   // of generating one with Auto Captions — no transcription, no AI. Once
@@ -2901,8 +2914,18 @@ export default function VideoEditorWorkspace() {
   // provider. Everything else here (transcript editing, SRT/VTT/TXT
   // export, caption burn-in) is the same local engine already used by
   // Audio Studio and Video Studio. ----
-  async function handleAutoCaptions() {
-    if (!mainClips.length) return;
+  // Shared by Auto Captions and AI Highlights below — both need the exact
+  // same "render this timeline's audio locally, then transcribe it" step,
+  // and must never trigger it twice in parallel for two different features.
+  // Returns the transcript directly (rather than relying on the setTranscript
+  // state update, which wouldn't be visible to an awaiting caller in the
+  // same tick) so a caller can use the result immediately. Resets
+  // transcribeStatus/transcribeError itself on every outcome (success,
+  // cancellation, or failure) so every caller gets the same cleanup rather
+  // than each having to duplicate it — it still rethrows on failure so a
+  // caller can react (e.g. AI Highlights showing its own error banner
+  // instead of, or in addition to, this one).
+  async function generateTranscriptForCurrentTimeline() {
     setTranscribeStatus('preparing-audio');
     setTranscribeError('');
     setTranscribeProgress(null);
@@ -2930,8 +2953,9 @@ export default function VideoEditorWorkspace() {
       setTranscriptTimelineRef(timelineAtStart);
       setTranscribeStatus('idle');
       setTranscribeProgress(null);
+      return result;
     } catch (err) {
-      if (err instanceof TimelineRenderCancelledError || cancelToken.cancelled) {
+      if (err instanceof TimelineRenderCancelledError) {
         setTranscribeStatus('idle');
         setTranscribeProgress(null);
       } else {
@@ -2939,8 +2963,18 @@ export default function VideoEditorWorkspace() {
         setTranscribeError(err instanceof TranscriptionError || err instanceof TimelineRenderError ? err.message : 'Could not generate captions. Please try again.');
         setTranscribeProgress(null);
       }
+      throw err;
     } finally {
       audioRenderCancelRef.current = null;
+    }
+  }
+  async function handleAutoCaptions() {
+    if (!mainClips.length) return;
+    try {
+      await generateTranscriptForCurrentTimeline();
+    } catch {
+      // generateTranscriptForCurrentTimeline() already set the appropriate
+      // status/error state above — nothing further to do here.
     }
   }
   function handleCancelAutoCaptions() {
@@ -2954,6 +2988,61 @@ export default function VideoEditorWorkspace() {
       return `Transcribing part ${transcribeProgress.chunkIndex + 1} of ${transcribeProgress.totalChunks}…`;
     }
     return TRANSCRIBE_STATUS_LABEL[transcribeStatus] || 'Working…';
+  }
+
+  // ---- AI Highlights (owner-only) ----
+  async function handleFindHighlights() {
+    if (!mainClips.length) return;
+    setHighlightsError('');
+    setHighlights([]);
+    setChapters([]);
+    try {
+      // Reuse the existing transcript only if it still matches the current
+      // timeline — same staleness rule the Auto Captions panel already
+      // shows a warning for — otherwise generate a fresh one first.
+      let t = transcript && transcriptTimelineRef === timeline ? transcript : await generateTranscriptForCurrentTimeline();
+      if (!t.segments.length) {
+        setHighlightsStatus('idle');
+        setHighlightsError('No speech was found in this video to analyze.');
+        return;
+      }
+      setHighlightsStatus('analyzing');
+      const res = await fetch('/api/video-highlights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ segments: t.segments.map((s) => ({ start: s.start, end: s.end, text: s.text })), duration: t.duration }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not analyze this video.');
+      setHighlights(data.highlights || []);
+      setChapters(data.chapters || []);
+      setHighlightsStatus('idle');
+    } catch (err) {
+      if (err instanceof TimelineRenderCancelledError) {
+        setHighlightsStatus('idle');
+      } else {
+        setHighlightsStatus('error');
+        setHighlightsError(err.message || 'Could not find highlights. Please try again.');
+      }
+    }
+  }
+  function handleHighlightSeek(time) {
+    setPlaying(false);
+    setPlayhead(time);
+  }
+  // Non-destructive: goes through the same commit() used by every manual
+  // edit, so it's a normal, undoable step — Undo brings back the full
+  // project exactly as a manual trim would.
+  function handleClipHighlight(h) {
+    commit((tl) => extractTimelineRange(tl, h.start, h.end));
+    setPlaying(false);
+    setPlayhead(0);
+    setHighlights([]);
+    setChapters([]);
+    // The transcript's timestamps refer to the OLD, longer timeline — no
+    // longer valid against the freshly clipped one.
+    setTranscript(null);
+    setTranscriptTimelineRef(null);
   }
   // Reuses the live editing preview's own playhead/scrub rather than a
   // second video element — the export is a rendering of this same
@@ -5172,6 +5261,74 @@ export default function VideoEditorWorkspace() {
               </>
             )}
           </div>
+
+          {/* AI Highlights — owner-only, see app/api/video-highlights/
+              route.js for the actual gate (this UI check is just so the
+              panel never even renders for anyone else; the route enforces
+              it independently). Reuses Auto Captions' own transcript rather
+              than transcribing a second time. */}
+          {isOwner && (
+            <div style={{ background: 'white', border: `1px solid ${T.border}`, borderRadius: 10, padding: 12, marginTop: 10 }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: T.ink, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3, display: 'flex', alignItems: 'center', gap: 6 }}>
+                AI Highlights
+                <span style={{ textTransform: 'none', fontWeight: 600, color: '#92400E', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 6, padding: '1px 6px', fontSize: '0.62rem', letterSpacing: 0 }}>Owner only</span>
+              </div>
+              {!mainClips.length ? (
+                <p style={{ fontSize: '0.72rem', color: T.muted, margin: 0 }}>Add a clip to the timeline first.</p>
+              ) : (
+                <>
+                  <p style={{ fontSize: '0.68rem', color: T.muted, margin: '0 0 8px' }}>
+                    Reads this video&apos;s transcript and suggests standout moments to clip out, plus natural chapter breaks. Text-based only — it can&apos;t see pacing, cuts, or visuals.
+                  </p>
+                  <button
+                    onClick={handleFindHighlights}
+                    disabled={highlightsStatus !== 'idle' && highlightsStatus !== 'error'}
+                    style={{ ...primaryBtn(highlightsStatus !== 'idle' && highlightsStatus !== 'error'), width: '100%', padding: '10px 20px', fontSize: '0.85rem' }}
+                  >
+                    {highlightsStatus === 'preparing-audio' || highlightsStatus === 'rendering-audio' || highlightsStatus === 'preparing' || highlightsStatus === 'transcribing' || highlightsStatus === 'merging'
+                      ? transcribeStatusLabel()
+                      : highlightsStatus === 'analyzing' ? 'Analyzing…' : '✨ Find Highlights (AI)'}
+                  </button>
+                  {highlightsStatus === 'error' && <div style={{ ...statusBox, marginTop: 8 }}>⚠️ {highlightsError}</div>}
+
+                  {chapters.length > 0 && (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: T.muted, marginBottom: 6 }}>CHAPTERS</div>
+                      {chapters.map((c, i) => (
+                        <div
+                          key={i}
+                          onClick={() => handleHighlightSeek(c.time)}
+                          style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '6px 8px', borderRadius: 6, cursor: 'pointer', fontSize: '0.75rem' }}
+                        >
+                          <span style={{ color: T.ink }}>{c.title}</span>
+                          <span style={{ color: T.muted, flexShrink: 0 }}>{formatDuration(c.time)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {highlights.length > 0 && (
+                    <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 700, color: T.muted }}>HIGHLIGHTS</div>
+                      {highlights.map((h, i) => (
+                        <div key={i} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }}>
+                          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: T.ink }}>{h.title}</div>
+                          <div style={{ fontSize: '0.7rem', color: T.muted, margin: '2px 0 6px' }}>{h.reason}</div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: '0.68rem', color: T.muted, flexShrink: 0 }}>{formatDuration(h.start)} – {formatDuration(h.end)}</span>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button onClick={() => handleHighlightSeek(h.start)} style={smallBtn}>Jump to</button>
+                              <button onClick={() => handleClipHighlight(h)} style={smallBtn}>Clip this</button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {/* Burn Subtitles — separate from Auto Captions above: no
               transcription, no AI, the user already has an .srt/.vtt file.

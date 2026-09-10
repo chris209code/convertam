@@ -23,6 +23,7 @@ import {
   setFitMode, setBackgroundFill, setBackgroundType, setBackgroundGradient, setBackgroundImageSource, setFrameAspect,
   setClipSpeedRipple, setImageClipDuration, setClipFade, setClipFilters, setClipCropFocus, setClipCropZoom, setClipTransitionOut, setClipGain, setClipReversed, setClipDucking,
   rotateClip90, setClipFlip, setClipKenBurns, getKenBurnsTransform,
+  setClipReframeMode, setClipReframeSubjectMode, setClipReframeSmoothing, setClipReframeFollow, setClipReframeAnalysis, setClipReframeOffset, resetClipReframeOffset, getEffectiveClipCrop,
   addTextOverlay, updateTextOverlay, deleteTextOverlay, duplicateTextOverlay,
   addImageOverlay, updateImageOverlay, deleteImageOverlay,
   addShapeOverlay, updateShapeOverlay, deleteShapeOverlay,
@@ -39,6 +40,7 @@ import {
 } from '@/lib/media/timeline';
 import { drawCompositionFrame, drawTextOverlays, drawImageOverlays, drawShapeOverlays, drawCaptions, drawMasterFade, computeLayoutRects, pipPositionFromPoint, getComposeSize, getFadeOpacity, getTextOverlayBounds, getImageOverlayBounds, getCaptionBounds, buildCutoutCanvas } from '@/lib/media/compositionLayouts';
 import { ensureSegmenterLoaded, getPersonMaskCanvas } from '@/lib/media/segmentation';
+import { analyzeClipForSmartReframe, SmartReframeCancelledError, SUBJECT_MODES } from '@/lib/media/smartReframe';
 import { renderTimeline, renderTimelineAudio, isTimelineExportSupported, TimelineRenderCancelledError, TimelineRenderError } from '@/lib/media/timelineRender';
 import { extractThumbnails, thumbnailsForRange } from '@/lib/media/thumbnails';
 import { extractWaveformPeaks, drawWaveform } from '@/lib/media/waveform';
@@ -524,6 +526,20 @@ export default function VideoEditorWorkspace() {
   const [transcribeProgress, setTranscribeProgress] = useState(null); // { chunkIndex, totalChunks } | { audioRenderProgress } | null
   const audioRenderCancelRef = useRef(null);
   const exportCancelRef = useRef(null);
+
+  // ---- Smart Reframe state — analysis result/settings live on the clip
+  // itself (timeline.js), this is just the in-progress-analysis UI state,
+  // same pattern as transcribeStatus above. lastMainClipCropRef tracks the
+  // CURRENT effective cropFocus for whichever clip the preview is showing
+  // right now, updated every preview tick — the crop pad's drag handler
+  // reads it to turn an absolute pointer position into a relative offset
+  // (see handleCropFocusPointer), since a moving target can't be dragged
+  // to an absolute position the way a static one can. ----
+  const [reframeStatus, setReframeStatus] = useState('idle'); // idle | analyzing | error
+  const [reframeProgress, setReframeProgress] = useState(0);
+  const [reframeError, setReframeError] = useState('');
+  const reframeCancelRef = useRef(null);
+  const lastMainClipCropRef = useRef(null);
 
   // ---- AI Highlights — owner-only (see app/api/video-highlights/route.js;
   // the route itself also enforces this, independent of this UI check).
@@ -2173,7 +2189,71 @@ export default function VideoEditorWorkspace() {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-    commit((tl) => setClipCropFocus(tl, selectedClip.id, { x, y }));
+    if (selectedClip.reframe?.mode === 'smart') {
+      // Smart Reframe's crop target moves on its own — dragging here can't
+      // set an absolute position the way it does for a static clip, so
+      // this instead nudges the stored offset by however far the drop
+      // point is from wherever the tracked subject currently sits (per
+      // lastMainClipCropRef, refreshed every preview tick), preserving the
+      // analyzed path rather than overwriting it. See setClipReframeOffset.
+      const ref = lastMainClipCropRef.current;
+      const current = ref?.clipId === selectedClip.id ? ref.cropFocus : { x: 0.5, y: 0.5 };
+      const existingOffset = selectedClip.reframe.offset || { x: 0, y: 0 };
+      commit((tl) => setClipReframeOffset(tl, selectedClip.id, { x: existingOffset.x + (x - current.x), y: existingOffset.y + (y - current.y) }));
+    } else {
+      commit((tl) => setClipCropFocus(tl, selectedClip.id, { x, y }));
+    }
+  }
+
+  // ---- Smart Reframe: runs entirely client-side (lib/media/smartReframe.js
+  // -> lib/media/segmentation.js's local person segmenter) — no upload, no
+  // Gemini call, same "local-first" posture as everything else in this
+  // tool. `clip` is captured at click time deliberately (its sourceId/
+  // sourceStart/sourceEnd don't change just from switching reframe mode),
+  // so this stays correct even though commit() below is an async state
+  // update this function doesn't wait on. ----
+  async function handleAnalyzeSmartReframe(clip) {
+    const source = timeline.sources.find((s) => s.id === clip.sourceId);
+    if (!source?.file) return;
+    setReframeStatus('analyzing');
+    setReframeError('');
+    setReframeProgress(0);
+    const cancelToken = { cancelled: false };
+    reframeCancelRef.current = cancelToken;
+    try {
+      const { trackingData, mediaAspect, fallbackReason } = await analyzeClipForSmartReframe({
+        file: source.file,
+        sourceStart: clip.sourceStart,
+        sourceEnd: clip.sourceEnd,
+        subjectMode: clip.reframe?.subjectMode || 'auto',
+        smoothing: clip.reframe?.smoothing || 'balanced',
+        onProgress: setReframeProgress,
+        cancelToken,
+      });
+      commit((tl) => setClipReframeAnalysis(tl, clip.id, { trackingData, mediaAspect, fallbackReason }));
+      setReframeStatus('idle');
+    } catch (err) {
+      if (err instanceof SmartReframeCancelledError) {
+        setReframeStatus('idle');
+      } else {
+        setReframeStatus('error');
+        setReframeError('Could not analyze this video. Please try again.');
+      }
+    } finally {
+      reframeCancelRef.current = null;
+    }
+  }
+  function handleCancelSmartReframe() {
+    if (reframeCancelRef.current) reframeCancelRef.current.cancelled = true;
+  }
+  // The "Smart Reframe" mode button itself — turns it on and, the very
+  // first time, immediately analyzes (no separate "now click Analyze"
+  // step the user has to discover). Re-selecting it later after tracking
+  // data already exists does NOT re-analyze — see the panel's own
+  // "Re-analyze" button for that.
+  function handleEnableSmartReframe(clip) {
+    commit((tl) => setClipReframeMode(tl, clip.id, 'smart'));
+    if (!clip.reframe?.trackingData?.length) handleAnalyzeSmartReframe(clip);
   }
 
   // ---- Live preview loop: same drawCompositionFrame function export uses ----
@@ -2607,12 +2687,24 @@ export default function VideoEditorWorkspace() {
         drawTimeline = { ...drawTimeline, captionStyle: { ...drawTimeline.captionStyle, ...liveCaptionStateRef.current } };
       }
 
+      // getEffectiveClipCrop tries Smart Reframe first, then Ken Burns,
+      // then falls through to the clip's plain static cropFocus/cropZoom —
+      // same precedence Ken Burns alone used to implement here. Smart
+      // Reframe needs the clip's native aspect ratio and the project's
+      // target frame aspect (Ken Burns needs neither), only available once
+      // the video element actually has a decoded frame — harmless to omit
+      // for an image main clip, since reframe.mode is never 'smart' there.
+      let mainCropRenderCtx;
+      if (mainHit && !mainIsImage && mainVideoRef.current?.videoWidth) {
+        const { width: targetW, height: targetH } = getComposeSize(timeline.frameAspect);
+        mainCropRenderCtx = { mediaAspect: mainVideoRef.current.videoWidth / mainVideoRef.current.videoHeight, targetAspect: targetW / targetH };
+      }
+      const mainCropOverride = mainHit ? getEffectiveClipCrop(mainHit.clip, mainHit.sourceTime, mainCropRenderCtx) : null;
+      lastMainClipCropRef.current = mainHit ? { clipId: mainHit.clip.id, cropFocus: mainCropOverride.cropFocus } : null;
       drawCompositionFrame(ctx, {
         timeline: drawTimeline,
         mainEl: mainHit ? (mainIsImage ? ensureMainImageElement(mainHit.clip.sourceId) : mainVideoRef.current) : null,
-        mainClip: mainHit ? (mainIsImage && mainHit.clip.kenBurns && mainHit.clip.kenBurns !== 'none'
-          ? { ...mainHit.clip, ...getKenBurnsTransform(mainHit.clip, mainHit.sourceTime) }
-          : mainHit.clip) : null,
+        mainClip: mainHit ? { ...mainHit.clip, ...mainCropOverride } : null,
         mainOpacity,
         crossfadeEl: crossfadeLayer?.el || null,
         crossfadeClip: crossfadeLayer?.clip || null,
@@ -4237,6 +4329,70 @@ export default function VideoEditorWorkspace() {
                 </div>
               )}
 
+              {timeline.fitMode !== 'contain' && selectedSource.kind !== 'image' && selectedClip.track === MAIN_TRACK && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ ...fieldLabel, marginBottom: 4 }}>Reframe <span style={{ fontWeight: 500, opacity: 0.8 }}>— how this clip fills the frame</span></div>
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                    <button onClick={() => commit((tl) => setClipReframeMode(tl, selectedClip.id, 'off'))}
+                      style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.68rem', background: selectedClip.reframe?.mode !== 'smart' ? T.accentGradient : 'white', color: selectedClip.reframe?.mode !== 'smart' ? 'white' : T.inkSecondary, border: selectedClip.reframe?.mode !== 'smart' ? 'none' : `1px solid ${T.border}` }}>
+                      Center Crop / Manual
+                    </button>
+                    <button onClick={() => handleEnableSmartReframe(selectedClip)}
+                      style={{ ...smallBtn, padding: '5px 10px', fontSize: '0.68rem', background: selectedClip.reframe?.mode === 'smart' ? T.accentGradient : 'white', color: selectedClip.reframe?.mode === 'smart' ? 'white' : T.inkSecondary, border: selectedClip.reframe?.mode === 'smart' ? 'none' : `1px solid ${T.border}` }}>
+                      ✨ Smart Reframe
+                    </button>
+                  </div>
+                  <p style={{ fontSize: '0.62rem', color: T.muted, margin: '4px 0 0' }}>Automatically keeps the main subject in frame — drag the pad below any time to nudge it.</p>
+
+                  {selectedClip.reframe?.mode === 'smart' && (
+                    <div style={{ marginTop: 8, padding: 8, background: '#F8FAFC', borderRadius: 8, border: `1px solid ${T.border}` }}>
+                      {reframeStatus === 'analyzing' && (
+                        <div style={{ marginBottom: 8 }}>
+                          <p style={{ fontSize: '0.68rem', color: T.muted, margin: '0 0 6px' }}>Analyzing video… {Math.round(reframeProgress * 100)}%</p>
+                          <button onClick={handleCancelSmartReframe} style={smallBtn}>Cancel</button>
+                        </div>
+                      )}
+                      {reframeStatus === 'error' && <p style={{ fontSize: '0.68rem', color: '#DC2626', margin: '0 0 8px' }}>⚠️ {reframeError}</p>}
+                      {reframeStatus === 'idle' && selectedClip.reframe.fallbackReason && (
+                        <p style={{ fontSize: '0.66rem', color: '#92400E', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 6, padding: '5px 8px', margin: '0 0 8px' }}>
+                          {selectedClip.reframe.fallbackReason === 'no-segmenter'
+                            ? "Smart Reframe couldn't load its detection engine, so this clip was centered automatically."
+                            : "Smart Reframe couldn't detect a clear subject, so this clip was centered automatically."}
+                        </p>
+                      )}
+                      {reframeStatus === 'idle' && !selectedClip.reframe.fallbackReason && selectedClip.reframe.trackingData?.length > 0 && (
+                        <p style={{ fontSize: '0.64rem', color: T.muted, margin: '0 0 8px' }}>✓ Following the detected subject through this clip.</p>
+                      )}
+
+                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+                        <label style={{ ...fieldLabel, display: 'block' }}>Subject
+                          <select value={selectedClip.reframe.subjectMode} onChange={(e) => commit((tl) => setClipReframeSubjectMode(tl, selectedClip.id, e.target.value))} style={{ display: 'block', marginTop: 2, fontSize: '0.72rem', padding: '3px 4px' }}>
+                            {SUBJECT_MODES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                          </select>
+                        </label>
+                        <label style={{ ...fieldLabel, display: 'block' }}>Reframe strength
+                          <select value={selectedClip.reframe.smoothing} onChange={(e) => commit((tl) => setClipReframeSmoothing(tl, selectedClip.id, e.target.value))} style={{ display: 'block', marginTop: 2, fontSize: '0.72rem', padding: '3px 4px' }}>
+                            <option value="smooth">Smooth</option>
+                            <option value="balanced">Balanced</option>
+                            <option value="responsive">Responsive</option>
+                          </select>
+                        </label>
+                      </div>
+                      <label style={{ ...fieldLabel, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                        <input type="checkbox" checked={selectedClip.reframe.follow !== false} onChange={(e) => commit((tl) => setClipReframeFollow(tl, selectedClip.id, e.target.checked))} />
+                        Follow subject
+                      </label>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => handleAnalyzeSmartReframe(selectedClip)} disabled={reframeStatus === 'analyzing'} style={smallBtn}>
+                          {selectedClip.reframe.trackingData?.length ? 'Re-analyze' : 'Analyze'}
+                        </button>
+                        <button onClick={() => commit((tl) => resetClipReframeOffset(tl, selectedClip.id))} style={smallBtn}>Reset</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {timeline.fitMode !== 'contain' && (
                 <div style={{ marginBottom: 10, display: 'flex', gap: 14, alignItems: 'flex-start' }}>
                   <div>
@@ -4248,15 +4404,19 @@ export default function VideoEditorWorkspace() {
                     >
                       <div style={{
                         position: 'absolute', width: 12, height: 12, borderRadius: '50%', background: T.accentGradient, border: '2px solid white',
-                        left: `calc(${selectedClip.cropFocus.x * 100}% - 6px)`, top: `calc(${selectedClip.cropFocus.y * 100}% - 6px)`, pointerEvents: 'none',
+                        left: `calc(${(selectedClip.reframe?.mode === 'smart' && lastMainClipCropRef.current?.clipId === selectedClip.id ? lastMainClipCropRef.current.cropFocus : selectedClip.cropFocus).x * 100}% - 6px)`,
+                        top: `calc(${(selectedClip.reframe?.mode === 'smart' && lastMainClipCropRef.current?.clipId === selectedClip.id ? lastMainClipCropRef.current.cropFocus : selectedClip.cropFocus).y * 100}% - 6px)`,
+                        pointerEvents: 'none',
                       }} />
                     </div>
                   </div>
-                  <label style={fieldLabel}>Zoom {(selectedClip.cropZoom ?? 1).toFixed(1)}×
-                    <input type="range" min={1} max={3} step={0.1} value={selectedClip.cropZoom ?? 1}
-                      onChange={(e) => commit((tl) => setClipCropZoom(tl, selectedClip.id, parseFloat(e.target.value)))} style={{ width: 90 }} />
-                    <span style={{ fontSize: '0.62rem', color: T.muted, fontWeight: 500 }}>Crops in tighter — drag the pad to pan the crop.</span>
-                  </label>
+                  {selectedClip.reframe?.mode !== 'smart' && (
+                    <label style={fieldLabel}>Zoom {(selectedClip.cropZoom ?? 1).toFixed(1)}×
+                      <input type="range" min={1} max={3} step={0.1} value={selectedClip.cropZoom ?? 1}
+                        onChange={(e) => commit((tl) => setClipCropZoom(tl, selectedClip.id, parseFloat(e.target.value)))} style={{ width: 90 }} />
+                      <span style={{ fontSize: '0.62rem', color: T.muted, fontWeight: 500 }}>Crops in tighter — drag the pad to pan the crop.</span>
+                    </label>
+                  )}
                 </div>
               )}
 

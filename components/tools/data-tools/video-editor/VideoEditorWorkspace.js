@@ -218,12 +218,6 @@ function applyVideoCallTemplate(timeline, templateId) {
 // single video too: picking a non-landscape shape reframes (crops/fits)
 // the whole export into it, the same "TikTok/Reels/Shorts vs. YouTube vs.
 // IG feed" choice most editing apps expose.
-const FRAME_ASPECT_OPTIONS = [
-  { id: 'landscape', label: 'Landscape', sub: '16:9 · YouTube', icon: '▭' },
-  { id: 'square', label: 'Square', sub: '1:1 · Feed', icon: '▢' },
-  { id: 'vertical', label: 'Vertical', sub: '9:16 · TikTok/Reels', icon: '▯' },
-];
-
 // Quick-jump presets alongside free dragging — not a replacement for it.
 const PIP_CORNER_OPTIONS = [
   { id: 'top-left', label: 'Top left', icon: '↖' },
@@ -235,11 +229,17 @@ const PIP_CORNER_OPTIONS = [
 // Named platform shortcuts on top of the same 3 underlying frame shapes —
 // picking one just calls setFrameAspect() with its mapped aspect, so this
 // is purely a friendlier label layer, not new engine behavior.
+const FRAME_ASPECT_RATIO_LABEL = { landscape: '16:9', square: '1:1', vertical: '9:16' };
+
+// YouTube Shorts, TikTok, and Instagram Reels are all the same 9:16 frame
+// — one shared "Shorts" preset instead of three buttons that all do the
+// exact same thing under different names. These presets are now the ONLY
+// way to set the frame shape (a separate "Frame: Landscape/Square/Vertical"
+// picker used to sit right below this and just re-offered the same 3
+// underlying shapes a second time).
 const SOCIAL_PRESETS = [
   { id: 'youtube', label: 'YouTube', aspect: 'landscape', icon: '▭' },
-  { id: 'youtube-shorts', label: 'YouTube Shorts', aspect: 'vertical', icon: '▯' },
-  { id: 'tiktok', label: 'TikTok', aspect: 'vertical', icon: '▯' },
-  { id: 'ig-reel', label: 'Instagram Reel', aspect: 'vertical', icon: '▯' },
+  { id: 'shorts', label: 'Shorts', aspect: 'vertical', icon: '▯' },
   { id: 'ig-square', label: 'Instagram Feed', aspect: 'square', icon: '▢' },
   { id: 'linkedin', label: 'LinkedIn', aspect: 'landscape', icon: '▭' },
 ];
@@ -4798,12 +4798,13 @@ export default function VideoEditorWorkspace() {
             </div>
 
             <div style={{ marginBottom: 10 }}>
-              <div style={{ ...fieldLabel, marginBottom: 4 }}>Quick presets</div>
+              <div style={{ ...fieldLabel, marginBottom: 4 }}>Frame</div>
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
                 {SOCIAL_PRESETS.map((p) => (
                   <button
                     key={p.id}
                     onClick={() => commit((tl) => setFrameAspect(tl, p.aspect))}
+                    title={FRAME_ASPECT_RATIO_LABEL[p.aspect]}
                     style={{
                       ...smallBtn, padding: '5px 9px', fontSize: '0.68rem',
                       background: timeline.frameAspect === p.aspect ? T.accentTint : 'white',
@@ -4811,25 +4812,6 @@ export default function VideoEditorWorkspace() {
                     }}
                   >
                     {p.icon} {p.label}
-                  </button>
-                ))}
-              </div>
-              <div style={{ ...fieldLabel, marginBottom: 4 }}>Frame</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {FRAME_ASPECT_OPTIONS.map((f) => (
-                  <button
-                    key={f.id}
-                    onClick={() => commit((tl) => setFrameAspect(tl, f.id))}
-                    title={f.sub}
-                    style={{
-                      ...smallBtn, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, lineHeight: 1.2,
-                      background: timeline.frameAspect === f.id ? T.accentGradient : 'white',
-                      color: timeline.frameAspect === f.id ? 'white' : T.inkSecondary,
-                      border: timeline.frameAspect === f.id ? 'none' : `1px solid ${T.border}`,
-                    }}
-                  >
-                    <span>{f.icon} {f.label}</span>
-                    <span style={{ fontSize: '0.6rem', fontWeight: 500, opacity: 0.85 }}>{f.sub}</span>
                   </button>
                 ))}
               </div>
